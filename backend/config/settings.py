@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # 서드파티
     "rest_framework",
+    "django_filters",
     "corsheaders",
     # 로컬 앱
     "apps.vocab",
