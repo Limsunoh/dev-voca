@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Django
+*.sqlite3
+/backend/media/
+/backend/staticfiles/
+
+# 환경변수
+.env
+.env.*
+!.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# 로컬 작업 노트 (커밋 안 함)
+.claude/TROUBLESHOOTING.md
+.claude/CODE_INSIGHTS.md
+.claude/settings.local.json
+
+# 에디터 / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

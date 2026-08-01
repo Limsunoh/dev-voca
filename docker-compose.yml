@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: devvoca-db
+    # 로컬 개발용 고정값. .env 를 참조하지 않는 이유는, compose 가 .env 를
+    # 자동으로 읽으면서 Django SECRET_KEY 안의 $ 를 변수로 오해하기 때문.
+    # 값을 바꾸려면 여기와 .env 의 POSTGRES_* 를 함께 수정한다.
+    environment:
+      POSTGRES_DB: devvoca
+      POSTGRES_USER: devvoca
+      POSTGRES_PASSWORD: devvoca
+    # 호스트에 이미 PostgreSQL 이 5432 를 쓰고 있어서 5433 으로 내보낸다.
+    ports:
+      - "5433:5432"
+    volumes:
+      - devvoca-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devvoca"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  devvoca-pgdata:

@@ -1,0 +1,10 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonPath": ".venv/Scripts/python.exe",
+  "include": ["backend"],
+  "exclude": ["**/__pycache__", "**/migrations"],
+  "extraPaths": ["backend"],
+  "reportIncompatibleVariableOverride": "none",
+  "reportMissingImports": "warning"
+}
