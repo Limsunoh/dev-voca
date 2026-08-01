@@ -22,7 +22,9 @@ out/
 # 로컬 작업 노트 (커밋 안 함)
 .claude/TROUBLESHOOTING.md
 .claude/CODE_INSIGHTS.md
+.claude/SLASH_COMMANDS_KR.md
 .claude/settings.local.json
+.claude/verification-state.json
 
 # 에디터 / OS
 .vscode/

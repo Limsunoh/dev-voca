@@ -167,6 +167,31 @@ devvoca의 AI 사용은 **콘텐츠 제작 도구**로만 사용한다. 사용�
 - 마이그레이션 파일을 손으로 편집 금지 (`makemigrations`로 재생성)
 - `python manage.py migrate --fake` 같은 우회 명령은 사용자 확인 후에만
 
+## 커밋 전 검증 5단계
+
+전역 훅(`check_verification.py` + `check_verification_on_stop.py`)이 강제한다. **`.py`/`.html`/`.js`/`.css` 를 하나라도 건드리면** commit·push 와 **턴 종료**가 막힌다(문서·설정만 바꾼 변경은 대상 아님).
+
+**목록을 기억으로 재구성하지 말고** 아래 명령으로 읽는다:
+```
+py ~/.claude/hooks/record_verification.py --show
+```
+
+| 단계 | devvoca 에서 무엇으로 채우나 |
+|---|---|
+| `static` | `.claude/agents/static-verifier.md` 서브에이전트 |
+| `dynamic` | `.claude/agents/dynamic-tester.md` 서브에이전트 |
+| `review_plugin` | `pr-review-toolkit:code-reviewer` 플러그인 에이전트 |
+| `review_skill` | `.claude/agents/devvoca-reviewer.md` (전역 code-reviewer 스킬 대신 — 도메인 규칙을 안다) |
+| `qa` | **프론트 생기기 전까지 `--skip`**. Next.js 화면이 생기면 `browser-qa` 에이전트를 그때 작성한다 |
+
+기록:
+```
+py ~/.claude/hooks/record_verification.py static --agent static-verifier --note '...'
+py ~/.claude/hooks/record_verification.py qa --skip --note '프론트 미구현 - 화면 없음'
+```
+
+**코드를 고치면 지문이 무효가 되어 정적 검증부터 다시** 돌려야 한다. 이건 버그가 아니라 "검증한 뒤 몰래 수정" 을 막는 설계다.
+
 ## 작업 진행 방식 (Claude Code에게)
 
 1. 새로운 기능 작업 전, 먼저 **간단한 계획(2~5줄)**을 제시하고 사용자 확인을 받는다
