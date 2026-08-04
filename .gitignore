@@ -26,6 +26,9 @@ out/
 .claude/settings.local.json
 .claude/verification-state.json
 
+# 브라우저 자동화 임시 산출물
+.playwright-mcp/
+
 # 에디터 / OS
 .vscode/
 .idea/

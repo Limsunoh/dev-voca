@@ -107,6 +107,8 @@ INSTALLED_APPS = [
     "corsheaders",
     # 로컬 앱
     "apps.vocab",
+    # AI 콘텐츠 생성. 관리자 배치 전용 - 사용자 요청 경로에서 호출하지 않는다.
+    "apps.ai_pipeline",
 ]
 
 MIDDLEWARE = [
