@@ -1,4 +1,4 @@
-# release: 배포마다 1회, web 이 뜨기 전에 실행된다. 되돌릴 수 없는 DB 변경은 여기.
+# 배포마다 1회, web 이 뜨기 전에 실행된다. 되돌릴 수 없는 DB 변경은 여기.
 release: python backend/manage.py migrate --noinput
 
 # collectstatic 은 web 안에서 돈다. Railway 의 release 는 별도 컨테이너라
