@@ -42,10 +42,13 @@ export default async function WordDetailPage({ params }: PageProps) {
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           {word.difficulty_label}
         </span>
-        {word.category && (
-          <span className="text-sm text-slate-500 dark:text-slate-400">
-            {word.category}
-          </span>
+        {word.category_label && (
+          <Link
+            href={`/vocab?category=${encodeURIComponent(word.category)}`}
+            className="text-sm text-slate-500 underline-offset-4 hover:underline dark:text-slate-400"
+          >
+            {word.category_label}
+          </Link>
         )}
       </header>
 
@@ -70,12 +73,6 @@ export default async function WordDetailPage({ params }: PageProps) {
             </p>
           )}
         </Section>
-      )}
-
-      {word.source && (
-        <p className="mt-8 text-xs text-slate-400 dark:text-slate-500">
-          출처: {word.source}
-        </p>
       )}
     </main>
   );

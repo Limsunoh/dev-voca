@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { CategoryFilter } from "@/components/CategoryFilter";
 import { LearningCard } from "@/components/LearningCard";
 import { SearchInput } from "@/components/SearchInput";
-import { ApiError, getWords } from "@/lib/api/vocab";
+import { ApiError, getCategories, getWords } from "@/lib/api/vocab";
 
 export const metadata = {
   title: "단어장 | devvoca",
@@ -40,9 +41,15 @@ export default async function VocabPage({ searchParams }: PageProps) {
   const currentPage = toPageNumber(first(params.page));
   const page = currentPage > 1 ? String(currentPage) : undefined;
 
+  // 분류 목록은 실패해도 빈 배열이라 단어 조회와 함께 기다려도 안전하다.
+  // 순서대로 부르면 두 번의 왕복이 그대로 대기 시간이 된다.
   let data;
+  let categories;
   try {
-    data = await getWords({ search, category, difficulty, page });
+    [data, categories] = await Promise.all([
+      getWords({ search, category, difficulty, page }),
+      getCategories(),
+    ]);
   } catch (error) {
     // 예상 못 한 에러는 error.tsx 로 올려보낸다.
     if (!(error instanceof ApiError)) throw error;
@@ -51,11 +58,22 @@ export default async function VocabPage({ searchParams }: PageProps) {
     // 안내하면 사용자가 원인을 오해하므로 "그런 페이지 없음"으로 구분한다.
     if (error.status === 404) notFound();
 
+    // 400 은 대부분 URL 의 조건값이 잘못된 경우다(오타·오래된 북마크).
+    // 서버 문제가 아니므로 그렇게 안내하고, 상태 코드는 보여주지 않는다.
+    const badRequest = error.status === 400;
+
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
         <Header />
-        <p className="mt-8 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          단어를 불러오지 못했습니다. {error.message}
+
+        {/* 에러 화면에도 필터를 남긴다. 없으면 잘못된 조건으로 들어온
+            사용자가 조건을 바꿀 수단이 없어 막다른 화면이 된다. */}
+        <CategoryFilter options={await getCategories()} />
+
+        <p className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          {badRequest
+            ? "검색 조건이 올바르지 않습니다. 위에서 분류를 다시 골라보세요."
+            : `단어를 불러오지 못했습니다. ${error.message}`}
         </p>
       </main>
     );
@@ -75,6 +93,13 @@ export default async function VocabPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
 
+      <CategoryFilter
+        options={categories}
+        selected={category}
+        search={search}
+        difficulty={difficulty}
+      />
+
       <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
         {search ? `"${search}" 검색 결과 ` : "전체 "}
         {data.count}개
@@ -82,8 +107,10 @@ export default async function VocabPage({ searchParams }: PageProps) {
 
       {data.results.length === 0 ? (
         <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-400">
-          {search
-            ? "검색 결과가 없습니다. 다른 단어로 찾아보세요."
+          {/* 분류만 걸어 비었을 때 "등록된 단어가 없다"고 하면 서비스 전체가
+              비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
+          {search || category
+            ? "조건에 맞는 단어가 없습니다. 검색어나 분류를 바꿔보세요."
             : "아직 등록된 단어가 없습니다."}
         </p>
       ) : (
@@ -95,7 +122,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
                 title={word.term}
                 subtitle={word.meaning}
                 badge={word.difficulty_label}
-                tag={word.category || undefined}
+                tag={word.category_label || undefined}
               />
             </li>
           ))}

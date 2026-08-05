@@ -31,7 +31,10 @@ export type WordListItem = {
   meaning: string;
   difficulty: number;
   difficulty_label: string;
+  /** 영어 코드(devops 등). 필터 링크를 만들 때만 쓴다. */
   category: string;
+  /** 화면에 보여줄 한글 라벨. 분류가 비어 있으면 빈 문자열이다. */
+  category_label: string;
 };
 
 /**
@@ -40,12 +43,15 @@ export type WordListItem = {
  * is_reviewed 는 일부러 뺐다. 검수 게이트는 백엔드가 전담하고(미검수는 404),
  * 프론트는 그 판단을 다시 하지 않는다. 타입에 있으면 언젠가
  * `{word.is_reviewed && ...}` 같은 프론트측 분기가 생긴다.
+ *
+ * source 도 같은 이유로 뺐다. API 는 여전히 내려주지만 학습자에게는
+ * "직접 작성" 같은 값이 아무 정보도 주지 않는다. 타입에 없어야 화면에
+ * 다시 새어나가지 않는다. 출처가 필요한 곳은 Admin 이다.
  */
 export type WordDetail = WordListItem & {
   description: string;
   example: string;
   example_translation: string;
-  source: string;
   created_at: string;
   updated_at: string;
 };
@@ -115,6 +121,31 @@ export function getWords(
 ): Promise<Paginated<WordListItem>> {
   return request(`/api/vocab/words/${buildQuery(params)}`);
 }
+
+/** 분류 필터 버튼 하나. 백엔드 Word.Category 와 짝. */
+export type CategoryOption = {
+  /** 필터 URL 에 넣는 영어 코드. */
+  value: string;
+  /** 버튼에 보이는 한글 라벨. */
+  label: string;
+};
+
+/**
+ * 분류 목록.
+ *
+ * 실패해도 빈 배열을 돌려준다. 필터 버튼은 편의 기능이라, 이것 때문에
+ * 단어 목록까지 못 보여주면 손해가 더 크다.
+ */
+export const getCategories = cache(async (): Promise<CategoryOption[]> => {
+  try {
+    return await request<CategoryOption[]>("/api/vocab/words/categories/");
+  } catch (error) {
+    // 조용히 삼키면 필터 칩이 사라진 이유를 알 방법이 없다. 화면은 그대로
+    // 두되 서버 로그에는 남긴다.
+    console.error("분류 목록을 불러오지 못했습니다.", error);
+    return [];
+  }
+});
 
 /**
  * 없으면 null. 404 는 실패가 아니라 "그런 단어 없음"이므로 호출부가 notFound() 로 처리한다.

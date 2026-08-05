@@ -1,7 +1,10 @@
 from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, serializers, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import BasePermission, IsAuthenticatedOrReadOnly
+from rest_framework.request import Request
+from rest_framework.response import Response
 
 from .models import Word
 from .serializers import WordDetailSerializer, WordListSerializer
@@ -57,6 +60,20 @@ class WordViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return WordListSerializer
         return WordDetailSerializer
+
+    @action(detail=False)
+    def categories(self, request: Request) -> Response:
+        """분류 목록. 화면의 필터 버튼을 만들 때 쓴다.
+
+        프론트에 목록을 복사해두면 분류를 추가할 때 두 곳을 고쳐야 하고,
+        한쪽만 고치면 조용히 어긋난다. 라벨의 출처는 모델 하나로 둔다.
+        """
+        return Response(
+            [
+                {"value": value, "label": label}
+                for value, label in Word.Category.choices
+            ]
+        )
 
     def get_permissions(self) -> list[BasePermission]:
         """쓰기는 검수 권한이 있는 사용자만.

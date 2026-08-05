@@ -4,6 +4,7 @@
 """
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -54,7 +55,17 @@ class ReviewGateLeakTest(TestCase):
         ]
 
     def assert_no_leak(self, res, label):
-        """응답 본문 어디에도 미검수 단어의 term 이 없어야 한다."""
+        """요청이 통과했는데 미검수 단어가 섞여 나오지는 않는지 본다.
+
+        200 만 받는다. 거부(400)까지 여기서 허용하면 필터가 통째로 고장나
+        모든 요청이 400 이 되어도 "본문에 미검수가 없다" 며 통과한다.
+        잘못된 값의 거부는 그 자체를 확인하는 테스트에서 따로 본다.
+
+        거부 응답을 이 검사에 태우면 안 되는 이유가 하나 더 있다. DRF 의
+        검증 에러는 사용자가 보낸 값을 그대로 되돌려주므로,
+        ?category=<미검수단어의 term> 같은 요청은 DB 를 한 줄도 읽지 않고도
+        본문에 그 term 이 찍힌다. 누출이 아닌데 누출로 잡히는 오탐이 된다.
+        """
         self.assertEqual(res.status_code, 200, label)
         body = res.content.decode()
         for word in self.hidden:
@@ -103,10 +114,27 @@ class ReviewGateLeakTest(TestCase):
     # --- 필터 조합 ---
 
     def test_category_filter_does_not_leak(self):
-        for category in ["git", "devops", "", "nonexistent"]:
+        # 유효한 값만 넣는다. 거부되는 값을 섞으면 200 을 기대하는 케이스까지
+        # 검증이 헐거워져, 필터가 통째로 고장나도 통과한다.
+        for category in ["git", "devops", ""]:
             with self.subTest(category=category):
                 res = self.client.get(LIST_URL, {"category": category})
                 self.assert_no_leak(res, f"category={category}")
+
+    def test_rejected_filter_echoes_input_but_reads_nothing(self):
+        """거부된 요청이 입력을 되돌려줘도 DB 를 읽지 않는다.
+
+        미검수 단어의 term 을 분류로 보내면 검증 에러 본문에 그 문자열이
+        그대로 찍힌다. 이건 DB 에서 온 값이 아니라 방금 보낸 값이라 누출이
+        아니다 - 그 단어의 뜻이나 설명은 나오지 않아야 한다.
+        """
+        hidden = self.hidden[0]
+
+        res = self.client.get(LIST_URL, {"category": hidden.term})
+
+        self.assertEqual(res.status_code, 400)
+        body = res.content.decode()
+        self.assertNotIn(hidden.meaning, body, "미검수 단어의 내용이 새어나왔다")
 
     def test_difficulty_filter_does_not_leak(self):
         for difficulty in ["1", "2", "3"]:
@@ -485,3 +513,69 @@ class SerializerShapeTest(TestCase):
     def test_reverse_url_matches_hardcoded_path(self):
         """URL 이 바뀌면 이 테스트 파일의 하드코딩 경로도 같이 깨져야 한다."""
         self.assertEqual(reverse("vocab:word-list"), LIST_URL)
+
+
+class CategoryLabelTest(TestCase):
+    """분류는 영어 코드 대신 한글 라벨로 나간다."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.word = Word.objects.create(
+            term="deploy", meaning="배포하다",
+            category=Word.Category.DEVOPS, is_reviewed=True,
+        )
+
+    def test_list_and_detail_carry_label(self):
+        """목록과 상세 모두 라벨을 준다. 한쪽만 있으면 화면이 갈린다."""
+        item = self.client.get(LIST_URL).json()["results"][0]
+        detail = self.client.get(f"{LIST_URL}{self.word.pk}/").json()
+
+        for body, where in [(item, "목록"), (detail, "상세")]:
+            self.assertEqual(body["category_label"], "배포·운영(DevOps)", where)
+            # 필터 링크를 만들려면 영어 코드도 함께 필요하다.
+            self.assertEqual(body["category"], "devops", where)
+
+    def test_blank_category_gives_blank_label(self):
+        """분류가 비어 있으면 라벨도 빈 문자열이어야 화면이 조건부로 숨긴다."""
+        Word.objects.create(term="nocat", meaning="분류없음", is_reviewed=True)
+
+        body = self.client.get(f"{LIST_URL}?search=nocat").json()["results"][0]
+
+        self.assertEqual(body["category_label"], "")
+
+    def test_categories_endpoint_lists_every_choice(self):
+        """화면의 필터 버튼은 이 응답으로 만든다. 모델과 어긋나면 안 된다."""
+        res = self.client.get(f"{LIST_URL}categories/")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(
+            res.json(),
+            [{"value": v, "label": l} for v, l in Word.Category.choices],
+        )
+
+    def test_categories_is_public(self):
+        """로그인 없이도 보여야 한다. 필터는 익명 사용자가 제일 많이 쓴다."""
+        self.assertEqual(self.client.get(f"{LIST_URL}categories/").status_code, 200)
+
+    def test_db_rejects_category_outside_choices(self):
+        """DB 가 막는다. choices 는 full_clean() 을 타는 경로에서만 검사한다.
+
+        seed_words 의 update_or_create 나 bulk_create 는 그 경로를 안 타므로,
+        모델 검증만 믿으면 목록에 없는 값이 조용히 저장된다. 그렇게 들어가면
+        화면에 영어 코드가 그대로 노출되고 그 필터 링크는 400 이 된다.
+        """
+        # 제약 위반은 트랜잭션을 깬다. atomic 으로 감싸야 이후 쿼리가 산다.
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Word.objects.create(term="badcat", meaning="뜻", category="testing")
+
+    def test_db_allows_blank_category(self):
+        """분류 미정은 허용한다. Admin 에서 비워둘 수 있어야 한다."""
+        Word.objects.create(term="nocat2", meaning="뜻", category="")
+
+        self.assertEqual(Word.objects.get(term="nocat2").get_category_display(), "")
+
+    def test_unknown_category_is_rejected(self):
+        """목록에 없는 분류로 거르면 400. 조용히 전체를 주면 필터가 안 먹은 걸 모른다."""
+        self.assertEqual(
+            self.client.get(LIST_URL, {"category": "nonexistent"}).status_code, 400
+        )

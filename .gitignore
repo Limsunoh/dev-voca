@@ -29,6 +29,17 @@ out/
 # 브라우저 자동화 임시 산출물
 .playwright-mcp/
 
+# 리포지토리에 두면 안 되는 개인 파일
+# 작업 폴더에 잠깐 내려받아 두는 일이 있어, git add -A 로 딸려 들어가지 않게 막는다.
+recovery-codes.txt
+*recovery-code*
+*.pdf
+
+# 검증 중 만든 임시 산출물
+/backend/probe_*.txt
+/backend/apps/**/tests_probe_*.py
+/*.png
+
 # 에디터 / OS
 .vscode/
 .idea/
