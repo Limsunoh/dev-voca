@@ -59,6 +59,7 @@ class WordListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "term",
+            "pronunciation",
             "meaning",
             "difficulty",
             "difficulty_label",
@@ -80,6 +81,7 @@ class WordDetailSerializer(
         fields = [
             "id",
             "term",
+            "pronunciation",
             "meaning",
             "description",
             "example",
@@ -99,7 +101,15 @@ class WordDetailSerializer(
 
     # 내용이 바뀌면 다시 검수받아야 하는 필드. 난이도·분류·출처는 분류 정보라
     # 바뀌어도 "사람이 확인한 내용"이 달라지지 않으므로 제외한다.
-    CONTENT_FIELDS = ("term", "meaning", "description", "example", "example_translation")
+    CONTENT_FIELDS = (
+        "term",
+        # 학습자가 그대로 외우는 내용이라, 바뀌면 사람이 다시 확인해야 한다.
+        "pronunciation",
+        "meaning",
+        "description",
+        "example",
+        "example_translation",
+    )
 
     # 앞뒤 공백 제거와 빈 값 거부는 CharField 가 이미 한다
     # (trim_whitespace=True, allow_blank=False 가 기본값).

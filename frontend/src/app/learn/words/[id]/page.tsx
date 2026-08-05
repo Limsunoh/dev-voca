@@ -40,6 +40,16 @@ export default async function WordDetailPage({ params }: PageProps) {
         <h1 className="font-mono text-3xl font-bold text-slate-900 dark:text-slate-100">
           {word.term}
         </h1>
+        {word.pronunciation && (
+          // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
+          // 깨지거나 폭이 어긋나는 경우가 있다.
+          <span
+            lang="en-US"
+            className="text-lg text-slate-500 dark:text-slate-400"
+          >
+            {word.pronunciation}
+          </span>
+        )}
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           {word.difficulty_label}
         </span>

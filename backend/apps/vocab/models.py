@@ -42,6 +42,8 @@ class LearningItem(models.Model):
         DATABASE = "database", "데이터베이스(Database)"
         DEVOPS = "devops", "배포·운영(DevOps)"
         DEBUG = "debug", "디버깅(Debugging)"
+        FRONTEND = "frontend", "프론트엔드(Frontend)"
+        CS = "cs", "CS 기초(Computer Science)"
 
     difficulty = models.PositiveSmallIntegerField(
         "난이도", choices=Difficulty.choices, default=Difficulty.NORMAL
@@ -71,6 +73,12 @@ class Word(LearningItem):
     """개발 영어 단어 하나."""
 
     term = models.CharField("영어 단어", max_length=100, unique=True)
+    # IPA 발음기호. 예: /aɪˈdempətənt/
+    #
+    # 비워둘 수 있게 한다. 개발자만 쓰는 말은 사전에 없어 발음이 갈리는데,
+    # 틀린 발음을 가르치느니 그 자리를 비우는 편이 낫다. 타겟이 영어가
+    # 약한 사람이라 잘못 외우면 되돌리기 어렵다.
+    pronunciation = models.CharField("발음기호", max_length=100, blank=True)
     meaning = models.CharField("한글 뜻", max_length=200)
     description = models.TextField("설명", blank=True)
     example = models.TextField("예문", blank=True)

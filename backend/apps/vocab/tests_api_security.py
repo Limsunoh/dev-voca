@@ -515,6 +515,50 @@ class SerializerShapeTest(TestCase):
         self.assertEqual(reverse("vocab:word-list"), LIST_URL)
 
 
+class PronunciationTest(TestCase):
+    """발음기호는 목록·상세 양쪽에 실린다."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.word = Word.objects.create(
+            term="cache", pronunciation="/kæʃ/", meaning="캐시", is_reviewed=True
+        )
+        cls.no_pron = Word.objects.create(
+            term="nopron", meaning="발음없음", is_reviewed=True
+        )
+
+    def test_list_and_detail_carry_pronunciation(self):
+        """한쪽만 있으면 카드와 상세 화면이 갈린다."""
+        item = self.client.get(f"{LIST_URL}?search=cache").json()["results"][0]
+        detail = self.client.get(f"{LIST_URL}{self.word.pk}/").json()
+
+        for body, where in [(item, "목록"), (detail, "상세")]:
+            self.assertEqual(body["pronunciation"], "/kæʃ/", where)
+
+    def test_missing_pronunciation_is_blank_not_null(self):
+        """비어 있으면 빈 문자열이어야 화면이 조건부로 숨긴다."""
+        item = self.client.get(f"{LIST_URL}?search=nopron").json()["results"][0]
+
+        self.assertEqual(item["pronunciation"], "")
+
+    def test_editing_pronunciation_resets_review(self):
+        """발음을 고치면 검수가 풀린다. 잘못된 발음은 되돌리기 어렵다."""
+        staff = get_user_model().objects.create_user(
+            username="pron-reviewer", password="x", is_staff=True
+        )
+        self.client.force_login(staff)
+
+        res = self.client.patch(
+            f"{LIST_URL}{self.word.pk}/",
+            {"pronunciation": "/kætʃ/"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(res.status_code, 200)
+        self.word.refresh_from_db()
+        self.assertFalse(self.word.is_reviewed, "발음이 바뀌었는데 검수가 유지됐다")
+
+
 class CategoryLabelTest(TestCase):
     """분류는 영어 코드 대신 한글 라벨로 나간다."""
 
