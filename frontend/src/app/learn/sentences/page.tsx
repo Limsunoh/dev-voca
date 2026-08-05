@@ -1,15 +1,23 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
+import { ChoiceFilter } from "@/components/ChoiceFilter";
+import { LearnHeader } from "@/components/LearnHeader";
 import { LearningCard } from "@/components/LearningCard";
+import { Pagination } from "@/components/Pagination";
 import { SearchInput } from "@/components/SearchInput";
-import { ApiError, getCategories, getWords } from "@/lib/api/vocab";
+import { ApiError } from "@/lib/api/client";
+import {
+  getSentenceCategories,
+  getSentenceKinds,
+  getSentences,
+} from "@/lib/api/sentences";
+import { routes } from "@/lib/routes";
 
 export const metadata = {
-  title: "단어장 | devvoca",
-  description: "개발할 때 마주치는 영어 단어를 모아 봅니다.",
+  title: "문장 | devvoca",
+  description: "리뷰 코멘트와 에러 메시지에서 실제로 만나는 영어 문장.",
 };
 
 // Next 16 에서 searchParams 는 Promise 다. 동기 접근은 런타임 에러.
@@ -29,27 +37,32 @@ function toPageNumber(value: string | undefined): number {
   return Number.isInteger(n) && n > 1 ? n : 1;
 }
 
-export default async function VocabPage({ searchParams }: PageProps) {
+export default async function SentencesPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const search = first(params.search);
   const category = first(params.category);
+  const kind = first(params.kind);
   const difficulty = first(params.difficulty);
 
   // page 는 여기서 한 번만 정규화한다. 검증 없이 넘기면 "abc"·"2.7"·"-1" 이
-  // 그대로 백엔드로 가 404 가 되고(DRF Paginator 가 거부한다), 화면에는
-  // "2.7 페이지" 같은 표시와 ?page=3.7 링크까지 생긴다.
+  // 그대로 백엔드로 가 404 가 되고, 화면에는 "2.7 페이지" 같은 표시와
+  // ?page=3.7 링크까지 생긴다.
   const currentPage = toPageNumber(first(params.page));
   const page = currentPage > 1 ? String(currentPage) : undefined;
 
-  // 분류 목록은 실패해도 빈 배열이라 단어 조회와 함께 기다려도 안전하다.
-  // 순서대로 부르면 두 번의 왕복이 그대로 대기 시간이 된다.
+  // 세 요청을 동시에 띄운다. 순서대로 기다리면 세 번의 왕복이 그대로
+  // 대기 시간이 된다.
+  //
+  // 선택지 목록은 실패해도 빈 배열이라 절대 throw 하지 않으므로 그냥 await
+  // 한다. 목록만 try 로 감싸면 catch 안에서도 선택지를 그대로 쓸 수 있다
+  // (백엔드가 죽어서 들어온 자리에서 백엔드를 다시 부르지 않는다).
+  const listPromise = getSentences({ search, category, kind, difficulty, page });
+  const categories = await getSentenceCategories();
+  const kinds = await getSentenceKinds();
+
   let data;
-  let categories;
   try {
-    [data, categories] = await Promise.all([
-      getWords({ search, category, difficulty, page }),
-      getCategories(),
-    ]);
+    data = await listPromise;
   } catch (error) {
     // 예상 못 한 에러는 error.tsx 로 올려보낸다.
     if (!(error instanceof ApiError)) throw error;
@@ -64,16 +77,21 @@ export default async function VocabPage({ searchParams }: PageProps) {
 
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Header />
+        <LearnHeader
+          mode="learn"
+          content="sentences"
+          title="문장"
+          description="리뷰 코멘트와 에러 메시지에서 실제로 만나는 문장을 모았습니다."
+        />
 
         {/* 에러 화면에도 필터를 남긴다. 없으면 잘못된 조건으로 들어온
             사용자가 조건을 바꿀 수단이 없어 막다른 화면이 된다. */}
-        <CategoryFilter options={await getCategories()} />
+        <CategoryFilter options={categories} basePath={routes.sentences} />
 
         <p className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
           {badRequest
             ? "검색 조건이 올바르지 않습니다. 위에서 분류를 다시 골라보세요."
-            : `단어를 불러오지 못했습니다. ${error.message}`}
+            : `문장을 불러오지 못했습니다. ${error.message}`}
         </p>
       </main>
     );
@@ -81,7 +99,12 @@ export default async function VocabPage({ searchParams }: PageProps) {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <Header />
+      <LearnHeader
+        mode="learn"
+        content="sentences"
+        title="문장"
+        description="리뷰 코멘트와 에러 메시지에서 실제로 만나는 문장을 모았습니다."
+      />
 
       <div className="mt-6">
         {/* useSearchParams 를 쓰는 컴포넌트는 Suspense 로 감싼다.
@@ -89,15 +112,31 @@ export default async function VocabPage({ searchParams }: PageProps) {
         <Suspense fallback={<div className="h-[42px]" />}>
           {/* key 가 바뀌면 입력창이 새로 만들어진다 - 뒤로가기로 검색어가
               달라졌을 때 입력창이 URL 을 따라가게 하는 방법. */}
-          <SearchInput key={search ?? ""} basePath="/vocab" />
+          <SearchInput
+            key={search ?? ""}
+            basePath={routes.sentences}
+            label="문장 검색"
+            placeholder="문장, 해석, 에러 원문으로 검색"
+          />
         </Suspense>
       </div>
 
+      <ChoiceFilter
+        label="종류"
+        paramName="kind"
+        options={kinds}
+        basePath={routes.sentences}
+        selected={kind}
+        keep={{ search, category, difficulty }}
+      />
+
       <CategoryFilter
         options={categories}
+        basePath={routes.sentences}
         selected={category}
         search={search}
         difficulty={difficulty}
+        extra={{ kind }}
       />
 
       <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
@@ -107,22 +146,25 @@ export default async function VocabPage({ searchParams }: PageProps) {
 
       {data.results.length === 0 ? (
         <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-400">
-          {/* 분류만 걸어 비었을 때 "등록된 단어가 없다"고 하면 서비스 전체가
+          {/* 조건을 걸어 비었을 때 "등록된 문장이 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
-          {search || category
-            ? "조건에 맞는 단어가 없습니다. 검색어나 분류를 바꿔보세요."
-            : "아직 등록된 단어가 없습니다."}
+          {search || category || kind
+            ? "조건에 맞는 문장이 없습니다. 검색어나 분류를 바꿔보세요."
+            : "아직 등록된 문장이 없습니다."}
         </p>
       ) : (
         <ul className="mt-4 grid gap-3">
-          {data.results.map((word) => (
-            <li key={word.id}>
+          {data.results.map((sentence) => (
+            <li key={sentence.id}>
               <LearningCard
-                href={`/vocab/${word.id}`}
-                title={word.term}
-                subtitle={word.meaning}
-                badge={word.difficulty_label}
-                tag={word.category_label || undefined}
+                href={routes.sentenceDetail(sentence.id)}
+                title={sentence.text}
+                subtitle={sentence.translation}
+                badge={sentence.kind_label}
+                tag={sentence.context || sentence.category_label || undefined}
+                // 에러 메시지는 코드에 가까워 고정폭이 읽기 좋지만,
+                // 사람이 쓴 문장은 고정폭으로 길어지면 오히려 읽기 어렵다.
+                monoTitle={sentence.kind === "error"}
               />
             </li>
           ))}
@@ -130,86 +172,12 @@ export default async function VocabPage({ searchParams }: PageProps) {
       )}
 
       <Pagination
-        filters={{ search, category, difficulty }}
+        basePath={routes.sentences}
+        filters={{ search, category, kind, difficulty }}
         currentPage={currentPage}
         hasPrevious={Boolean(data.previous)}
         hasNext={Boolean(data.next)}
       />
     </main>
-  );
-}
-
-/**
- * 이전/다음 링크.
- *
- * 백엔드가 준 next/previous 절대 URL 을 그대로 쓰지 않는다 - 그러면 API 주소가
- * 화면에 노출된다. 우리가 아는 필터만 유지한 채 page 만 바꿔 붙인다.
- * (searchParams 를 통째로 넘기면 URL 에 낀 임의의 키까지 링크마다 따라다닌다.)
- */
-function Pagination({
-  filters,
-  currentPage,
-  hasPrevious,
-  hasNext,
-}: {
-  filters: Record<string, string | undefined>;
-  currentPage: number;
-  hasPrevious: boolean;
-  hasNext: boolean;
-}) {
-  if (!hasPrevious && !hasNext) return null;
-
-  function hrefFor(page: number): string {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(filters)) {
-      if (value) query.set(key, value);
-    }
-    if (page > 1) query.set("page", String(page));
-
-    const qs = query.toString();
-    return qs ? `/vocab?${qs}` : "/vocab";
-  }
-
-  const linkClass =
-    "rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:border-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500";
-
-  return (
-    <nav
-      aria-label="페이지 이동"
-      className="mt-8 flex items-center justify-between"
-    >
-      {hasPrevious ? (
-        <Link href={hrefFor(currentPage - 1)} className={linkClass}>
-          이전
-        </Link>
-      ) : (
-        <span />
-      )}
-
-      <span className="text-sm text-slate-500 dark:text-slate-400">
-        {currentPage} 페이지
-      </span>
-
-      {hasNext ? (
-        <Link href={hrefFor(currentPage + 1)} className={linkClass}>
-          다음
-        </Link>
-      ) : (
-        <span />
-      )}
-    </nav>
-  );
-}
-
-function Header() {
-  return (
-    <header>
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-        단어장
-      </h1>
-      <p className="mt-1 text-slate-600 dark:text-slate-400">
-        개발할 때 마주치는 영어 단어를 모았습니다.
-      </p>
-    </header>
   );
 }

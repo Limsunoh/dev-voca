@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getWord } from "@/lib/api/vocab";
+import { routes } from "@/lib/routes";
 
 // Next 16 에서 params 는 Promise 다.
 type PageProps = {
@@ -29,7 +30,7 @@ export default async function WordDetailPage({ params }: PageProps) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <Link
-        href="/vocab"
+        href={routes.words}
         className="text-sm text-slate-500 hover:underline dark:text-slate-400"
       >
         &larr; 단어장으로
@@ -44,7 +45,7 @@ export default async function WordDetailPage({ params }: PageProps) {
         </span>
         {word.category_label && (
           <Link
-            href={`/vocab?category=${encodeURIComponent(word.category)}`}
+            href={`${routes.words}?category=${encodeURIComponent(word.category)}`}
             className="text-sm text-slate-500 underline-offset-4 hover:underline dark:text-slate-400"
           >
             {word.category_label}
