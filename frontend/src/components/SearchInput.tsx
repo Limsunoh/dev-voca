@@ -16,7 +16,16 @@ import { useState } from "react";
  * 뒤로가기 등으로 URL 이 바뀌었을 때 입력창을 맞추는 것은 호출부의 key 가 한다
  * (useEffect 로 setState 하는 것보다 단순하고, 리렌더가 한 번 덜 돈다).
  */
-export function SearchInput({ basePath }: { basePath: string }) {
+export function SearchInput({
+  basePath,
+  label = "단어 검색",
+  placeholder = "단어, 뜻, 설명으로 검색",
+}: {
+  basePath: string;
+  /** 스크린리더용 라벨. 화면에는 안 보인다. */
+  label?: string;
+  placeholder?: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSearch = searchParams.get("search") ?? "";
@@ -47,7 +56,7 @@ export function SearchInput({ basePath }: { basePath: string }) {
       className="flex gap-2"
     >
       <label htmlFor="search" className="sr-only">
-        단어 검색
+        {label}
       </label>
       <input
         id="search"
@@ -55,7 +64,7 @@ export function SearchInput({ basePath }: { basePath: string }) {
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="단어, 뜻, 설명으로 검색"
+        placeholder={placeholder}
         className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
       />
       <button

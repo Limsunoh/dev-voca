@@ -14,6 +14,13 @@ export type LearningCardProps = {
   badge?: string;
   /** 분류 같은 보조 라벨. */
   tag?: string;
+  /**
+   * 제목을 고정폭 글꼴로 보일지. 기본은 true.
+   *
+   * 단어나 에러 메시지는 코드에 가까워 고정폭이 읽기 좋지만, 사람이 쓴
+   * 문장은 고정폭으로 길게 늘어놓으면 오히려 읽기 어렵다.
+   */
+  monoTitle?: boolean;
 };
 
 export function LearningCard({
@@ -22,6 +29,7 @@ export function LearningCard({
   subtitle,
   badge,
   tag,
+  monoTitle = true,
 }: LearningCardProps) {
   return (
     <Link
@@ -29,7 +37,11 @@ export function LearningCard({
       className="group block rounded-lg border border-slate-200 bg-white p-4 transition hover:border-slate-400 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600"
     >
       <div className="flex items-start justify-between gap-3">
-        <h2 className="font-mono text-lg font-semibold text-slate-900 group-hover:underline dark:text-slate-100">
+        <h2
+          className={`text-lg font-semibold text-slate-900 group-hover:underline dark:text-slate-100 ${
+            monoTitle ? "font-mono" : ""
+          }`}
+        >
           {title}
         </h2>
         {badge && (
