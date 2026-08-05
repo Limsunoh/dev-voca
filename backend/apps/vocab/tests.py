@@ -158,7 +158,7 @@ class SeedWordsTest(TestCase):
         terms = [w[0] for w in WORDS]
         self.assertEqual(len(terms), len(set(terms)), "중복된 단어가 있다")
 
-        for term, meaning, category, difficulty, desc, ex, ex_ko in WORDS:
+        for term, pron, meaning, category, difficulty, desc, ex, ex_ko in WORDS:
             with self.subTest(term=term):
                 self.assertTrue(term.strip())
                 self.assertTrue(meaning.strip())
@@ -174,6 +174,48 @@ class SeedWordsTest(TestCase):
                 self.assertLessEqual(
                     len(meaning), Word._meta.get_field("meaning").max_length
                 )
+                self.assertLessEqual(
+                    len(pron), Word._meta.get_field("pronunciation").max_length
+                )
+
+    def test_pronunciation_format(self):
+        """발음기호는 미국식 IPA 를 슬래시로 감싼다. 없으면 빈 문자열.
+
+        형식이 섞이면 화면에서 슬래시가 있다 없다 한다. 확신이 없어 비우는
+        것은 허용하되, 적을 거면 형식을 지킨다.
+        """
+        for term, pron, *_rest in WORDS:
+            with self.subTest(term=term):
+                if not pron:
+                    continue
+                self.assertTrue(pron.startswith("/"), f"{term}: 슬래시로 시작해야 한다")
+                self.assertTrue(pron.endswith("/"), f"{term}: 슬래시로 끝나야 한다")
+                self.assertGreater(len(pron), 2, f"{term}: 발음기호가 비었다")
+
+                # 미국식에는 음소적 장음이 없다. ː 를 쓰면 영국식 표기가
+                # 섞여 학습자가 없는 소리를 길게 읽는다.
+                self.assertNotIn("ː", pron, f"{term}: 미국식에는 장음 기호를 쓰지 않는다")
+
+                # 슬래시 안이 ASCII 알파벳뿐이면 IPA 가 아니라 로마자 표기다.
+                # 350개를 받아 넣을 때 한글·로마자가 섞여 들어오는 것을 막는다.
+                body = pron.strip("/").replace(" ", "").replace("-", "")
+                self.assertFalse(
+                    body.isascii() and body.isalpha(),
+                    f"{term}: IPA 가 아니라 로마자 표기로 보인다",
+                )
+
+    def test_multiword_pronunciation_has_one_primary_stress(self):
+        """두 단어 구는 주강세가 하나다. 나머지는 2강세로 내린다.
+
+        양쪽 다 1강세를 주면 어디를 세게 읽어야 할지 알 수 없다.
+        """
+        for term, pron, *_rest in WORDS:
+            if not pron or " " not in pron:
+                continue
+            with self.subTest(term=term):
+                self.assertEqual(
+                    pron.count("ˈ"), 1, f"{term}: 주강세(ˈ)는 하나여야 한다"
+                )
 
     def test_every_word_has_a_category(self):
         """분류가 빠지면 필터 화면에서 찾을 수 없다.
@@ -181,7 +223,7 @@ class SeedWordsTest(TestCase):
         분류별 개수 균형은 편집 방침이라 테스트로 고정하지 않는다.
         나중에 특정 분류를 집중적으로 늘리는 것도 정당한 변경이다.
         """
-        for term, _, category, *_rest in WORDS:
+        for term, _pron, _meaning, category, *_rest in WORDS:
             with self.subTest(term=term):
                 self.assertTrue(category.strip(), f"{term} 에 분류가 없다")
 

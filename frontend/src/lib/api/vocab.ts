@@ -17,6 +17,8 @@ const BASE = "/api/vocab/words/";
 export type WordListItem = {
   id: number;
   term: string;
+  /** IPA 발음기호. 확실하지 않은 단어는 빈 문자열이다. */
+  pronunciation: string;
   meaning: string;
   difficulty: number;
   difficulty_label: string;

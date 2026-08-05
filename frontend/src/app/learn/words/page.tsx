@@ -137,6 +137,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
               <LearningCard
                 href={routes.wordDetail(word.id)}
                 title={word.term}
+                aside={word.pronunciation || undefined}
                 subtitle={word.meaning}
                 badge={word.difficulty_label}
                 tag={word.category_label || undefined}
