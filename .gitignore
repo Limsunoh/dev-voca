@@ -17,6 +17,9 @@ __pycache__/
 # Node / Next.js
 node_modules/
 .next/
+# D 드라이브가 ACL 미지원이라 .next 가 잠겨 지워지지 않는 일이 있다.
+# 그때 distDir 을 임시로 바꿔 빌드하는데, 그 산출물이 커밋되지 않게 막는다.
+.next-*/
 out/
 
 # 로컬 작업 노트 (커밋 안 함)
