@@ -10,16 +10,27 @@ class WordListSerializer(serializers.ModelSerializer):
     """
 
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
+    # 화면은 이 라벨만 쓴다. category(영어 코드)는 필터 링크를 만들 때 필요해서 함께 준다.
+    category_label = serializers.CharField(source="get_category_display", read_only=True)
 
     class Meta:
         model = Word
-        fields = ["id", "term", "meaning", "difficulty", "difficulty_label", "category"]
+        fields = [
+            "id",
+            "term",
+            "meaning",
+            "difficulty",
+            "difficulty_label",
+            "category",
+            "category_label",
+        ]
 
 
 class WordDetailSerializer(serializers.ModelSerializer):
     """상세 조회 + 생성/수정 공용."""
 
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
+    category_label = serializers.CharField(source="get_category_display", read_only=True)
 
     class Meta:
         model = Word
@@ -33,6 +44,7 @@ class WordDetailSerializer(serializers.ModelSerializer):
             "difficulty",
             "difficulty_label",
             "category",
+            "category_label",
             "source",
             "is_reviewed",
             "created_at",
