@@ -102,3 +102,92 @@ class Word(LearningItem):
 
     def __str__(self) -> str:
         return f"{self.term} ({self.meaning})"
+
+
+class SentenceKind(models.TextChoices):
+    """문장의 종류. 어디서 마주치는 문장인지.
+
+    Sentence 안에 중첩하면 Meta 의 CheckConstraint 에서 참조할 수 없다
+    (클래스 본문이 실행되는 중이라 Sentence 도 Kind 도 아직 이름이 없다).
+    LearningItem.Category 는 이미 정의가 끝난 다른 클래스라 문제가 없었다.
+    """
+
+    PHRASE = "phrase", "실무 표현"
+    ERROR = "error", "에러 메시지"
+
+
+class Sentence(LearningItem):
+    """개발하면서 마주치는 영어 문장 하나.
+
+    단어를 다 외워도 문장이 안 읽히는 지점이 따로 있다. 리뷰 코멘트의
+    돌려 말하는 표현("Could you...?" 은 요청이 아니라 사실상 지시다),
+    에러 메시지의 관용구("refusing to", "unrelated histories") 같은 것들.
+
+    실무 문장과 에러 메시지를 한 모델에 담고 kind 로 구분한다. 둘 다
+    "읽고 뜻을 파악한다" 는 점에서 학습 방식이 같고, 화면·검색·검수도
+    똑같이 돌아간다. 지금 테이블을 나누면 그 셋을 두 벌 만들어야 한다.
+    """
+
+    # Sentence.Kind 로 쓸 수 있게 붙여 둔다. Word.Category 와 같은 모양.
+    Kind = SentenceKind
+
+    # 시드가 "이미 넣은 항목" 을 찾을 때 쓰는 키.
+    #
+    # text 를 키로 쓰면 안 된다. 같은 문장이 다른 상황에서 나오는 것을
+    # 일부러 허용하는데(unique 를 안 걸었다), 그 상태에서 --reset 을 돌리면
+    # update_or_create 가 MultipleObjectsReturned 로 터진다.
+    #
+    # 사람이 Admin 에서 넣은 문장은 비어 있다. 그래서 unique 가 아니라
+    # UniqueConstraint 로 "빈 값이 아닐 때만" 유일하게 만든다.
+    slug = models.CharField("시드 키", max_length=100, blank=True)
+
+    text = models.TextField("영어 문장")
+    translation = models.TextField("한글 해석")
+    kind = models.CharField(
+        "종류",
+        max_length=20,
+        choices=SentenceKind.choices,
+        default=SentenceKind.PHRASE,
+    )
+    # 같은 문장이라도 어디서 나왔는지에 따라 뜻이 달라진다. 에러라면
+    # 어떤 상황에서 뜨는지, 실무 표현이라면 누가 어떤 자리에서 쓰는지.
+    context = models.CharField("나오는 상황", max_length=200, blank=True)
+    description = models.TextField("설명", blank=True)
+
+    class Meta:
+        verbose_name = "문장"
+        verbose_name_plural = "문장"
+        ordering = ["id"]
+        indexes = [
+            # 목록이 항상 검수된 것만 보므로 정렬 키와 묶는다.
+            models.Index(fields=["is_reviewed", "id"]),
+        ]
+        constraints = [
+            # Word 와 같은 이유. choices 는 full_clean() 경로에서만 검사한다.
+            models.CheckConstraint(
+                condition=models.Q(
+                    category__in=[*LearningItem.Category.values, ""]
+                ),
+                name="%(app_label)s_%(class)s_category_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind__in=SentenceKind.values),
+                name="%(app_label)s_%(class)s_kind_valid",
+            ),
+            # slug 는 비어 있을 수 있으므로(Admin 에서 넣은 문장) unique=True 를
+            # 못 쓴다. 빈 값이 아닐 때만 유일하게 만든다.
+            #
+            # 이게 없으면 시드를 두 터미널에서 동시에 돌렸을 때 같은 항목이
+            # 두 벌 들어간다. get_or_create 의 재시도 안전장치는 DB 제약이
+            # 있을 때만 작동한다.
+            models.UniqueConstraint(
+                fields=["slug"],
+                condition=~models.Q(slug=""),
+                name="%(app_label)s_%(class)s_slug_unique",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        # 문장은 길어서 통째로 찍으면 Admin 목록이 읽기 어려워진다.
+        head = self.text if len(self.text) <= 40 else f"{self.text[:40]}..."
+        return f"[{self.get_kind_display()}] {head}"

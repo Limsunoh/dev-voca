@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { routes } from "@/lib/routes";
+
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-4 py-10">
@@ -10,12 +12,18 @@ export default function Home() {
         개발하면서 마주치는 영어, 하나씩 익혀봅니다.
       </p>
 
-      <div className="mt-8">
+      <div className="mt-8 flex flex-wrap gap-3">
         <Link
-          href="/vocab"
+          href={routes.words}
           className="inline-block rounded-md bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
         >
           단어장 보기
+        </Link>
+        <Link
+          href={routes.sentences}
+          className="inline-block rounded-md border border-slate-300 px-5 py-2.5 font-medium text-slate-900 transition hover:border-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-700 dark:text-slate-100 dark:hover:border-slate-500"
+        >
+          문장 보기
         </Link>
       </div>
     </main>
