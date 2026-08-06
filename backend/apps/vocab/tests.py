@@ -1,3 +1,4 @@
+import re
 from io import StringIO
 from unittest.mock import patch
 
@@ -43,6 +44,20 @@ class WordModelTest(TestCase):
         Word.objects.create(term="stash", meaning="임시저장하다")
 
         self.assertEqual([w.term for w in Word.objects.visible()], ["commit"])
+
+
+# IPA 인데 짧아서 로마자 표기와 모양이 같은 것들. 아래 발음기호 형식
+# 검사에서 예외로 통과시킨다.
+SHORT_IPA_OK = {
+    "/hed/",   # HEAD
+    "/prun/",  # prune
+    "/spek/",  # spec
+    "/rest/",  # REST
+    "/vju/",   # view
+    "/sid/",   # seed
+    "/ki/",    # key
+    "/kju/",   # queue
+}
 
 
 class SeedWordsTest(TestCase):
@@ -196,12 +211,29 @@ class SeedWordsTest(TestCase):
                 # 섞여 학습자가 없는 소리를 길게 읽는다.
                 self.assertNotIn("ː", pron, f"{term}: 미국식에는 장음 기호를 쓰지 않는다")
 
-                # 슬래시 안이 ASCII 알파벳뿐이면 IPA 가 아니라 로마자 표기다.
-                # 350개를 받아 넣을 때 한글·로마자가 섞여 들어오는 것을 막는다.
-                body = pron.strip("/").replace(" ", "").replace("-", "")
-                self.assertFalse(
-                    body.isascii() and body.isalpha(),
-                    f"{term}: IPA 가 아니라 로마자 표기로 보인다",
+                # 한글이 섞이면 IPA 가 아니다.
+                self.assertNotRegex(
+                    pron, r"[가-힣]", f"{term}: 발음기호에 한글이 섞였다"
+                )
+
+                # "캐시" 를 /kaesi/ 로 적는 로마자 표기를 막는다. 한글 검사만으로는
+                # 못 잡는다 - 한글 코드포인트가 없기 때문이다.
+                #
+                # ASCII 만으로 되어 있다고 로마자로 단정할 수는 없다. 아래
+                # SHORT_IPA_OK 의 여덟 개는 실제 IPA 인데 짧아서 로마자와
+                # 모양이 같다. 길이로 열어두면(len <= 5) /kaesi/ 같은 진짜
+                # 로마자까지 함께 통과하므로 목록으로 박아둔다 - 새 항목을
+                # 추가할 때 목록에 한 줄 넣는 것이 "사람이 봤다" 는 신호다.
+                body = pron.strip("/").replace(" ", "")
+                looks_like_ipa = (
+                    re.search(r"[æðŋʃʒθʌɑɔəɚɜɛɪʊɡ]", body)
+                    or "ˈ" in body
+                    or "ˌ" in body
+                    or pron in SHORT_IPA_OK
+                )
+                self.assertTrue(
+                    looks_like_ipa,
+                    f"{term}: IPA 고유 기호도 강세도 없다 - 로마자 표기인지 확인",
                 )
 
     def test_multiword_pronunciation_has_one_primary_stress(self):

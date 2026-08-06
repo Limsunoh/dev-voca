@@ -121,7 +121,6 @@ class WordViewSet(LearningItemViewSet):
     model = Word
     list_serializer = WordListSerializer
     detail_serializer = WordDetailSerializer
-    reviewer_ordering = ("is_reviewed", "term")
 
     search_fields = ["term", "meaning", "description"]
     ordering_fields = ["term", "created_at", "difficulty"]
