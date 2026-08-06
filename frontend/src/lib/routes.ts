@@ -63,7 +63,7 @@ export const learningModes: LearningMode[] = [
   {
     slug: "test",
     label: "문제풀기",
-    ready: false,
+    ready: true,
     description: "외운 것을 문제로 확인합니다.",
   },
   {

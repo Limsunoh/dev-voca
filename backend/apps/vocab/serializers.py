@@ -68,6 +68,28 @@ class WordListSerializer(serializers.ModelSerializer):
         ]
 
 
+class QuizWordSerializer(serializers.ModelSerializer):
+    """채점 후 해설용.
+
+    상세 시리얼라이저를 그대로 쓰면 is_reviewed 와 source 까지 나간다.
+    채점은 로그인 없이 되는 경로라, 어떤 항목이 AI 생성인지 같은
+    검수 워크플로우 내부 정보를 익명에게 흘리지 않는다.
+    """
+
+    class Meta:
+        model = Word
+        fields = [
+            "id",
+            "term",
+            "pronunciation",
+            "meaning",
+            "description",
+            "example",
+            "example_translation",
+            "category",
+        ]
+
+
 class WordDetailSerializer(
     UnreviewOnContentChangeMixin, serializers.ModelSerializer
 ):

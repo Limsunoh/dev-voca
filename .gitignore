@@ -45,6 +45,7 @@ recovery-codes.txt
 /review_chunks/
 
 # 검증 중 만든 임시 산출물
+/*.log
 /backend/probe_*.txt
 /backend/apps/**/tests_probe_*.py
 /*.png

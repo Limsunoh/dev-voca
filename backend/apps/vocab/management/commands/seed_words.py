@@ -1510,8 +1510,9 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     ),
     (
         "ACID", "/ˈæsɪd/", "트랜잭션이 지켜야 할 네 가지 성질", DB, H,
-        "Atomicity(원자성), Consistency(일관성), Isolation(고립성), "
-        "Durability(지속성) 의 앞 글자를 딴 말. 트랜잭션이 믿을 만하려면 갖춰야 "
+        "Atomicity, Consistency, Isolation, Durability "
+        "의 앞 글자를 딴 말로 원자성·일관성·고립성·지속성을 뜻한다. "
+        "트랜잭션이 믿을 만하려면 갖춰야 "
         "할 성질들이다. '에이시아이디' 가 아니라 '애시드' 로 읽는다. "
         "정처기 단골 문제다.",
         "The database guarantees ACID properties for each transaction.",
@@ -3606,7 +3607,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     ),
     (
         "XML", "/ˌeks em ˈel/", "태그로 감싸 구조를 나타내는 형식", API, N,
-        "eXtensible Markup Language 의 줄임말. 여는 태그와 닫는 태그로 감싸 데이터를 "
+        "Extensible Markup Language 의 줄임말. 여는 태그와 닫는 태그로 감싸 데이터를 "
         "표현한다. JSON 보다 무겁지만 스키마 검증이나 서명 같은 기능이 잘 갖춰져 있어 "
         "금융이나 기업 연동에서는 여전히 현역이다.",
         "The legacy partner API still speaks XML.",
@@ -3664,7 +3665,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     ),
     (
         "CRLF", "/ˌsi ɑr el ˈef/", "줄바꿈을 나타내는 두 글자", API, N,
-        "Carriage Return 과 Line Feed 를 붙여 부르는 말로 윈도우식 줄바꿈이다. "
+        "Carriage Return, Line Feed 를 붙여 부르는 말로 윈도우식 줄바꿈이다. "
         "리눅스와 맥은 LF 하나만 쓰기 때문에, 같은 파일이 운영체제에 따라 전부 "
         "바뀐 것처럼 보이는 diff 가 여기서 나온다. HTTP 헤더 구분자이기도 하다.",
         "The whole file shows as changed because of CRLF line endings.",
@@ -3800,8 +3801,8 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     ),
     (
         "CAP", "/kæp/", "분단 상황에서 둘 중 하나를 고르기", DB, H,
-        "Consistency(일관성), Availability(가용성), Partition tolerance(분단 내성) "
-        "셋 중 둘만 고를 수 있다고 흔히 소개되지만 정확하지 않다. 네트워크 분단은 "
+        "일관성·가용성·분단 내성 셋 중 둘만 고를 수 있다고 흔히 소개되지만 "
+        "정확하지 않다. 네트워크 분단은 "
         "고르는 것이 아니라 언젠가 일어나는 일이라, 실제 선택은 '분단이 났을 때 "
         "일관성과 가용성 중 무엇을 포기하느냐' 다. 정처기에도 나온다.",
         "Under a network partition, this system favors availability over consistency.",
@@ -3835,8 +3836,8 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     (
         "IaC", "/ˌaɪ eɪ ˈsi/", "infrastructure as code 의 줄임말", OPS, N,
         "Infrastructure as Code 를 줄여 쓴 말. 문서와 채팅에서는 거의 이 형태로만 "
-        "쓴다. 철자를 하나씩 '아이에이씨' 로 읽고, 개념 자체는 "
-        "infrastructure as code 항목을 보면 된다.",
+        "쓴다. 철자를 하나씩 '아이에이씨' 로 읽고, 개념 자체는 풀어 쓴 "
+        "항목을 따로 보면 된다.",
         "Every environment change goes through IaC, not the console.",
         "모든 환경 변경은 콘솔이 아니라 IaC 를 거칩니다.",
     ),
@@ -4176,7 +4177,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     ),
     (
         "npm", "/ˌen pi ˈem/", "자바스크립트 패키지 관리 도구", FRONT, E,
-        "Node Package Manager 로 알려진 패키지 관리 도구이자 그 저장소. 소문자로 쓰는 것이 "
+        "자바스크립트 패키지 관리 도구이자 그 저장소. 이름을 줄임말로 풀지 않으며 소문자로 쓰는 것이 "
         "관례다. 설치된 정확한 버전은 잠금 파일에 기록되므로 이 파일을 커밋해야 "
         "다른 사람 환경에서 같은 버전이 깔린다.",
         "Commit the lock file so everyone installs the same versions.",

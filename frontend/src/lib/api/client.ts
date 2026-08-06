@@ -62,11 +62,27 @@ export function buildQuery(params: Record<string, string | undefined>): string {
   return qs ? `?${qs}` : "";
 }
 
-export async function request<T>(path: string): Promise<T> {
+type RequestOptions = {
+  method?: "GET" | "POST";
+  /** JSON 으로 직렬화해 본문에 싣는다. */
+  body?: unknown;
+};
+
+export async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const { method = "GET", body } = options;
+
   let res: Response;
   try {
     res = await fetch(`${apiBase()}${path}`, {
-      headers: { Accept: "application/json" },
+      method,
+      headers: {
+        Accept: "application/json",
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
       // 캐시하지 않는다. 검수 상태(is_reviewed)는 언제든 바뀌는 값이라,
       // 응답이 굳으면 검수가 취소된 항목을 옛 스냅샷으로 계속 보여준다.
       // 목록은 searchParams 덕에 어차피 매 요청 렌더되지만, 상세는
