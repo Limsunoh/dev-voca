@@ -232,4 +232,13 @@ CORS_ALLOWED_ORIGINS = [
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    # 속도 제한은 여기 두지 않는다. 이 구조에서는 오히려 해가 된다.
+    #
+    # 브라우저가 백엔드를 직접 부르지 않는다. 목록은 서버 컴포넌트가,
+    # 문제풀기는 /api/quiz 중계가 대신 부른다. 그래서 백엔드가 보는
+    # 요청자 주소는 항상 Next 서버 하나다. IP 로 세는 제한을 걸면
+    # 접속자 전원이 한 통에 담겨, 한 사람이 빠르게 눌러도 나머지가
+    # 429 를 받는다. 막고 싶은 반복 호출도 같은 통을 쓰니 구분되지 않는다.
+    #
+    # 제한이 필요해지면 실제 클라이언트를 아는 쪽, 즉 Next 중계에 둔다.
 }
