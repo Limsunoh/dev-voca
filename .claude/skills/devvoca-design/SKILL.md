@@ -67,6 +67,80 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 
 나머지(Spline, Getlayers, Animmaster Lib, Skiper UI, Craftwork)는 탈락시켰다. 사유는 전역 스킬에 적어뒀으니 다시 조사하지 않는다.
 
+## 화면 작업 절차
+
+홈을 다시 만들거나 목록·상세를 손볼 때 이 순서로 한다. 순서가 중요한 이유는 2번이 1번의 결정을 재료로 쓰고, 3번은 2번이 끝나야 의미가 있기 때문이다.
+
+### 0. 먼저 확인할 것
+
+- 지금 만지는 화면이 어느 유형인지 (위 표). 이걸 틀리면 1~3번이 전부 어긋난다.
+- 이 변경이 홈만 건드리는지, 목록·상세까지 가는지. 범위가 넘어가면 스킬 선택이 달라진다.
+
+### 1. 팔레트와 폰트 후보를 먼저 정한다
+
+화면을 쓰기 전에 색과 글꼴을 정한다. 나중에 정하면 이미 쓴 코드를 다시 고치게 된다.
+
+```powershell
+py ~/.claude/skills/ui-ux-pro-max/scripts/search.py "learning app education vocabulary" --domain color --max-results 5
+py ~/.claude/skills/ui-ux-pro-max/scripts/search.py "developer learning korean" --domain typography --max-results 5
+```
+
+이 스킬은 **추천만 하고 코드를 쓰지 않는다.** 결과 중 하나를 고르는 건 사람이다. 고른 값은 `globals.css` 의 `@theme inline` 에 토큰으로 넣고, 컴포넌트에서는 토큰만 참조한다. 화면마다 hex 를 박으면 나중에 테마를 못 바꾼다.
+
+폰트를 고를 때 **devvoca 고유 제약이 하나 있다.** 화면에 라틴(용어·코드)과 한글(뜻·설명)이 항상 같이 나온다. 라틴 전용 폰트를 본문에 그대로 물리면 한글이 폴백으로 떨어져 두 글자체가 어긋나 보인다. 라틴용과 한글용을 나눠 지정하고, 실제로 단어 목록 화면에서 눈으로 확인한 뒤 확정한다.
+
+### 2. 홈은 design-taste-frontend 를 켠 채로 쓴다
+
+**홈에만 쓴다.** 이 스킬은 본문에서 스스로 "대시보드·데이터 테이블·다단계 제품 UI 아님" 이라고 못 박는다. 목록 화면에 부르면 랜딩 기준의 조언이 나와서 오히려 훑어보기를 방해한다. 85KB 짜리라 컨텍스트도 크게 잡아먹는다.
+
+스킬이 세 다이얼을 묻는데, devvoca 홈의 출발값은 이렇게 잡는다.
+
+- `DESIGN_VARIANCE 6` — 학습 도구지 에이전시 포트폴리오가 아니다. 실험적일 이유가 없다
+- `MOTION_INTENSITY 3` — 오래 머물며 읽는 서비스다. 움직임이 많으면 피로해진다
+- `VISUAL_DENSITY 3` — 홈은 진입점 한 장이라 비워두는 편이 낫다
+
+목록·상세를 손볼 때는 이 스킬 대신 `impeccable` 을 쓴다. `critique`(위계·명확성), `layout`(여백·리듬), `typeset`(글자 크기), `adapt`(모바일).
+
+### 3. 다 만든 뒤 기계로 한 번, 눈으로 한 번
+
+기계 검사부터. 백엔드까지 띄워야 학습 화면이 뜬다(아래 절 참고).
+
+```bash
+npx impeccable detect http://localhost:3000/                    # 홈
+npx impeccable detect http://localhost:3000/learn/words          # 목록
+npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words   # 모바일
+```
+
+**결과가 0건이어도 끝이 아니다.** 탐지기가 구조적으로 못 잡는 게 있다.
+
+- **폰트** — `next/font` 가 해시 클래스명(`geist_a71539c9-module__...`)을 내보내서 `font-family` 문자열이 HTML 에 안 남는다. 폰트 규칙이 통째로 무력화된다
+- **`h-screen` / `min-h-screen`** — iOS Safari 주소창 문제를 정규식이 못 잡는다
+- **소스 스캔은 얕다** — `detect src` 는 JSX/TSX 에 정규식만 돌린다. URL 스캔이 본체다
+
+그래서 눈으로 볼 것을 정해둔다.
+
+- 단어 목록에서 **라틴과 한글이 한 줄에 섞였을 때** 어긋나 보이지 않는지
+- 발음기호(IPA)가 깨지거나 폭이 어긋나지 않는지
+- 모바일 폭에서 필터·페이지네이션이 눌리는지
+- 다크 모드로 전환했을 때 대비가 무너지지 않는지
+
+`detect` 가 0건이면 "AI 티가 없다" 는 뜻이지 "잘 만들었다" 는 뜻이 아니다. 밋밋함은 탐지기가 잡는 항목이 아니다.
+
+### 4. 검증 기록을 남긴다
+
+UI 를 건드렸으면 `qa` 단계를 실제로 채운다. 결과 건수를 사유에 적어둔다.
+
+```
+py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 데스크톱/모바일 각 1회, N건. 폰트·다크모드는 눈으로 확인'
+```
+
+### 하지 말 것
+
+- **런타임 의존성 추가** — 위 "의존성" 절의 기준을 먼저 통과시킨다. 장식 목적이면 넣지 않는다
+- **목록·상세에 `design-taste-frontend` 호출** — 맞지 않는 조언이 나온다
+- **`/impeccable hooks on`** — `check_verification` 훅과 충돌해 검증 지문이 계속 무효화된다. 수동 호출만
+- **탐지기 0건을 근거로 "확인 끝" 이라고 보고** — 위 블라인드스팟 세 가지를 눈으로 본 뒤에 말한다
+
 ## 화면을 스캔하려면 백엔드도 띄워야 한다
 
 `/learn/words`는 Django API를 호출하는 서버 컴포넌트라, 백엔드 없이 dev 서버만 띄우면 404가 뜬다. 홈(`/`)만 정적이다.
