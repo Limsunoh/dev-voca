@@ -5,6 +5,7 @@
 경우는 줄었지만, 시리얼라이저와 모델 제약은 도메인마다 따로 있다.
 """
 
+from collections import Counter
 from io import StringIO
 
 from django.contrib.auth import get_user_model
@@ -14,7 +15,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
-from .management.commands.seed_sentences import SENTENCES
+from .management.commands.seed_sentences import RETIRED_SLUGS, SENTENCES
 from .models import Sentence, SentenceKind
 
 LIST_URL = "/api/vocab/sentences/"
@@ -73,6 +74,28 @@ class SeedSentencesTest(TestCase):
         self.run_seed()
         self.run_seed()
 
+        self.assertEqual(Sentence.objects.count(), len(SENTENCES))
+
+    def test_removes_retired_sentences(self):
+        """목록에서 뺀 문장은 DB 에서도 지워야 한다.
+
+        시드는 추가와 갱신만 하므로, 소스에서 지우기만 하면 이미 배포된
+        DB 에는 그대로 남아 사용자에게 계속 보인다. 테스트는 빈 DB 에서
+        시작해서 이 경로를 못 잡으므로 옛 항목을 일부러 넣고 확인한다.
+        """
+        retired = RETIRED_SLUGS[0]
+        Sentence.objects.create(
+            slug=retired,
+            text="옛 문장",
+            translation="옛 해석",
+            kind=SentenceKind.ERROR,
+            category=Sentence.Category.API,
+            is_reviewed=True,
+        )
+
+        self.run_seed()
+
+        self.assertFalse(Sentence.objects.filter(slug=retired).exists())
         self.assertEqual(Sentence.objects.count(), len(SENTENCES))
 
     def test_does_not_overwrite_without_reset(self):
@@ -185,6 +208,20 @@ class SeedSentencesTest(TestCase):
         kinds = {s[3] for s in SENTENCES}
 
         self.assertEqual(kinds, set(SentenceKind.values))
+
+    def test_every_category_can_fill_a_quiz(self):
+        """분류를 좁혀도 4지선다를 만들 수 있어야 한다.
+
+        단어 쪽 문제풀기가 보기 넷을 같은 분류에서 뽑는다. 문장에도
+        같은 방식을 쓸 텐데, 분류 하나에 셋 이하면 문제를 못 만든다.
+        """
+        counts = Counter(s[4] for s in SENTENCES)
+
+        for category in Sentence.Category.values:
+            with self.subTest(category=category):
+                self.assertGreaterEqual(
+                    counts[category], 4, f"{category} 분류가 4개 미만이다"
+                )
 
 
 class SentenceAPITest(TestCase):

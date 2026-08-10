@@ -38,10 +38,10 @@ recovery-codes.txt
 *recovery-code*
 *.pdf
 
-# 다른 세션에서 받은 단어·문장 데이터를 병합 전에 잠깐 두는 자리.
-# seed_words.py 에 합치고 나면 지운다 - 두 벌이 남으면 어느 쪽이
+# 다른 세션에서 받은 학습 데이터를 병합 전에 잠깐 두는 자리.
+# seed_*.py 에 합치고 나면 지운다 - 두 벌이 남으면 어느 쪽이
 # 최신인지 알 수 없게 된다.
-/new_words*.py
+/new_*.py
 /review_chunks/
 
 # 검증 중 만든 임시 산출물
