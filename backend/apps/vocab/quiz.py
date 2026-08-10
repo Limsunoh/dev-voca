@@ -272,8 +272,11 @@ def _mask_term(description: str, term: str) -> str:
 # 쉼표도 구분자로 본다: "Create, Read, Update, Delete" 처럼 나열로
 # 적은 원형이 있다.
 _SEP = r"(?:[ -]|,\s*)"
+# 낱말 안에는 아포스트로피가 올 수 있다. "Don't Repeat Yourself"(DRY) 처럼
+# 축약형이 들어간 원형이 있어, 여기서 끊기면 머리글자가 어긋난다.
+_LETTERS = r"[A-Za-z]['’A-Za-z]*"
 _EXPANSION = re.compile(
-    rf"[A-Z][A-Za-z]*(?:{_SEP}[A-Za-z][A-Za-z]*)*{_SEP}[A-Z][A-Za-z]*"
+    rf"[A-Z]['’A-Za-z]*(?:{_SEP}{_LETTERS})*{_SEP}[A-Z]['’A-Za-z]*"
 )
 
 
@@ -282,12 +285,26 @@ def _mask_expansion(description: str, term: str) -> str:
 
     "SQL" 의 설명에 "Structured Query Language" 가 있으면 가리고,
     "Git Bash" 처럼 머리글자가 다른 덩어리는 그대로 둔다.
+
+    머리글자를 두 가지로 세는 이유: 약어가 연결어를 빼고 만들어지는 경우가
+    있다. "Redundant Array of Independent Disks" 는 of 를 빼야 RAID 가 되고,
+    "Proof of Concept" 는 of 를 넣어야 POC 가 된다. 둘 중 하나라도 맞으면
+    원형으로 본다.
     """
 
     def replace(match: re.Match) -> str:
-        words = re.split(r"[ -]", match.group())
-        initials = "".join(w[0] for w in words if w)
-        return "____" if initials.upper() == term.upper() else match.group()
+        # 정규식이 "쉼표 뒤 임의 공백" 을 구분자로 보므로 여기서도 같아야
+        # 한다. \s 를 빼면 줄바꿈이 낱말 앞에 붙어 머리글자가 어긋나고,
+        # 마스킹이 조용히 안 걸린다.
+        words = [w for w in re.split(r"[\s,-]+", match.group()) if w]
+        all_initials = "".join(w[0] for w in words)
+        # 소문자로 시작하는 낱말(of, and, the ...)을 뺀 머리글자
+        major_initials = "".join(w[0] for w in words if w[0].isupper())
+
+        target = term.upper()
+        if all_initials.upper() == target or major_initials.upper() == target:
+            return "____"
+        return match.group()
 
     return _EXPANSION.sub(replace, description)
 

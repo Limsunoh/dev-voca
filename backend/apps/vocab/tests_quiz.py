@@ -530,6 +530,33 @@ class MaskTermUnitTest(TestCase):
             with self.subTest(term=term):
                 self.assertNotIn(desc.split()[0], _mask_term(desc, term))
 
+    def test_masks_expansion_that_skips_connectives(self):
+        """약어가 연결어를 빼고 만들어진 경우.
+
+        "Redundant Array of Independent Disks" 는 of 를 빼야 RAID 가 된다.
+        머리글자를 전부 세면 RAOID 라 안 맞아서 그냥 지나쳤고, 프로덕션
+        퀴즈에서 원형이 지문에 그대로 나왔다.
+        """
+        cases = [
+            ("RAID", "Redundant Array of Independent Disks 의 줄임말"),
+            ("DRY", "Don't Repeat Yourself 의 줄임말"),
+            ("YAGNI", "You Aren't Gonna Need It 에서 왔다"),
+        ]
+        for term, desc in cases:
+            with self.subTest(term=term):
+                self.assertNotIn(desc.split()[0], _mask_term(desc, term))
+
+    def test_masks_expansion_across_line_breaks(self):
+        """설명에 줄바꿈이 있어도 원형을 가려야 한다.
+
+        Admin 에서 여러 줄로 입력하면 낱말 사이에 개행이 들어온다.
+        구분자 처리가 어긋나면 마스킹이 조용히 안 걸린다.
+        """
+        masked = _mask_term("Create,\nRead, Update, Delete 의 앞 글자", "CRUD")
+
+        self.assertNotIn("Create", masked)
+        self.assertIn("____", masked)
+
     def test_masks_comma_separated_expansion(self):
         """나열로 적은 원형도 가린다."""
         masked = _mask_term("Create, Read, Update, Delete 의 앞 글자", "CRUD")
@@ -650,10 +677,16 @@ class DescriptionQuizLeakTest(TestCase):
 
         단어가 그대로 남는 경우와, 낱말들의 머리글자를 조합하면 답이
         나오는 경우를 함께 본다. 후자가 약어에서 특히 많다.
+
+        이 검사는 마스킹 코드보다 넓게 본다. 여기서는 한글을 건너뛰고
+        영어 낱말을 이어 붙이는데, 마스킹은 한글에서 끊긴다. 그래서
+        "Continuous 하게 Integration" 처럼 원형 사이에 한글이 낀 경우는
+        여기서 잡히지만 코드로는 못 지운다 - 그때는 설명 문장을 고쳐야
+        한다. 코드 검사가 아니라 데이터 품질 검사에 가깝다.
         """
         from .management.commands.seed_words import WORDS
 
-        word_pattern = re.compile(r"[A-Za-z][A-Za-z]*")
+        word_pattern = re.compile(r"[A-Za-z]['’A-Za-z]*")
         leaks = []
 
         for row in WORDS:
@@ -666,16 +699,30 @@ class DescriptionQuizLeakTest(TestCase):
                 leaks.append(f"{term}: 단어가 그대로 남음")
                 continue
 
-            # 연속한 영어 낱말의 머리글자가 약어와 맞으면 답이 보인다
+            # 연속한 영어 낱말의 머리글자가 약어와 맞으면 답이 보인다.
+            #
+            # 길이를 term 보다 길게도 잘라보는 이유: 약어가 연결어를 빼고
+            # 만들어진 경우가 있다(RAID <- Redundant Array of Independent
+            # Disks). 딱 맞는 길이만 보면 그런 원형을 놓친다.
             words = word_pattern.findall(masked)
+            leaked = None
             for i in range(len(words)):
-                segment = words[i : i + len(term)]
-                if len(segment) < 2:
+                for size in range(len(term), len(term) + 4):
+                    segment = words[i : i + size]
+                    if len(segment) < 2:
+                        continue
+                    every = "".join(w[0] for w in segment).upper()
+                    major = "".join(
+                        w[0] for w in segment if w[0].isupper()
+                    ).upper()
+                    if term.upper() in (every, major):
+                        leaked = " ".join(segment)
+                        break
+                if leaked:
                     break
-                initials = "".join(w[0] for w in segment)
-                if initials.upper() == term.upper():
-                    leaks.append(f"{term}: 원형 '{' '.join(segment)}' 남음")
-                    break
+
+            if leaked:
+                leaks.append(f"{term}: 원형 '{leaked}' 남음")
 
         self.assertEqual(leaks, [], f"설명에 답이 남는 단어 {len(leaks)}개")
 
