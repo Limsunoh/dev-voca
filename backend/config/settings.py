@@ -4,6 +4,7 @@
 """
 
 import os
+import sys
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -103,9 +104,13 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # 서드파티
     "rest_framework",
+    # 토큰 인증. 토큰은 Next 서버가 받아 httpOnly 쿠키에 넣으므로
+    # 브라우저 자바스크립트가 읽지 못한다.
+    "rest_framework.authtoken",
     "django_filters",
     "corsheaders",
     # 로컬 앱
+    "apps.accounts",
     "apps.vocab",
     # AI 콘텐츠 생성. 관리자 배치 전용 - 사용자 요청 경로에서 호출하지 않는다.
     "apps.ai_pipeline",
@@ -187,6 +192,22 @@ else:
     }
 
 
+# 사용자 모델을 갈아끼운다. 로그인 키가 username 이 아니라 email 이다.
+#
+# 이 설정은 프로젝트 시작 시점에 정하라는 것이 Django 공식 권고다. 테이블이
+# 이미 생긴 뒤에 바꾸면 auth_user 를 참조하는 외래키를 손으로 옮겨야 한다.
+# 학습 기록이나 즐겨찾기가 사용자를 참조하기 시작하면 그 비용이 훨씬 커지므로
+# 지금 바꾼다.
+#
+# 이미 만든 DB 에 적용할 때 할 일:
+#   1. accounts 로 슈퍼유저를 다시 만든다(옛 auth_user 계정은 넘어오지 않는다)
+#   2. django_admin_log.user_id 가 auth_user 를 계속 참조하므로 다시 걸어준다.
+#      안 하면 두 번째 검수자가 Admin 에서 저장할 때 IntegrityError 가 난다.
+#      제약 이름은 환경마다 다르니 먼저 확인한다:
+#        SELECT conname FROM pg_constraint
+#         WHERE contype='f' AND confrelid='auth_user'::regclass;
+AUTH_USER_MODEL = "accounts.User"
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -232,6 +253,19 @@ CORS_ALLOWED_ORIGINS = [
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    # 토큰이 먼저다. API 요청은 Next 서버가 Authorization 헤더로 보낸다.
+    #
+    # 순서를 지킬 것. DRF 는 첫 번째 클래스의 인증 방식으로 401/403 을
+    # 가르는데, 세션을 앞에 두면 로그인 안 한 요청이 401 대신 403 이 된다.
+    # 프론트는 401 을 보고 "로그아웃 상태로 그리기" 를 판단하므로 그 분기가
+    # 조용히 깨진다.
+    #
+    # 세션도 남겨두는 이유: Admin 화면과 DRF 의 브라우저 화면이 세션으로
+    # 동작한다. 빼면 브라우저에서 API 를 눌러볼 수 없다.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
     # 속도 제한은 여기 두지 않는다. 이 구조에서는 오히려 해가 된다.
     #
     # 브라우저가 백엔드를 직접 부르지 않는다. 목록은 서버 컴포넌트가,
@@ -241,4 +275,25 @@ REST_FRAMEWORK = {
     # 429 를 받는다. 막고 싶은 반복 호출도 같은 통을 쓰니 구분되지 않는다.
     #
     # 제한이 필요해지면 실제 클라이언트를 아는 쪽, 즉 Next 중계에 둔다.
+    #
+    # 다만 로그인·가입은 예외다. 그쪽은 IP 가 아니라 제출된 이메일로 세므로
+    # 위 문제를 피해간다(apps.accounts.throttles). 백엔드가 공개 도메인이라
+    # Next 를 건너뛰고 직접 두드릴 수 있어, 제한이 없으면 한 계정의
+    # 비밀번호를 무한히 추측할 수 있다.
+    #
+    # 이 제한이 막는 것은 거기까지다. 이메일마다 한 번씩 던져 가입 여부를
+    # 훑는 것은 못 막는다 - 카운터가 이메일별이라 한 번씩은 다 통과한다.
+    # 그건 실제 클라이언트를 아는 Next 중계에서 IP 로 막아야 한다.
+    #
+    # 카운터는 로컬 메모리 캐시에 쌓여 워커마다 따로 센다. 워커가 둘이면
+    # 실효 한도가 두 배다. 정확한 제한이 필요해지면 공유 캐시를 붙인다.
+    # 테스트에서는 넉넉하게 둔다. 테스트는 사람보다 훨씬 빠르게 요청해서
+    # 운영 값이면 관계없는 테스트까지 429 로 막힌다.
+    #
+    # 설정을 아예 None 으로 끄지 않는 이유: DRF 는 스로틀 인스턴스를 만들
+    # 때 이 값을 한 번 읽고 굳혀서, 나중에 override_settings 로 켜도 안
+    # 돌아온다. 제한 자체를 검증하는 테스트가 조용히 무력해진다.
+    "DEFAULT_THROTTLE_RATES": {
+        "auth_email": "1000/min" if sys.argv[1:2] == ["test"] else "10/min",
+    },
 }
