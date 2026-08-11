@@ -380,7 +380,7 @@ class QuizAPITest(TestCase):
         목록에서는 검수하려고 보여주지만, 문제는 학습용이라 다르다.
         """
         staff = get_user_model().objects.create_user(
-            username="reviewer", password="x", is_staff=True
+            email="reviewer@example.com", password="x", is_staff=True
         )
         self.client.force_login(staff)
 
@@ -1071,7 +1071,7 @@ class GradeReviewGateTest(TestCase):
         """목록은 미검수를 보여주지만 채점 해설은 안 된다."""
         self.client.force_login(
             get_user_model().objects.create_user(
-                username="grade-staff", password="x", is_staff=True
+                email="grade-staff@example.com", password="x", is_staff=True
             )
         )
 
@@ -1083,7 +1083,7 @@ class GradeReviewGateTest(TestCase):
     def test_superuser_cannot_grade_into_unreviewed(self):
         self.client.force_login(
             get_user_model().objects.create_superuser(
-                username="grade-super", password="x", email="a@b.c"
+                email="grade-super@example.com", password="x"
             )
         )
 
@@ -1093,7 +1093,7 @@ class GradeReviewGateTest(TestCase):
         """staff 뿐 아니라 superuser 도 미검수를 문제로 받지 않는다."""
         self.client.force_login(
             get_user_model().objects.create_superuser(
-                username="quiz-super", password="x", email="b@c.d"
+                email="quiz-super@example.com", password="x"
             )
         )
 

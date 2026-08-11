@@ -13,9 +13,9 @@ from .models import Word
 LIST_URL = "/api/vocab/words/"
 
 
-def make_user(username, **kwargs):
+def make_user(email, **kwargs):
     return get_user_model().objects.create_user(
-        username=username, password="pw1234!x", **kwargs
+        email=email, password="pw1234!x", **kwargs
     )
 
 
@@ -231,6 +231,21 @@ class ReviewGateLeakTest(TestCase):
         res = self.client.get(LIST_URL)
         self.assert_no_leak(res, "비활성 staff")
 
+    def test_can_review_itself_checks_is_active(self):
+        """판정 함수가 is_active 를 실제로 보는지.
+
+        위 테스트는 세션이 끊겨서 통과하는 면이 있어, 판정 로직 자체를
+        직접 확인한다. can_review 에서 is_active 조건이 빠지면 정지된
+        검수자가 미검수 단어를 계속 보게 된다.
+        """
+        from apps.vocab.views import can_review
+
+        staff = make_user("gate-active-check", is_staff=True)
+        self.assertTrue(can_review(staff))
+
+        staff.is_active = False
+        self.assertFalse(can_review(staff), "정지된 staff 가 검수자로 판정됐다")
+
     def test_api_root_does_not_leak(self):
         """DefaultRouter 의 API 루트가 데이터를 흘리지 않는다."""
         res = self.client.get("/api/vocab/")
@@ -313,7 +328,7 @@ class PermissionTest(TestCase):
     def test_superuser_cannot_flip_is_reviewed_via_api(self):
         """슈퍼유저라도 API 로는 검수 상태를 못 바꾼다(검수는 Admin 전용)."""
         admin = get_user_model().objects.create_superuser(
-            username="perm-super", password="pw1234!x", email="a@b.c"
+            email="perm-super@example.com", password="pw1234!x"
         )
         self.client.force_login(admin)
 
@@ -544,7 +559,7 @@ class PronunciationTest(TestCase):
     def test_editing_pronunciation_resets_review(self):
         """발음을 고치면 검수가 풀린다. 잘못된 발음은 되돌리기 어렵다."""
         staff = get_user_model().objects.create_user(
-            username="pron-reviewer", password="x", is_staff=True
+            email="pron-reviewer@example.com", password="x", is_staff=True
         )
         self.client.force_login(staff)
 

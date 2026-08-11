@@ -299,7 +299,7 @@ class WordAPITest(TestCase):
     def test_staff_sees_unreviewed(self):
         """관리자는 검수하려면 미검수 단어를 봐야 한다."""
         staff = get_user_model().objects.create_user(
-            username="admin", password="pw", is_staff=True
+            email="admin@example.com", password="pw", is_staff=True
         )
         self.client.force_login(staff)
 
@@ -335,7 +335,7 @@ class WordAPITest(TestCase):
 
     def test_normal_user_cannot_delete(self):
         """로그인만 했다고 단어를 지울 수 있으면 안 된다."""
-        user = get_user_model().objects.create_user(username="u", password="pw")
+        user = get_user_model().objects.create_user(email="u@example.com", password="pw")
         self.client.force_login(user)
 
         res = self.client.delete(self.detail_url(self.reviewed))
@@ -345,7 +345,7 @@ class WordAPITest(TestCase):
 
     def test_staff_can_create(self):
         staff = get_user_model().objects.create_user(
-            username="admin2", password="pw", is_staff=True
+            email="admin2@example.com", password="pw", is_staff=True
         )
         self.client.force_login(staff)
 
@@ -356,7 +356,7 @@ class WordAPITest(TestCase):
     def test_created_word_starts_unreviewed(self):
         """API 로 만든 단어도 검수 전 상태여야 한다 - is_reviewed 는 읽기 전용."""
         staff = get_user_model().objects.create_user(
-            username="admin3", password="pw", is_staff=True
+            email="admin3@example.com", password="pw", is_staff=True
         )
         self.client.force_login(staff)
 
@@ -377,7 +377,7 @@ class WordAPITest(TestCase):
         사용자에게 나간다.
         """
         staff = get_user_model().objects.create_user(
-            username="editor", password="pw", is_staff=True
+            email="editor@example.com", password="pw", is_staff=True
         )
         self.client.force_login(staff)
 
@@ -394,7 +394,7 @@ class WordAPITest(TestCase):
     def test_editing_only_category_keeps_review(self):
         """분류만 바꾼 것은 내용 변경이 아니므로 검수 상태를 유지한다."""
         staff = get_user_model().objects.create_user(
-            username="editor2", password="pw", is_staff=True
+            email="editor2@example.com", password="pw", is_staff=True
         )
         self.client.force_login(staff)
 
@@ -410,7 +410,7 @@ class WordAPITest(TestCase):
     def test_editing_with_same_content_keeps_review(self):
         """같은 값으로 다시 보내는 것은 변경이 아니다."""
         staff = get_user_model().objects.create_user(
-            username="editor3", password="pw", is_staff=True
+            email="editor3@example.com", password="pw", is_staff=True
         )
         self.client.force_login(staff)
 
@@ -427,7 +427,7 @@ class WordAPITest(TestCase):
 
     def test_blank_term_is_rejected(self):
         staff = get_user_model().objects.create_user(
-            username="admin4", password="pw", is_staff=True
+            email="admin4@example.com", password="pw", is_staff=True
         )
         self.client.force_login(staff)
 
@@ -437,7 +437,7 @@ class WordAPITest(TestCase):
 
     def test_duplicate_term_is_400_not_500(self):
         staff = get_user_model().objects.create_user(
-            username="admin5", password="pw", is_staff=True
+            email="admin5@example.com", password="pw", is_staff=True
         )
         self.client.force_login(staff)
 

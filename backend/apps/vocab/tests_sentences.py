@@ -242,7 +242,7 @@ class SentenceAPITest(TestCase):
             is_reviewed=False,
         )
         cls.staff = get_user_model().objects.create_user(
-            username="reviewer", password="x", is_staff=True
+            email="reviewer@example.com", password="x", is_staff=True
         )
 
     def test_list_hides_unreviewed(self):
@@ -346,7 +346,7 @@ class SentenceAPITest(TestCase):
         self.assertEqual(Sentence.objects.filter(text="x").count(), 0)
 
     def test_non_staff_cannot_write(self):
-        user = get_user_model().objects.create_user(username="normal", password="x")
+        user = get_user_model().objects.create_user(email="normal@example.com", password="x")
         self.client.force_login(user)
 
         res = self.client.post(LIST_URL, {"text": "x", "translation": "y"})

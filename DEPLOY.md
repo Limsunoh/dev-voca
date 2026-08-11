@@ -50,10 +50,110 @@ python backend/manage.py shell -c "from django.core.management.utils import get_
 `/admin/` 이 200 인데 `/api/vocab/words/` 가 500 이면 vocab 마이그레이션이
 안 돈 것이다 - `release` 로그를 본다.
 
+## 계정 기능 첫 배포 (한 번만)
+
+로그인 키를 username 에서 email 로 바꾸면서 사용자 모델을 갈아끼웠다
+(`AUTH_USER_MODEL = "accounts.User"`). 이미 만들어진 DB 에는 **그냥
+배포하면 마이그레이션이 시작하자마자 실패한다.**
+
+```
+django.db.migrations.exceptions.InconsistentMigrationHistory:
+Migration admin.0001_initial is applied before its dependency
+accounts.0001_initial on database 'default'.
+```
+
+Django 의 admin 앱이 사용자 모델에 의존하는데, 그 의존 대상이 바뀌면서
+"admin 이 accounts 보다 먼저 적용됐다" 는 상태가 되기 때문이다. 코드로는
+못 고치고 DB 쪽에서 풀어야 한다.
+
+테스트는 매번 빈 DB 를 새로 만들어서 이 문제를 잡지 못한다.
+
+### 순서가 중요하다
+
+`Procfile` 의 `release: migrate` 가 배포할 때마다 먼저 돈다. 즉 **DB 를
+손보기 전에 배포하면 release 단계에서 멈춘다.**
+
+그리고 release 가 실패하면 Railway 는 이전 이미지를 계속 서빙하므로,
+그 상태에서 `railway ssh` 로 들어가면 **accounts 앱이 없는 옛 코드**에
+붙는다. 거기서 `migrate` 를 쳐도 이 오류는 재현조차 안 되니 헷갈리지 말 것.
+
+**DB 를 먼저 정리하고, 그다음 배포한다.**
+
+### 방법 1: DB 를 비우고 다시 만든다 (권장)
+
+계정이 아직 없고 단어·문장은 시드로 복원되므로 이쪽이 짧다.
+
+**먼저 확인할 것**: 시드는 검수를 마친 항목만 넣는다. Admin 에서
+`/admin/vocab/word/?is_reviewed__exact=0` 이 비어 있는지 보고, 검수 대기
+중인 것이 있으면 그건 이 방법으로 사라지고 되돌릴 수 없다.
+
+`flush` 로는 안 된다 — 테이블 구조와 `django_migrations` 기록이 남아
+같은 오류가 이어진다. 스키마를 통째로 지운다.
+
+```
+railway connect Postgres
+```
+
+이 명령은 로컬에 `psql` 이 깔려 있어야 동작한다. 없으면 Railway
+대시보드 > Postgres 서비스 > Data 탭의 쿼리 창에서 같은 SQL 을 친다.
+```sql
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+```
+
+그 뒤 배포하면 release 의 `migrate` 가 처음부터 돈다. 이어서:
+
+```
+railway ssh --service web "python backend/manage.py seed_words"
+railway ssh --service web "python backend/manage.py seed_sentences"
+railway ssh --service web
+# 붙은 뒤 셸에서: python backend/manage.py createsuperuser
+```
+
+### 방법 2: 데이터를 살린다
+
+단어·문장을 다시 넣기 싫을 때. admin 관련만 걷어내고 다시 만들게 한다.
+
+```
+railway connect Postgres
+```
+
+이 명령은 로컬에 `psql` 이 깔려 있어야 동작한다. 없으면 Railway
+대시보드 > Postgres 서비스 > Data 탭의 쿼리 창에서 같은 SQL 을 친다.
+```sql
+-- 테이블을 지운다. 외래키만 떼면 이후 migrate 가 만들 스키마와 어긋나고,
+-- 테이블을 남긴 채 마이그레이션 기록만 지우면 "이미 존재한다" 로 터진다.
+DROP TABLE django_admin_log;
+DELETE FROM django_migrations WHERE app='admin';
+```
+
+그 뒤 배포하면 accounts 가 먼저 적용되고, admin 이 뒤따르며
+`django_admin_log` 를 `accounts_user` 참조로 새로 만든다.
+
+옛 `auth_user` 계정은 넘어오지 않으므로 슈퍼유저를 다시 만든다.
+
+```
+railway ssh --service web
+# 붙은 뒤 셸에서: python backend/manage.py createsuperuser
+```
+
+### 배포 후 확인
+
+`auth_user` 테이블은 고아로 남지만 무해하다. 아래만 확인한다.
+
+| 확인 | 기대 |
+|---|---|
+| `/admin/` 로그인 | 이메일로 로그인된다 |
+| `/admin/accounts/user/add/` | 계정 추가 화면이 뜬다 |
+| Admin 에서 단어 수정 후 저장 | 500 이 안 난다(로그 외래키 확인) |
+| `/api/vocab/words/` | 200, 566개 |
+
 ## 아직 안 한 것
 
 - HSTS (`SECURE_HSTS_SECONDS`) - 도메인 확정 후 짧은 값부터 켠다.
   브라우저가 기억해버려 되돌리기 어렵다.
-- 레이트리밋 - 공개 API 이므로 `AnonRateThrottle` 검토.
+- 레이트리밋 - 로그인·가입은 이메일 단위로 걸어뒀다. 나머지 조회 경로는
+  모든 요청이 Next 서버 하나로 보여 IP 로 셀 수 없으니, 필요해지면
+  Next 중계 쪽에 둔다.
 - 프론트엔드 - Vercel 배포 시 `CORS_ALLOWED_ORIGINS` 에 도메인 추가.
 - `ANTHROPIC_API_KEY` - AI 생성을 서버에서 돌릴 때만 필요. 로컬에서 돌려도 된다.
