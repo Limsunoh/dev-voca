@@ -38,3 +38,28 @@ class EmailRateThrottle(SimpleRateThrottle):
         # 캐시에 이메일 원문이 남지도 않는다.
         ident = hashlib.sha256(email.strip().lower().encode()).hexdigest()
         return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
+class GoogleRateThrottle(SimpleRateThrottle):
+    """구글 로그인 시도 제한.
+
+    이메일로 셀 수 없다. 구글 요청에는 코드만 들어 있고 이메일은 구글에
+    물어봐야 나온다.
+
+    요청자별로도 못 센다. 이 프로젝트는 모든 요청이 Next 서버 하나로
+    보이고, 주소를 알려주는 헤더는 아무나 지어낼 수 있어 나누는 척하면
+    오히려 헤더 하나로 갈라진다. 인증 여부로 나누는 것도 안 된다 -
+    토큰만 붙이면 세지 않는 구현이 있어, 계정 하나 만들면 그대로 뚫린다.
+
+    그래서 통을 하나만 둔다. 여기서 재는 것은 "누가 얼마나" 가 아니라
+    "우리 서버가 구글을 얼마나 두드리는가" 다. 그 총량에 상한을 두면
+    남이 우리를 통해 구글을 때리는 것도 함께 막힌다.
+
+    대가로 한 사람이 한도를 다 쓰면 그동안 모두가 막힌다. 그래서 실제
+    사용량보다 훨씬 넉넉하게 잡는다.
+    """
+
+    scope = "auth_google"
+
+    def get_cache_key(self, request, view) -> str:
+        return self.cache_format % {"scope": self.scope, "ident": "all"}

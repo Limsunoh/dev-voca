@@ -19,10 +19,15 @@ export default async function LoginPage({ searchParams }: PageProps) {
 
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : undefined;
+  // 구글에서 실패해 돌아온 경우. 이유는 서버 로그에만 남긴다.
+  const googleFailed = params.error === "google";
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-16">
-      <AuthForm mode="login" action={loginAction} next={next} />
+      <AuthForm mode="login" action={loginAction}
+        next={next}
+        googleFailed={googleFailed}
+      />
     </main>
   );
 }

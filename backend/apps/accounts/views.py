@@ -10,6 +10,8 @@ XSS 하나로 계정이 통째로 넘어가지 않는다.
 
 from __future__ import annotations
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AbstractBaseUser
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -18,8 +20,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .google import GoogleAuthError, fetch_google_user
 from .serializers import LoginSerializer, SignUpSerializer, UserSerializer
-from .throttles import EmailRateThrottle
+from .throttles import EmailRateThrottle, GoogleRateThrottle
 
 
 def _auth_response(user: AbstractBaseUser, created: bool = False) -> Response:
@@ -68,6 +71,88 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         return _auth_response(serializer.validated_data["user"])
+
+
+class GoogleLoginView(APIView):
+    """구글 로그인. 계정이 없으면 만들고 있으면 그대로 들어온다.
+
+    Next 서버가 구글에서 받은 코드를 넘긴다. 사용자 정보를 그대로 받지
+    않는 이유: 그러면 누구든 남의 이메일을 적어 보내 그 계정으로 들어올
+    수 있다. 코드를 받아 구글에 되물어 확인한다.
+
+    이미 그 이메일로 계정이 있으면 새로 만들지 않고 붙는다. 안 묶으면
+    같은 사람의 학습 기록이 두 계정으로 갈린다.
+
+    **알려진 한계**: 구글은 "이 사람이 그 구글 계정의 주인" 임을 확인해줄
+    뿐, 우리 DB 에 있던 그 행을 누가 만들었는지는 보증하지 않는다. 가입에
+    메일 확인 절차가 없어서, 남의 주소로 미리 가입해두고 진짜 주인이
+    구글로 들어오기를 기다리는 것이 가능하다. 그러면 두 사람이 같은
+    계정을 쓰게 된다.
+
+    막으려면 가입할 때 메일로 주소를 확인해야 한다. 토큰만 끊는 식으로는
+    안 된다 - 먼저 가입한 쪽은 비밀번호를 알고 있어 곧바로 다시 받는다.
+    반대로 두 방법을 번갈아 쓰는 정상 사용자는 구글로 들어올 때마다 다른
+    기기에서 로그아웃된다. 얻는 것 없이 잃기만 한다.
+
+    메일 확인을 붙이기 전까지는 이 한계를 안고 간다.
+    """
+
+    permission_classes = [AllowAny]
+    # 누가 보냈는지로 나누지 않고 전체 합계로 센다. 이유는 throttles 에
+    # 적어뒀다 - 요청자를 구분할 방법이 없어서 나누는 척하면 오히려 뚫린다.
+    throttle_classes = [GoogleRateThrottle]
+
+    def post(self, request: Request) -> Response:
+        if not isinstance(request.data, dict):
+            return Response(
+                {"detail": "요청 형식이 올바르지 않습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        code = request.data.get("code")
+        redirect_uri = request.data.get("redirect_uri")
+
+        if not isinstance(code, str) or not code.strip():
+            return Response(
+                {"detail": "구글 로그인 정보가 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not isinstance(redirect_uri, str) or not redirect_uri.strip():
+            return Response(
+                {"detail": "구글 로그인 정보가 올바르지 않습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            info = fetch_google_user(code.strip(), redirect_uri.strip())
+        except GoogleAuthError as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        User = get_user_model()
+
+        # 이메일은 저장할 때 소문자로 내려가므로 여기서도 맞춘다.
+        email = info["email"].lower()
+
+        # make_password(None) 로 비밀번호를 못 쓰는 값으로 넣는다. 만든 뒤
+        # 따로 설정하면 그 사이에 password 가 빈 문자열인 행이 존재하고,
+        # 그 상태로 로그인을 시도하면 400 이 아니라 500 이 난다.
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "display_name": info["name"][:50],
+                "password": make_password(None),
+            },
+        )
+
+        if not user.is_active:
+            return Response(
+                {"detail": "사용할 수 없는 계정입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return _auth_response(user, created=created)
 
 
 class LogoutView(APIView):

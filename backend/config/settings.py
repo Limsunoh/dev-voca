@@ -208,6 +208,11 @@ else:
 #         WHERE contype='f' AND confrelid='auth_user'::regclass;
 AUTH_USER_MODEL = "accounts.User"
 
+# 구글 로그인. 없으면 그 기능만 못 쓰고 나머지는 그대로 돈다 -
+# SECRET_KEY 처럼 기동을 막지 않는다.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -250,6 +255,30 @@ CORS_ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
+# 시도 횟수를 세는 자리.
+#
+# 기본값(프로세스 메모리)을 그대로 두면 워커마다 따로 센다. 워커가 둘이면
+# 실제 한도가 두 배이고, 재시작하면 0으로 돌아간다. 제한을 걸어둔 의미가
+# 그만큼 줄어든다.
+#
+# DB 를 쓰는 이유: Postgres 가 이미 있어 새로 붙일 것이 없다. 캐시 테이블은
+# createcachetable 로 만든다. 트래픽이 늘어 이것이 부담이 되면 그때
+# 공유 캐시(Redis)로 옮긴다.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "throttle_cache",
+        # 기본값 300 을 넘으면 일부를 지워 자리를 만든다. 그때 노리던
+        # 계정의 카운터가 함께 밀려나면 제한이 풀린다. 1만으로 올려도
+        # 그 길은 닫히지 않고 비용만 오른다 - 분당 1만 건을 보내야 한다.
+        # 제대로 막으려면 아래 주석대로 Next 중계에 제한을 둬야 한다.
+        #
+        # 항목은 1분이면 만료되고, 자리가 모자랄 때 그것부터 지우므로
+        # 넉넉히 잡아도 쌓이지 않는다.
+        "OPTIONS": {"MAX_ENTRIES": 10000},
+    }
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
@@ -284,9 +313,6 @@ REST_FRAMEWORK = {
     # 이 제한이 막는 것은 거기까지다. 이메일마다 한 번씩 던져 가입 여부를
     # 훑는 것은 못 막는다 - 카운터가 이메일별이라 한 번씩은 다 통과한다.
     # 그건 실제 클라이언트를 아는 Next 중계에서 IP 로 막아야 한다.
-    #
-    # 카운터는 로컬 메모리 캐시에 쌓여 워커마다 따로 센다. 워커가 둘이면
-    # 실효 한도가 두 배다. 정확한 제한이 필요해지면 공유 캐시를 붙인다.
     # 테스트에서는 넉넉하게 둔다. 테스트는 사람보다 훨씬 빠르게 요청해서
     # 운영 값이면 관계없는 테스트까지 429 로 막힌다.
     #
@@ -295,5 +321,10 @@ REST_FRAMEWORK = {
     # 돌아온다. 제한 자체를 검증하는 테스트가 조용히 무력해진다.
     "DEFAULT_THROTTLE_RATES": {
         "auth_email": "1000/min" if sys.argv[1:2] == ["test"] else "10/min",
+        # 구글은 통을 하나만 둔다(apps.accounts.throttles 참고). 사이트
+        # 전체가 함께 쓰는 값이라, 한 사람이 다 쓰면 그동안 모두가 막힌다.
+        # 그래서 실제 사용량보다 훨씬 넉넉하게 잡는다 - 여기서 재는 것은
+        # 개인의 시도 횟수가 아니라 우리 서버가 구글을 두드리는 총량이다.
+        "auth_google": "2000/min" if sys.argv[1:2] == ["test"] else "120/min",
     },
 }
