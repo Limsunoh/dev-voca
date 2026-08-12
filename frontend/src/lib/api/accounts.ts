@@ -39,6 +39,20 @@ export function logIn(body: {
   return request("/api/accounts/login/", { method: "POST", body });
 }
 
+/**
+ * 구글 로그인.
+ *
+ * 구글이 준 코드를 넘기면 백엔드가 구글에 되물어 확인하고, 계정을 찾거나
+ * 만든다. 사용자 정보를 직접 넘기지 않는 이유: 그러면 누구든 남의
+ * 이메일을 적어 보내 그 계정으로 들어올 수 있다.
+ */
+export function logInWithGoogle(body: {
+  code: string;
+  redirect_uri: string;
+}): Promise<AuthResult> {
+  return request("/api/accounts/google/", { method: "POST", body });
+}
+
 /** 토큰을 서버에서도 무효로 만든다. */
 export function logOut(token: string): Promise<void> {
   return request("/api/accounts/logout/", { method: "POST", token });

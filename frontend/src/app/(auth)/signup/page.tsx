@@ -21,7 +21,9 @@ export default async function SignUpPage({ searchParams }: PageProps) {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-16">
-      <AuthForm mode="signup" action={signUpAction} next={next} />
+      <AuthForm mode="signup" action={signUpAction}
+        next={next}
+      />
     </main>
   );
 }

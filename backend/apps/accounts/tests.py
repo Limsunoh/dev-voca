@@ -8,10 +8,11 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.authtoken.models import Token
 
-from .throttles import EmailRateThrottle
+from .google import GoogleAuthError, fetch_google_user
+from .throttles import EmailRateThrottle, GoogleRateThrottle
 
 User = get_user_model()
 
@@ -19,6 +20,10 @@ SIGNUP_URL = "/api/accounts/signup/"
 LOGIN_URL = "/api/accounts/login/"
 LOGOUT_URL = "/api/accounts/logout/"
 ME_URL = "/api/accounts/me/"
+GOOGLE_URL = "/api/accounts/google/"
+
+# 구글이 코드를 발급할 때 쓴 주소. 확인 요청에 같이 보내야 한다.
+REDIRECT_URI = "http://localhost:3000/api/auth/google/callback"
 
 # 검사기를 통과하는 비밀번호. 짧거나 흔하면 가입 자체가 막힌다.
 PASSWORD = "devvoca-pass-8821"
@@ -296,6 +301,86 @@ class ThrottleTest(TestCase):
 
         self.assertEqual(self.login(email="other@example.com").status_code, 400)
 
+    def narrow_google_throttle(self):
+        """구글 제한을 3회로 좁히고 구글 호출을 막는다.
+
+        막지 않으면 이 머신의 .env 에 키가 있을 때 테스트가 실제로
+        구글에 요청을 보낸다. 그러면 통과 이유가 제한이 아니라 구글의
+        거절이 되어, 무엇을 확인했는지 알 수 없다.
+        """
+        rate = mock.patch.object(
+            GoogleRateThrottle, "get_rate", return_value="3/min"
+        )
+        rate.start()
+        self.addCleanup(rate.stop)
+
+        google = mock.patch(
+            "apps.accounts.views.fetch_google_user",
+            side_effect=GoogleAuthError("확인하지 못했습니다."),
+        )
+        google.start()
+        self.addCleanup(google.stop)
+
+    def try_google(self, **extra):
+        """구글 로그인을 한 번 시도한다.
+
+        요청마다 코드·주소·브라우저를 다르게 보낸다. 전부 같게 보내면
+        그 값들로 통을 나누는 구현도 테스트를 통과한다. 특히 코드로
+        나누는 구현이 위험한데, 실제 코드는 매번 달라서 제한이 영영
+        안 걸린다.
+        """
+        self._try_count = getattr(self, "_try_count", 0) + 1
+        n = self._try_count
+
+        return self.client.post(
+            GOOGLE_URL,
+            {"code": f"code-{n}", "redirect_uri": f"{REDIRECT_URI}?v={n}"},
+            content_type="application/json",
+            REMOTE_ADDR=f"10.0.0.{n}",
+            HTTP_USER_AGENT=f"tester/{n}",
+            **extra,
+        )
+
+    def test_google_throttle_counts_every_account(self):
+        """계정별로 세면 계정을 늘려가며 무한히 시도할 수 있다.
+
+        토큰을 붙였다고 아예 안 세는 구현도 있어, 그 경우 계정 하나만
+        만들면 제한이 통째로 사라진다.
+        """
+        self.narrow_google_throttle()
+
+        tokens = []
+        for name in ("a", "b"):
+            user = User.objects.create_user(
+                email=f"{name}@example.com", password=PASSWORD
+            )
+            tokens.append(Token.objects.create(user=user).key)
+
+        # 계정을 바꿔가며, 중간에 로그인 안 한 채로도 보낸다. 어떻게
+        # 나눠 보내도 합쳐서 세야 한다 - 인증 여부로 통을 가르는 구현도
+        # 있어서, 토큰 요청만으로는 그것을 잡지 못한다.
+        self.try_google(HTTP_AUTHORIZATION=f"Token {tokens[0]}")
+        self.try_google(HTTP_AUTHORIZATION=f"Token {tokens[1]}")
+        self.try_google()
+
+        res = self.try_google(HTTP_AUTHORIZATION=f"Token {tokens[0]}")
+
+        self.assertEqual(res.status_code, 429)
+
+    def test_google_throttle_ignores_forwarded_header(self):
+        """주소를 알려주는 헤더는 아무나 지어낼 수 있다.
+
+        그것으로 통을 나누면 헤더만 바꿔가며 무한히 시도할 수 있다.
+        """
+        self.narrow_google_throttle()
+
+        for i in range(3):
+            self.try_google(HTTP_X_FORWARDED_FOR=f"1.2.3.{i}")
+
+        res = self.try_google(HTTP_X_FORWARDED_FOR="9.9.9.9")
+
+        self.assertEqual(res.status_code, 429)
+
     def test_case_does_not_bypass(self):
         """대소문자를 바꿔가며 같은 계정을 계속 때릴 수 없어야 한다."""
         for _ in range(3):
@@ -304,6 +389,244 @@ class ThrottleTest(TestCase):
         res = self.login(email="TARGET@EXAMPLE.COM")
 
         self.assertEqual(res.status_code, 429)
+
+
+class GoogleLoginTest(TestCase):
+    """구글 로그인.
+
+    구글을 실제로 부르지 않는다. 네트워크가 필요하고, 코드는 한 번만
+    쓸 수 있어 테스트를 반복할 수 없다. 구글에 물어보는 부분만 가짜로
+    바꾸고 그 뒤 처리를 확인한다.
+    """
+
+    def setUp(self):
+        # 구글 제한은 통이 하나라 클래스가 달라도 횟수가 이어진다.
+        # 비워두지 않으면 나중에 제한을 낮출 때 엉뚱한 테스트가 깨진다.
+        cache.clear()
+
+    def google(self, **body):
+        payload = {"code": "구글이-준-코드", "redirect_uri": REDIRECT_URI, **body}
+        return self.client.post(
+            GOOGLE_URL, payload, content_type="application/json"
+        )
+
+    def patch_google(self, email="new@example.com", name="구글사용자"):
+        return mock.patch(
+            "apps.accounts.views.fetch_google_user",
+            return_value={"email": email, "name": name},
+        )
+
+    def test_creates_account_on_first_login(self):
+        with self.patch_google():
+            res = self.google()
+
+        self.assertEqual(res.status_code, 201)
+        self.assertIn("token", res.json())
+        self.assertTrue(User.objects.filter(email="new@example.com").exists())
+
+    def test_uses_google_name(self):
+        with self.patch_google(name="홍길동"):
+            self.google()
+
+        self.assertEqual(
+            User.objects.get(email="new@example.com").display_name, "홍길동"
+        )
+
+    def test_second_login_reuses_account(self):
+        with self.patch_google():
+            first = self.google()
+        with self.patch_google():
+            second = self.google()
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(User.objects.count(), 1)
+
+    def test_links_to_existing_email_account(self):
+        """이메일로 가입한 사람이 구글로 들어와도 같은 계정이어야 한다.
+
+        따로 만들면 학습 기록이 두 계정으로 갈리고, 사용자는 자기 기록이
+        어디 갔는지 알 수 없다.
+        """
+        existing = User.objects.create_user(
+            email="both@example.com", password=PASSWORD, display_name="원래이름"
+        )
+
+        with self.patch_google(email="both@example.com"):
+            res = self.google()
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(User.objects.count(), 1)
+        self.assertEqual(res.json()["user"]["id"], existing.pk)
+
+    def test_login_does_not_cut_other_devices(self):
+        """구글로 들어와도 다른 기기가 끊기지 않는다.
+
+        두 방법을 번갈아 쓰는 사람이 있다. PC 에서 이메일로 들어와 있는데
+        폰에서 구글로 들어왔다고 PC 가 로그아웃되면 안 된다.
+        """
+        user = User.objects.create_user(
+            email="both@example.com", password=PASSWORD
+        )
+        token = Token.objects.create(user=user)
+
+        with self.patch_google(email="both@example.com"):
+            self.google()
+
+        self.assertEqual(
+            self.client.get(
+                ME_URL, HTTP_AUTHORIZATION=f"Token {token.key}"
+            ).status_code,
+            200,
+        )
+
+    def test_created_account_has_no_blank_password(self):
+        """만드는 도중에 비밀번호가 빈 값인 상태가 없어야 한다.
+
+        빈 문자열은 "쓸 수 있는 비밀번호" 로 판정돼, 그 상태로 로그인을
+        시도하면 400 이 아니라 500 이 난다.
+        """
+        with self.patch_google():
+            self.google()
+
+        user = User.objects.get(email="new@example.com")
+        self.assertNotEqual(user.password, "")
+        self.assertFalse(user.has_usable_password())
+
+        res = self.client.post(
+            LOGIN_URL,
+            {"email": "new@example.com", "password": ""},
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_existing_display_name_is_kept(self):
+        """이미 정한 이름을 구글 이름으로 덮어쓰지 않는다."""
+        User.objects.create_user(
+            email="both@example.com", password=PASSWORD, display_name="내가정한이름"
+        )
+
+        with self.patch_google(email="both@example.com", name="구글이름"):
+            self.google()
+
+        self.assertEqual(
+            User.objects.get(email="both@example.com").display_name, "내가정한이름"
+        )
+
+    def test_email_case_does_not_split_account(self):
+        """구글이 대문자 섞인 이메일을 줘도 같은 계정으로 모여야 한다."""
+        User.objects.create_user(email="mixed@example.com", password=PASSWORD)
+
+        with self.patch_google(email="Mixed@Example.com"):
+            res = self.google()
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(User.objects.count(), 1)
+
+    def test_new_account_cannot_login_with_password(self):
+        """구글로 만든 계정에 빈 비밀번호로 들어올 수 없어야 한다."""
+        with self.patch_google():
+            self.google()
+
+        user = User.objects.get(email="new@example.com")
+        self.assertFalse(user.has_usable_password())
+
+    def test_new_account_is_not_staff(self):
+        with self.patch_google():
+            self.google()
+
+        user = User.objects.get(email="new@example.com")
+        self.assertFalse(user.is_staff)
+
+    def test_inactive_account_is_rejected(self):
+        User.objects.create_user(
+            email="stopped@example.com", password=PASSWORD, is_active=False
+        )
+
+        with self.patch_google(email="stopped@example.com"):
+            res = self.google()
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_rejects_missing_code(self):
+        for body in ({"code": ""}, {"code": None}, {"code": 123}, {"code": []}):
+            with self.subTest(body=body):
+                self.assertEqual(self.google(**body).status_code, 400)
+
+    def test_rejects_missing_redirect_uri(self):
+        self.assertEqual(self.google(redirect_uri="").status_code, 400)
+
+    def test_rejects_non_object_body(self):
+        for body in ("[]", '"문자열"', "123", "null"):
+            with self.subTest(body=body):
+                res = self.client.post(
+                    GOOGLE_URL, body, content_type="application/json"
+                )
+                self.assertEqual(res.status_code, 400)
+
+    def test_google_failure_becomes_400(self):
+        """구글이 거절하면 500 이 아니라 안내가 나가야 한다."""
+        with mock.patch(
+            "apps.accounts.views.fetch_google_user",
+            side_effect=GoogleAuthError("구글 로그인을 확인하지 못했습니다."),
+        ):
+            res = self.google()
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("구글", res.json()["detail"])
+
+
+class GoogleFetchTest(TestCase):
+    """구글에 물어보는 부분.
+
+    확인되지 않은 이메일을 받으면 그 주소의 진짜 주인 계정으로 들어갈
+    수 있다. 그 검사가 실제로 도는지 본다.
+    """
+
+    def test_rejects_unverified_email(self):
+        with mock.patch("apps.accounts.google.httpx.Client") as client:
+            ctx = client.return_value.__enter__.return_value
+            ctx.post.return_value = mock.Mock(
+                status_code=200, json=lambda: {"access_token": "t"}
+            )
+            ctx.get.return_value = mock.Mock(
+                status_code=200,
+                json=lambda: {
+                    "email": "someone@example.com",
+                    "name": "이름",
+                    "email_verified": False,
+                },
+            )
+
+            with self.assertRaises(GoogleAuthError):
+                fetch_google_user("code", REDIRECT_URI)
+
+    def test_rejects_missing_email(self):
+        with mock.patch("apps.accounts.google.httpx.Client") as client:
+            ctx = client.return_value.__enter__.return_value
+            ctx.post.return_value = mock.Mock(
+                status_code=200, json=lambda: {"access_token": "t"}
+            )
+            ctx.get.return_value = mock.Mock(
+                status_code=200, json=lambda: {"email_verified": True}
+            )
+
+            with self.assertRaises(GoogleAuthError):
+                fetch_google_user("code", REDIRECT_URI)
+
+    def test_rejects_when_google_refuses_code(self):
+        with mock.patch("apps.accounts.google.httpx.Client") as client:
+            ctx = client.return_value.__enter__.return_value
+            ctx.post.return_value = mock.Mock(status_code=400)
+
+            with self.assertRaises(GoogleAuthError):
+                fetch_google_user("code", REDIRECT_URI)
+
+    @override_settings(GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="")
+    def test_requires_settings(self):
+        """키가 없으면 조용히 실패하지 않고 이유를 알려준다."""
+        with self.assertRaises(GoogleAuthError):
+            fetch_google_user("code", REDIRECT_URI)
 
 
 class AdminTest(TestCase):

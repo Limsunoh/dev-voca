@@ -23,6 +23,8 @@ type Props = {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   /** 로그인 후 돌아갈 곳. */
   next?: string;
+  /** 구글 로그인이 실패해 돌아온 경우. */
+  googleFailed?: boolean;
 };
 
 const COPY = {
@@ -44,9 +46,13 @@ const COPY = {
   },
 } as const;
 
-export function AuthForm({ mode, action, next }: Props) {
+export function AuthForm({ mode, action, next, googleFailed }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(action, {});
   const copy = COPY[mode];
+
+  const googleHref = next
+    ? `/api/auth/google?next=${encodeURIComponent(next)}`
+    : "/api/auth/google";
 
   return (
     <div className="mx-auto w-full max-w-sm">
@@ -57,7 +63,31 @@ export function AuthForm({ mode, action, next }: Props) {
         로그인하면 푼 문제와 틀린 단어가 기기를 옮겨도 이어집니다.
       </p>
 
-      <form action={formAction} className="mt-8 grid gap-4">
+      {googleFailed && (
+        <p
+          role="alert"
+          className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+        >
+          구글 로그인을 마치지 못했습니다. 다시 시도해주세요.
+        </p>
+      )}
+
+      {/* 링크지만 버튼처럼 보인다. 누르면 구글 동의 화면으로 간다. */}
+      <a
+        href={googleHref}
+        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-md border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+      >
+        <GoogleMark />
+        구글로 계속하기
+      </a>
+
+      <div className="mt-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+        <span className="text-xs text-slate-500 dark:text-slate-400">또는</span>
+        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+      </div>
+
+      <form action={formAction} className="mt-6 grid gap-4">
         {next && <input type="hidden" name="next" value={next} />}
 
         <Field
@@ -113,6 +143,35 @@ export function AuthForm({ mode, action, next }: Props) {
         </Link>
       </p>
     </div>
+  );
+}
+
+/**
+ * 구글 로고.
+ *
+ * 구글 브랜드 규정상 색과 모양을 바꾸지 않는다. 다크 모드에서도
+ * 그대로 둔다.
+ */
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"
+      />
+    </svg>
   );
 }
 

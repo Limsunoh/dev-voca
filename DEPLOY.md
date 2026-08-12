@@ -5,7 +5,7 @@ Railway 기준. 다른 플랫폼도 대부분 같은 값이 필요하다.
 ## Procfile
 
 ```
-release: python backend/manage.py migrate --noinput
+release: python backend/manage.py migrate --noinput && python backend/manage.py createcachetable
 web: python backend/manage.py collectstatic --noinput && gunicorn ...
 ```
 
@@ -147,6 +147,58 @@ railway ssh --service web
 | `/admin/accounts/user/add/` | 계정 추가 화면이 뜬다 |
 | Admin 에서 단어 수정 후 저장 | 500 이 안 난다(로그 외래키 확인) |
 | `/api/vocab/words/` | 200, 566개 |
+
+## 캐시 테이블
+
+로그인·가입·구글 로그인의 시도 횟수를 DB 에 센다. `release` 가
+`createcachetable` 을 함께 돌리므로 따로 할 일은 없다. 이미 있으면
+그냥 넘어가서 매 배포에 반복돼도 안전하다.
+
+프로세스 메모리를 쓰지 않는 이유: 워커마다 따로 세서 실제 한도가 워커
+수만큼 늘어나고, 재시작하면 0 으로 돌아간다.
+
+테이블이 없으면 조회·문제풀기는 멀쩡한데 **로그인 계열만 500** 이 난다.
+스모크 테스트가 초록이어도 인증이 죽어 있을 수 있으니, 배포 후 로그인을
+한 번 해본다.
+
+## 구글 로그인
+
+환경변수가 **양쪽에** 필요하다. 한쪽만 넣으면 버튼은 보이는데 눌러도 안 된다.
+
+| 어디 | 변수 | 왜 |
+|---|---|---|
+| Railway (백엔드) | `GOOGLE_CLIENT_ID` | 구글에 코드를 확인할 때 |
+| Railway (백엔드) | `GOOGLE_CLIENT_SECRET` | 같이 보내야 한다. **프론트에는 넣지 않는다** |
+| Vercel (프론트) | `GOOGLE_CLIENT_ID` | 구글 동의 화면 주소를 만들 때 |
+| Vercel (프론트) | `APP_ORIGIN` | 아래 참고 |
+
+`APP_ORIGIN` 은 `https://dev-voca.vercel.app` 처럼 스킴을 포함한 주소다.
+없으면 요청에서 주소를 유추하는데, 프록시 뒤에서는 https 로 들어온 요청이
+앱에는 http 로 보일 수 있다. 그러면 구글이 등록된 주소와 다르다며 거절하고,
+사용자에게는 "구글 로그인을 마치지 못했습니다" 만 보여 원인을 찾기 어렵다.
+
+### 구글 콘솔
+
+Google Cloud Console > 사용자 인증 정보 > OAuth 클라이언트 ID(웹 애플리케이션)의
+**승인된 리디렉션 URI** 에 아래를 등록한다. 글자 하나라도 다르면 거절당한다.
+
+```
+http://localhost:3000/api/auth/google/callback
+https://dev-voca.vercel.app/api/auth/google/callback
+```
+
+첫 줄은 로컬 개발용이다. 도메인을 바꾸면 여기도 같이 바꾼다.
+
+### 확인
+
+| 확인 | 기대 |
+|---|---|
+| 로그인 화면의 "구글로 계속하기" | 구글 동의 화면으로 간다 |
+| 계정 선택 후 | devvoca 로 돌아오고 머리말에 이름이 뜬다 |
+| Admin 의 사용자 목록 | 그 계정이 보이고 비밀번호가 "사용 불가" 다 |
+
+"구글 로그인을 마치지 못했습니다" 가 뜨면 이유는 Vercel 함수 로그에 있다.
+`redirect_uri_mismatch` 면 위 URI 등록을, 500 이면 백엔드 로그를 본다.
 
 ## 아직 안 한 것
 
