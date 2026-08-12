@@ -187,6 +187,17 @@ py ~/.claude/hooks/record_verification.py --show
 | `review_skill` | `.claude/agents/devvoca-reviewer.md` (전역 code-reviewer 스킬 대신 — 도메인 규칙을 안다) |
 | `qa` | UI 를 건드린 변경이면 `impeccable` 로 채운다 — 절차는 `.claude/skills/devvoca-design/SKILL.md`. 백엔드·프론트 무관한 변경이면 `--skip` |
 
+**화면 QA 는 두 크기를 반드시 다 본다.** 하나만 보고 기록하지 않는다.
+
+| 크기 | 용도 |
+|---|---|
+| 390 x 844 | 폰 (iPhone 기준) |
+| 1280 x 800 | 데스크톱 |
+
+`mcp__playwright__browser_resize` 로 바꾸고 각각 스크린샷을 찍어 눈으로 확인한다. QA 를 서브에이전트에 맡길 때도 **프롬프트에 두 크기를 명시**한다.
+
+데스크톱만 보면 여백이 넉넉해 겹침·넘침이 안 보인다. 2026-08-12 로그인 화면에서 실제로 그랬다 — 머리말이 두 번 나오고 홈에 스크롤이 생겼는데 데스크톱에서는 둘 다 안 띄었고, 모바일로 보자마자 드러났다. 타겟이 주니어 개발자라 폰으로 볼 일이 많다.
+
 기록:
 ```
 py ~/.claude/hooks/record_verification.py static --agent static-verifier --note '...'

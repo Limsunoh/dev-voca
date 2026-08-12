@@ -119,9 +119,26 @@ npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words   # �
 
 그래서 눈으로 볼 것을 정해둔다.
 
+**두 크기를 반드시 다 본다.** 하나만 보고 넘어가지 않는다.
+
+```
+mcp__playwright__browser_resize  390 x 844    # 폰
+mcp__playwright__browser_resize  1280 x 800   # 데스크톱
+```
+
+각각 `browser_take_screenshot` 으로 찍어 **이미지를 직접 열어 본다.** 스냅샷(접근성 트리)만으로는 겹침·넘침이 안 보인다.
+
+데스크톱만 보면 여백이 넉넉해 문제가 묻힌다. 2026-08-12 로그인 화면에서 실제로 그랬다 — 머리말이 두 번 나오고 홈에 불필요한 스크롤이 생겼는데, 데스크톱에서는 둘 다 안 띄었고 모바일로 보자마자 드러났다.
+
+QA 를 서브에이전트에 맡길 때도 **프롬프트에 두 크기를 명시한다.** 안 적으면 데스크톱만 보고 온다.
+
+볼 것:
+
 - 단어 목록에서 **라틴과 한글이 한 줄에 섞였을 때** 어긋나 보이지 않는지
 - 발음기호(IPA)가 깨지거나 폭이 어긋나지 않는지
 - 모바일 폭에서 필터·페이지네이션이 눌리는지
+- 머리말·탭 같은 공통 요소가 **화면마다 중복되지 않는지**
+- 세로 높이가 화면을 넘어 불필요한 스크롤이 생기지 않는지
 - 다크 모드로 전환했을 때 대비가 무너지지 않는지
 
 `detect` 가 0건이면 "AI 티가 없다" 는 뜻이지 "잘 만들었다" 는 뜻이 아니다. 밋밋함은 탐지기가 잡는 항목이 아니다.
@@ -131,7 +148,7 @@ npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words   # �
 UI 를 건드렸으면 `qa` 단계를 실제로 채운다. 결과 건수를 사유에 적어둔다.
 
 ```
-py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 데스크톱/모바일 각 1회, N건. 폰트·다크모드는 눈으로 확인'
+py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 데스크톱/모바일 각 1회 N건. 390x844 와 1280x800 스크린샷 확인, 폰트·다크모드 포함'
 ```
 
 ### 하지 말 것
@@ -164,7 +181,7 @@ npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words
 CLAUDE.md의 검증 5단계 중 `qa`는 "프론트 미구현"을 이유로 계속 `--skip` 상태였다. 이제 화면이 있으니 UI를 건드린 변경에서는 실제로 채운다.
 
 ```
-py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'impeccable audit + detect 데스크톱/모바일, 결과 N건'
+py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'impeccable audit + detect 데스크톱/모바일 N건. 390x844 와 1280x800 스크린샷 확인'
 ```
 
 `impeccable`의 훅 기능(`/impeccable hooks on`)은 **켜지 않는다.** devvoca에는 `check_verification` 훅이 있어서 "코드를 고치면 정적 검증부터 다시"를 강제한다. UI 파일 편집마다 탐지기가 자동으로 끼어들면 검증 지문이 계속 무효화된다. 수동으로만 부른다.
