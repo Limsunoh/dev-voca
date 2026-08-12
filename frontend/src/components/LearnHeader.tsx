@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { ContentTabs } from "@/components/ContentTabs";
 import { ModeTabs } from "@/components/ModeTabs";
 
@@ -24,14 +22,9 @@ export function LearnHeader({
 }) {
   return (
     <header>
-      <Link
-        href="/"
-        className="text-sm text-slate-500 hover:underline dark:text-slate-400"
-      >
-        devvoca
-      </Link>
-
-      <div className="mt-3">
+      {/* 홈으로 가는 링크는 사이트 머리말이 이미 갖고 있다.
+          여기 또 두면 화면 위쪽에 devvoca 가 두 번 보인다. */}
+      <div>
         <ModeTabs current={mode} content={content} />
       </div>
 

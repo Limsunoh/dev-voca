@@ -3,8 +3,10 @@ import Link from "next/link";
 import { routes } from "@/lib/routes";
 
 export default function Home() {
+  // flex-1 로 남은 높이를 채운다. min-h-screen 을 쓰면 위에 놓인
+  // 머리말 높이만큼 화면을 넘어가 스크롤이 생긴다.
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-4 py-10">
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-4 py-10">
       <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
         devvoca
       </h1>

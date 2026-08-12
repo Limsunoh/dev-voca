@@ -63,16 +63,62 @@ export function buildQuery(params: Record<string, string | undefined>): string {
 }
 
 type RequestOptions = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PATCH";
   /** JSON 으로 직렬화해 본문에 싣는다. */
   body?: unknown;
+  /**
+   * 인증 토큰. 서버가 쿠키에서 꺼내 넘긴다.
+   *
+   * 브라우저는 이 값을 볼 수 없다 - 토큰은 httpOnly 쿠키에만 있고,
+   * 그것을 읽어 헤더에 붙이는 일은 Next 서버에서만 일어난다.
+   */
+  token?: string;
 };
+
+/**
+ * 백엔드가 준 안내 문구를 꺼낸다.
+ *
+ * 상태 코드만 남기면 "이미 가입된 이메일입니다" 같은 안내가 사용자에게
+ * 닿지 않는다. 사용자는 왜 안 되는지 모른 채 같은 시도를 반복한다.
+ *
+ * DRF 는 형태가 여러 가지다.
+ *   {"detail": "..."}                  권한·인증 오류
+ *   {"non_field_errors": ["..."]}      폼 전체에 걸린 오류
+ *   {"email": ["..."], "password": [...]}  칸별 오류
+ */
+async function errorMessage(res: Response): Promise<string> {
+  const fallback = `요청이 실패했습니다. (${res.status})`;
+
+  // 서버 오류의 본문은 그대로 보여주지 않는다. 거기엔 사용자가 할 수 있는
+  // 일이 없고, 내부 사정이 적혀 나갈 수 있다. 400 대만 안내로 쓴다.
+  if (res.status >= 500) return fallback;
+
+  try {
+    const data = await res.json();
+
+    // 객체가 아니면 아래 순회가 이상하게 동작한다. 문자열이 오면
+    // Object.values 가 글자 하나씩 쪼개서 첫 글자만 보여준다.
+    if (!data || typeof data !== "object") return fallback;
+
+    if (typeof data.detail === "string") return data.detail;
+
+    // 칸별 오류는 첫 줄만 보여준다. 여러 개를 이어 붙이면 읽기 어렵다.
+    for (const value of Object.values(data)) {
+      if (typeof value === "string") return value;
+      if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+    }
+  } catch {
+    // 본문이 JSON 이 아닌 경우. 아래 기본 문구를 쓴다.
+  }
+
+  return fallback;
+}
 
 export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = "GET", body } = options;
+  const { method = "GET", body, token } = options;
 
   let res: Response;
   try {
@@ -81,6 +127,7 @@ export async function request<T>(
       headers: {
         Accept: "application/json",
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(token ? { Authorization: `Token ${token}` } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       // 캐시하지 않는다. 검수 상태(is_reviewed)는 언제든 바뀌는 값이라,
@@ -95,8 +142,10 @@ export async function request<T>(
   }
 
   if (!res.ok) {
-    throw new ApiError(`요청이 실패했습니다. (${res.status})`, res.status);
+    throw new ApiError(await errorMessage(res), res.status);
   }
+  // 204 는 본문이 없다. json() 을 부르면 파싱 에러가 난다.
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
