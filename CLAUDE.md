@@ -20,6 +20,7 @@ devvoca는 주니어 개발자들이 흔히 보는 개발 영어 용어들과 �
 | DB | PostgreSQL (로컬은 Docker) |
 | 프론트 | Next.js (App Router) + TypeScript |
 | AI | Anthropic Claude API (콘텐츠 생성 전용) |
+| 모바일 앱 (예정) | React Native (Expo), 별도 프로젝트. 착수는 학습 기록·점수 API 다음. **웹에는 Ionic 을 넣지 않는다** (이유는 `.claude/skills/devvoca-design/SKILL.md`) |
 | 패키지 관리 | Python: pip + requirements.txt / JS: npm 또는 pnpm |
 | 배포 | 미정 (후보: 백엔드 Railway, 프론트 Vercel) |
 
