@@ -43,7 +43,16 @@ class UserAdmin(BaseUserAdmin):
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("정보", {"fields": ("display_name",)}),
+        (
+            "정보",
+            {
+                "fields": ("display_name", "avatar", "google_picture"),
+                # google_picture 는 구글이 주는 값이라 손으로 고칠 것이
+                # 아니지만, 사진이 안 뜬다는 문의가 왔을 때 무엇이 저장돼
+                # 있는지 봐야 해서 열어둔다.
+                "description": "보여지는 이름은 대소문자를 구분하지 않고 중복될 수 없습니다.",
+            },
+        ),
         (
             "권한",
             {

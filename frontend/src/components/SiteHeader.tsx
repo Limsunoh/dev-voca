@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/(auth)/actions";
+import { Avatar } from "@/components/Avatar";
 import { getCurrentUser } from "@/lib/session";
 
 /**
@@ -23,10 +24,18 @@ export async function SiteHeader() {
         </Link>
 
         {user ? (
-          <nav aria-label="계정" className="flex items-center gap-3 text-sm">
-            <span className="text-slate-600 dark:text-slate-400">
-              {user.name}
-            </span>
+          <nav aria-label="계정" className="flex items-center gap-2 text-sm">
+            {/* 이름과 사진이 프로필로 가는 입구다. 폰에서는 이름이 길면
+                줄바꿈이 나서 머리말 높이가 튀므로 한 줄로 자른다. */}
+            <Link
+              href="/profile"
+              className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:hover:bg-slate-800"
+            >
+              <Avatar shown={user.avatar_display} size={28} />
+              <span className="max-w-28 truncate text-slate-700 sm:max-w-40 dark:text-slate-300">
+                {user.name}
+              </span>
+            </Link>
             {/* 로그아웃은 상태를 바꾸는 동작이라 링크가 아니라 폼이다.
                 링크로 두면 브라우저나 확장이 미리 눌러볼 수 있다. */}
             <form action={logoutAction}>

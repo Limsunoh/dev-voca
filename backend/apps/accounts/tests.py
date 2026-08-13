@@ -4,6 +4,7 @@
 실패했을 때 그 응답만으로 가입 여부를 알아낼 수 없는가.
 """
 
+import unicodedata
 from importlib import import_module
 from unittest import mock
 
@@ -11,11 +12,13 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.management import call_command
-from django.db import DatabaseError, connection
+from django.db import DatabaseError, connection, migrations
+from django.db.migrations.loader import MigrationLoader
 from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.authtoken.models import Token
 
 from .google import GoogleAuthError, fetch_google_user
+from .models import DISPLAY_NAME_MAX, free_display_name, name_taken
 from .throttles import EmailRateThrottle, GoogleRateThrottle
 
 # 마이그레이션 모듈은 이름이 숫자로 시작해 평범한 import 가 안 된다.
@@ -248,6 +251,116 @@ class MeTest(TestCase):
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_staff)
 
+    def _patch(self, body: dict):
+        return self.client.patch(
+            ME_URL, body, content_type="application/json", **self.auth()
+        )
+
+    def test_name_already_taken_is_rejected(self):
+        self.other.display_name = "먼저잡은이름"
+        self.other.save()
+
+        res = self._patch({"display_name": "먼저잡은이름"})
+
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertNotEqual(self.user.display_name, "먼저잡은이름")
+
+    def test_name_taken_check_ignores_case(self):
+        """대소문자만 바꿔 같은 이름을 또 만들 수 없다.
+
+        허용하면 순위표에서 누가 누구인지 구분이 안 된다.
+        """
+        self.other.display_name = "Devvoca"
+        self.other.save()
+
+        res = self._patch({"display_name": "devvoca"})
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_name_is_trimmed_before_the_taken_check(self):
+        """다듬기 전 값으로 중복을 보면 "이름 " 이 통과한다."""
+        self.other.display_name = "같은이름"
+        self.other.save()
+
+        res = self._patch({"display_name": "  같은이름  "})
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_hidden_characters_cannot_fake_another_name(self):
+        """폭 없는 공백을 끼워 남의 이름과 똑같이 보이게 만들 수 없다.
+
+        지우고 나면 같은 이름이 되므로 중복으로 걸린다. 이걸 막지 않으면
+        순위표에 똑같이 보이는 두 사람이 생긴다.
+        """
+        self.other.display_name = "임선오"
+        self.other.save()
+
+        # U+200B 폭 없는 공백. 소스에 직접 쓰지 않고 코드포인트로 만든다.
+        res = self._patch({"display_name": "임선" + chr(0x200B) + "오"})
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_name_longer_than_the_limit_is_rejected(self):
+        """순위표는 이름을 여러 개 늘어놓는 화면이라 길이를 묶어둔다.
+
+        모델의 max_length 에 맡기면 저장할 때 걸려서 500 이 난다.
+        """
+        res = self._patch({"display_name": "가" * (DISPLAY_NAME_MAX + 1)})
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_name_at_the_limit_is_allowed(self):
+        """경계값이 막히면 쓸 수 있는 이름을 못 쓰게 된다."""
+        res = self._patch({"display_name": "가" * DISPLAY_NAME_MAX})
+
+        self.assertEqual(res.status_code, 200)
+
+    def test_length_is_counted_after_trimming(self):
+        """다듬기 전 값으로 세면 공백 때문에 억울하게 막힌다."""
+        res = self._patch({"display_name": "  " + "가" * DISPLAY_NAME_MAX + "  "})
+
+        self.assertEqual(res.status_code, 200)
+
+    def test_blank_name_is_rejected(self):
+        """공백만 보내면 이름이 사라진다. save() 가 지어주긴 하지만,
+        사용자가 지우려 한 것인지 실수인지 알 수 없으므로 되묻는다."""
+        res = self._patch({"display_name": "   "})
+
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.display_name)
+
+    def test_keeping_own_name_is_allowed(self):
+        """자기 이름을 그대로 두고 아바타만 바꾸는 경우가 막히면 안 된다."""
+        res = self._patch(
+            {"display_name": self.user.display_name, "avatar": "a3"}
+        )
+
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.avatar, "a3")
+
+    def test_avatar_choice_is_limited(self):
+        res = self._patch({"avatar": "../../etc/passwd"})
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_cannot_set_google_picture(self):
+        """구글이 주는 값이다. 아무 주소나 넣을 수 있으면 우리 화면을 여는
+        것만으로 그 서버에 요청이 나가는 통로가 된다."""
+        self._patch({"google_picture": "https://evil.example.com/track.png"})
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.google_picture, "")
+
+    def test_avatar_display_falls_back_when_there_is_no_photo(self):
+        res = self.client.get(ME_URL, **self.auth())
+
+        shown = res.json()["avatar_display"]
+        self.assertEqual(shown["type"], "preset")
+        self.assertIn(shown["key"], ("a1", "a2", "a3", "a4", "a5", "a6"))
+
 
 class LogoutTest(TestCase):
     @classmethod
@@ -423,10 +536,21 @@ class GoogleLoginTest(TestCase):
             GOOGLE_URL, payload, content_type="application/json"
         )
 
-    def patch_google(self, email="new@example.com", name="구글사용자"):
+    def patch_google(
+        self,
+        email="new@example.com",
+        name="구글사용자",
+        picture="https://lh3.googleusercontent.com/a/first",
+    ):
+        """fetch_google_user 가 돌려주는 것과 같은 모양으로 흉내 낸다.
+
+        키를 빠뜨리면 뷰가 KeyError 로 터진다. 그게 맞다 - 실제 함수는
+        세 키를 항상 채우므로, 흉내가 그것과 어긋나면 테스트가 통과해도
+        의미가 없다.
+        """
         return mock.patch(
             "apps.accounts.views.fetch_google_user",
-            return_value={"email": email, "name": name},
+            return_value={"email": email, "name": name, "picture": picture},
         )
 
     def test_creates_account_on_first_login(self):
@@ -444,6 +568,62 @@ class GoogleLoginTest(TestCase):
         self.assertEqual(
             User.objects.get(email="new@example.com").display_name, "홍길동"
         )
+
+    def test_taken_google_name_gets_a_number(self):
+        """동명이인이라고 가입이 막히면 안 된다.
+
+        구글 이름은 사용자가 고른 것이 아니라 받아온 것이라, 실패하면
+        본인이 뭘 잘못했는지 알 수 없다.
+        """
+        User.objects.create_user(
+            email="other@example.com", password=PASSWORD, display_name="홍길동"
+        )
+
+        with self.patch_google(name="홍길동"):
+            res = self.google()
+
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(
+            User.objects.get(email="new@example.com").display_name, "홍길동2"
+        )
+
+    def test_stores_google_picture(self):
+        with self.patch_google(picture="https://lh3.googleusercontent.com/a/x"):
+            self.google()
+
+        user = User.objects.get(email="new@example.com")
+        self.assertEqual(user.google_picture, "https://lh3.googleusercontent.com/a/x")
+        self.assertEqual(
+            user.avatar_display,
+            {"type": "photo", "url": "https://lh3.googleusercontent.com/a/x"},
+        )
+
+    def test_picture_is_refreshed_on_later_logins(self):
+        """구글에서 사진을 바꾸면 옛 주소가 죽어 깨진 그림이 남는다."""
+        with self.patch_google(picture="https://lh3.googleusercontent.com/a/old"):
+            self.google()
+        with self.patch_google(picture="https://lh3.googleusercontent.com/a/new"):
+            self.google()
+
+        self.assertEqual(
+            User.objects.get(email="new@example.com").google_picture,
+            "https://lh3.googleusercontent.com/a/new",
+        )
+
+    def test_later_logins_keep_the_name_the_user_chose(self):
+        """바꾼 이름이 다음 로그인에 구글 이름으로 되돌아가면 안 된다."""
+        with self.patch_google(name="구글이름"):
+            self.google()
+
+        user = User.objects.get(email="new@example.com")
+        user.display_name = "내가정한이름"
+        user.save()
+
+        with self.patch_google(name="구글이름"):
+            self.google()
+
+        user.refresh_from_db()
+        self.assertEqual(user.display_name, "내가정한이름")
 
     def test_second_login_reuses_account(self):
         with self.patch_google():
@@ -706,10 +886,18 @@ class UserModelTest(TestCase):
         user.refresh_from_db()
         self.assertEqual(user.email, "mixed.case@example.com")
 
-    def test_display_name_falls_back_to_email(self):
+    def test_blank_name_is_generated_not_taken_from_email(self):
+        """이름을 안 적으면 지어준다. 이메일 앞부분을 쓰면 안 된다.
+
+        예전에는 비어 있을 때 화면에서 이메일 앞부분을 대신 보여줬다.
+        순위표에 이름이 뜨기 시작하면 그건 남의 메일 주소 절반을 공개하는
+        것이 된다.
+        """
         user = User.objects.create_user(email="hong@example.com", password=PASSWORD)
 
-        self.assertEqual(user.name_for_display, "hong")
+        self.assertNotIn("hong", user.display_name)
+        self.assertTrue(user.display_name.startswith("학습자"))
+        self.assertEqual(user.name_for_display, user.display_name)
 
 
 class _SchemaEditorStub:
@@ -844,3 +1032,150 @@ class ThrottleCacheTableTest(TransactionTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+
+class DisplayNameMigrationOrderTest(TestCase):
+    """이름 길이를 줄이는 순서를 고정한다.
+
+    처음에는 컬럼 축소가 데이터 정리보다 앞에 있었다. PostgreSQL 은 그
+    자리에서 "value too long" 으로 멈추고 컨테이너가 아예 안 뜬다.
+    SQLite 는 max_length 를 강제하지 않아 테스트가 통과해버린다 - 즉
+    실행해보는 것만으로는 이 순서를 지킬 수 없다.
+
+    그래서 실행이 아니라 마이그레이션의 모양을 본다. 누가 순서를 되돌리면
+    엔진과 무관하게 여기서 걸린다.
+    """
+
+    def _operations_of(self, name: str):
+        module = import_module(f"apps.accounts.migrations.{name}")
+        return module.Migration.operations
+
+    def _alters_display_name_length(self, operations) -> list[int]:
+        return [
+            i
+            for i, op in enumerate(operations)
+            if isinstance(op, migrations.AlterField)
+            and op.name == "display_name"
+            and op.field.max_length == DISPLAY_NAME_MAX
+        ]
+
+    def test_the_column_shrinks_after_the_data_is_cleaned(self):
+        names = [m.name for m in MigrationLoader(None).disk_migrations.values()
+                 if m.app_label == "accounts"]
+
+        cleanup = next(n for n in names if "fill_display_names" in n)
+        shrink = next(
+            n for n in names if self._alters_display_name_length(self._operations_of(n))
+        )
+
+        self.assertLess(
+            cleanup, shrink,
+            "데이터를 자르기 전에 컬럼이 좁아지면 PostgreSQL 배포가 멈춘다",
+        )
+
+    def test_the_constraint_comes_after_the_shrink(self):
+        """같은 파일 안에서도 순서가 있다. 제약이 먼저면 12자로 못 줄인다."""
+        operations = self._operations_of("0005_alter_user_display_name_and_more")
+
+        shrink_at = self._alters_display_name_length(operations)[0]
+        constraint_at = next(
+            i for i, op in enumerate(operations)
+            if isinstance(op, migrations.AddConstraint)
+        )
+
+        self.assertLess(shrink_at, constraint_at)
+
+
+class DisplayNameRulesTest(TestCase):
+    """이름 규칙이 모든 경로에서 같은지 본다.
+
+    가입·프로필 수정·구글 로그인이 각자 다른 판정을 쓰면, 한쪽에서 되는
+    이름이 다른 쪽에서 안 되거나 엉뚱한 안내가 나간다.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(
+            email="owner@example.com", password=PASSWORD, display_name="임선오"
+        )
+
+    def signup(self, **body):
+        payload = {"email": "new@example.com", "password": PASSWORD, **body}
+        return self.client.post(SIGNUP_URL, payload, content_type="application/json")
+
+    def test_signup_says_the_name_is_taken_not_the_email(self):
+        """이름이 겹쳤는데 "이미 가입된 이메일" 이 뜨면, 사용자는 멀쩡한
+        이메일을 바꿔가며 계속 실패한다."""
+        res = self.signup(display_name="임선오")
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("display_name", res.json())
+        self.assertNotIn("email", res.json())
+
+    def test_signup_trims_the_name(self):
+        res = self.signup(display_name="  새이름  ")
+
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(
+            User.objects.get(email="new@example.com").display_name, "새이름"
+        )
+
+    def test_signup_counts_length_after_trimming(self):
+        """다듬기 전 값으로 세면 공백 때문에 억울하게 막힌다."""
+        res = self.signup(display_name="  " + "가" * DISPLAY_NAME_MAX + "  ")
+
+        self.assertEqual(res.status_code, 201)
+
+    def test_signup_rejects_a_name_over_the_limit(self):
+        res = self.signup(display_name="가" * (DISPLAY_NAME_MAX + 1))
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_combining_jamo_cannot_impersonate(self):
+        """한글은 같은 글자를 완성형으로도 자모 조합으로도 쓸 수 있다.
+
+        모아주지 않으면 화면에서 구별할 수 없는 두 이름이 생긴다.
+        """
+        # "임선오" 를 자모로 푼 것. 소스에 붙여넣지 않고 여기서 만든다.
+        decomposed = unicodedata.normalize("NFD", "임선오")
+        self.assertNotEqual(decomposed, "임선오")
+
+        res = self.signup(display_name=decomposed)
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_combining_jamo_does_not_inflate_the_length(self):
+        """자모는 글자당 셋이라, 모으지 않으면 네 글자가 12자로 세어진다."""
+        res = self.signup(display_name=unicodedata.normalize("NFD", "가나다라"))
+
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(
+            User.objects.get(email="new@example.com").display_name, "가나다라"
+        )
+
+    def test_truncating_does_not_leave_a_trailing_space(self):
+        """자르는 위치가 공백이면 검사한 값과 저장되는 값이 달라진다.
+
+        그대로 두면 중복 검사는 통과하고, 저장 직전 정리에서 기존 이름과
+        부딪혀 구글 로그인이 500 이 된다.
+        """
+        User.objects.create_user(
+            email="x@example.com", password=PASSWORD, display_name="abcdefghijk"
+        )
+
+        picked = free_display_name("abcdefghijk zzz")
+
+        self.assertEqual(picked, picked.strip())
+        self.assertNotEqual(picked.lower(), "abcdefghijk")
+
+    def test_taken_check_uses_the_same_folding_as_the_database(self):
+        """파이썬은 upper, DB 는 lower 로 접으면 판정이 갈린다.
+
+        갈리면 파이썬은 통과시키고 DB 가 거절해, 사용자는 이유를 알 수 없는
+        오류를 받는다. 켈빈 기호가 그 예다 - lower 하면 k 가 된다.
+        """
+        User.objects.create_user(
+            email="k@example.com", password=PASSWORD, display_name="kelvin"
+        )
+
+        self.assertTrue(name_taken("Kelvin"))

@@ -52,7 +52,7 @@ def fetch_google_user(code: str, redirect_uri: str) -> dict:
     같은지 대조한다. 다르면 거절한다 - 남의 코드를 가로채 다른 사이트에서
     쓰는 것을 막는 장치다.
 
-    돌려주는 것: {"email": ..., "name": ...}
+    돌려주는 것: {"email": ..., "name": ..., "picture": ...}
     확인되지 않은 이메일은 여기서 걸러내므로 호출부는 검사할 필요가 없다.
     """
     client_id = _require("GOOGLE_CLIENT_ID")
@@ -110,4 +110,26 @@ def fetch_google_user(code: str, redirect_uri: str) -> dict:
     return {
         "email": email,
         "name": (info.get("name") or "").strip(),
+        "picture": _safe_picture(info.get("picture")),
     }
+
+
+def _safe_picture(value: object) -> str:
+    """구글이 준 사진 주소. 믿을 수 있는 것만 통과시킨다.
+
+    이 값은 그대로 저장돼 나중에 브라우저가 불러온다. 검사 없이 받으면
+    구글 응답이 바뀌거나 중간에서 갈아치웠을 때 아무 주소나 화면에 박히고,
+    사용자가 우리 화면을 여는 것만으로 그쪽 서버에 요청이 나간다.
+
+    javascript: 같은 스킴도 여기서 걸린다. img 태그에서는 실행되지 않지만,
+    나중에 이 값을 링크로 쓰는 곳이 생기면 그때 문제가 된다.
+    """
+    if not isinstance(value, str):
+        return ""
+
+    url = value.strip()
+    if not url.startswith("https://"):
+        return ""
+
+    # DB 컬럼이 500자다. 넘치면 저장할 때 잘리거나 터진다.
+    return url if len(url) <= 500 else ""

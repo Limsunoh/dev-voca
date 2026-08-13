@@ -104,7 +104,9 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
             name="display_name"
             type="text"
             autoComplete="nickname"
-            hint="화면에 보일 이름입니다. 비워두면 이메일 앞부분을 씁니다."
+            // 백엔드 DISPLAY_NAME_MAX 와 같아야 한다. 프로필 화면도 같은 값.
+            maxLength={12}
+            hint="순위표에 뜰 이름입니다. 비워두면 알아서 지어드립니다."
           />
         )}
 
@@ -181,6 +183,7 @@ function Field({
   type,
   autoComplete,
   required,
+  maxLength,
   hint,
 }: {
   label: string;
@@ -188,6 +191,7 @@ function Field({
   type: string;
   autoComplete: string;
   required?: boolean;
+  maxLength?: number;
   hint?: string;
 }) {
   const hintId = hint ? `${name}-hint` : undefined;
@@ -213,6 +217,7 @@ function Field({
         type={type}
         autoComplete={autoComplete}
         required={required}
+        maxLength={maxLength}
         aria-describedby={hintId}
         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
       />

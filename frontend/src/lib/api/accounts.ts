@@ -8,13 +8,30 @@ import { request } from "./client";
  * httpOnly 쿠키에 넣는 의미가 사라진다.
  */
 
+/** 프로필 그림으로 무엇을 그릴지. 서버가 정해서 내려준다. */
+export type AvatarDisplay =
+  | { type: "photo"; url: string }
+  | { type: "preset"; key: string };
+
 /** 로그인한 사용자. 백엔드 UserSerializer 와 짝. */
 export type User = {
   id: number;
   email: string;
+  /** 사용자가 정한 이름. 대소문자를 구분하지 않고 중복될 수 없다. */
   display_name: string;
-  /** 화면에 쓸 이름. 표시 이름이 없으면 이메일 앞부분이 온다. */
+  /** 화면에 쓸 이름. 비어 있는 경우가 없도록 서버가 채워 내려준다. */
   name: string;
+  /** 고른 값. 비어 있으면 서버가 알아서 정한다. */
+  avatar: string;
+  avatar_display: AvatarDisplay;
+  /**
+   * 구글 계정 사진 주소. 없으면 빈 문자열.
+   *
+   * 읽기 전용이다. "구글 사진" 선택지를 그릴지 판단하는 데 쓴다 -
+   * avatar_display 로 대신하면 안 된다. 그건 "지금 무엇을 그릴지" 라서
+   * 아바타를 한 번 고르면 사진이 남아 있어도 preset 으로 온다.
+   */
+  google_picture: string;
   is_staff: boolean;
 };
 
@@ -65,4 +82,17 @@ export function logOut(token: string): Promise<void> {
  */
 export function getMe(token: string): Promise<User> {
   return request("/api/accounts/me/", { token });
+}
+
+/**
+ * 내 프로필 수정.
+ *
+ * 이메일과 권한은 서버가 읽기 전용으로 막는다. 여기서 보낼 수 있는 것은
+ * 이름과 아바타뿐이다.
+ */
+export function updateMe(
+  token: string,
+  body: { display_name?: string; avatar?: string },
+): Promise<User> {
+  return request("/api/accounts/me/", { method: "PATCH", body, token });
 }
