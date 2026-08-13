@@ -14,20 +14,102 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from rest_framework import serializers
 
+from .models import DISPLAY_NAME_MAX, name_taken, normalize_display_name
+
 User = get_user_model()
 
 
+def validate_display_name(value: str, *, instance=None) -> str:
+    """이름을 다듬고, 이미 쓰는 이름인지 본다.
+
+    가입과 프로필 수정이 같은 함수를 쓴다. 한쪽에만 두면 그쪽만 안내를
+    받고 다른 쪽은 DB 제약에 걸려 엉뚱한 문구가 나간다 - 실제로 가입에서
+    이름이 겹치면 "이미 가입된 이메일입니다" 가 떴다. 이메일은 멀쩡한데
+    사용자는 이메일을 바꿔가며 계속 실패한다.
+
+    모델의 save() 도 같은 규칙으로 다듬는다. 여기서 또 하는 이유는 다듬은
+    뒤의 값으로 중복과 길이를 봐야 하기 때문이다 - 다듬기 전 값으로 보면
+    "임선오 " 가 "임선오" 와 다르다고 판정돼 통과하고, "  임선오  " 는
+    실제보다 길게 세어져 억울하게 막힌다.
+    """
+    name = normalize_display_name(value)
+
+    if not name:
+        raise serializers.ValidationError("이름을 입력해주세요.")
+
+    # 길이를 모델의 max_length 에 맡기면 저장할 때 걸려 500 이 된다.
+    if len(name) > DISPLAY_NAME_MAX:
+        raise serializers.ValidationError(
+            f"이름은 {DISPLAY_NAME_MAX}자까지 쓸 수 있습니다."
+        )
+
+    if name_taken(name, exclude_pk=instance.pk if instance else None):
+        raise serializers.ValidationError("이미 쓰고 있는 이름입니다.")
+
+    return name
+
+
+def _conflict_message(exc: IntegrityError) -> dict:
+    """DB 가 막은 것이 이름인지 이메일인지 가려낸다.
+
+    제약 이름으로 판정한다. 엔진마다 문구가 다르지만 제약 이름은 우리가
+    지은 것이라 양쪽에 다 들어간다.
+
+    못 가려내면 이메일 쪽으로 둔다. 이 경로에서 유일성이 걸린 칸이 둘뿐이고,
+    이름은 위에서 한 번 걸러지므로 남는 쪽이 이메일일 가능성이 높다.
+    """
+    if "display_name" in str(exc):
+        return {"display_name": ["이미 쓰고 있는 이름입니다."]}
+    return {"email": ["이미 가입된 이메일입니다."]}
+
+
 class UserSerializer(serializers.ModelSerializer):
-    """로그인한 사용자 정보. 화면 상단과 마이페이지가 쓴다."""
+    """로그인한 사용자 정보. 화면 상단과 내 프로필이 쓴다."""
 
     name = serializers.CharField(source="name_for_display", read_only=True)
 
+    # 화면이 그릴 것을 서버가 정해서 내려준다.
+    # {"type": "photo", "url": ...} 이거나 {"type": "preset", "key": "a3"}.
+    # 프론트가 "구글 사진이 있으면 그것, 없으면 아바타" 규칙을 따로 들고
+    # 있으면 두 곳이 어긋난다.
+    avatar_display = serializers.DictField(read_only=True)
+
     class Meta:
         model = User
-        fields = ["id", "email", "display_name", "name", "is_staff"]
+        fields = [
+            "id",
+            "email",
+            "display_name",
+            "name",
+            "avatar",
+            "avatar_display",
+            "google_picture",
+            "is_staff",
+        ]
         # 이메일은 로그인 키라 API 로 바꾸지 않는다. 바꾸려면 본인 확인이
         # 먼저 필요한데 그 절차가 아직 없다.
-        read_only_fields = ["id", "email", "is_staff"]
+        #
+        # google_picture 는 읽기만 연다. 화면이 "구글 사진" 선택지를
+        # 그리려면 주소가 필요한데, 쓰기까지 열면 아무 주소나 넣어 우리
+        # 화면을 여는 것만으로 그 서버에 요청이 나가는 통로가 된다.
+        #
+        # avatar_display 로 대신할 수 없다. 그건 "지금 무엇을 그릴지" 라서
+        # 아바타를 한 번 고르면 사진이 남아 있어도 preset 으로 나온다.
+        # 그것만 보면 구글 사진으로 되돌아갈 방법이 화면에서 사라진다.
+        read_only_fields = ["id", "email", "is_staff", "google_picture"]
+
+    def validate_display_name(self, value: str) -> str:
+        return validate_display_name(value, instance=self.instance)
+
+    def update(self, instance: User, validated_data: dict) -> User:
+        try:
+            return super().update(instance, validated_data)
+        except IntegrityError as exc:
+            # 위에서 확인했지만 그 사이 다른 요청이 같은 이름을 먼저
+            # 가져갈 수 있다. DB 가 막아준 것을 500 대신 안내로 바꾼다.
+            raise serializers.ValidationError(
+                {"display_name": ["이미 쓰고 있는 이름입니다."]}
+            ) from exc
 
 
 class SignUpSerializer(serializers.ModelSerializer):
@@ -43,6 +125,9 @@ class SignUpSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["email", "password", "display_name"]
+
+    def validate_display_name(self, value: str) -> str:
+        return validate_display_name(value)
 
     def validate_email(self, value: str) -> str:
         """이미 있는 이메일인지 본다.
@@ -90,11 +175,13 @@ class SignUpSerializer(serializers.ModelSerializer):
         try:
             return User.objects.create_user(**validated_data)
         except IntegrityError as exc:
-            # 위에서 중복을 확인했지만 그 사이 다른 요청이 같은 이메일로
-            # 먼저 들어올 수 있다. DB 가 막아준 것을 500 대신 안내로 바꾼다.
-            raise serializers.ValidationError(
-                {"email": ["이미 가입된 이메일입니다."]}
-            ) from exc
+            # 위에서 중복을 확인했지만 그 사이 다른 요청이 먼저 들어올 수
+            # 있다. DB 가 막아준 것을 500 대신 안내로 바꾼다.
+            #
+            # 어느 칸이 걸렸는지 가려낸다. 전부 이메일 탓으로 돌리면,
+            # 이름이 겹쳤을 때 "이미 가입된 이메일입니다" 가 떠서 사용자가
+            # 멀쩡한 이메일을 바꿔가며 계속 실패한다.
+            raise serializers.ValidationError(_conflict_message(exc)) from exc
 
     def update(self, instance: User, validated_data: dict) -> User:
         """이 시리얼라이저로는 수정하지 않는다.
