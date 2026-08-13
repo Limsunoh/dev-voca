@@ -2,25 +2,57 @@
 
 Railway 기준. 다른 플랫폼도 대부분 같은 값이 필요하다.
 
-## Procfile
+## 시작 명령
 
 ```
-release: python backend/manage.py migrate --noinput && python backend/manage.py createcachetable
-web: python backend/manage.py collectstatic --noinput && gunicorn ...
+python backend/manage.py migrate --noinput && python backend/manage.py collectstatic --noinput && gunicorn --chdir backend config.wsgi --bind 0.0.0.0:$PORT --workers 2
 ```
 
-**주석을 넣지 않는다.** Railway 는 Procfile 의 `#` 줄을 명령으로 넘겨서,
-한글 주석이 그대로 셸에 전달돼 `command not found` 가 반복된다.
-설명이 필요하면 이 파일에 적는다.
+**지금 이 값은 저장소가 아니라 서비스 설정에 있다** - Settings > Deploy >
+Custom Start Command. 거기에 값이 있으면 `Procfile` 은 무시된다. 저장소의
+`Procfile` 은 같은 내용을 적어두기만 한 것이고, 고쳐도 배포는 안 바뀐다.
 
-- `release` - 배포마다 1회, web 이 뜨기 전에 실행. 되돌릴 수 없는 DB 변경은 여기.
-- `web` - collectstatic 을 gunicorn 앞에 둔다. release 는 별도 컨테이너라
-  거기서 모은 staticfiles/ 가 web 으로 전달되지 않는다.
+현재 값 확인:
+
+```
+railway status --json    # serviceInstances ... startCommand
+```
+
+**`migrate` 가 그 한 줄 안에 들어 있어야 한다.** 빠지면 마이그레이션이
+도는 곳이 하나도 없어진다. 대시보드를 고칠 때 같이 지우기 쉬운 자리다.
+
+### release: 는 쓰지 않는다
+
+`release:` 로 적어둔 것은 실행되지 않았고, 실행되지 않았다는 신호도
+없었다. 2026-08-13 에 `release: ... createcachetable` 이 그랬다 - 캐시
+테이블이 한 번도 만들어지지 않아 구글 로그인이 배포 직후부터 500 이었다.
+조회 API 는 멀쩡해서 배포 후 확인표가 초록이었다.
+
+**배포마다 돌아야 하는 것은 시작 명령 한 줄에 넣거나, 마이그레이션으로
+옮긴다.** 마이그레이션 쪽이 낫다 - 대시보드 값은 저장소 밖이라 빠져도
+아무도 모른다.
+
+### Procfile 을 고칠 일이 생기면
+
+**주석을 넣지 않는다.** 2026-08-04 에 `#` 줄이 셸 명령으로 넘어가
+`command not found` 가 반복됐다. 그때는 Custom Start Command 를 설정하기
+전이라 Procfile 이 실제로 읽히고 있었다. 즉 "무시된다" 는 지금 설정
+상태에서만 참이고, 설정을 지우면 다시 읽힌다. 설명은 이 파일에 적는다.
+
+`collectstatic` 은 gunicorn 앞, 같은 줄에 둔다. 다른 컨테이너에서 모으면
+거기서 만든 staticfiles/ 가 web 으로 전달되지 않는다.
+
+### 레플리카를 늘릴 때
+
+`migrate` 가 시작 명령 안에 있으므로 인스턴스마다 돈다. 2개 이상으로
+올리면 동시에 돌아 한쪽이 `already exists` 로 죽을 수 있다(재시작하면
+풀리지만 부팅이 한 번 실패한다). 늘릴 거면 그때 `migrate` 를 시작 명령에서
+빼고 별도 단계로 옮긴다.
 
 ## 환경변수
 
-`release` 와 `web` **양쪽 다** 필요하다. Railway 의 Shared Variables 를 쓰면
-한 번만 넣어도 된다.
+시작 명령 하나가 마이그레이션부터 gunicorn 까지 다 하므로, 서비스에 한 번
+넣으면 된다.
 
 | 변수 | 값 | 없으면 |
 |---|---|---|
@@ -35,8 +67,9 @@ SECRET_KEY 생성:
 python backend/manage.py shell -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-`release` 에도 `ALLOWED_HOSTS` 가 필요한 이유: 마이그레이션은 HTTP 요청을
-받지 않지만, Django 가 settings 를 통째로 로드하면서 가드에 걸린다.
+마이그레이션에도 `ALLOWED_HOSTS` 가 필요한 이유: 마이그레이션은 HTTP 요청을
+받지 않지만, Django 가 settings 를 통째로 로드하면서 가드에 걸린다. 즉 이 값이
+없으면 gunicorn 이 아니라 그 앞의 `migrate` 에서 멈춘다.
 
 ## 배포 후 확인
 
@@ -46,9 +79,38 @@ python backend/manage.py shell -c "from django.core.management.utils import get_
 | `/admin/` | 200 |
 | `/api/vocab/` | 200 |
 | `/api/vocab/words/` | 200 |
+| `POST /api/accounts/google/` (본문 `{}`) | **400** |
+| `POST /api/accounts/login/` (없는 계정) | **400** |
 
 `/admin/` 이 200 인데 `/api/vocab/words/` 가 500 이면 vocab 마이그레이션이
-안 돈 것이다 - `release` 로그를 본다.
+안 돈 것이다 - 배포 로그의 `migrate` 부분을 본다.
+
+**마지막 두 줄을 빼먹지 않는다.** 위 네 줄은 요청 제한을 거치지 않아
+**캐시 테이블이 없어도 전부 200** 이다. 2026-08-13 에 정확히 그래서
+초록으로 착각했다. 여기서 500 이 나오면 캐시 테이블을 의심한다.
+
+```
+H=https://<호스트>
+curl -so /dev/null -w "google %{http_code}\n" -X POST $H/api/accounts/google/ \
+  -H "Content-Type: application/json" -d '{}'
+curl -so /dev/null -w "login  %{http_code}\n" -X POST $H/api/accounts/login/ \
+  -H "Content-Type: application/json" -d '{"email":"nobody@example.com","password":"x"}'
+```
+
+**본문을 저렇게 맞춰야 하는 이유**가 있다. 이 두 줄이 확인하는 것은 딱
+하나 - throttle 이 캐시 테이블에 접근하는 데 성공했다(500 이 아니다).
+그런데 throttle 은 캐시 키를 못 만들면 캐시를 안 건드리고 그냥 통과한다.
+
+- `login/` 은 이메일로 키를 만든다. **`email` 이 없으면 키가 `None` 이라
+  캐시를 아예 안 친다** - 400 이 나와도 아무것도 검증하지 않은 것이다.
+  없는 계정으로 보내면 400 이면서 캐시는 확실히 친다.
+- `google/` 은 본문과 무관한 고정 키를 쓰므로 `{}` 로 충분하다. 그리고
+  `{}` 면 코드 검사에서 먼저 400 이라 **구글로 실제 요청이 나가지 않는다.**
+  `{"code":"x"}` 처럼 보내면 매번 구글에 실패 요청을 보내게 되고, 그때는
+  키가 없거나 네트워크가 막혀도 똑같이 400 이라 의미를 읽을 수 없다.
+
+**이 두 줄은 구글 로그인이 실제로 되는지는 증명하지 않는다.** 키가 비어
+있어도 400 이다. 로그인이 되는지는 브라우저로 한 번 해봐야 안다.
 
 ## 계정 기능 첫 배포 (한 번만)
 
@@ -70,10 +132,10 @@ Django 의 admin 앱이 사용자 모델에 의존하는데, 그 의존 대상�
 
 ### 순서가 중요하다
 
-`Procfile` 의 `release: migrate` 가 배포할 때마다 먼저 돈다. 즉 **DB 를
-손보기 전에 배포하면 release 단계에서 멈춘다.**
+시작 명령의 `migrate` 가 gunicorn 앞에서 돈다. 즉 **DB 를 손보기 전에
+배포하면 거기서 멈춰 컨테이너가 아예 뜨지 않는다.**
 
-그리고 release 가 실패하면 Railway 는 이전 이미지를 계속 서빙하므로,
+그리고 컨테이너가 못 뜨면 Railway 는 이전 이미지를 계속 서빙하므로,
 그 상태에서 `railway ssh` 로 들어가면 **accounts 앱이 없는 옛 코드**에
 붙는다. 거기서 `migrate` 를 쳐도 이 오류는 재현조차 안 되니 헷갈리지 말 것.
 
@@ -101,7 +163,7 @@ DROP SCHEMA public CASCADE;
 CREATE SCHEMA public;
 ```
 
-그 뒤 배포하면 release 의 `migrate` 가 처음부터 돈다. 이어서:
+그 뒤 배포하면 `migrate` 가 처음부터 돈다. 이어서:
 
 ```
 railway ssh --service web "python backend/manage.py seed_words"
@@ -150,16 +212,26 @@ railway ssh --service web
 
 ## 캐시 테이블
 
-로그인·가입·구글 로그인의 시도 횟수를 DB 에 센다. `release` 가
-`createcachetable` 을 함께 돌리므로 따로 할 일은 없다. 이미 있으면
-그냥 넘어가서 매 배포에 반복돼도 안전하다.
+로그인·가입·구글 로그인의 시도 횟수를 DB 에 센다. 테이블은 마이그레이션
+(`accounts/0002_throttle_cache_table`) 이 만드므로 따로 할 일은 없다.
+이미 있으면 그냥 넘어간다.
+
+배포 명령에 `createcachetable` 을 넣지 않고 마이그레이션에 둔 이유:
+배포 설정은 저장소 밖에 있어서 빠져도 아무 신호가 없다. 실제로 그렇게
+났었다 - `release:` 줄에만 적혀 있었고, 그 줄은 실행되지 않았다.
 
 프로세스 메모리를 쓰지 않는 이유: 워커마다 따로 세서 실제 한도가 워커
 수만큼 늘어나고, 재시작하면 0 으로 돌아간다.
 
-테이블이 없으면 조회·문제풀기는 멀쩡한데 **로그인 계열만 500** 이 난다.
-스모크 테스트가 초록이어도 인증이 죽어 있을 수 있으니, 배포 후 로그인을
-한 번 해본다.
+테이블이 없으면 조회·문제풀기는 멀쩡하고 **가입·로그인·구글 로그인만**
+500 이 난다. 요청 제한이 붙은 뷰가 그 셋뿐이기 때문이다 - 로그아웃과
+`me/` 는 제한이 없어서 테이블이 없어도 멀쩡하다. 감지하려면 위
+`## 배포 후 확인` 의 마지막 두 줄을 쳐야 한다.
+
+테스트가 대신 봐주지 않는다. Django 테스트 러너가 테스트 DB 에 캐시
+테이블을 알아서 만들어주기 때문에, 배포 절차에서 빠져 있어도 로컬은 늘
+통과한다. `ThrottleCacheTableTest` 가 "테이블이 없으면 무엇이 죽는지"
+까지는 고정하지만, **프로덕션에 실제로 적용됐는지는 확인표로만 안다.**
 
 ## 구글 로그인
 

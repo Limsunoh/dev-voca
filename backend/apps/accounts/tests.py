@@ -4,15 +4,28 @@
 실패했을 때 그 응답만으로 가입 여부를 알아낼 수 없는가.
 """
 
+from importlib import import_module
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.core.management import call_command
+from django.db import DatabaseError, connection
+from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.authtoken.models import Token
 
 from .google import GoogleAuthError, fetch_google_user
 from .throttles import EmailRateThrottle, GoogleRateThrottle
+
+# 마이그레이션 모듈은 이름이 숫자로 시작해 평범한 import 가 안 된다.
+# 함수만 꺼내지 않고 모듈째 잡아둔다 - 함수가 operations 에 실제로 걸려
+# 있는지도 봐야 하기 때문이다. 이번 사고가 정확히 "동작하는 코드는 있는데
+# 그것을 실행하는 배선이 없다" 였다.
+cache_table_migration = import_module(
+    "apps.accounts.migrations.0002_throttle_cache_table"
+)
+create_cache_table = cache_table_migration.create_cache_table
 
 User = get_user_model()
 
@@ -697,3 +710,137 @@ class UserModelTest(TestCase):
         user = User.objects.create_user(email="hong@example.com", password=PASSWORD)
 
         self.assertEqual(user.name_for_display, "hong")
+
+
+class _SchemaEditorStub:
+    """create_cache_table 이 실제로 쓰는 것은 connection.alias 하나뿐이다.
+
+    쓰지도 않을 진짜 schema_editor 를 열 이유가 없어 그 자리만 채운다.
+
+    여기 alias 는 항상 "default" 다. 진짜 마이그레이션에서는
+    `migrate --database=<alias>` 로 준 값이 온다. 즉 **이 테스트는 alias 를
+    제대로 넘기는지는 검증하지 못한다** - 0002 에서 그 자리를 "default" 로
+    하드코딩해도 전부 통과한다. DB 가 하나뿐이라 지금은 실피해가 없다.
+    """
+
+    connection = connection
+
+
+class ThrottleCacheTableTest(TransactionTestCase):
+    """캐시 테이블이 없으면 무엇이 죽고 무엇이 멀쩡해 보이는지 고정한다.
+
+    2026-08-13 에 이 테이블이 프로덕션에 없어서 가입·로그인·구글 로그인이
+    500 이었다. 그때 배포 후 확인표에는 조회 경로만 있어서 전부 초록이었고,
+    사용자가 로그인이 안 된다고 알려주고 나서야 드러났다.
+
+    여기서 고정하는 것:
+    - 어느 경로가 이 사고를 감지하고 어느 경로가 못 하는가 (DEPLOY.md 확인표의 근거)
+    - create_cache_table 이 설정된 테이블을 만드는가
+    - 그 함수가 operations 에 실제로 걸려 있는가
+
+    세 번째가 빠지면 이번 사고를 그대로 반복한다. 동작하는 코드가 있어도
+    그것을 실행하는 배선이 없으면 아무 일도 일어나지 않는데, 함수를 직접
+    부르는 테스트는 그 차이를 못 본다.
+
+    **여전히 검증하지 않는 것**: 프로덕션에 실제로 적용됐는지. 그건 배포 후
+    확인표로만 안다. 그리고 동시 실행(레플리카 경합)도 아니다 - 아래는
+    순차 재실행만 본다.
+
+    TransactionTestCase 인 이유: 테이블을 지웠다 만드는 DDL 이라 트랜잭션
+    안에서 굴리면 뒤 테스트로 샌다.
+    """
+
+    def setUp(self):
+        self.table = settings.CACHES["default"]["LOCATION"]
+
+    def tearDown(self):
+        """다음 테스트가 빈 채로 시작하지 않도록 되돌린다.
+
+        검증 대상인 create_cache_table 을 안 쓰고 관리 명령을 직접 부른다.
+        대상 함수가 고장 났을 때 복구까지 같이 고장 나면, 실패가 엉뚱한
+        테스트에서 터져 원인을 못 찾는다.
+        """
+        call_command("createcachetable", verbosity=0)
+
+    def _table_exists(self) -> bool:
+        return self.table in connection.introspection.table_names()
+
+    def _drop_table(self):
+        with connection.cursor() as cursor:
+            cursor.execute("DROP TABLE %s" % connection.ops.quote_name(self.table))
+
+    def test_the_function_is_wired_into_operations(self):
+        """0002 의 operations 가 비면 함수가 멀쩡해도 테이블은 안 생긴다.
+
+        아래 테스트들은 함수를 직접 부르므로 이 경우를 못 잡는다. 이번
+        사고의 자리가 정확히 여기였다 - `release:` 줄에 명령은 적혀 있었고,
+        그 줄을 실행하는 쪽이 없었다.
+        """
+        operations = cache_table_migration.Migration.operations
+
+        self.assertEqual(len(operations), 1)
+        self.assertIs(operations[0].code, create_cache_table)
+
+    def test_the_function_creates_the_configured_table(self):
+        self._drop_table()
+        self.assertFalse(self._table_exists())
+
+        create_cache_table(None, _SchemaEditorStub())
+
+        self.assertTrue(self._table_exists())
+
+    def test_running_it_twice_is_safe(self):
+        """이미 있는 테이블 위에서 다시 돌아도 괜찮아야 한다.
+
+        프로덕션이 실제로 그 상태였다 - 급한 대로 손으로 만들어두고
+        마이그레이션은 그다음 배포에 처음 적용됐다.
+
+        동시 실행은 다른 이야기다. 여기서는 순차 재실행만 본다.
+        """
+        create_cache_table(None, _SchemaEditorStub())
+        create_cache_table(None, _SchemaEditorStub())
+
+        self.assertTrue(self._table_exists())
+
+    def test_auth_paths_break_and_the_rest_looks_fine(self):
+        """DEPLOY.md 확인표가 이 결과에 기대고 있다.
+
+        조회 경로는 요청 제한을 안 거쳐서 테이블이 없어도 200 이다.
+        me/ 도 마찬가지다 - 요청 제한이 아예 안 붙어 있고, 붙어 있더라도
+        권한 검사가 먼저라 거기까지 가지 않는다. 즉 **이 셋만 보면 사고를
+        못 잡는다.** 확인표에 로그인·구글이 있어야 하는 이유다.
+
+        DatabaseError 로 잡는 이유: 없는 테이블에 대한 예외가 엔진마다
+        다르다. SQLite 는 OperationalError, PostgreSQL 은 ProgrammingError 고
+        둘은 상속 관계가 아닌 형제다. 한쪽으로 적으면 다른 엔진에서 깨진다.
+        """
+        self._drop_table()
+
+        self.assertEqual(self.client.get("/api/vocab/words/").status_code, 200)
+        self.assertEqual(self.client.get(ME_URL).status_code, 401)
+
+        # 본문은 DEPLOY.md 가 시키는 것과 같아야 한다. 다르면 문서가 썩는다.
+        for url, body in (
+            (GOOGLE_URL, {}),
+            (LOGIN_URL, {"email": "nobody@example.com", "password": "x"}),
+        ):
+            with self.subTest(url=url), self.assertRaises(DatabaseError):
+                self.client.post(url, body, content_type="application/json")
+
+    def test_login_without_email_does_not_touch_the_cache(self):
+        """확인용 요청에 email 을 꼭 넣어야 하는 이유.
+
+        캐시 키를 이메일로 만들기 때문에, 이메일이 없으면 키가 None 이 되고
+        요청 제한은 캐시를 건드리지 않고 통과한다. 그 상태로는 400 이 나와도
+        아무것도 확인하지 못한 것이다.
+
+        이 테스트만으로는 "이메일이 없어서" 와 "요청 제한이 아예 없어서" 를
+        구분하지 못한다. 제한이 붙어 있다는 것은 ThrottleTest 가 본다.
+        """
+        self._drop_table()
+
+        response = self.client.post(
+            LOGIN_URL, {"password": "x"}, content_type="application/json"
+        )
+
+        self.assertEqual(response.status_code, 400)
