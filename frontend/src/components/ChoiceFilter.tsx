@@ -50,7 +50,7 @@ export function ChoiceFilter({
       aria-label={`${label} 필터`}
       className="mt-4 flex flex-wrap items-center gap-2"
     >
-      <span className="text-sm text-slate-500 dark:text-slate-400">
+      <span className="text-sm text-slate-500 dark:text-slate-300">
         {label}
       </span>
       <Chip href={href()} active={!selected}>

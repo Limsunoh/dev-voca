@@ -109,7 +109,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
       <div className="mt-6">
         {/* useSearchParams 를 쓰는 컴포넌트는 Suspense 로 감싼다.
             없으면 프로덕션 빌드가 실패한다. */}
-        <Suspense fallback={<div className="h-[42px]" />}>
+        <Suspense fallback={<div className="h-[46px]" />}>
           {/* key 가 바뀌면 입력창이 새로 만들어진다 - 뒤로가기로 검색어가
               달라졌을 때 입력창이 URL 을 따라가게 하는 방법. */}
           <SearchInput
@@ -139,13 +139,13 @@ export default async function SentencesPage({ searchParams }: PageProps) {
         extra={{ kind }}
       />
 
-      <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
+      <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">
         {search ? `"${search}" 검색 결과 ` : "전체 "}
         {data.count}개
       </p>
 
       {data.results.length === 0 ? (
-        <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
           {/* 조건을 걸어 비었을 때 "등록된 문장이 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
           {search || category || kind

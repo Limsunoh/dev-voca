@@ -147,7 +147,9 @@ export function ProfileForm({
           value={name}
           onChange={(event) => setName(event.target.value)}
           aria-describedby="display_name-hint"
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          // SearchInput 과 같은 값이다. 앱의 입력칸은 이 셋뿐이라 한 곳만
+          // 고치면 로그인·프로필 칸만 대비가 낮고 높이가 낮은 채로 남는다.
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/40 dark:bg-slate-900/55 dark:text-slate-100"
         />
         <p
           id="display_name-hint"
@@ -205,7 +207,7 @@ function AvatarOption({
         checked
           ? "border-slate-900 bg-slate-100 dark:border-slate-100 dark:bg-slate-800"
           : "border-transparent hover:border-slate-300 dark:hover:border-slate-700"
-      } has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-slate-900`}
+      } has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus`}
     >
       <input
         type="radio"
@@ -234,7 +236,7 @@ function SaveButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-6 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+      className="w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-6 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
     >
       {pending ? "저장하는 중" : "저장"}
     </button>

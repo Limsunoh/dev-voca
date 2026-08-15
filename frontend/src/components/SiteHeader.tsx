@@ -29,7 +29,7 @@ export async function SiteHeader() {
                 줄바꿈이 나서 머리말 높이가 튀므로 한 줄로 자른다. */}
             <Link
               href="/profile"
-              className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:hover:bg-slate-800"
+              className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:hover:bg-slate-800"
             >
               <Avatar shown={user.avatar_display} size={28} />
               <span className="max-w-28 truncate text-slate-700 sm:max-w-40 dark:text-slate-300">
@@ -41,7 +41,7 @@ export async function SiteHeader() {
             <form action={logoutAction}>
               <button
                 type="submit"
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 transition hover:border-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 transition hover:border-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
               >
                 로그아웃
               </button>
@@ -51,13 +51,13 @@ export async function SiteHeader() {
           <nav aria-label="계정" className="flex items-center gap-2 text-sm">
             <Link
               href="/login"
-              className="rounded-md px-3 py-1.5 text-slate-700 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-md px-3 py-1.5 text-slate-700 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:text-slate-300 dark:hover:bg-slate-800"
             >
               로그인
             </Link>
             <Link
               href="/signup"
-              className="rounded-md bg-slate-900 px-3 py-1.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+              className="rounded-md bg-slate-900 px-3 py-1.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
             >
               가입하기
             </Link>

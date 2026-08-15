@@ -35,7 +35,7 @@ export function LearnHeader({
       <h1 className="mt-6 text-2xl font-bold text-slate-900 dark:text-slate-100">
         {title}
       </h1>
-      <p className="mt-1 text-slate-600 dark:text-slate-400">{description}</p>
+      <p className="mt-1 text-slate-600 dark:text-slate-300">{description}</p>
     </header>
   );
 }
