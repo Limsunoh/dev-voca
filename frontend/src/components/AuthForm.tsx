@@ -75,7 +75,7 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
       {/* 링크지만 버튼처럼 보인다. 누르면 구글 동의 화면으로 간다. */}
       <a
         href={googleHref}
-        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-md border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-md border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
       >
         <GoogleMark />
         구글로 계속하기
@@ -204,8 +204,7 @@ function Field({
       >
         {label}
         {!required && (
-          // 밝은 배경에서는 slate-500, 어두운 배경에서는 slate-400 이라야
-          // 양쪽 다 읽힌다. 아래 hint 도 같은 짝을 쓴다.
+          // 실제로 쓰이는 값은 dark: 쪽이다(globals.css 참고). 아래 hint 도 같다.
           <span className="ml-1 font-normal text-slate-500 dark:text-slate-400">
             (선택)
           </span>
@@ -219,7 +218,9 @@ function Field({
         required={required}
         maxLength={maxLength}
         aria-describedby={hintId}
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        // SearchInput·ProfileForm 과 같은 값이다. 앱의 입력칸은 이 셋뿐이라
+        // 한 곳만 고치면 나머지가 낮은 대비·작은 터치 대상으로 남는다.
+        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/40 dark:bg-slate-900/55 dark:text-slate-100"
       />
       {hint && (
         <p id={hintId} className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -249,7 +250,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={pending}
-      className="mt-2 w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+      className="mt-2 w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
     >
       {pending ? pendingLabel : label}
     </button>

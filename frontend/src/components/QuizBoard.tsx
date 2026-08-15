@@ -226,7 +226,7 @@ export function QuizBoard({ category }: Props) {
         <button
           type="button"
           onClick={() => void load()}
-          className="mt-6 w-full rounded-md bg-slate-900 px-4 py-3 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+          className="mt-6 w-full rounded-md bg-slate-900 px-4 py-3 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
         >
           다음 문제
         </button>
@@ -300,10 +300,13 @@ function ChoiceButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-default ${style}`}
+      className={`flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default ${style}`}
     >
+      {/* min-w-0 이 있어야 flex 항목이 내용보다 작아진다. 글자를 끊는 쪽은
+          globals.css 의 base 규칙(body 상속)이 맡는다. 둘 중 하나만 있으면
+          보기 문구가 길 때 버튼이 화면 밖으로 밀린다. */}
       <span
-        className={`text-slate-800 dark:text-slate-200 ${mono ? "font-mono" : ""}`}
+        className={`min-w-0 text-slate-800 dark:text-slate-200 ${mono ? "font-mono" : ""}`}
       >
         {text}
       </span>

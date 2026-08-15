@@ -61,7 +61,11 @@ export default async function ProfilePage() {
             <dt className="text-slate-500 dark:text-slate-400">이메일</dt>
             {/* 이메일은 로그인 키라 바꿀 수 없다. 바꾸려면 본인 확인이
                 먼저인데 그 절차가 아직 없다. */}
-            <dd className="truncate font-mono text-slate-700 dark:text-slate-300">
+            {/* min-w-0 이 없으면 truncate 가 아예 발동하지 않는다. flex 항목의
+                min-width 는 auto = min-content 인데, truncate 가 건
+                white-space: nowrap 때문에 min-content 가 이메일 전체 폭이
+                되어 칸이 줄지 않고 행이 그대로 넘친다. */}
+            <dd className="min-w-0 truncate font-mono text-slate-700 dark:text-slate-300">
               {user.email}
             </dd>
           </div>
@@ -70,7 +74,7 @@ export default async function ProfilePage() {
         <form action={logoutAction} className="mt-4">
           <button
             type="submit"
-            className="w-full rounded-md border border-slate-300 px-4 py-2.5 text-slate-700 transition hover:border-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 sm:w-auto sm:px-6 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
+            className="w-full rounded-md border border-slate-300 px-4 py-2.5 text-slate-700 transition hover:border-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:w-auto sm:px-6 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
           >
             로그아웃
           </button>
@@ -120,7 +124,10 @@ function Records() {
             </dt>
             {/* 0 이 아니라 - 로 둔다. 0 은 "내가 안 한 것" 으로 읽힌다. */}
             <dd
-              className="mt-1 text-xl font-semibold text-slate-300 dark:text-slate-700"
+              // slate-700 은 어두운 배경에서 대비가 1.84:1 이라 - 가 아예 안
+              // 보인다. 그러면 0 도 - 도 아닌 빈 칸이 되어 위 주석의 의도가
+              // 무산된다.
+              className="mt-1 text-xl font-semibold text-slate-300 dark:text-slate-400"
               title={slot.hint}
             >
               -

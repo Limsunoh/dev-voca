@@ -17,13 +17,13 @@ export default function Home() {
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
           href={routes.words}
-          className="inline-block rounded-md bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+          className="inline-block rounded-md bg-slate-900 px-5 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
         >
           단어장 보기
         </Link>
         <Link
           href={routes.sentences}
-          className="inline-block rounded-md border border-slate-300 px-5 py-2.5 font-medium text-slate-900 transition hover:border-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-700 dark:text-slate-100 dark:hover:border-slate-500"
+          className="inline-block rounded-md border border-slate-300 px-5 py-2.5 font-medium text-slate-900 transition hover:border-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-slate-700 dark:text-slate-100 dark:hover:border-slate-500"
         >
           문장 보기
         </Link>

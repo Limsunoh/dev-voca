@@ -65,11 +65,15 @@ export function SearchInput({
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        // 배경은 카드와 같은 반투명도를 쓰고 테두리는 더 세게 준다. 입력칸은
+        // "여기에 쓴다" 는 경계 자체가 정보라, 장식용 테두리보다 높은 대비가
+        // 필요하다(WCAG 1.4.11 은 폼 컨트롤 경계에 3:1 을 요구한다).
+        // py-2.5 인 이유: py-2 면 높이가 42px 이라 터치 대상 44px 에 못 미친다.
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-slate-900 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/40 dark:bg-slate-900/55 dark:text-slate-100"
       />
       <button
         type="submit"
-        className="shrink-0 rounded-md bg-slate-900 px-4 py-2 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+        className="shrink-0 rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
       >
         검색
       </button>

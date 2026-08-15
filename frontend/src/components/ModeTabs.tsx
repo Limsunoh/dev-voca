@@ -34,7 +34,10 @@ export function ModeTabs({
               key={mode.slug}
               // 마우스를 올리면 왜 못 누르는지 알려준다.
               title="준비 중입니다"
-              className="cursor-default rounded-full border border-dashed border-slate-300 px-3 py-1 text-sm text-slate-400 dark:border-slate-700 dark:text-slate-600"
+              // 어두운 배경에서 slate-600 은 대비가 2.5:1 이라 읽히지 않는다.
+              // 준비 중이라도 그런 모드가 있다는 걸 알리려고 남긴 자리라,
+              // 안 보이면 둘 자리가 없는 것과 같다.
+              className="cursor-default rounded-full border border-dashed border-slate-300 px-3 py-1 text-sm text-slate-400 dark:border-slate-500 dark:text-slate-300"
             >
               {mode.label}
               <span className="ml-1 text-xs">준비 중</span>
