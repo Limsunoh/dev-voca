@@ -62,6 +62,42 @@ export function getWords(
   return request(`${BASE}${buildQuery(params)}`);
 }
 
+/**
+ * 오늘 하루 고정으로 보여줄 단어. 없으면 null.
+ *
+ * "오늘" 은 KST 로 센다. UTC 로 두면 밤 9시에 연 한국 사용자에게 다음 날
+ * 단어가 나온다.
+ *
+ * 무작위로 뽑지 않는 이유: 화면을 새로 그릴 때마다 바뀌면 "오늘의 단어" 가
+ * 아니다. 날짜에서 번호를 만들어 고르면 서버가 여러 대여도 결과가 같다.
+ *
+ * 다만 하루 안에 안 바뀐다는 보장은 아니다. 인덱스가 목록 순서(term 오름차순)
+ * 기준이라, 검수가 하나 통과되면 count 가 늘고 새 단어가 알파벳 중간에
+ * 끼어들어 그 뒤가 한 칸씩 밀린다. 정말 고정하려면 백엔드에 daily 엔드포인트가
+ * 필요한데, 지금은 그만한 값어치가 없다.
+ *
+ * 목록 API 만 쓰는 이유: 전용 엔드포인트를 만들 만큼 무겁지 않고,
+ * 검수 게이트(is_reviewed)를 백엔드가 이미 걸어둔 경로를 그대로 탄다.
+ */
+export async function getDailyWord(): Promise<WordListItem | null> {
+  const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+  const day = Math.floor((Date.now() + KST_OFFSET_MS) / 86_400_000);
+
+  const first = await getWords();
+  if (first.count === 0 || first.results.length === 0) return null;
+
+  const pageSize = first.results.length;
+  const index = day % first.count;
+  const page = Math.floor(index / pageSize) + 1;
+  const offset = index % pageSize;
+
+  // 1페이지면 이미 받아둔 것을 쓴다. 같은 것을 두 번 부르지 않는다.
+  const target = page === 1 ? first : await getWords({ page: String(page) });
+
+  // 마지막 페이지는 pageSize 보다 짧을 수 있다.
+  return target.results[offset] ?? target.results[0] ?? null;
+}
+
 /** 분류 목록. 실패해도 빈 배열이라 목록 화면은 계속 뜬다. */
 export const getCategories = cache(() => fetchChoices(`${BASE}categories/`));
 

@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { FormState } from "@/app/(auth)/actions";
+import { routes } from "@/lib/routes";
 
 /**
  * 로그인·가입 폼.
@@ -142,6 +143,19 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
           className="font-medium text-slate-900 underline underline-offset-4 dark:text-slate-100"
         >
           {copy.switchLabel}
+        </Link>
+      </p>
+
+      {/* 이 화면에서는 아래 탭바를 숨긴다(한 가지 일만 하는 화면이라).
+          그래서 여기에 나가는 문이 없으면 막다른 곳이 된다 - 전에는 화면
+          맨 위 devvoca 로고가 그 역할을 했는데 앱 셸로 바꾸며 없앴다.
+          가입 없이 둘러보려던 사람이 갇히지 않게 한 줄 남긴다. */}
+      <p className="mt-4 text-center text-sm">
+        <Link
+          href={routes.home}
+          className="text-slate-400 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+          로그인 없이 둘러보기
         </Link>
       </p>
     </div>

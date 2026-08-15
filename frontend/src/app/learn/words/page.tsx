@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { LearnHeader } from "@/components/LearnHeader";
+import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { LearningCard } from "@/components/LearningCard";
 import { Pagination } from "@/components/Pagination";
 import { SearchInput } from "@/components/SearchInput";
@@ -139,8 +139,19 @@ export default async function VocabPage({ searchParams }: PageProps) {
                 title={word.term}
                 aside={word.pronunciation || undefined}
                 subtitle={word.meaning}
-                badge={word.difficulty_label}
-                tag={word.category_label || undefined}
+                badge={
+                  <DifficultyBadge
+                    level={word.difficulty}
+                    label={word.difficulty_label}
+                  />
+                }
+                tag={
+                  word.category_label ? (
+                    // 카드 전체가 이미 링크라 여기는 링크로 만들지 않는다.
+                    // 링크 안의 링크는 마크업이 깨지고 키보드 순서도 꼬인다.
+                    <CategoryChip label={word.category_label} />
+                  ) : undefined
+                }
               />
             </li>
           ))}

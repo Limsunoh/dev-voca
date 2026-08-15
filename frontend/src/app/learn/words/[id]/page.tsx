@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { getWord } from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
 
@@ -36,34 +37,41 @@ export default async function WordDetailPage({ params }: PageProps) {
         &larr; 단어장으로
       </Link>
 
-      <header className="mt-4 flex flex-wrap items-baseline gap-3">
-        <h1 className="font-mono text-3xl font-bold text-slate-900 dark:text-slate-100">
-          {word.term}
-        </h1>
-        {word.pronunciation && (
-          // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
-          // 깨지거나 폭이 어긋나는 경우가 있다.
-          <span
-            lang="en-US"
-            className="text-lg text-slate-500 dark:text-slate-400"
-          >
-            {word.pronunciation}
-          </span>
-        )}
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {word.difficulty_label}
-        </span>
-        {word.category_label && (
-          <Link
-            href={`${routes.words}?category=${encodeURIComponent(word.category)}`}
-            className="text-sm text-slate-500 underline-offset-4 hover:underline dark:text-slate-400"
-          >
-            {word.category_label}
-          </Link>
-        )}
+      {/* 단어와 발음기호가 한 줄, 부가 정보는 아랫줄로 내린다. 넷을 한 줄에
+          쓸어 담으면 난이도와 분류가 제목 옆에 붙은 잔글씨로 보여서
+          눈에 들어오지 않는다. */}
+      <header className="mt-4">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="font-mono text-4xl font-bold text-slate-900 dark:text-slate-50">
+            {word.term}
+          </h1>
+          {word.pronunciation && (
+            // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
+            // 깨지거나 폭이 어긋나는 경우가 있다.
+            <span
+              lang="en-US"
+              className="text-lg text-slate-500 dark:text-slate-300"
+            >
+              {word.pronunciation}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <DifficultyBadge
+            level={word.difficulty}
+            label={word.difficulty_label}
+          />
+          {word.category_label && (
+            <CategoryChip
+              label={word.category_label}
+              href={`${routes.words}?category=${encodeURIComponent(word.category)}`}
+            />
+          )}
+        </div>
       </header>
 
-      <p className="mt-2 text-xl text-slate-800 dark:text-slate-200">
+      <p className="mt-5 text-2xl leading-snug font-semibold tracking-tight text-slate-800 dark:text-slate-100">
         {word.meaning}
       </p>
 
@@ -75,11 +83,11 @@ export default async function WordDetailPage({ params }: PageProps) {
 
       {word.example && (
         <Section title="예문">
-          <p className="font-mono text-slate-800 dark:text-slate-200">
+          <p className="font-mono text-slate-800 dark:text-slate-100">
             {word.example}
           </p>
           {word.example_translation && (
-            <p className="mt-2 text-slate-600 dark:text-slate-400">
+            <p className="mt-2.5 text-slate-600 dark:text-slate-300">
               {word.example_translation}
             </p>
           )}
@@ -97,11 +105,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-8">
-      <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+    // 제목이 본문보다 작고 흐리면 어디서 무엇이 시작되는지 안 보인다.
+    // 본문과 같은 크기로 올리고 굵기와 색으로 구분한다.
+    <section className="mt-9">
+      <h2 className="text-base font-semibold text-slate-500 dark:text-slate-200">
         {title}
       </h2>
-      <div className="mt-2 text-slate-700 dark:text-slate-300">{children}</div>
+      <div className="mt-2.5 text-lg leading-relaxed text-slate-700 dark:text-slate-200">
+        {children}
+      </div>
     </section>
   );
 }

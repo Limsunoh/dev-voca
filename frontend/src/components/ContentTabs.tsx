@@ -5,7 +5,7 @@ import { contentPath, contents } from "@/lib/routes";
 /**
  * 한 모드 안에서 콘텐츠를 오가는 탭(단어 / 문장).
  *
- * 모드 탭(ModeTabs)이 세로축이면 이건 가로축이다. 나중에 에러 메시지나
+ * 모드(익히기·문제풀기)는 아래 탭바가 맡고 이건 콘텐츠 축이다. 나중에 에러 메시지나
  * 아티클이 생기면 routes 의 contents 에 추가한다.
  *
  * 링크에 mode 를 반드시 넣는다. /learn 으로 고정하면 /test/words 에서
