@@ -8,9 +8,10 @@ import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { LearningCard } from "@/components/LearningCard";
 import { Pagination } from "@/components/Pagination";
 import { SearchInput } from "@/components/SearchInput";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, newShuffleSeed } from "@/lib/api/client";
 import {
   getSentenceCategories,
+  getSentenceDifficulties,
   getSentenceKinds,
   getSentences,
 } from "@/lib/api/sentences";
@@ -51,15 +52,32 @@ export default async function SentencesPage({ searchParams }: PageProps) {
   const currentPage = toPageNumber(first(params.page));
   const page = currentPage > 1 ? String(currentPage) : undefined;
 
+  // 단어장과 같은 규칙이다. 들어올 때마다 새로 섞고, 페이지 넘기기에만
+  // 시드를 실어 보내고, 검색 중일 때는 섞지 않는다.
+  // 자세한 이유는 learn/words/page.tsx 참고.
+  const shuffle = search
+    ? undefined
+    : (first(params.shuffle)?.slice(0, 64) || newShuffleSeed());
+
   // 세 요청을 동시에 띄운다. 순서대로 기다리면 세 번의 왕복이 그대로
   // 대기 시간이 된다.
   //
   // 선택지 목록은 실패해도 빈 배열이라 절대 throw 하지 않으므로 그냥 await
   // 한다. 목록만 try 로 감싸면 catch 안에서도 선택지를 그대로 쓸 수 있다
   // (백엔드가 죽어서 들어온 자리에서 백엔드를 다시 부르지 않는다).
-  const listPromise = getSentences({ search, category, kind, difficulty, page });
-  const categories = await getSentenceCategories();
-  const kinds = await getSentenceKinds();
+  const listPromise = getSentences({
+    search,
+    category,
+    kind,
+    difficulty,
+    page,
+    shuffle,
+  });
+  const [categories, kinds, difficulties] = await Promise.all([
+    getSentenceCategories(),
+    getSentenceKinds(),
+    getSentenceDifficulties(),
+  ]);
 
   let data;
   try {
@@ -122,6 +140,8 @@ export default async function SentencesPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
 
+      {/* 필터 링크에는 시드를 싣지 않는다. 누를 때마다 그 조건 안에서
+          새로 섞인 목록이 나온다. */}
       <ChoiceFilter
         label="종류"
         paramName="kind"
@@ -129,6 +149,15 @@ export default async function SentencesPage({ searchParams }: PageProps) {
         basePath={routes.sentences}
         selected={kind}
         keep={{ search, category, difficulty }}
+      />
+
+      <ChoiceFilter
+        label="난이도"
+        paramName="difficulty"
+        options={difficulties}
+        basePath={routes.sentences}
+        selected={difficulty}
+        keep={{ search, category, kind }}
       />
 
       <CategoryFilter
@@ -149,8 +178,8 @@ export default async function SentencesPage({ searchParams }: PageProps) {
         <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
           {/* 조건을 걸어 비었을 때 "등록된 문장이 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
-          {search || category || kind
-            ? "조건에 맞는 문장이 없습니다. 검색어나 분류를 바꿔보세요."
+          {search || category || kind || difficulty
+            ? "조건에 맞는 문장이 없습니다. 위에서 조건을 바꿔보세요."
             : "아직 등록된 문장이 없습니다."}
         </p>
       ) : (
@@ -194,7 +223,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
 
       <Pagination
         basePath={routes.sentences}
-        filters={{ search, category, kind, difficulty }}
+        filters={{ search, category, kind, difficulty, shuffle }}
         currentPage={currentPage}
         hasPrevious={Boolean(data.previous)}
         hasNext={Boolean(data.next)}

@@ -52,6 +52,23 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 목록을 섞을 새 시드.
+ *
+ * 화면을 열 때마다 새로 만들면 들어올 때마다 다른 항목이 보인다. 대신
+ * 페이지 넘기기 링크에는 이 값을 실어 보내야 1페이지와 2페이지가 같은
+ * 순서를 공유한다.
+ *
+ * 콘텐츠 타입과 무관해서 도메인 모듈(vocab·sentences)이 아니라 여기 둔다.
+ * vocab 에 두면 문장 화면이 단어 모듈을 거치게 되고, 에러·아티클이 늘면
+ * 전부 그렇게 된다.
+ *
+ * 서버에서만 부른다. 브라우저의 비보안 컨텍스트에서는 crypto 가 없다.
+ */
+export function newShuffleSeed(): string {
+  return crypto.randomUUID().slice(0, 8);
+}
+
 export function buildQuery(params: Record<string, string | undefined>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

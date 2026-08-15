@@ -41,6 +41,10 @@ export function SearchInput({
     }
     // 검색어가 바뀌면 1페이지부터 다시 본다.
     params.delete("page");
+    // 섞기 시드도 버린다. 필터 칩과 같은 규칙이다 - 조건을 바꾸면 새 목록이고,
+    // 시드를 유지하는 것은 페이지 넘기기 하나뿐이다. 남겨두면 2페이지에서
+    // 검색했을 때만 옛 순서를 물고 가서 동작이 세 갈래가 된다.
+    params.delete("shuffle");
 
     const qs = params.toString();
     router.push(qs ? `${basePath}?${qs}` : basePath);

@@ -289,7 +289,11 @@ function ChoiceButton({
   const mark = { correct: "정답", wrong: "오답", picked: "", idle: "" }[state];
 
   const style = {
-    idle: "border-slate-200 hover:border-slate-400 dark:border-slate-700 dark:hover:border-slate-500",
+    // 고르기 전 테두리가 유일한 "여기가 버튼" 신호다. slate-700 은 어두운
+    // 배경에서 1.8:1 이라 버튼 넷이 그냥 텍스트 넉 줄로 보인다.
+    // WCAG 1.4.11 은 컨트롤 경계에 3:1 을 요구한다 - SearchInput 이 같은
+    // 이유로 이미 white/40 을 쓰고 있다.
+    idle: "border-slate-200 hover:border-slate-400 dark:border-white/40 dark:hover:border-white/60",
     picked: "border-slate-900 dark:border-slate-100",
     correct: "border-emerald-500 bg-emerald-50 dark:bg-emerald-950",
     wrong: "border-rose-400 bg-rose-50 dark:bg-rose-950",
