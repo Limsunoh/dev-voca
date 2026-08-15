@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import hmac
 import random
@@ -21,7 +22,11 @@ from django.conf import settings
 from django.core import signing
 from django.db.models import QuerySet
 
-from .models import Word
+from .models import Sentence, Word
+
+# 정답이 무엇을 가리키는지. 채점한 뒤 무엇을 보여줄지 정하는 데 쓴다.
+TARGET_WORD = "word"
+TARGET_SENTENCE = "sentence"
 
 # 보기 개수. 4지선다.
 CHOICE_COUNT = 4
@@ -46,8 +51,8 @@ def _fingerprint(answer_id: int, nonce: str) -> str:
     return hmac.new(settings.SECRET_KEY.encode(), msg, hashlib.sha256).hexdigest()
 
 
-def sign_question(answer_id: int, choice_ids: list[int]) -> str:
-    """문제 하나의 채점 정보를 토큰으로 만든다.
+def answer_payload(answer_id: int, choice_ids: list[int]) -> dict:
+    """문제 하나의 채점 정보. 서명하기 전의 알맹이다.
 
     정답 id 를 그대로 담지 않는다. signing.dumps 는 위조를 막을 뿐
     내용을 숨기지 않아서, base64 로 풀면 값이 그대로 보인다.
@@ -55,58 +60,89 @@ def sign_question(answer_id: int, choice_ids: list[int]) -> str:
     담는 것:
         a - 정답의 지문(HMAC). 되돌릴 수 없다
         n - 문제마다 다른 값. 같은 정답이라도 지문이 달라진다
-        c - 보기 id 넷. 채점 후 정답 단어를 찾는 데 쓴다
+        c - 보기 id 넷. 채점 후 정답을 찾는 데 쓴다
 
-    보기 id 는 어차피 응답에 그대로 나가 있으므로 토큰에 담아도
-    새는 정보가 없다. 그 넷 중 무엇이 정답인지가 감춰지면 된다.
+    보기 id 는 어차피 응답에 그대로 나가 있으므로 담아도 새는 정보가 없다.
+    그 넷 중 무엇이 정답인지가 감춰지면 된다.
+
+    서명과 분리해 둔 이유: 판(세션)은 이 알맹이를 자기 토큰 안에 넣어
+    한 번만 서명한다. 토큰 안에 토큰을 넣으면 길이가 배로 늘어난다.
     """
     # random 이 아니라 secrets 를 쓴다. random 은 Mersenne Twister 라
     # 출력을 충분히 모으면 다음 값을 예측할 수 있다.
     nonce = secrets.token_urlsafe(16)
-    return signing.dumps(
-        {
-            "a": _fingerprint(answer_id, nonce),
-            "n": nonce,
-            # 정렬해서 담는다. 화면에 보이는 보기 순서와 토큰 안의 순서가
-            # 같으면 "몇 번째에 담긴 것이 정답" 같은 단서가 생길 수 있다.
-            "c": sorted(choice_ids),
-        },
-        salt=_SALT,
-    )
+    return {
+        "a": _fingerprint(answer_id, nonce),
+        "n": nonce,
+        # 정렬해서 담는다. 화면에 보이는 보기 순서와 토큰 안의 순서가
+        # 같으면 "몇 번째에 담긴 것이 정답" 같은 단서가 생길 수 있다.
+        "c": sorted(choice_ids),
+    }
+
+
+def sign_question(answer_id: int, choice_ids: list[int]) -> str:
+    """채점 정보를 그 자체로 하나의 토큰으로 만든다.
+
+    문제를 하나씩 내주는 옛 경로(vocab 의 quiz/grade)가 쓴다.
+    """
+    return signing.dumps(answer_payload(answer_id, choice_ids), salt=_SALT)
+
+
+def resolve_answer(payload: dict, picked_id: int) -> tuple[bool, int] | None:
+    """(정답 여부, 정답 id). 알맹이가 망가졌으면 None.
+
+    정답 id 는 보기 넷을 하나씩 대조해 찾는다. 지문에서 직접 꺼낼 수는
+    없지만 후보가 넷뿐이라 금방 찾는다.
+    """
+    if not _valid_payload(payload):
+        return None
+
+    expected, nonce, choices = payload["a"], payload["n"], payload["c"]
+
+    for cid in choices:
+        # 타이밍 공격을 막는다. == 는 앞에서부터 비교해 다른 위치가 드러난다.
+        if hmac.compare_digest(expected, _fingerprint(cid, nonce)):
+            return cid == picked_id, cid
+
+    # 알맹이는 정상인데 보기 중에 정답이 없다. 만들 수 없는 상태다.
+    return None
 
 
 def grade_answer(token: str, picked_id: int) -> tuple[bool, int] | None:
     """(정답 여부, 정답 id) 를 돌려준다. 토큰이 위조·만료면 None.
-
-    정답 id 는 보기 넷을 하나씩 대조해 찾는다. 지문에서 직접 꺼낼 수는
-    없지만 후보가 넷뿐이라 금방 찾는다.
 
     실패를 예외로 올리지 않는 이유: 사용자가 보내는 값이라 잘못된 토큰이
     정상 경로다. 여기서 터뜨리면 500 이 되고, 호출부는 400 으로 답해야 한다.
 
     한계: 토큰은 유효 시간 안에서 몇 번이든 다시 채점할 수 있고, 채점은
     맞든 틀리든 정답을 알려준다. 즉 한 번만 불러도 정답을 알 수 있다.
-    지금은 점수를 서버에 저장하지 않아 속여봐야 본인 화면 숫자만 바뀐다.
-    점수·학습기록을 저장하게 되면 nonce 를 캐시에 남겨 1회용으로 만들 것.
+    이 경로는 점수를 저장하지 않아 속여봐야 본인 화면 숫자만 바뀐다.
+    점수가 걸린 판은 apps.learning 의 세션을 쓴다 - 거기서는 문제를
+    하나씩만 내주고, 판 토큰이 다음 문제로 넘어가면서 앞 문제는 닫힌다.
     """
     payload = _load(token)
     if payload is None:
         return None
+    return resolve_answer(payload, picked_id)
 
-    expected, nonce, choices = payload["a"], payload["n"], payload["c"]
 
-    answer_id = None
-    for cid in choices:
-        # 타이밍 공격을 막는다. == 는 앞에서부터 비교해 다른 위치가 드러난다.
-        if hmac.compare_digest(expected, _fingerprint(cid, nonce)):
-            answer_id = cid
-            break
+def _valid_payload(payload: object) -> bool:
+    """채점 정보의 모양을 본다.
 
-    if answer_id is None:
-        # 토큰은 정상인데 보기 중에 정답이 없다. 만들 수 없는 상태다.
-        return None
-
-    return answer_id == picked_id, answer_id
+    서명이 유효해도 모양까지 맞다는 보장은 없다. SECRET_KEY 를 가진
+    쪽(우리 코드)이 잘못 만들었을 수도 있고, 옛 형식의 토큰이 남아
+    있을 수도 있다. 여기서 안 걸러내면 대조하는 자리에서 터진다.
+    """
+    if not isinstance(payload, dict):
+        return False
+    if not isinstance(payload.get("a"), str):
+        return False
+    if not isinstance(payload.get("n"), str):
+        return False
+    choices = payload.get("c")
+    if not isinstance(choices, list) or not choices:
+        return False
+    return all(isinstance(cid, int) and not isinstance(cid, bool) for cid in choices)
 
 
 def _load(token: str) -> dict | None:
@@ -114,22 +150,7 @@ def _load(token: str) -> dict | None:
         payload = signing.loads(token, salt=_SALT, max_age=TOKEN_MAX_AGE)
     except (signing.BadSignature, signing.SignatureExpired):
         return None
-
-    # 서명이 유효해도 모양까지 맞다는 보장은 없다. SECRET_KEY 를 가진
-    # 쪽(우리 코드)이 잘못 만들었을 수도 있고, 옛 형식의 토큰이 남아
-    # 있을 수도 있다. 여기서 안 걸러내면 아래 계산에서 터진다.
-    if not isinstance(payload, dict):
-        return None
-    if not isinstance(payload.get("a"), str):
-        return None
-    if not isinstance(payload.get("n"), str):
-        return None
-    choices = payload.get("c")
-    if not isinstance(choices, list) or not choices:
-        return None
-    if not all(isinstance(cid, int) and not isinstance(cid, bool) for cid in choices):
-        return None
-    return payload
+    return payload if _valid_payload(payload) else None
 
 
 class QuizKind:
@@ -141,20 +162,51 @@ class QuizKind:
     MEANING = "meaning"  # 단어를 보여주고 뜻 고르기
     TERM = "term"  # 뜻을 보여주고 단어 고르기
     DESCRIPTION = "description"  # 설명을 보여주고 단어 고르기
+    BLANK = "blank"  # 문장에서 용어를 가리고 맞히기
+    SITUATION = "situation"  # 문장을 보여주고 나오는 상황 고르기
 
-    ALL = (MEANING, TERM, DESCRIPTION)
+    WORD_KINDS = (MEANING, TERM, DESCRIPTION)
+    SENTENCE_KINDS = (BLANK, SITUATION)
+    ALL = WORD_KINDS + SENTENCE_KINDS
 
     LABELS = {
         MEANING: "뜻 고르기",
         TERM: "단어 고르기",
         DESCRIPTION: "설명 보고 맞히기",
+        BLANK: "빈칸 채우기",
+        SITUATION: "상황 고르기",
     }
 
     QUESTIONS = {
         MEANING: "이 단어의 뜻은?",
         TERM: "이 뜻에 해당하는 단어는?",
         DESCRIPTION: "이 설명에 해당하는 단어는?",
+        BLANK: "빈칸에 들어갈 말은?",
+        SITUATION: "이 말이 나오는 상황은?",
     }
+
+    # 정답이 무엇을 가리키는지. 빈칸 문제는 문장을 보여주지만 답은 단어다.
+    TARGETS = {
+        MEANING: TARGET_WORD,
+        TERM: TARGET_WORD,
+        DESCRIPTION: TARGET_WORD,
+        BLANK: TARGET_WORD,
+        SITUATION: TARGET_SENTENCE,
+    }
+
+
+# 유형별 제한 시간(ms). 이 안에 맞히면 +1, 지나서 맞히면 0.
+#
+# 기준은 유형 이름이 아니라 **읽을 것의 길이**다. 지문이 단어 하나면 3초,
+# 한 줄짜리 문장이면 7초. 설명 문제는 단어를 묻지만 지문이 문장이라
+# 문장 쪽에 넣는다 - 3초로 두면 지문을 다 읽기도 전에 시간이 끝난다.
+TIME_LIMITS_MS = {
+    QuizKind.MEANING: 3000,
+    QuizKind.TERM: 3000,
+    QuizKind.DESCRIPTION: 7000,
+    QuizKind.BLANK: 7000,
+    QuizKind.SITUATION: 7000,
+}
 
 
 @dataclass
@@ -177,6 +229,17 @@ class Question:
     answer_id: int
     category: str
     category_label: str
+
+    # 정답 id 가 무엇의 id 인지. 채점 뒤 무엇을 보여줄지 여기서 갈린다.
+    # 빈칸 문제는 문장을 보여주지만 답은 단어라 word 다.
+    answer_type: str = TARGET_WORD
+
+    # 이 안에 맞히면 +1, 지나서 맞히면 0. 화면이 막대로 그린다.
+    time_limit_ms: int = 3000
+
+    # 빈칸 문제를 낸 문장. 같은 문장을 연달아 내지 않으려고 들고 있다.
+    # 정답(단어)과 다른 값이라 exclude 에 섞어 쓸 수 없다.
+    source_sentence_id: int | None = None
 
 
 def _pick_distractors(answer: Word, pool: QuerySet[Word], count: int) -> list[Word]:
@@ -332,6 +395,8 @@ def _build(kind: str, answer: Word, distractors: list[Word]) -> Question:
         answer_id=answer.pk,
         category=answer.category,
         category_label=answer.get_category_display(),
+        answer_type=QuizKind.TARGETS[kind],
+        time_limit_ms=TIME_LIMITS_MS[kind],
     )
 
 
@@ -349,7 +414,11 @@ def make_question(
     적용한다 - 오답 보기까지 빼면 최근 푼 만큼 보기 후보가 줄어드는데,
     같은 단어가 오답으로 다시 나오는 건 문제가 되지 않는다.
     """
-    kind = kind if kind in QuizKind.ALL else random.choice(QuizKind.ALL)
+    # WORD_KINDS 로 좁힌다. 이 함수는 단어만 만들 수 있는데, ALL 에는
+    # 문장 유형(blank/situation)도 들어 있다. 그대로 두면 지문은 단어
+    # 설명인데 묻는 말은 "이 말이 나오는 상황은?" 이 되고, 정답 종류가
+    # sentence 로 붙어 나중에 엉뚱한 문장을 정답이라고 보여준다.
+    kind = kind if kind in QuizKind.WORD_KINDS else random.choice(QuizKind.WORD_KINDS)
 
     candidates = pool.exclude(pk__in=exclude_ids) if exclude_ids else pool
 
@@ -367,3 +436,184 @@ def make_question(
         return None
 
     return _build(kind, answer, distractors)
+
+
+# 빈칸 자리에 넣는 표시. 화면이 이 문자열을 찾아 칸으로 그린다.
+BLANK_MARK = "____"
+
+# 빈칸을 뚫고도 읽을 말이 남았는지 볼 때 쓴다.
+_HAS_LETTER = re.compile(r"[A-Za-z]")
+
+
+# 문장에서 용어를 찾을 때 쓰는 경계. 앞뒤가 알파벳이면 다른 단어의 일부다.
+# "for" 가 "format" 안에서 잡히면 엉뚱한 자리에 빈칸이 뚫린다.
+#
+# 캐시가 필요한 이유: 한 문장을 검사할 때 단어 수만큼(566회) 부른다.
+# 파이썬 re 모듈의 자체 캐시는 512개라 단어가 그보다 많으면 매번 밀려나
+# 한 번도 안 맞는다. 컴파일을 다시 하느라 문장 하나에 174ms 가 들었다.
+@functools.lru_cache(maxsize=2048)
+def _term_pattern(term: str) -> re.Pattern[str]:
+    return re.compile(
+        rf"(?<![A-Za-z]){re.escape(term)}(?![A-Za-z])", re.IGNORECASE
+    )
+
+
+# 빈칸을 뚫을 때 쓰는 패턴. 찾기용(_term_pattern)과 달리 **뒤에 붙은 글자까지**
+# 함께 지운다. 낱말이 정확히 같은 자리만 지우면 파생어가 답을 그대로 보여준다.
+# 시드 380개 중 5개가 그랬다:
+#   "IndexError: list ____ out of range"        (정답 index)
+#   "RecursionError: maximum ____ depth ..."    (정답 recursion)
+#   "____.decoder.JSONDecodeError: ..."         (정답 JSON)
+# 설명 문제 쪽 _mask_term 이 이미 같은 이유로 \w* 를 쓰고 있다.
+#
+# 앞쪽은 열지 않는다. "for" 가 "format" 안에서 잡히면 엉뚱한 자리가 뚫린다.
+@functools.lru_cache(maxsize=2048)
+def _blank_pattern(term: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<![A-Za-z]){re.escape(term)}\w*", re.IGNORECASE)
+
+
+def _blank_out(text: str, term: str) -> str | None:
+    """문장에서 용어가 나오는 자리를 모두 빈칸으로 바꾼다.
+
+    못 찾거나, 다 지우고 나면 읽을 말이 안 남으면 None.
+    호출부가 다른 문장으로 넘어간다.
+
+    처음 하나만 바꾸지 않는 이유: 같은 용어가 두 번 나오는 문장에서 한쪽만
+    지우면 남은 쪽이 정답을 그대로 보여준다. 실제 문장 12개가 그랬다.
+    예: "____ prematurely closed connection ... from upstream"
+    """
+    replaced, count = _blank_pattern(term).subn(BLANK_MARK, text)
+    if not count:
+        return None
+
+    # 문장이 용어 하나로만 이뤄져 있으면 단서가 없다. 예: 문장이 "upstream"
+    if not _HAS_LETTER.search(replaced.replace(BLANK_MARK, " ")):
+        return None
+
+    return replaced
+
+
+def _terms_in(text: str, terms: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    """문장 안에 실제로 들어 있는 단어들.
+
+    단어 566개를 전부 훑는다. 쿼리로는 "이 문장에 포함된 단어" 를 물을 수
+    없어서(방향이 반대다) 파이썬에서 본다. 정규식은 위에서 캐시한다.
+    """
+    return [(pk, term) for pk, term in terms if _term_pattern(term).search(text)]
+
+
+def make_blank_question(
+    sentences: QuerySet[Sentence],
+    words: QuerySet[Word],
+    exclude_sentence_ids: list[int] | None = None,
+) -> Question | None:
+    """문장에서 용어 하나를 가리고 맞히는 문제.
+
+    만들 수 없으면 None - 호출부가 다른 유형으로 넘어간다. 단어가 안 들어
+    있는 문장이 절반쯤(2026-08 기준 380개 중 162개) 되기 때문에 실패가
+    예외가 아니라 정상 흐름이다.
+    """
+    pool = sentences.exclude(pk__in=exclude_sentence_ids or [])
+
+    # (id, term) 만 가져온다. 문장마다 다시 부르지 않으려고 한 번만 읽는다.
+    terms = [(pk, t.strip()) for pk, t in words.values_list("pk", "term") if t.strip()]
+    if not terms:
+        return None
+
+    # 몇 개만 뽑아 그중 되는 것을 쓴다. 전부 훑으면 매 요청마다 380개를
+    # 스캔하게 되고, 안 되는 문장이 절반이라 몇 번만 시도해도 충분히 걸린다.
+    for sentence in pool.order_by("?")[:12]:
+        found = _terms_in(sentence.text, terms)
+        if not found:
+            continue
+
+        # 여러 개면 가장 긴 것을 고른다. "out of scope" 와 "scope" 가 같이
+        # 잡히면 긴 쪽이 더 배울 것이 많고, 짧은 쪽은 긴 것 안에 들어 있어
+        # 빈칸을 뚫으면 남은 조각이 단서가 된다.
+        answer_id, term = max(found, key=lambda pair: len(pair[1]))
+
+        prompt = _blank_out(sentence.text, term)
+        if prompt is None:
+            continue
+
+        answer = words.filter(pk=answer_id).first()
+        if answer is None:
+            continue
+
+        distractors = _pick_distractors(answer, words, CHOICE_COUNT - 1)
+        if len(distractors) < CHOICE_COUNT - 1:
+            return None
+
+        options = [Choice(w.pk, w.term) for w in [answer, *distractors]]
+        random.shuffle(options)
+
+        return Question(
+            kind=QuizKind.BLANK,
+            kind_label=QuizKind.LABELS[QuizKind.BLANK],
+            question=QuizKind.QUESTIONS[QuizKind.BLANK],
+            prompt=prompt,
+            choices=options,
+            answer_id=answer.pk,
+            category=answer.category,
+            category_label=answer.get_category_display(),
+            answer_type=QuizKind.TARGETS[QuizKind.BLANK],
+            time_limit_ms=TIME_LIMITS_MS[QuizKind.BLANK],
+            source_sentence_id=sentence.pk,
+        )
+
+    return None
+
+
+def make_situation_question(
+    sentences: QuerySet[Sentence],
+    exclude_ids: list[int] | None = None,
+) -> Question | None:
+    """문장을 보여주고 그 말이 나오는 상황을 고르는 문제."""
+    pool = sentences.exclude(context="")
+    candidates = pool.exclude(pk__in=exclude_ids or [])
+
+    answer = candidates.order_by("?").first()
+    if answer is None:
+        return None
+
+    # 같은 상황 글자를 쓰는 문장이 있다(2026-08 기준 380개 중 149개가
+    # 남과 상황을 공유하고, 한 상황에 최대 14개). 정답과 겹치는 것만
+    # 빼면 **오답끼리 겹치는 것**이 남아 보기 둘이 똑같아 보인다.
+    # 그러면 4지선다가 사실상 2지선다가 되어 찍기 확률이 두 배가 된다.
+    #
+    # 쿼리로는 "서로 다른 상황 셋" 을 뽑을 수 없어(DISTINCT ON 은 정렬을
+    # 고정해야 해서 무작위와 섞이지 않는다) 넉넉히 받아 파이썬에서 고른다.
+    others = (
+        pool.exclude(pk=answer.pk)
+        .exclude(context=answer.context)
+        .order_by("?")[: (CHOICE_COUNT - 1) * 5]
+    )
+
+    distractors: list[Sentence] = []
+    seen = {answer.context}
+    for one in others:
+        if one.context in seen:
+            continue
+        seen.add(one.context)
+        distractors.append(one)
+        if len(distractors) == CHOICE_COUNT - 1:
+            break
+
+    if len(distractors) < CHOICE_COUNT - 1:
+        return None
+
+    options = [Choice(s.pk, s.context) for s in [answer, *distractors]]
+    random.shuffle(options)
+
+    return Question(
+        kind=QuizKind.SITUATION,
+        kind_label=QuizKind.LABELS[QuizKind.SITUATION],
+        question=QuizKind.QUESTIONS[QuizKind.SITUATION],
+        prompt=answer.text,
+        choices=options,
+        answer_id=answer.pk,
+        category=answer.category,
+        category_label=answer.get_category_display(),
+        answer_type=QuizKind.TARGETS[QuizKind.SITUATION],
+        time_limit_ms=TIME_LIMITS_MS[QuizKind.SITUATION],
+    )

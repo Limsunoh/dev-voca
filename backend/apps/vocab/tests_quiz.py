@@ -20,6 +20,7 @@ from django.test import TestCase
 from .models import Word
 from .quiz import (
     CHOICE_COUNT,
+    TARGET_WORD,
     TOKEN_MAX_AGE,
     QuizKind,
     _mask_term,
@@ -152,17 +153,32 @@ class MakeQuestionTest(TestCase):
     def test_kind_can_be_fixed(self):
         make_words(10)
 
-        for kind in QuizKind.ALL:
+        for kind in QuizKind.WORD_KINDS:
             q = make_question(Word.objects.visible(), kind=kind)
             self.assertEqual(q.kind, kind)
 
     def test_random_kind_covers_all(self):
-        """유형을 지정하지 않으면 세 가지가 골고루 나온다."""
+        """유형을 지정하지 않으면 단어 세 가지가 골고루 나온다."""
         make_words(10)
 
         kinds = {make_question(Word.objects.visible()).kind for _ in range(60)}
 
-        self.assertEqual(kinds, set(QuizKind.ALL))
+        self.assertEqual(kinds, set(QuizKind.WORD_KINDS))
+
+    def test_sentence_kind_never_leaks_into_word_question(self):
+        """문장 유형을 넘겨도 단어 문제로만 나온다.
+
+        make_question 은 Word 만 다룬다. 문장 유형이 그대로 붙으면
+        묻는 말과 보기가 어긋나고, 정답 종류가 sentence 로 기록돼
+        나중에 엉뚱한 문장을 정답이라고 보여준다.
+        """
+        make_words(10)
+
+        for kind in QuizKind.SENTENCE_KINDS:
+            for _ in range(10):
+                q = make_question(Word.objects.visible(), kind=kind)
+                self.assertIn(q.kind, QuizKind.WORD_KINDS)
+                self.assertEqual(q.answer_type, TARGET_WORD)
 
     def test_description_kind_skips_words_without_description(self):
         """설명이 없는 단어는 설명 문제로 낼 수 없다."""

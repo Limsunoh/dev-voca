@@ -61,3 +61,6 @@ recovery-codes.txt
 .idea/
 .DS_Store
 Thumbs.db
+
+# Claude Code 가 만드는 격리 작업공간. 저장소에 들어갈 것이 아니다.
+.claude/worktrees/

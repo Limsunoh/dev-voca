@@ -112,6 +112,8 @@ INSTALLED_APPS = [
     # 로컬 앱
     "apps.accounts",
     "apps.vocab",
+    # 학습 기록·점수. 단어에도 문장에도 붙지 않는 도메인이라 따로 둔다.
+    "apps.learning",
     # AI 콘텐츠 생성. 관리자 배치 전용 - 사용자 요청 경로에서 호출하지 않는다.
     "apps.ai_pipeline",
 ]
@@ -269,13 +271,17 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "throttle_cache",
         # 기본값 300 을 넘으면 일부를 지워 자리를 만든다. 그때 노리던
-        # 계정의 카운터가 함께 밀려나면 제한이 풀린다. 1만으로 올려도
-        # 그 길은 닫히지 않고 비용만 오른다 - 분당 1만 건을 보내야 한다.
-        # 제대로 막으려면 아래 주석대로 Next 중계에 제한을 둬야 한다.
+        # 계정의 카운터가 함께 밀려나면 제한이 풀린다. 올려도 그 길은
+        # 닫히지 않고 비용만 오른다 - 제대로 막으려면 아래 주석대로
+        # Next 중계에 제한을 둬야 한다.
         #
-        # 항목은 1분이면 만료되고, 자리가 모자랄 때 그것부터 지우므로
-        # 넉넉히 잡아도 쌓이지 않는다.
-        "OPTIONS": {"MAX_ENTRIES": 10000},
+        # 여기 들어오는 것은 요청 제한 카운터뿐이고 1분이면 만료되므로
+        # 거의 쌓이지 않는다. 넉넉히 잡아도 된다.
+        #
+        # 되돌리기 방어는 여기 두지 않는다. 한때 뒀다가 옮겼는데, 이유는
+        # cull 이다 - 캐시는 넘치면 스스로 지우므로 공격자가 항목을 채우면
+        # 방어가 열린다. 지금은 apps.learning.models.RoundStep 표에 있다.
+        "OPTIONS": {"MAX_ENTRIES": 20000},
     }
 }
 
@@ -326,5 +332,13 @@ REST_FRAMEWORK = {
         # 그래서 실제 사용량보다 훨씬 넉넉하게 잡는다 - 여기서 재는 것은
         # 개인의 시도 횟수가 아니라 우리 서버가 구글을 두드리는 총량이다.
         "auth_google": "2000/min" if sys.argv[1:2] == ["test"] else "120/min",
+        # 판은 로그인한 사람을 계정별로 가른다(apps.learning.throttles 참고).
+        # 90초짜리 판이라 열고 닫기는 한 사람당 분당 하나꼴이면 충분하다.
+        "round_start": "2000/min" if sys.argv[1:2] == ["test"] else "60/min",
+        "round_finish": "2000/min" if sys.argv[1:2] == ["test"] else "60/min",
+        # 답하기는 한 판에 수십 번 오간다. 90초에 40문제를 풀고 곧바로
+        # 다음 판을 해도 걸리지 않을 값이어야 한다. 그래도 통을 두는 이유는
+        # 요청마다 RoundStep 표에 쓰고 order_by("?") 로 표를 훑기 때문이다.
+        "round_answer": "5000/min" if sys.argv[1:2] == ["test"] else "600/min",
     },
 }
