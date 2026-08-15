@@ -120,7 +120,9 @@ function DailyWord({ word }: { word: WordListItem }) {
 
       <div className="mt-7 h-px bg-gradient-to-r from-focus/50 via-white/10 to-transparent" />
 
-      <div className="mt-7 flex gap-2.5">
+      {/* flex-wrap 을 준다. 글자를 200% 로 키우면 버튼 둘이 한 줄에 못
+          들어가는데, 안 주면 줄바꿈 대신 화면 밖으로 밀린다. */}
+      <div className="mt-7 flex flex-wrap gap-2.5">
         <Link
           href={routes.wordDetail(word.id)}
           className="flex min-h-12 flex-1 items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"

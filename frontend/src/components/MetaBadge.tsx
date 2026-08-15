@@ -36,6 +36,8 @@ export function DifficultyBadge({
     }[level] ?? "border-white/15 bg-white/5 text-slate-200";
 
   return (
+    // 여기는 shrink-0 을 유지한다. 라벨이 choices 로 닫혀 있어 "어려움" 3자가
+    // 최대이고, 목록 카드에서는 제목 오른쪽에 놓여서 긴 제목에 눌리면 안 된다.
     <span
       className={`shrink-0 rounded-full border px-2.5 py-0.5 text-sm font-medium ${tone}`}
     >
@@ -63,8 +65,12 @@ export function CategoryChip({
   // 여기서 한 번 막는다.
   if (!label) return null;
 
+  // shrink-0 을 쓰지 않는다. 분류 라벨은 "CS 기초(Computer Science)" 처럼
+  // 길 수 있는데, 줄어들지 못하게 막으면 칸보다 넓어졌을 때 그대로 화면
+  // 밖으로 나간다. 부모가 flex-wrap 이라 줄바꿈으로 해결되는 자리다.
+  // 기본 글꼴에서는 안 드러나고 글자를 200% 로 키운 사용자에게만 보인다.
   const shape =
-    "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-sm";
+    "inline-flex min-w-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-sm";
 
   // 누를 수 있는 것과 없는 것을 모양으로 가른다. hover 로만 다르게 두면
   // 터치에서는 구분할 단서가 하나도 없다 - 같은 줄에 두 종류가 나란히
