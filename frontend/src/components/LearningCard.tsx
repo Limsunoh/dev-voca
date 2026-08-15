@@ -12,10 +12,16 @@ export type LearningCardProps = {
   subtitle: string;
   /** 제목 옆에 붙는 보조 문구. 단어의 발음기호 같은 것. */
   aside?: string;
-  /** 난이도 등 배지로 보일 짧은 문구. */
-  badge?: string;
-  /** 분류 같은 보조 라벨. */
-  tag?: string;
+  /**
+   * 제목 오른쪽에 놓일 표시. 난이도 배지 같은 것.
+   *
+   * 문자열이 아니라 노드로 받는다. 난이도를 색으로 구분하려면 등급 숫자가
+   * 필요한데, 그건 콘텐츠 타입마다 다르다. 카드가 그 사정을 알면 단어에만
+   * 맞는 컴포넌트가 된다.
+   */
+  badge?: React.ReactNode;
+  /** 아래쪽에 놓일 분류 같은 보조 표시. */
+  tag?: React.ReactNode;
   /**
    * 제목을 고정폭 글꼴로 보일지. 기본은 true.
    *
@@ -51,7 +57,7 @@ export function LearningCard({
             글자를 끊는 쪽은 globals.css 의 base 규칙이 맡는다. */}
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <h2
-            className={`text-lg font-semibold text-slate-900 group-hover:underline dark:text-slate-100 ${
+            className={`text-xl font-semibold text-slate-900 group-hover:underline dark:text-slate-50 ${
               monoTitle ? "font-mono" : ""
             }`}
           >
@@ -62,26 +68,20 @@ export function LearningCard({
             // 깨지거나 폭이 어긋나는 경우가 있다.
             <span
               lang="en-US"
-              className="text-sm text-slate-500 dark:text-slate-300"
+              className="text-base text-slate-500 dark:text-slate-300"
             >
               {aside}
             </span>
           )}
         </div>
-        {badge && (
-          // 카드가 반투명이라 배지도 반투명이어야 한다. 불투명하게 두면
-          // 배지만 혼자 solid 조각으로 떠 보인다.
-          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-white/10 dark:text-slate-300">
-            {badge}
-          </span>
-        )}
+        {badge}
       </div>
 
-      <p className="mt-1 text-slate-700 dark:text-slate-300">{subtitle}</p>
+      <p className="mt-1.5 text-lg text-slate-700 dark:text-slate-200">
+        {subtitle}
+      </p>
 
-      {tag && (
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">{tag}</p>
-      )}
+      {tag && <div className="mt-3">{tag}</div>}
     </Link>
   );
 }

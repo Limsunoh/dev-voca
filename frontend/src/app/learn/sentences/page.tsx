@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { ChoiceFilter } from "@/components/ChoiceFilter";
 import { LearnHeader } from "@/components/LearnHeader";
+import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { LearningCard } from "@/components/LearningCard";
 import { Pagination } from "@/components/Pagination";
 import { SearchInput } from "@/components/SearchInput";
@@ -160,8 +161,28 @@ export default async function SentencesPage({ searchParams }: PageProps) {
                 href={routes.sentenceDetail(sentence.id)}
                 title={sentence.text}
                 subtitle={sentence.translation}
-                badge={sentence.kind_label}
-                tag={sentence.context || sentence.category_label || undefined}
+                badge={
+                  <DifficultyBadge
+                    level={sentence.difficulty}
+                    label={sentence.difficulty_label}
+                  />
+                }
+                tag={
+                  // 카드 전체가 이미 링크라 여기는 링크로 만들지 않는다.
+                  // 링크 안의 링크는 마크업이 깨지고 키보드 순서도 꼬인다.
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CategoryChip label={sentence.kind_label} />
+                    {/* 분류도 함께 보여준다. 이 화면에 분류 필터가 있는데
+                        카드에 안 보이면 무엇으로 걸러진 목록인지 알 수 없다.
+                        단어 카드도 분류를 보여주므로 두 목록이 어긋나지 않는다. */}
+                    <CategoryChip label={sentence.category_label} />
+                    {sentence.context && (
+                      <span className="text-sm text-slate-500 dark:text-slate-300">
+                        {sentence.context}
+                      </span>
+                    )}
+                  </div>
+                }
                 // 에러 메시지는 코드에 가까워 고정폭이 읽기 좋지만,
                 // 사람이 쓴 문장은 고정폭으로 길어지면 오히려 읽기 어렵다.
                 monoTitle={sentence.kind === "error"}

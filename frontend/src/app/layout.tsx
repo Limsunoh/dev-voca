@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Noto_Sans_KR } from "next/font/google";
 
-import { SiteHeader } from "@/components/SiteHeader";
+import { TabBar } from "@/components/TabBar";
 import "./globals.css";
 
 // 화면에 한글(뜻·설명)과 라틴(용어·코드)이 항상 같이 나온다. 라틴 전용 글꼴만
@@ -42,6 +42,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0b1017",
   colorScheme: "dark",
+  // 이게 없으면 iOS 가 safe-area env() 를 전부 0 으로 준다. 아래 탭바가
+  // safe-area 만큼 띄우도록 짜여 있는데 그 방어가 통째로 무효가 되어,
+  // 아이폰 홈 인디케이터가 탭 라벨 위에 겹친다.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -55,9 +59,15 @@ export default function RootLayout({
       // dark 는 고정이다. globals.css 의 @custom-variant 설명 참고.
       className={`dark ${notoSansKr.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
-        <SiteHeader />
+      {/* 아래 탭바가 가리는 만큼 본문을 띄운다. 없으면 목록 마지막 항목과
+          페이지네이션이 탭바 뒤로 들어가 눌리지 않는다.
+
+          5rem 은 탭바 높이(테두리 1px + 48px)에 여유를 더한 값이고,
+          safe-area 를 더하는 이유는 탭바 자신도 그만큼 두꺼워지기 때문이다.
+          이 둘이 어긋나면 아이폰에서만 마지막 항목이 가려진다. */}
+      <body className="flex min-h-full flex-col bg-background pb-[calc(5rem+env(safe-area-inset-bottom))] font-sans text-foreground">
         {children}
+        <TabBar />
       </body>
     </html>
   );

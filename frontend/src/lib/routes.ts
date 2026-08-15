@@ -20,11 +20,55 @@ export function contentPath(mode: string, content: string): string {
 }
 
 export const routes = {
+  home: "/",
   words: "/learn/words",
   wordDetail: (id: number | string) => `/learn/words/${id}`,
   sentences: "/learn/sentences",
   sentenceDetail: (id: number | string) => `/learn/sentences/${id}`,
+  login: "/login",
+  signup: "/signup",
+  profile: "/profile",
 } as const;
+
+/**
+ * 아래 탭바 항목.
+ *
+ * 앱은 화면 위에 사이트 머리말을 두지 않는다. 이동은 아래 탭이 맡고,
+ * 계정은 "나" 안으로 들어간다. (`/profile` 은 로그인 안 했으면 로그인
+ * 화면으로 보내므로 두 상태를 한 탭으로 덮는다.)
+ *
+ * 모드(익히기·문제풀기)가 탭이 된 이유: 화면 안에도 같은 줄이 있으면
+ * 같은 이동 수단이 두 번 나온다. 콘텐츠(단어·문장)를 고르는 줄만 화면에
+ * 남긴다.
+ */
+export type Tab = {
+  key: string;
+  label: string;
+  /** 이 탭이 맡는 첫 경로 segment. 활성 판정에 쓴다. */
+  segment: string;
+  /** false 면 누를 수 없고 "준비 중" 으로 보인다. */
+  ready: boolean;
+};
+
+/**
+ * 탭을 눌렀을 때 갈 곳.
+ *
+ * 익히기·문제풀기는 보고 있던 콘텐츠를 유지한다. 문장을 보다 "문제풀기"
+ * 를 눌렀는데 단어 문제가 나오면 사용자가 흐름을 잃는다.
+ */
+export function tabHref(tab: Tab, pathname: string): string {
+  if (tab.segment === "learn" || tab.segment === "test") {
+    const content = contentFromPath(pathname);
+    return contentPath(tab.segment, content);
+  }
+  return tab.segment ? `/${tab.segment}` : routes.home;
+}
+
+/** 지금 보고 있는 콘텐츠. 알 수 없으면 words. */
+export function contentFromPath(pathname: string): string {
+  const second = pathname.split("/")[2] ?? "";
+  return contents.some((c) => c.slug === second) ? second : "words";
+}
 
 /** 콘텐츠 탭에 쓰는 목록. 모드와 무관하게 이름만 갖는다. */
 export const contents = [
@@ -32,46 +76,51 @@ export const contents = [
   { slug: "sentences", label: "문장" },
 ] as const;
 
-/** 학습 모드 하나. 화면 위쪽 탭을 이걸로 만든다. */
+/** 학습 모드 하나. 아래 탭바의 가운데 칸들을 이걸로 만든다. */
 export type LearningMode = {
   /** URL 의 첫 segment. */
   slug: string;
   label: string;
-  /** 만들어졌는지. false 면 링크 대신 "준비 중" 으로 보인다. */
+  /** 만들어졌는지. false 면 눌리지 않고 "준비 중" 으로 보인다. */
   ready: boolean;
-  description: string;
 };
 
 /**
- * 모드 목록.
+ * 모드 목록. 아래 탭바가 이걸로 만들어진다.
  *
- * 아직 learn 만 동작한다. 나머지를 "준비 중"으로 함께 보여주는 이유는
- * 이 서비스가 단어장 하나로 끝나지 않는다는 걸 알리기 위해서다.
- * 각 모드를 만들면 ready 를 true 로 바꾸면 그대로 링크가 된다.
+ * 아직 안 만든 모드(talk)도 목록에 있다. 만들고 나서 ready 를 true 로
+ * 바꾸면 그대로 눌리는 탭이 된다.
  *
  * 경로를 여기 박아두지 않는 이유: 모드를 바꿀 때 보고 있던 콘텐츠를
  * 유지해야 한다. 문장을 보다 "문제풀기" 를 눌렀는데 단어 문제가 나오면
- * 사용자가 흐름을 잃는다. 링크는 ModeTabs 가 현재 콘텐츠로 만든다.
+ * 사용자가 흐름을 잃는다. 링크는 tabHref 가 현재 콘텐츠로 만든다.
  */
 export const learningModes: LearningMode[] = [
-  {
-    slug: "learn",
-    label: "익히기",
-    ready: true,
-    description: "뜻과 쓰임을 읽으며 익힙니다.",
-  },
-  {
-    slug: "test",
-    label: "문제풀기",
-    ready: true,
-    description: "외운 것을 문제로 확인합니다.",
-  },
-  {
-    slug: "talk",
-    label: "말하기",
-    ready: false,
-    description: "소리 내어 읽고 따라 합니다.",
-  },
+  { slug: "learn", label: "익히기", ready: true },
+  { slug: "test", label: "문제풀기", ready: true },
+  { slug: "talk", label: "말하기", ready: false },
+];
+
+/**
+ * 아래 탭바 항목.
+ *
+ * 가운데는 learningModes 에서 만든다. 두 벌로 두면 모드를 하나 열 때
+ * 탭바만 낡는다.
+ *
+ * 아직 안 만든 모드도 자리를 준다. 이 서비스가 단어장 하나로 끝나지
+ * 않는다는 걸 로그인 전에도 알리기 위해서다. 대신 누를 수는 없게 두고
+ * "준비 중" 을 함께 보여준다 - 눌리는데 아무 일도 안 일어나는 것이
+ * 눌리지 않는 것보다 나쁘다.
+ */
+export const tabs: Tab[] = [
+  { key: "home", label: "홈", segment: "", ready: true },
+  ...learningModes.map((mode) => ({
+    key: mode.slug,
+    label: mode.label,
+    segment: mode.slug,
+    ready: mode.ready,
+  })),
+  { key: "profile", label: "나", segment: "profile", ready: true },
 ];
 
 /**

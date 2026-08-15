@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { getSentence } from "@/lib/api/sentences";
 import { routes } from "@/lib/routes";
 
@@ -46,31 +47,32 @@ export default async function SentenceDetailPage({ params }: PageProps) {
       </Link>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {sentence.kind_label}
-        </span>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {sentence.difficulty_label}
-        </span>
+        <CategoryChip label={sentence.kind_label} />
+        <DifficultyBadge
+          level={sentence.difficulty}
+          label={sentence.difficulty_label}
+        />
         {sentence.category_label && (
-          <Link
+          <CategoryChip
+            label={sentence.category_label}
             href={`${routes.sentences}?category=${encodeURIComponent(sentence.category)}`}
-            className="text-sm text-slate-500 underline-offset-4 hover:underline dark:text-slate-400"
-          >
-            {sentence.category_label}
-          </Link>
+          />
         )}
       </div>
 
+      {/* 크기를 삼항 안에서 통째로 고른다. 기본 크기를 밖에 두고 안에서
+          덮으려 하면 안 먹는다 - Tailwind 는 같은 속성 유틸을 이름순으로
+          출력하므로 class 문자열의 순서가 우선순위를 정하지 않는다.
+          (text-3xl 이 text-2xl 보다 뒤에 나와서 늘 이긴다.) */}
       <h1
-        className={`mt-3 text-2xl font-bold text-slate-900 dark:text-slate-100 ${
-          isError ? "font-mono text-xl" : ""
+        className={`mt-4 leading-snug font-bold tracking-tight text-slate-900 dark:text-slate-50 ${
+          isError ? "font-mono text-2xl" : "text-3xl"
         }`}
       >
         {sentence.text}
       </h1>
 
-      <p className="mt-3 text-lg text-slate-800 dark:text-slate-200">
+      <p className="mt-4 text-xl leading-snug text-slate-800 dark:text-slate-100">
         {sentence.translation}
       </p>
 
@@ -97,11 +99,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-8">
-      <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+    // 제목이 본문보다 작고 흐리면 어디서 무엇이 시작되는지 안 보인다.
+    // 본문과 같은 크기로 올리고 굵기와 색으로 구분한다.
+    <section className="mt-9">
+      <h2 className="text-base font-semibold text-slate-500 dark:text-slate-200">
         {title}
       </h2>
-      <div className="mt-2 text-slate-700 dark:text-slate-300">{children}</div>
+      <div className="mt-2.5 text-lg leading-relaxed text-slate-700 dark:text-slate-200">
+        {children}
+      </div>
     </section>
   );
 }
