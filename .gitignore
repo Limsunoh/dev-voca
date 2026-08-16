@@ -48,6 +48,9 @@ recovery-codes.txt
 /*.log
 /backend/probe_*.txt
 /backend/apps/**/tests_probe_*.py
+# 병렬 세션이 테스트 DB 를 안 밟게 이름만 바꾼 설정. 커밋 대상이 아니다.
+/backend/config/settings_dt*.py
+/backend/config/settings_mine.py
 /*.png
 # 데이터 검수 스크립트가 레포 루트에 뱉는 것들
 /inspect*.txt

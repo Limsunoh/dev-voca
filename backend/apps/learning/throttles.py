@@ -26,6 +26,10 @@ IP 로 나눌 수 없다. accounts 쪽과 같은 사정이다 - 브라우저가 
 오가는 곳이라 그 통이 수용 인원을 정한다(계산은 RoundAnswerThrottle 참고).
 로그인한 사람은 계정별이라 이 상한과 무관하다. "로그인 안 하면 429 가
 난다" 는 신고가 들어오면 여기가 원인이다.
+
+순위표에도 게스트 공용 통이 있다(순위표별로 하나씩, 각 1200/분). 판을
+시작하기 전에 보는 화면이라 **답하기보다 여기가 먼저 막힐 수도 있다** -
+신고가 들어오면 두 곳을 다 본다.
 """
 
 from __future__ import annotations
@@ -94,3 +98,29 @@ class RoundAnswerThrottle(_PerUserOrShared):
 
     scope = "round_answer"
     guest_multiplier = 5
+
+
+class LeaderboardThrottle(_PerUserOrShared):
+    """순위표 조회.
+
+    쓰기가 없어 막을 것이 데이터가 아니라 **비용**이다. 세 순위표 모두
+    전 사용자를 훑어 정렬하는 집계라 한 번이 가볍지 않다.
+
+    **통을 순위표별로 나눈다**(아래 get_cache_key). 화면 하나가 셋을
+    한꺼번에 부르므로, 통이 공용이면 새로고침 한 번에 3회가 닳아 분당
+    60이 실제로는 20번이 된다. 나누면 각자 자기 몫을 쓴다.
+
+    한도를 넉넉히 두는 이유: 순위표는 자꾸 보게 만드는 것이 목적이다.
+    나눈 만큼 한 사람이 쓸 수 있는 총량은 분당 180이 되지만, 셋이 서로
+    다른 집계라 한 통을 다 써도 나머지 둘은 멀쩡한 편이 낫다.
+    """
+
+    scope = "leaderboard"
+
+    def get_cache_key(self, request, view) -> str:
+        # 뷰마다 다른 통. board_kind 가 weekly / all_time / streak 다.
+        #
+        # getattr 로 기본값을 주지 않는다. 뷰가 board_kind 를 빠뜨리면
+        # 거기서 터지는 것이 설계인데(views.py 참고), 여기서 빈 문자열로
+        # 삼키면 그런 뷰들이 통 하나를 같이 쓰게 된다.
+        return f"{super().get_cache_key(request, view)}:{view.board_kind}"
