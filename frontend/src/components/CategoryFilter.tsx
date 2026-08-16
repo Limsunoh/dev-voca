@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { FilterChip } from "@/components/FilterChip";
 import type { CategoryOption } from "@/lib/api/vocab";
 
 type Props = {
@@ -14,6 +13,15 @@ type Props = {
   difficulty?: string;
   /** 분류를 바꿔도 유지할 그 밖의 조건(문장의 kind 등). */
   extra?: Record<string, string | undefined>;
+  /**
+   * 고른 칩을 다시 눌러 끌 수 있는지. 기본은 켬.
+   *
+   * 끄는 화면이 있는 이유: 문제풀기는 목록이 아니라 진행 중인 판이다.
+   * 분류가 바뀌면 판을 새로 만들도록 돼 있어서, 켜진 칩을 잘못 한 번
+   * 누르면 점수와 방금 푼 목록이 사라진다. 되돌릴 방법도 없다.
+   * 거기서는 "전체" 를 눌러 의도적으로 초기화하게 둔다.
+   */
+  toggle?: boolean;
 };
 
 /**
@@ -32,11 +40,15 @@ export function CategoryFilter({
   search,
   difficulty,
   extra,
+  toggle = true,
 }: Props) {
   if (options.length === 0) return null;
 
   // 분류 외의 조건은 그대로 들고 간다. 여기서 빠뜨리면 분류를 바꾸는 순간
   // 다른 필터가 조용히 풀린다(Pagination 은 유지하므로 규칙도 어긋난다).
+  //
+  // 이미 고른 것을 다시 누르면 그 조건을 뺀다. 끄는 방법이 "전체" 뿐이면
+  // 방금 누른 자리에서 손을 떼고 줄 맨 앞까지 되돌아가야 한다.
   const href = (category?: string) => {
     const query = new URLSearchParams();
     if (search) query.set("search", search);
@@ -44,50 +56,44 @@ export function CategoryFilter({
     for (const [key, value] of Object.entries(extra ?? {})) {
       if (value) query.set(key, value);
     }
-    if (category) query.set("category", category);
+    // extra 에 category 가 섞여 오면 끄기 링크가 지금 주소와 같아져 눌러도
+    // 아무 일이 없다. extra 는 자유형이라 다음 화면에서 밟기 쉽다.
+    query.delete("category");
+    if (category && !(toggle && category === selected)) {
+      query.set("category", category);
+    }
     const qs = query.toString();
     return qs ? `${basePath}?${qs}` : basePath;
   };
 
   return (
     <nav aria-label="분류 필터" className="mt-4 flex flex-wrap gap-2">
-      <Chip href={href()} active={!selected}>
+      {/* "전체" 는 화면에 필터 줄이 여러 개일 때 이름이 겹친다. 스크린리더의
+          링크 목록에서는 nav 이름이 안 읽히므로 여기서 한정해 준다. */}
+      <FilterChip href={href()} active={!selected} ariaLabel="분류 전체">
         전체
-      </Chip>
-      {options.map((option) => (
-        <Chip
-          key={option.value}
-          href={href(option.value)}
-          active={selected === option.value}
-        >
-          {option.label}
-        </Chip>
-      ))}
+      </FilterChip>
+      {options.map((option) => {
+        const active = selected === option.value;
+        return (
+          <FilterChip
+            key={option.value}
+            href={href(option.value)}
+            active={active}
+            // 눌렀을 때 무엇이 되는지 말해준다. 켜진 칩과 꺼진 칩이 같은
+            // 링크처럼 읽히면 다시 누르면 취소된다는 걸 알 수 없다.
+            // 조사를 붙이지 않는다. "네트워크 로" 처럼 띄면 어색하고,
+            // 붙이면 받침에 따라 로/으로 가 갈려 "깃로" 같은 것이 나온다.
+            ariaLabel={
+              active && toggle
+                ? `분류 ${option.label} 선택 해제`
+                : `분류 ${option.label} 적용`
+            }
+          >
+            {option.label}
+          </FilterChip>
+        );
+      })}
     </nav>
-  );
-}
-
-function Chip({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      // 선택된 항목은 색만으로 구분하지 않는다. 색각 이상이 있으면 구분이 안 된다.
-      aria-current={active ? "page" : undefined}
-      className={
-        active
-          ? "rounded-full bg-slate-900 px-3 py-1 text-sm text-white dark:bg-slate-100 dark:text-slate-900"
-          : "rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
-      }
-    >
-      {children}
-    </Link>
   );
 }

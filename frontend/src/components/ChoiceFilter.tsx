@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { FilterChip } from "@/components/FilterChip";
 import type { ChoiceOption } from "@/lib/api/client";
 
 type Props = {
@@ -35,12 +34,18 @@ export function ChoiceFilter({
 }: Props) {
   if (options.length === 0) return null;
 
+  // 이미 고른 것을 다시 누르면 그 조건을 뺀다. 끄는 방법이 "전체" 뿐이면
+  // 방금 누른 자리에서 손을 떼고 줄 맨 앞까지 되돌아가야 한다.
   const href = (value?: string) => {
     const query = new URLSearchParams();
     for (const [key, kept] of Object.entries(keep ?? {})) {
       if (kept) query.set(key, kept);
     }
-    if (value) query.set(paramName, value);
+    // keep 에 이 필터와 같은 키가 섞여 오면 끄기 링크가 지금 주소와 같아져
+    // 눌러도 아무 일이 없다. keep 은 자유형이라 다음 필터를 추가할 때
+    // 밟기 쉬우므로 여기서 한 번 지운다.
+    query.delete(paramName);
+    if (value && value !== selected) query.set(paramName, value);
     const qs = query.toString();
     return qs ? `${basePath}?${qs}` : basePath;
   };
@@ -53,43 +58,33 @@ export function ChoiceFilter({
       <span className="text-sm text-slate-500 dark:text-slate-300">
         {label}
       </span>
-      <Chip href={href()} active={!selected}>
+      {/* "전체" 는 화면에 여러 줄이 나란히 설 때 이름이 겹친다(문장 화면은
+          종류·난이도·분류 셋). 스크린리더의 링크 목록에서는 nav 이름이
+          안 읽히므로 여기서 한정해 준다. */}
+      <FilterChip href={href()} active={!selected} ariaLabel={`${label} 전체`}>
         전체
-      </Chip>
-      {options.map((option) => (
-        <Chip
-          key={option.value}
-          href={href(option.value)}
-          active={selected === option.value}
-        >
-          {option.label}
-        </Chip>
-      ))}
+      </FilterChip>
+      {options.map((option) => {
+        const active = selected === option.value;
+        return (
+          <FilterChip
+            key={option.value}
+            href={href(option.value)}
+            active={active}
+            // 눌렀을 때 무엇이 되는지 말해준다. 켜진 칩과 꺼진 칩이 같은
+            // 링크처럼 읽히면 다시 누르면 취소된다는 걸 알 수 없다.
+            // 조사를 붙이지 않는다. "네트워크 로" 처럼 띄면 어색하고,
+            // 붙이면 받침에 따라 로/으로 가 갈려 "깃로" 같은 것이 나온다.
+            ariaLabel={
+              active
+                ? `${label} ${option.label} 선택 해제`
+                : `${label} ${option.label} 적용`
+            }
+          >
+            {option.label}
+          </FilterChip>
+        );
+      })}
     </nav>
-  );
-}
-
-function Chip({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      // 선택된 항목은 색만으로 구분하지 않는다. 색각 이상이 있으면 구분이 안 된다.
-      aria-current={active ? "page" : undefined}
-      className={
-        active
-          ? "rounded-full bg-slate-900 px-3 py-1 text-sm text-white dark:bg-slate-100 dark:text-slate-900"
-          : "rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
-      }
-    >
-      {children}
-    </Link>
   );
 }
