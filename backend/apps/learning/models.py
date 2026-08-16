@@ -185,6 +185,10 @@ class DailyScore(models.Model):
         그날 판이 전부 마이너스일 수 있다. 그대로 더하면 열심히 한 날
         누적이 줄어든다 - 판 화면에서는 마이너스가 그대로 보여 긴장감이
         살아 있지만, 쌓는 쪽에서는 자른다.
+
+        **같은 식이 SQL 로도 있다** - leaderboards.py 의 _streak_by_user.
+        순위표는 상위 몇 명만 알면 되는데 여기 property 는 DB 가 모르기
+        때문이다. 이 식을 고치면 저쪽도 같이 고쳐야 한다.
         """
         return max(0, (self.best_free_score or 0) + self.daily_study_score)
 

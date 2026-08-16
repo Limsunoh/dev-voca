@@ -340,5 +340,9 @@ REST_FRAMEWORK = {
         # 다음 판을 해도 걸리지 않을 값이어야 한다. 그래도 통을 두는 이유는
         # 요청마다 RoundStep 표에 쓰고 order_by("?") 로 표를 훑기 때문이다.
         "round_answer": "5000/min" if sys.argv[1:2] == ["test"] else "600/min",
+        # 순위표는 읽기만 한다. 막는 것은 데이터가 아니라 집계 비용이다.
+        # 이 값은 **순위표 하나당**이다 - 통을 셋으로 나눠 쓴다
+        # (apps/learning/throttles.py 의 LeaderboardThrottle).
+        "leaderboard": "5000/min" if sys.argv[1:2] == ["test"] else "60/min",
     },
 }

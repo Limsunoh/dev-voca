@@ -14,14 +14,17 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import record, session
+from . import leaderboards, record, session
 from .throttles import (
+    LeaderboardThrottle,
     RoundAnswerThrottle,
     RoundFinishThrottle,
     RoundStartThrottle,
@@ -143,3 +146,48 @@ class RoundFinishView(APIView):
                 "guest": not request.user.is_authenticated,
             }
         )
+
+
+class LeaderboardView(APIView):
+    """순위표 하나. 종류는 URL 로 갈린다.
+
+    로그인하지 않아도 볼 수 있다. 순위표는 "나도 저기 오르고 싶다" 를
+    만드는 화면이라 가입 전에 보여야 의미가 있다. 로그인했으면 내가
+    몇 등인지도 같이 내려준다.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [LeaderboardThrottle]
+
+    # URL 마다 다른 값을 넣는다. 기본값을 두지 않는다 - 빈 문자열이
+    # 기본이면 서브클래스가 빠뜨렸을 때 조용히 build() 까지 흘러간다.
+    board_kind: str
+
+    def get(self, request: Request) -> Response:
+        board = leaderboards.build(self.board_kind, user=request.user)
+
+        body = {
+            "kind": board.kind,
+            "rows": [asdict(row) for row in board.rows],
+            "me": asdict(board.me) if board.me else None,
+        }
+
+        if board.period_start is not None:
+            body["period"] = {
+                "start": board.period_start,
+                "end": board.period_end,
+            }
+
+        return Response(body)
+
+
+class WeeklyBestView(LeaderboardView):
+    board_kind = leaderboards.WEEKLY
+
+
+class AllTimeBestView(LeaderboardView):
+    board_kind = leaderboards.ALL_TIME
+
+
+class StreakView(LeaderboardView):
+    board_kind = leaderboards.STREAK

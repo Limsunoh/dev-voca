@@ -55,3 +55,21 @@ def week_start(day: date) -> date:
 
 def this_week_start() -> date:
     return week_start(today())
+
+
+def week_end(start: date) -> date:
+    """그 주의 일요일. 화면이 "8/10 ~ 8/16" 을 그린다."""
+    return start + timedelta(days=6)
+
+
+def day_begins(day: date) -> datetime:
+    """그 날이 시작되는 순간(한국 자정)을 시각으로.
+
+    DB 조회에 쓴다. `finished_at__gte=day_begins(월요일)` 처럼.
+
+    날짜(date)로 바로 비교하면 안 되는 이유: `finished_at__date` 는 DB 가
+    **settings 의 시간대**로 변환해 비교한다. 그 설정이 바뀌면 이 모듈이
+    잡아둔 한국 기준과 조용히 갈린다. 시각으로 바꿔 넘기면 그 의존이
+    사라진다 - 어느 시간대로 저장돼 있든 가리키는 순간은 하나다.
+    """
+    return datetime(day.year, day.month, day.day, tzinfo=KST)
