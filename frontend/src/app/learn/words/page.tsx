@@ -2,12 +2,19 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
+import { ChoiceFilter } from "@/components/ChoiceFilter";
 import { LearnHeader } from "@/components/LearnHeader";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { LearningCard } from "@/components/LearningCard";
 import { Pagination } from "@/components/Pagination";
 import { SearchInput } from "@/components/SearchInput";
-import { ApiError, getCategories, getWords } from "@/lib/api/vocab";
+import { newShuffleSeed } from "@/lib/api/client";
+import {
+  ApiError,
+  getCategories,
+  getDifficulties,
+  getWords,
+} from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
 
 export const metadata = {
@@ -44,14 +51,35 @@ export default async function VocabPage({ searchParams }: PageProps) {
   const currentPage = toPageNumber(first(params.page));
   const page = currentPage > 1 ? String(currentPage) : undefined;
 
+  // 목록을 열 때마다 새로 섞는다. 정렬이 고정이면 앞쪽 단어만 계속 보이고
+  // 뒤쪽은 다음 페이지를 눌러야 만난다.
+  //
+  // 시드가 URL 에 없으면 새로 만든다. 그래서 /learn/words 로 그냥 들어오면
+  // (새로고침, 상세에서 뒤로가기, 필터 누르기) 매번 다른 순서가 나온다.
+  // 반대로 페이지 넘기기 링크에는 시드를 실어 보내므로 1페이지와 2페이지는
+  // 같은 순서를 공유한다 - 안 그러면 1페이지에서 본 단어가 2페이지에 또 나온다.
+  //
+  // 검색 중일 때는 섞지 않는다. 찾으러 온 사람에게 섞기는 방해다 -
+  // "commit" 을 검색했는데 정확히 그 단어가 12번째에 나오면 안 된다.
+  // (백엔드 검색은 관련도 순위가 없어서 기본 정렬이 사실상 그 역할을 한다.)
+  //
+  // URL 로 들어온 시드는 길이를 자른다. 안 자르면 페이지 넘기기 링크마다
+  // 그 길이가 그대로 박힌다. 백엔드도 자르지만 그건 SQL 인자 쪽이다.
+  const shuffle = search
+    ? undefined
+    : (first(params.shuffle)?.slice(0, 64) || newShuffleSeed());
+
   // 두 요청을 동시에 띄운다. 순서대로 기다리면 두 번의 왕복이 그대로
   // 대기 시간이 된다.
   //
   // 분류 목록은 실패해도 빈 배열이라 절대 throw 하지 않으므로 그냥 await
   // 한다. 목록만 try 로 감싸면 catch 안에서도 분류를 그대로 쓸 수 있다
   // (백엔드가 죽어서 들어온 자리에서 백엔드를 다시 부르지 않는다).
-  const listPromise = getWords({ search, category, difficulty, page });
-  const categories = await getCategories();
+  const listPromise = getWords({ search, category, difficulty, page, shuffle });
+  const [categories, difficulties] = await Promise.all([
+    getCategories(),
+    getDifficulties(),
+  ]);
 
   let data;
   try {
@@ -109,6 +137,17 @@ export default async function VocabPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
 
+      {/* 필터 링크에는 시드를 싣지 않는다. 그래서 난이도나 분류를 누르면
+          그 조건 안에서 새로 섞인 목록이 나온다. */}
+      <ChoiceFilter
+        label="난이도"
+        paramName="difficulty"
+        options={difficulties}
+        basePath={routes.words}
+        selected={difficulty}
+        keep={{ search, category }}
+      />
+
       <CategoryFilter
         options={categories}
         basePath={routes.words}
@@ -126,8 +165,8 @@ export default async function VocabPage({ searchParams }: PageProps) {
         <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
           {/* 분류만 걸어 비었을 때 "등록된 단어가 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
-          {search || category
-            ? "조건에 맞는 단어가 없습니다. 검색어나 분류를 바꿔보세요."
+          {search || category || difficulty
+            ? "조건에 맞는 단어가 없습니다. 위에서 조건을 바꿔보세요."
             : "아직 등록된 단어가 없습니다."}
         </p>
       ) : (
@@ -158,9 +197,12 @@ export default async function VocabPage({ searchParams }: PageProps) {
         </ul>
       )}
 
+      {/* 페이지 넘기기에는 시드를 실어 보낸다. 필터와 반대다 - 여기서
+          시드가 빠지면 2페이지가 새 순서로 섞여서 1페이지에 본 단어를
+          또 만나고 어떤 단어는 아예 못 만난다. */}
       <Pagination
         basePath={routes.words}
-        filters={{ search, category, difficulty }}
+        filters={{ search, category, difficulty, shuffle }}
         currentPage={currentPage}
         hasPrevious={Boolean(data.previous)}
         hasNext={Boolean(data.next)}

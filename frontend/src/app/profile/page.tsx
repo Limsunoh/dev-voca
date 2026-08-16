@@ -46,7 +46,7 @@ export default async function ProfilePage() {
       <Records />
 
       <section
-        className="mt-10 border-t border-slate-200 pt-6 dark:border-slate-800"
+        className="mt-10 border-t border-slate-200 pt-6 dark:border-white/15"
         aria-labelledby="account"
       >
         <h2
@@ -100,7 +100,7 @@ function Records() {
 
   return (
     <section
-      className="mt-10 border-t border-slate-200 pt-6 dark:border-slate-800"
+      className="mt-10 border-t border-slate-200 pt-6 dark:border-white/15"
       aria-labelledby="records"
     >
       <h2
@@ -117,7 +117,10 @@ function Records() {
         {slots.map((slot) => (
           <div
             key={slot.label}
-            className="rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+            // 이 칸은 배경 채움이 없어서 테두리 하나로만 구분된다.
+            // slate-800 은 따뜻한 배경 위에서 1:1 에 가까워 칸이 사라지고,
+            // 그러면 위 주석대로 살려둔 "-" 가 아무 구획 없이 떠 있게 된다.
+            className="rounded-lg border border-slate-200 p-3 dark:border-white/25"
           >
             <dt className="text-xs text-slate-500 dark:text-slate-400">
               {slot.label}

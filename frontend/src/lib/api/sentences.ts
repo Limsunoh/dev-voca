@@ -46,6 +46,8 @@ export type SentenceListParams = {
   kind?: string;
   difficulty?: string;
   page?: string;
+  /** 목록을 섞을 시드. 자세한 설명은 vocab 의 WordListParams 참고. */
+  shuffle?: string;
 };
 
 export function getSentences(
@@ -61,6 +63,11 @@ export const getSentenceCategories = cache(() =>
 
 /** 종류 목록(실무 표현/에러 메시지). */
 export const getSentenceKinds = cache(() => fetchChoices(`${BASE}kinds/`));
+
+/** 난이도 목록. 단어와 같은 척도를 쓴다. */
+export const getSentenceDifficulties = cache(() =>
+  fetchChoices(`${BASE}difficulties/`),
+);
 
 export const getSentence = cache((id: string) =>
   fetchDetail<SentenceDetail>(BASE, id),

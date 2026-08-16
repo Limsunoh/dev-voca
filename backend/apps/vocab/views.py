@@ -1,4 +1,5 @@
-from django.db.models import QuerySet
+from django.db.models import CharField, QuerySet, Value
+from django.db.models.functions import MD5, Cast, Concat
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -82,9 +83,48 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         정렬은 뒤에 남아 그대로 작동한다.
         """
         queryset = super().filter_queryset(queryset)
+        queryset = self._shuffle(queryset)
         if can_review(self.request.user):
             return queryset.order_by("is_reviewed", *queryset.query.order_by)
         return queryset
+
+    def _shuffle(self, queryset: QuerySet) -> QuerySet:
+        """?shuffle=<시드> 가 오면 그 시드로 섞은 순서로 준다.
+
+        목록을 열 때마다 다른 항목이 보이게 하려는 것이다. 정렬이 고정이면
+        앞쪽 항목만 계속 보이고 뒤쪽은 다음 페이지를 눌러야 만난다.
+
+        ORDER BY RANDOM() 을 쓰지 않는 이유: 페이지마다 새로 섞여서 1페이지에
+        본 항목이 2페이지에 또 나오고 어떤 항목은 아예 안 나온다. 시드를
+        받아 같은 시드면 같은 순서가 나오게 해야 페이지 넘기기가 성립한다.
+        새로 섞고 싶으면 호출하는 쪽이 새 시드를 보낸다.
+
+        id 를 시드와 붙여 해시한다. 해시값은 시드마다 다른 순서를 주면서
+        같은 시드 안에서는 안정적이다. MD5 는 Django 가 SQLite 에도
+        등록해주므로 로컬(SQLite)과 운영(Postgres)이 같게 동작한다.
+        암호 용도가 아니라 순서를 흩는 용도다.
+
+        시드 길이를 제한하는 이유: 그대로 SQL 인자로 들어가므로 아주 긴
+        문자열을 던져 쿼리를 부풀리는 것을 막는다.
+
+        ordering 이 함께 오면 섞지 않는다. 사용자가 정렬을 골랐다는 뜻인데
+        그 위에 섞기를 덮으면 고른 정렬이 조용히 사라진다.
+
+        비용: 해시로 정렬하므로 인덱스를 쓰지 못하고 조건에 맞는 행 전체를
+        정렬한다. 지금 규모(수백 건)에서는 문제가 없지만 수만 건을 넘어가면
+        다시 봐야 한다. 그때는 시드로 구간을 잡아 뽑는 방식이 필요하다.
+        """
+        seed = self.request.query_params.get("shuffle", "").strip()
+        if not seed:
+            return queryset
+        if self.request.query_params.get("ordering"):
+            return queryset
+
+        return queryset.annotate(
+            _shuffle_key=MD5(
+                Concat(Value(seed[:64]), Cast("id", CharField()))
+            )
+        ).order_by("_shuffle_key")
 
     def get_serializer_class(self) -> type[serializers.ModelSerializer]:
         if self.action == "list":
@@ -102,6 +142,23 @@ class LearningItemViewSet(viewsets.ModelViewSet):
             [
                 {"value": value, "label": label}
                 for value, label in self.model.Category.choices
+            ]
+        )
+
+    @action(detail=False)
+    def difficulties(self, request: Request) -> Response:
+        """난이도 목록. 분류와 같은 이유로 모델에서 만들어 내려준다.
+
+        프론트에 [쉬움, 보통, 어려움] 을 적어두면 난이도가 하나 늘 때
+        두 곳을 고쳐야 하고, 한쪽만 고치면 조용히 어긋난다.
+
+        value 를 문자열로 바꾸는 이유: 화면에서 그대로 쿼리스트링에 넣는데,
+        숫자로 두면 쓰는 쪽에서 매번 String() 을 붙이게 된다.
+        """
+        return Response(
+            [
+                {"value": str(value), "label": label}
+                for value, label in self.model.Difficulty.choices
             ]
         )
 

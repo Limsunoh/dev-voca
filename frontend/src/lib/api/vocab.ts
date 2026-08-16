@@ -54,7 +54,15 @@ export type WordListParams = {
   category?: string;
   difficulty?: string;
   page?: string;
+  /**
+   * 목록을 섞을 시드. 없으면 기본 정렬(가나다순)로 온다.
+   *
+   * 같은 시드면 같은 순서라 페이지를 넘겨도 겹치거나 빠지지 않는다.
+   * 새로 섞고 싶으면 새 시드를 만들어 보낸다.
+   */
+  shuffle?: string;
 };
+
 
 export function getWords(
   params: WordListParams = {},
@@ -100,6 +108,14 @@ export async function getDailyWord(): Promise<WordListItem | null> {
 
 /** 분류 목록. 실패해도 빈 배열이라 목록 화면은 계속 뜬다. */
 export const getCategories = cache(() => fetchChoices(`${BASE}categories/`));
+
+/**
+ * 난이도 목록(쉬움·보통·어려움). 분류와 같은 이유로 백엔드에서 받는다 -
+ * 화면에 적어두면 난이도가 늘 때 두 곳을 고쳐야 한다.
+ */
+export const getDifficulties = cache(() =>
+  fetchChoices(`${BASE}difficulties/`),
+);
 
 /**
  * 없으면 null.

@@ -18,7 +18,7 @@
   color-scheme: dark;
 
   /* 바탕색. 영역별 배경 레이어가 이 위를 덮으므로, 이 색이 그대로 보이는
-     곳은 아직 레이어를 두지 않은 화면(로그인·문제풀이·내정보)이다. */
+     곳은 아직 레이어를 두지 않은 화면(로그인·가입)이다. */
   --background: #0b1017;
   --foreground: #f2f6fa;
 
@@ -110,6 +110,30 @@
       radial-gradient(105% 50% at 78% 58%, rgb(45 212 205 / 0.13), transparent 68%),
       radial-gradient(110% 48% at 12% 92%, rgb(38 150 190 / 0.13), transparent 68%),
       linear-gradient(170deg, #0c1a22 0%, #0a141b 48%, #080d13 100%);
+  }
+
+  /* 문제풀이. 조용하게.
+
+     여기는 집중하는 화면이라 배경이 눈을 끌면 안 된다. 색을 거의 빼고
+     위아래 밝기 차이만 아주 얕게 준다. 단어·문장과 구분은 되지만 무엇이
+     그려져 있다고 말하기 어려운 정도가 목표다. */
+  .surface-quiz {
+    background-image:
+      radial-gradient(120% 55% at 50% 0%, rgb(90 120 150 / 0.09), transparent 68%),
+      linear-gradient(180deg, #0d1218 0%, #0a0e13 55%, #080b10 100%);
+  }
+
+  /* 내정보. 조금 더 밝고 따뜻하게.
+
+     자기 것을 보는 화면이라 나머지보다 온도를 올린다. 색상만 따뜻한 쪽으로
+     옮기고 밝기는 다른 화면과 같은 선을 지킨다 - 여기만 밝히면 그 위의
+     보조 텍스트가 대비 기준 아래로 떨어진다. */
+  .surface-profile {
+    background-image:
+      radial-gradient(110% 50% at 12% 0%, rgb(214 150 90 / 0.16), transparent 66%),
+      radial-gradient(95% 45% at 95% 18%, rgb(198 110 120 / 0.13), transparent 66%),
+      radial-gradient(100% 45% at 60% 95%, rgb(180 130 90 / 0.1), transparent 68%),
+      linear-gradient(170deg, #17140f 0%, #100d0b 50%, #0b0908 100%);
   }
 }
 

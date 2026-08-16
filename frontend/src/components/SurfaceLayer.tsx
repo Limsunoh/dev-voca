@@ -2,7 +2,7 @@
  * 쓸 수 있는 배경. 유니온으로 두면 오타(surface-lern)가 컴파일에서 걸린다.
  * string 으로 두면 배경만 조용히 사라지고 아무도 모른다.
  */
-export type Surface = "surface-learn";
+export type Surface = "surface-learn" | "surface-quiz" | "surface-profile";
 
 /**
  * 화면 뒤에 깔리는 배경 레이어.
