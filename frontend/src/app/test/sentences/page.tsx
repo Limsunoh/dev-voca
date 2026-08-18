@@ -25,20 +25,25 @@ export default function TestSentencesPage() {
         description="준비 중입니다."
       />
 
-      <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-400">
+      <p className="mt-8 rounded-lg border border-white/12 bg-slate-950/45 p-6 text-center text-slate-300">
         문장 문제는 아직 만들지 않았습니다. 단어 문제부터 풀어보세요.
       </p>
 
-      <div className="mt-6 flex flex-wrap gap-3">
+      {/* flex-wrap 을 준다. 글자를 200% 로 키우면 버튼 둘이 한 줄에 못
+          들어가는데, 안 주면 줄바꿈 대신 화면 밖으로 밀린다. */}
+      <div className="mt-6 flex flex-wrap gap-2.5">
         <Link
           href={contentPath("test", "words")}
-          className="rounded-md bg-slate-900 px-4 py-2 font-medium text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+          className="flex min-h-12 flex-1 items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           단어 문제풀기
         </Link>
         <Link
           href={contentPath("learn", "sentences")}
-          className="rounded-md border border-slate-300 px-4 py-2 font-medium text-slate-900 transition hover:border-slate-500 dark:border-slate-700 dark:text-slate-100 dark:hover:border-slate-500"
+          // 테두리가 유일한 "여기가 버튼" 신호라 white/40 아래로 내리지
+          // 않는다. WCAG 1.4.11 이 컨트롤 경계에 3:1 을 요구하는데
+          // white/15 는 1.5:1 이라 떠 있는 글자로 읽힌다.
+          className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/40 px-5 font-semibold text-slate-100 transition hover:border-white/60 active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           문장 익히기
         </Link>
