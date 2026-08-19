@@ -71,7 +71,7 @@ function Greeting({ user }: { user: User | null }) {
         </p>
         <Link
           href={routes.login}
-          className="shrink-0 rounded-full border border-white/40 px-3.5 py-2 text-sm font-medium text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="shrink-0 rounded-full border border-white/40 px-3.5 py-2 text-sm font-medium text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           로그인
         </Link>
@@ -97,35 +97,54 @@ function DailyWord({ word }: { word: WordListItem }) {
       aria-labelledby="daily-word"
       className="mt-8 flex flex-1 flex-col justify-center pb-10"
     >
-      <p className="text-sm font-medium text-focus">오늘의 단어</p>
+      {/* 네 덩이가 80ms 씩 차이를 두고 올라온다: 라벨(0) · 단어(80) ·
+          발음과 뜻(160) · 구분선과 버튼(240). 마지막 덩이는 요소가 둘이지만
+          같은 240ms 를 공유해 한 덩이로 움직인다.
+
+          하루 한 번 여는 화면이고 여기가 이 앱의 첫인상이라, 모션 예산을
+          여기에 쓴다.
+
+          한 덩이로 묶지 않고 나눈 이유: 통째로 올라오면 그냥 화면이 밀려
+          들어온 것으로 보인다. 순서가 있으면 무엇부터 읽어야 하는지가
+          같이 전달된다 - 라벨, 단어, 뜻, 그다음에 갈 곳.
+
+          마지막 덩이가 240ms 에 시작해 560ms 에 끝난다. 그전에 누를 수
+          있는 것이 없으니 조작을 막지 않는다. */}
+      <p className="rise text-sm font-medium text-focus">오늘의 단어</p>
 
       <h1
         id="daily-word"
-        className="mt-3 font-mono text-[2.75rem] leading-none font-bold tracking-tighter text-slate-50"
+        className="rise mt-3 font-mono text-[2.75rem] leading-none font-bold tracking-tighter text-slate-50 [animation-delay:80ms]"
       >
         {word.term}
       </h1>
 
-      {word.pronunciation && (
-        // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
-        // 깨지거나 폭이 어긋나는 경우가 있다.
-        <p lang="en-US" className="mt-4 text-base text-slate-300">
-          {word.pronunciation}
+      {/* flex 로 두는 이유: 그냥 div 면 첫 자식의 위 여백이 이 상자를 뚫고
+          부모로 새어나간다(margin collapse). 그러면 상자만 올라오고 여백은
+          제자리에 남아서, 발음기호가 없는 단어에서 뜻이 잘못된 위치에서
+          출발한다. flex 컨테이너는 자식 여백을 안에 가둔다. */}
+      <div className="rise flex flex-col [animation-delay:160ms]">
+        {word.pronunciation && (
+          // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
+          // 깨지거나 폭이 어긋나는 경우가 있다.
+          <p lang="en-US" className="mt-4 text-base text-slate-300">
+            {word.pronunciation}
+          </p>
+        )}
+
+        <p className="mt-5 text-xl leading-snug font-semibold tracking-tight text-slate-100">
+          {word.meaning}
         </p>
-      )}
+      </div>
 
-      <p className="mt-5 text-xl leading-snug font-semibold tracking-tight text-slate-100">
-        {word.meaning}
-      </p>
-
-      <div className="mt-7 h-px bg-gradient-to-r from-focus/50 via-white/10 to-transparent" />
+      <div className="rise mt-7 h-px bg-gradient-to-r from-focus/50 via-white/10 to-transparent [animation-delay:240ms]" />
 
       {/* flex-wrap 을 준다. 글자를 200% 로 키우면 버튼 둘이 한 줄에 못
           들어가는데, 안 주면 줄바꿈 대신 화면 밖으로 밀린다. */}
-      <div className="mt-7 flex flex-wrap gap-2.5">
+      <div className="rise mt-7 flex flex-wrap gap-2.5 [animation-delay:240ms]">
         <Link
           href={routes.wordDetail(word.id)}
-          className="flex min-h-12 flex-1 items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="flex min-h-12 flex-1 items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           더 보기
         </Link>
@@ -135,7 +154,7 @@ function DailyWord({ word }: { word: WordListItem }) {
           // WCAG 1.4.11 이 컨트롤 경계에 요구하는 3:1 에 못 미치고,
           // 옆의 "더 보기"(bg-focus, 13:1)와 나란히 서면 이쪽만 눌리지
           // 않는 글자처럼 보인다. SearchInput 이 이미 white/40 을 쓴다.
-          className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/40 px-5 font-semibold text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/40 px-5 font-semibold text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           단어장
         </Link>

@@ -74,7 +74,7 @@ export default async function ProfilePage() {
         <form action={logoutAction} className="mt-4">
           <button
             type="submit"
-            className="w-full rounded-md border border-slate-300 px-4 py-2.5 text-slate-700 transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:w-auto sm:px-6 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
+            className="w-full rounded-md border border-slate-300 px-4 py-2.5 text-slate-700 transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:w-auto sm:px-6 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
           >
             로그아웃
           </button>

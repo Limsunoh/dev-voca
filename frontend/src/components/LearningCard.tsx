@@ -53,8 +53,9 @@ export function LearningCard({
       // 아래에서 아무 일도 일어나지 않는다. 웹 문서는 그렇게 동작하지만
       // 앱은 그렇지 않다.
       //
-      // 0.985 인 이유: 카드가 화면 폭을 다 쓰고 세로로 붙어 있어서, 더 줄이면
-      // 눌린 카드와 이웃 사이가 눈에 띄게 벌어진다.
+      // 0.96 은 globals.css 의 "누름 피드백" 절이 정한 값이다. 처음에 이웃
+      // 카드와 벌어질까 봐 0.985 로 뒀는데, 재보니 좌우 2.6px 위아래 1px 이라
+      // 눌러도 안 보였다. 값을 낮출 생각이 들면 먼저 몇 px 움직이는지 잰다.
       //
       // transition 을 속성으로 좁힌다. 맨 transition 은 all 이라 카드 스무
       // 장에 걸리면 폰에서 낭비다(위에서 backdrop-blur 를 뺀 것과 같은 이유).
@@ -64,7 +65,7 @@ export function LearningCard({
       // transform 만 적어두면 전환 대상에 안 잡혀서 크기가 툭 바뀐다
       // (실측으로 확인했다 - scale 은 0.985 로 바뀌는데 transitionProperty
       // 에는 없었다).
-      className="group block rounded-lg border border-slate-200 bg-white p-4 transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/12 dark:bg-slate-950/45 dark:hover:border-white/25"
+      className="group block rounded-lg border border-slate-200 bg-white p-4 transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/12 dark:bg-slate-950/45 dark:hover:border-white/25"
     >
       <div className="flex items-start justify-between gap-3">
         {/* min-w-0 이 없으면 flex 항목이 내용보다 작아지지 못한다. 제목에
