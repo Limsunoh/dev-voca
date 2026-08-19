@@ -31,7 +31,7 @@ export default function QuizError({
       <button
         type="button"
         onClick={() => unstable_retry()}
-        className="mt-6 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="mt-6 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         다시 시도
       </button>

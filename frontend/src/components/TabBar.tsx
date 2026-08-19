@@ -63,6 +63,12 @@ export function TabBar() {
           );
 
           // 터치 대상 44px 이상. 앱으로 옮겨도 그대로 쓰는 치수다.
+          //
+          // 다른 누를 수 있는 것들과 달리 여기에는 누름 축소(active:scale)를
+          // 일부러 넣지 않는다. 탭바는 이 앱의 핵심 이동 수단이라 하루에
+          // 수십~수백 번 눌린다. 그 빈도에서는 반응이 붙을수록 느리게
+          // 느껴진다 - 색과 표시줄이 즉시 바뀌는 지금이 가장 빠르다.
+          // (globals.css 의 "누름 피드백" 주석 참고)
           const shape =
             "flex min-h-12 flex-col items-center justify-center gap-1.5 py-2 text-xs transition";
 

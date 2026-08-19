@@ -203,7 +203,10 @@ function AvatarOption({
 }) {
   return (
     <label
-      className={`flex h-14 w-14 cursor-pointer items-center justify-center rounded-lg border-2 transition ${
+      // 누름 축소를 0.97 이 아니라 0.94 로 둔다. 56px 짜리 작은 사각형이라
+      // 0.97 이면 실제 이동이 1px 도 안 돼 손가락 밑에서 안 보인다. 큰
+      // 버튼과 같은 값을 쓰는 것보다 같은 세기로 느껴지는 쪽이 맞다.
+      className={`flex h-14 w-14 cursor-pointer items-center justify-center rounded-lg border-2 transition-[scale,border-color,background-color] duration-[120ms] ease-press active:scale-[0.94] ${
         checked
           ? "border-slate-900 bg-slate-100 dark:border-slate-100 dark:bg-slate-800"
           : "border-transparent hover:border-slate-300 dark:hover:border-slate-700"
@@ -236,7 +239,7 @@ function SaveButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-6 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+      className="w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition-[scale,background-color] duration-[120ms] ease-press hover:bg-slate-700 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-6 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
     >
       {pending ? "저장하는 중" : "저장"}
     </button>

@@ -285,7 +285,7 @@ export function QuizBoard({ category }: Props) {
             setScore({ solved: 0, correct: 0 });
             void load();
           }}
-          className="mt-4 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="mt-4 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           처음부터 다시
         </button>
@@ -350,7 +350,7 @@ export function QuizBoard({ category }: Props) {
           ref={nextButtonRef}
           type="button"
           onClick={() => void load()}
-          className="mt-6 min-h-12 w-full rounded-full bg-focus px-4 font-semibold text-focus-on transition active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="mt-6 min-h-12 w-full rounded-full bg-focus px-4 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           다음 문제
         </button>
@@ -466,7 +466,19 @@ function ChoiceButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default ${style}`}
+      // 누르면 살짝 들어간다. 채점은 서버 왕복이라 이게 없으면 손가락을 뗀
+      // 뒤 응답이 올 때까지 아무 반응이 없다 - 눌리긴 한 건지 알 수 없다.
+      //
+      // 0.98 인 이유: 버튼이 화면 폭을 다 쓰고 grid gap-2 로 촘촘히 붙어
+      // 있다. 더 줄이면 눌린 것만 눈에 띄게 작아져서 흔들려 보인다.
+      //
+      // 채점 뒤에는 disabled 라 브라우저가 :active 를 주지 않는다. 따로 끌
+      // 필요가 없다.
+      //
+      // 목록에 transform 이 아니라 scale 을 적는다. Tailwind v4 의
+      // active:scale-* 는 transform 이 아니라 별개의 scale 속성을 쓴다.
+      // transform 만 적어두면 전환 대상에 안 잡혀서 크기가 툭 바뀐다.
+      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-[scale,border-color,background-color] duration-[120ms] ease-press active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default ${style}`}
     >
       {/* min-w-0 이 있어야 flex 항목이 내용보다 작아진다. 글자를 끊는 쪽은
           globals.css 의 base 규칙(body 상속)이 맡는다. 둘 중 하나만 있으면
@@ -482,7 +494,14 @@ function ChoiceButton({
         // 오답 색이 된다. 지금은 mark 가 빈 문자열이라 이 span 이 안 그려져
         // 드러나지 않지만, 나중에 picked 에 "채점 중" 같은 문구를 넣는 순간
         // 아직 결과를 모르는 상태가 빨갛게 뜬다.
-        <span className={`shrink-0 text-xs font-semibold ${markTone}`}>
+        //
+        // 색 전환을 여기 두는 이유도 같은 미래 때문이다. 지금은 이 span 이
+        // 채점된 뒤에야 처음 생겨서 전환할 이전 값이 없지만, picked 에 문구가
+        // 붙으면 계속 살아 있게 되어 색만 툭 바뀐다. 버튼 쪽에 걸어봐야
+        // 자식 글자색에는 닿지 않는다.
+        <span
+          className={`shrink-0 text-xs font-semibold transition-[color] duration-[120ms] ease-press ${markTone}`}
+        >
           {mark}
         </span>
       )}
