@@ -71,7 +71,7 @@ function Greeting({ user }: { user: User | null }) {
         </p>
         <Link
           href={routes.login}
-          className="shrink-0 rounded-full border border-white/20 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:border-white/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="shrink-0 rounded-full border border-white/40 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:border-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           로그인
         </Link>
@@ -131,7 +131,11 @@ function DailyWord({ word }: { word: WordListItem }) {
         </Link>
         <Link
           href={routes.words}
-          className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/15 px-5 font-semibold text-slate-100 transition active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          // 테두리가 유일한 "여기가 버튼" 신호다. white/15 는 1.5:1 이라
+          // WCAG 1.4.11 이 컨트롤 경계에 요구하는 3:1 에 못 미치고,
+          // 옆의 "더 보기"(bg-focus, 13:1)와 나란히 서면 이쪽만 눌리지
+          // 않는 글자처럼 보인다. SearchInput 이 이미 white/40 을 쓴다.
+          className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/40 px-5 font-semibold text-slate-100 transition hover:border-white/60 active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           단어장
         </Link>
