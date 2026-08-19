@@ -124,3 +124,31 @@ class LeaderboardThrottle(_PerUserOrShared):
         # 거기서 터지는 것이 설계인데(views.py 참고), 여기서 빈 문자열로
         # 삼키면 그런 뷰들이 통 하나를 같이 쓰게 된다.
         return f"{super().get_cache_key(request, view)}:{view.board_kind}"
+
+
+class DailyStudyThrottle(_PerUserOrShared):
+    """일일공부 - 오늘 상태 보기와 시작.
+
+    로그인해야 쓸 수 있어 게스트 통이 안 돈다. 그래도 _PerUserOrShared 를
+    쓰는 이유는 계정별로 나누기 위해서다 - 한 통이면 한 사람이 다 써서
+    나머지가 막힌다.
+
+    하루 한 번이라 시작은 하루 한 번만 성공한다. 낮아도 되는 자리다.
+    """
+
+    scope = "daily_study"
+
+
+class DailyStudyAnswerThrottle(_PerUserOrShared):
+    """일일공부 답하기.
+
+    **시작과 통을 나눈다.** 한 통이면 40문제짜리를 빠르게 푸는 사람이
+    조회·시작 요청까지 같은 통에서 써서 판 중간에 429 로 갇힌다. 하루
+    한 번이라 다시 시작할 수도 없다.
+
+    "하루 40문제니 분당 30이면 넉넉하다" 는 계산이 틀렸다 - 한도는 하루
+    총량이 아니라 슬라이딩 1분 창이다. 문제당 2.4초면 1분에 25문제가
+    나가는데, 그건 4지선다에서 충분히 나오는 속도다.
+    """
+
+    scope = "daily_study_answer"

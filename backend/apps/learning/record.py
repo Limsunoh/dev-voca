@@ -11,9 +11,9 @@
 문제가 안 된다 - 그날 점수가 최고 한 판이라 나쁜 판은 남겨도 어차피
 안 세기 때문이다. 버리는 것과 남기는 것의 결과가 같다.
 
-일일공부(SessionKind.DAILY)는 다르다. 그쪽은 **더하기**라서, 점수가
-깎이는 판을 중간에 버리는 것이 이득이 된다. 일일공부를 만들 때는 끝내기를
-클라이언트에 맡기면 안 된다(서버가 시작을 기록해두고 마감으로 닫는 식).
+일일공부는 다르다. 그쪽은 **더하기**라서, 점수가 깎이는 판을 중간에
+버리는 것이 이득이 된다. 그래서 daily_study.py 는 이 모듈을 안 쓰고
+답할 때마다 DailyStudy 에 쌓는다 - 끝내기를 클라이언트에 맡기지 않는다.
 """
 
 from __future__ import annotations
@@ -121,6 +121,14 @@ def _bump_daily(session: QuizSession) -> None:
 
     if session.kind == SessionKind.DAILY:
         # 일일공부는 하루 한 번이라 최고를 고를 것이 없다. 그대로 쌓는다.
+        #
+        # **지금은 이 경로로 안 온다.** 3-3 의 일일공부는 QuizSession 을
+        # 만들지 않고 DailyStudy 로 진행해, 끝낼 때 add_daily_study 가
+        # 그날 줄을 덮어쓴다. 여기는 그 이전 설계의 흔적이다.
+        #
+        # 지우지 않는 이유: QuizSession.kind 에 DAILY 가 여전히 있고,
+        # 그것으로 save_round 를 부르는 옛 코드가 남아 있을 수 있다.
+        # 그때 조용히 아무 일도 안 하는 것보다 예전 규칙대로 도는 편이 낫다.
         rows.update(daily_study_score=F("daily_study_score") + session.score)
         return
 
@@ -133,3 +141,23 @@ def _bump_daily(session: QuizSession) -> None:
     rows.filter(
         Q(best_free_score__isnull=True) | Q(best_free_score__lt=session.score)
     ).update(best_free_score=session.score)
+
+
+def add_daily_study(user, day, score: int) -> None:
+    """일일공부 점수를 그날 줄에 옮긴다.
+
+    daily_study.py 가 공부를 닫을 때 한 번 부른다. 하루 한 번이라 최고를
+    고를 것이 없고 그대로 쌓는다.
+
+    **더하기가 아니라 덮어쓰기다.** 일일공부는 하루에 한 줄뿐이고 그 줄의
+    최종 점수가 곧 그날 값이라, 더하면 한 번 더 불릴 때 점수가 두 배가 된다.
+
+    **다만 낮아지지는 않는다.** 답할 때마다 불리므로 요청이 겹치면 늦게
+    도착한 옛 값이 새 값을 덮을 수 있다 - 9번째 답이 9점을 쓰는 사이
+    10번째가 끝내며 14점(보너스 포함)을 쓰면, 순서에 따라 9점이 남는다.
+    일일공부 점수는 줄어들 일이 없으므로 조건 하나로 그 창을 닫는다.
+    """
+    row, _ = DailyScore.objects.get_or_create(user=user, day=day)
+    DailyScore.objects.filter(pk=row.pk, daily_study_score__lt=score).update(
+        daily_study_score=score
+    )

@@ -28,6 +28,9 @@ out/
 .claude/SLASH_COMMANDS_KR.md
 .claude/settings.local.json
 .claude/verification-state.json
+.claude/devclock.py
+.claude/dev_timing.jsonl
+.claude/.devclock_open.json
 
 # 브라우저 자동화 임시 산출물
 .playwright-mcp/

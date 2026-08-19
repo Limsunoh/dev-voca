@@ -2,6 +2,8 @@ from django.urls import path
 
 from .views import (
     AllTimeBestView,
+    DailyStudyAnswerView,
+    DailyStudyStartView,
     RoundAnswerView,
     RoundFinishView,
     RoundStartView,
@@ -23,4 +25,8 @@ urlpatterns = [
         name="leaderboard-all-time",
     ),
     path("leaderboards/streak/", StreakView.as_view(), name="leaderboard-streak"),
+    # 일일공부. 하루 한 번이라 시작·답하기 둘뿐이고 끝내기가 없다 -
+    # 마지막 문제를 풀면 서버가 닫는다.
+    path("daily/", DailyStudyStartView.as_view(), name="daily-study"),
+    path("daily/answer/", DailyStudyAnswerView.as_view(), name="daily-study-answer"),
 ]
