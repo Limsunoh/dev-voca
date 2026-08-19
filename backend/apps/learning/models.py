@@ -349,3 +349,63 @@ class DailyStudy(models.Model):
     def is_done(self) -> bool:
         return self.finished_at is not None
 
+
+
+class ReviewState(models.Model):
+    """한 사람이 한 항목(단어/문장)을 얼마나 익혔는지.
+
+    **왜 표가 따로 있나.** 복습 대상은 QuizAnswer 만으로도 뽑을 수 있지만,
+    "복습에서 연속 두 번 맞혔나" 는 그 표로 세면 사람마다 항목마다 과거
+    답을 거슬러 봐야 한다. 항목 수만큼 스캔이 늘어 목록 한 번 그리는 데
+    표 전체를 훑게 된다. 그래서 연속 횟수만 여기 들고 있는다.
+
+    자유 문제풀이의 답이 이 표를 갱신한다. 일일공부는 답을 하나하나
+    남기지 않으므로 여기 안 들어온다(QuizAnswer docstring 참고).
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="review_states",
+        verbose_name="사용자",
+    )
+
+    # 무엇을 익히는 중인가. QuizAnswer 와 같은 (종류, id) 짝이다.
+    # FK 로 묶지 않는 이유: 대상이 단어일 수도 문장일 수도 있어 한 칸에
+    # 안 들어간다. 대상이 지워지면 이 줄은 고아가 되는데, 출제가 어차피
+    # visible() 로 좁히므로 화면에는 안 나온다.
+    target_type = models.CharField("대상 종류", max_length=10)
+    target_id = models.PositiveBigIntegerField("대상 id")
+
+    # **복습에서** 연속으로 맞힌 횟수. 틀리면 0 으로 돌아간다.
+    # 자유 문제풀이에서 맞힌 것은 여기를 올리지 않는다 - 복습 목록을
+    # 벗어나는 조건이라 복습으로 확인한 것만 세야 한다.
+    streak = models.PositiveSmallIntegerField("연속 정답", default=0)
+
+    # 마지막으로 맞힌 시각. 여기서 7일이 지나면 "오래된 것" 이 된다.
+    # 틀리면 갱신하지 않는다 - 틀린 것은 이미 다른 조건으로 뽑힌다.
+    last_correct_at = models.DateTimeField("마지막 정답", null=True, blank=True)
+
+    # 마지막으로 이 항목에 답한 결과. 목록에서 "틀린 것" 을 고르는 조건.
+    is_wrong = models.BooleanField("마지막에 틀렸나", default=False)
+
+    created_at = models.DateTimeField("만든 때", auto_now_add=True)
+    updated_at = models.DateTimeField("고친 때", auto_now=True)
+
+    class Meta:
+        verbose_name = "복습 상태"
+        verbose_name_plural = "복습 상태"
+        constraints = [
+            # 사람마다 항목마다 한 줄. 이 제약이 곧 그 규칙이다.
+            models.UniqueConstraint(
+                fields=["user", "target_type", "target_id"],
+                name="learning_reviewstate_user_target_unique",
+            ),
+        ]
+        indexes = [
+            # 목록을 뽑는 조건 그대로. 틀린 것 먼저, 그다음 오래된 것.
+            models.Index(fields=["user", "is_wrong", "last_correct_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.target_type}:{self.target_id} streak={self.streak}"

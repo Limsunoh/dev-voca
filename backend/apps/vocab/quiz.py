@@ -430,6 +430,30 @@ def make_question(
     if answer is None:
         return None
 
+    return _with_answer(kind, answer, pool)
+
+
+def make_for_word(answer: Word, pool: QuerySet[Word], kind: str | None = None) -> Question | None:
+    """**이 단어를 정답으로** 하는 문제. 만들 수 없으면 None.
+
+    복습이 쓴다 - 거기서는 무엇을 낼지 이미 정해져 있고, 무작위로 고르면
+    복습이 아니라 그냥 문제풀이가 된다.
+
+    설명 문제는 설명이 있어야 낼 수 있으므로, 지정한 유형을 못 내면 낼
+    수 있는 다른 유형으로 바꾼다 - 여기서 None 을 내면 그 단어는 영영
+    복습에서 안 나온다.
+    """
+    kind = kind if kind in QuizKind.WORD_KINDS else random.choice(QuizKind.WORD_KINDS)
+
+    if kind == QuizKind.DESCRIPTION and not answer.description:
+        others = [one for one in QuizKind.WORD_KINDS if one != QuizKind.DESCRIPTION]
+        kind = random.choice(others) if others else kind
+
+    return _with_answer(kind, answer, pool)
+
+
+def _with_answer(kind: str, answer: Word, pool: QuerySet[Word]) -> Question | None:
+    """정답이 정해진 뒤의 공통 부분 - 보기를 채워 문제를 만든다."""
     distractors = _pick_distractors(answer, pool, CHOICE_COUNT - 1)
     if len(distractors) < CHOICE_COUNT - 1:
         # 보기를 채울 만큼 단어가 없다. 문제를 못 만든다.
@@ -567,14 +591,23 @@ def make_blank_question(
 def make_situation_question(
     sentences: QuerySet[Sentence],
     exclude_ids: list[int] | None = None,
+    answer: Sentence | None = None,
 ) -> Question | None:
-    """문장을 보여주고 그 말이 나오는 상황을 고르는 문제."""
-    pool = sentences.exclude(context="")
-    candidates = pool.exclude(pk__in=exclude_ids or [])
+    """문장을 보여주고 그 말이 나오는 상황을 고르는 문제.
 
-    answer = candidates.order_by("?").first()
-    if answer is None:
-        return None
+    answer 를 주면 그 문장을 정답으로 한다 - 복습이 그렇게 쓴다. 상황이
+    비어 있으면 이 유형을 못 내므로 None 이다.
+    """
+    pool = sentences.exclude(context="")
+
+    if answer is not None:
+        if not answer.context:
+            return None
+    else:
+        candidates = pool.exclude(pk__in=exclude_ids or [])
+        answer = candidates.order_by("?").first()
+        if answer is None:
+            return None
 
     # 같은 상황 글자를 쓰는 문장이 있다(2026-08 기준 380개 중 149개가
     # 남과 상황을 공유하고, 한 상황에 최대 14개). 정답과 겹치는 것만

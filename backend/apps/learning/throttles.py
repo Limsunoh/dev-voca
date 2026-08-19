@@ -152,3 +152,19 @@ class DailyStudyAnswerThrottle(_PerUserOrShared):
     """
 
     scope = "daily_study_answer"
+
+
+class ReviewThrottle(_PerUserOrShared):
+    """복습 - 시작과 남은 개수 보기."""
+
+    scope = "review"
+
+
+class ReviewAnswerThrottle(_PerUserOrShared):
+    """복습 답하기.
+
+    시작과 통을 나눈다 - 일일공부에서 한 통으로 뒀다가 20문제를 빠르게
+    푸는 사람이 판 중간에 막히는 것을 겪었다.
+    """
+
+    scope = "review_answer"

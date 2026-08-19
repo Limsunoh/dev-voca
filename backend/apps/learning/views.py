@@ -23,12 +23,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import daily_study, leaderboards, record, session
+from . import daily_study, leaderboards, record, review, session
 from .models import STUDY_PLANS, StudyLength
 from .throttles import (
     DailyStudyAnswerThrottle,
     DailyStudyThrottle,
     LeaderboardThrottle,
+    ReviewAnswerThrottle,
+    ReviewThrottle,
     RoundAnswerThrottle,
     RoundFinishThrottle,
     RoundStartThrottle,
@@ -314,3 +316,75 @@ def _study_body(study) -> dict:
         "bonus": study.bonus,
         "done": study.is_done,
     }
+
+
+class ReviewStartView(APIView):
+    """복습을 연다. GET 은 남은 개수만 본다.
+
+    **로그인이 필요하다.** 무엇을 틀렸는지가 계정에 쌓여야 하는 기능이다.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ReviewThrottle]
+
+    def get(self, request: Request) -> Response:
+        """복습할 것이 몇 개인가. 화면이 시작 버튼을 그릴지 정한다."""
+        return Response(
+            {
+                "due": review.count_due(request.user),
+                "round_size": review.ROUND_SIZE,
+            }
+        )
+
+    def post(self, request: Request) -> Response:
+        try:
+            token, question, total = review.start(request.user)
+        except session.SessionError as exc:
+            return _fail(exc)
+
+        return Response(
+            {"token": token, "question": question, "total": total},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ReviewAnswerView(APIView):
+    """복습 답 하나."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ReviewAnswerThrottle]
+
+    def post(self, request: Request) -> Response:
+        try:
+            token = _token_of(request)
+        except session.SessionError as exc:
+            return _fail(exc)
+
+        body = request.data if isinstance(request.data, dict) else {}
+        picked = body.get("choice_id")
+        # bool 은 int 의 하위라 True 가 1 로 통과한다.
+        if isinstance(picked, bool) or not isinstance(picked, int):
+            return Response(
+                {"detail": "보기를 골라주세요."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            result, next_token, question = review.answer(request.user, token, picked)
+        except session.SessionError as exc:
+            return _fail(exc)
+
+        return Response(
+            {
+                "result": {
+                    "correct": result.correct,
+                    "streak": result.streak,
+                    "graduated": result.graduated,
+                    "answer_type": result.answer_type,
+                    "answer_text": result.answer_text,
+                    "answer_extra": result.answer_extra,
+                },
+                "token": next_token,
+                "question": question,
+                "finished": question is None,
+            }
+        )
