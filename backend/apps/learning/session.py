@@ -378,6 +378,13 @@ def _issue(state: dict, now: datetime) -> dict | None:
 
 
 def _make(state: dict) -> quiz.Question | None:
+    """유형을 골라 문제를 만든다. 판 상태에서 최근 목록을 꺼내 넘긴다."""
+    return make_question(list(state["r"]), list(state["rs"]))
+
+
+def make_question(
+    recent_words: list[int], recent_sentences: list[int]
+) -> quiz.Question | None:
     """유형을 골라 문제를 만든다.
 
     문장 문제를 섞는 비율을 고정하지 않고 매번 뽑는다. 순서를 정해두면
@@ -388,8 +395,6 @@ def _make(state: dict) -> quiz.Question | None:
     """
     words = Word.objects.visible()
     sentences = Sentence.objects.visible()
-    recent_words = list(state["r"])
-    recent_sentences = list(state["rs"])
 
     kind = random.choice(quiz.QuizKind.ALL)
 

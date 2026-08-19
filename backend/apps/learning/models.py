@@ -83,8 +83,13 @@ class QuizSession(models.Model):
 class QuizAnswer(models.Model):
     """판 안의 답 하나.
 
-    틀린 문제 다시풀기와 일일공부의 복습 문제가 이 표에서 나온다.
-    그래서 맞은 것도 남긴다 - 무엇을 이미 아는지도 알아야 복습에서 뺀다.
+    틀린 문제 다시풀기가 이 표에서 나온다. 그래서 맞은 것도 남긴다 -
+    무엇을 이미 아는지도 알아야 복습에서 뺀다.
+
+    **자유 문제풀이만 여기 남는다.** 일일공부는 DailyStudy 에 개수만
+    쌓고 답 하나하나를 남기지 않는다 - 답마다 쓰기가 두 번이 되는 것을
+    피했다(daily_study.py 첫머리). 복습이 일일공부 오답까지 필요해지면
+    그때 답 표를 따로 만든다.
     """
 
     session = models.ForeignKey(
@@ -232,3 +237,115 @@ class RoundStep(models.Model):
 
     def __str__(self) -> str:
         return f"{self.round_id}#{self.step}"
+
+
+class StudyLength(models.TextChoices):
+    """일일공부 길이. 사용자가 시작할 때 고른다.
+
+    시간이 아니라 **문제 수**가 실제 규칙이다. 제한 시간이 없으므로
+    "5분" 은 대략 그만큼 걸린다는 안내이지 마감이 아니다 - 천천히 풀어도
+    불이익이 없어야 매일 온다.
+    """
+
+    SHORT = "5m", "5분"
+    MEDIUM = "10m", "10분"
+    LONG = "30m", "30분"
+
+
+# 길이별 문제 수와 완주 보너스.
+#
+# 보너스를 길이에 비례시키는 이유: 전부 같은 값이면 짧은 것을 고르는 쪽이
+# 항상 이득이라 긴 선택지가 사실상 죽는다. 자기 사정에 맞춰 고르게 하려면
+# 어느 것을 골라도 손해가 없어야 한다.
+STUDY_PLANS: dict[str, tuple[int, int]] = {
+    StudyLength.SHORT: (10, 5),
+    StudyLength.MEDIUM: (25, 10),
+    StudyLength.LONG: (40, 25),
+}
+
+
+class DailyStudy(models.Model):
+    """오늘의 일일공부 한 줄. 진행 상태를 서버가 들고 있다.
+
+    자유 문제풀이와 달리 **토큰만으로는 안 된다.** 저기는 그날 최고 한 판만
+    세므로 나쁜 판을 버려도 결과가 같지만, 여기는 더하기라서 점수가 깎이는
+    판을 중간에 버리는 것이 이득이 된다. 끝내기를 클라이언트에 맡기면
+    "마음에 안 들면 새로 시작" 이 열린다.
+
+    그래서 답할 때마다 여기에 쌓는다. 나가도 푼 만큼 남고, 다시 들어와도
+    이어지지 않는다 - 하루 한 번이라 이미 시작한 사람은 그 줄을 본다.
+
+    DailyScore 와 나눠 둔 이유: 저기는 순위표가 읽는 집계표다. 진행 상태를
+    섞으면 "하루를 대표하는 한 줄" 이라는 뜻이 흐려지고, 순위표 쿼리가
+    안 쓰는 칸을 함께 끌고 다닌다.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="daily_studies",
+        verbose_name="사용자",
+    )
+
+    day = models.DateField("날짜(KST)")
+
+    length = models.CharField(
+        "길이", max_length=8, choices=StudyLength.choices
+    )
+
+    # 낼 문제 수와 완주 보너스. 시작할 때 길이로 정해 **둘 다** 고정한다.
+    # STUDY_PLANS 를 나중에 바꿔도 진행 중인 판의 규칙이 안 바뀐다.
+    #
+    # 보너스만 런타임에 STUDY_PLANS 를 보게 두면 반쪽만 고정된다 - 9/10 을
+    # 푼 사람이 배포 한 번에 다른 보너스를 받고, 길이 값을 제거하면 조용히
+    # 0 이 된다.
+    total_questions = models.PositiveIntegerField("문제 수")
+    bonus = models.PositiveIntegerField("완주 보너스", default=0)
+
+    # 다음에 받을 순번. 답 하나가 이 값을 **원자적으로 가져간다**.
+    #
+    # 이게 없으면 같은 토큰으로 보기를 하나씩 다 넣어볼 수 있다. 첫 답의
+    # 응답이 정답을 알려주므로, 옛 토큰에 그 답을 실어 다시 보내면 확실히
+    # +1 이다. 진행 개수만 세는 것으로는 못 막는다 - 그쪽은 늘어나지만
+    # 맞힌 개수도 같이 늘어나기 때문이다.
+    #
+    # session.py 는 같은 일을 RoundStep 표로 한다. 저기는 로그인 안 한
+    # 사람도 풀어서 판마다 행을 만들 수 없었지만, 여기는 이미 하루 한 줄이
+    # 있으니 칸 하나면 된다.
+    step = models.PositiveIntegerField("다음 순번", default=0)
+
+    answered = models.PositiveIntegerField("푼 문제 수", default=0)
+    correct = models.PositiveIntegerField("맞힌 문제 수", default=0)
+
+    # 지금까지 얻은 점수. 맞히면 +1, 틀리면 0 이라 answered 와 별개로 둘
+    # 이유는 없어 보이지만, 완주 보너스가 여기 더해진다.
+    score = models.IntegerField("점수", default=0)
+
+    finished_at = models.DateTimeField(
+        "끝낸 때", null=True, blank=True, default=None
+    )
+
+    created_at = models.DateTimeField("시작한 때", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "일일공부"
+        verbose_name_plural = "일일공부"
+        ordering = ["-day"]
+        constraints = [
+            # 하루 한 번. 이 제약이 곧 그 규칙이다 - 코드로 검사하면
+            # 동시에 두 번 시작하는 경로가 열린다.
+            models.UniqueConstraint(
+                fields=["user", "day"], name="learning_dailystudy_user_day_unique"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user", "-day"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.day} {self.answered}/{self.total_questions}"
+
+    @property
+    def is_done(self) -> bool:
+        return self.finished_at is not None
+

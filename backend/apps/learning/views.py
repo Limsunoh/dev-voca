@@ -14,21 +14,27 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict
 
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import leaderboards, record, session
+from . import daily_study, leaderboards, record, session
+from .models import STUDY_PLANS, StudyLength
 from .throttles import (
+    DailyStudyAnswerThrottle,
+    DailyStudyThrottle,
     LeaderboardThrottle,
     RoundAnswerThrottle,
     RoundFinishThrottle,
     RoundStartThrottle,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _token_of(request: Request) -> str:
@@ -191,3 +197,120 @@ class AllTimeBestView(LeaderboardView):
 
 class StreakView(LeaderboardView):
     board_kind = leaderboards.STREAK
+
+
+class DailyStudyStartView(APIView):
+    """오늘 일일공부를 연다.
+
+    **로그인이 필요하다.** 진행이 DB 에 남아야 하는 기능이라 계정이 없으면
+    이어서 볼 자리가 없다. 자유 문제풀이가 게스트를 받는 것과 다르다.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [DailyStudyThrottle]
+
+    def get(self, request: Request) -> Response:
+        """오늘 상태를 본다. 화면이 시작 전에 무엇을 그릴지 정한다."""
+        # **어제 판을 여기서도 정산한다.** 시작할 때만 정산하면, 며칠 안
+        # 들어온 사람의 판이 열린 채 남는다. 그리고 어제 판을 "오늘" 로
+        # 내려주면 화면이 "이어서 풀기" 를 그리는데 이어 풀 토큰이 없다 -
+        # 서버가 약속하지 않은 것을 화면이 약속하게 된다.
+        # 정산이 실패해도 조회는 살린다. 화면 진입 경로라 여기서 500 이
+        # 나면 일일공부를 아예 못 연다. 정산은 다음 조회나 시작에서 다시
+        # 시도되는 성격이라 조회를 막을 만큼 급하지 않다 - 시작할 때는
+        # 반대로 삼키지 않는다(열린 판이 둘이 되면 안 된다).
+        try:
+            daily_study.settle_stale(request.user)
+        except Exception:
+            logger.exception("일일공부 정산에 실패했습니다. user=%s", request.user.pk)
+
+        study = daily_study.today_of(request.user)
+        return Response(
+            {
+                "lengths": [
+                    {
+                        "value": value,
+                        "label": label,
+                        "questions": STUDY_PLANS[value][0],
+                        "bonus": STUDY_PLANS[value][1],
+                    }
+                    for value, label in StudyLength.choices
+                ],
+                "today": _study_body(study) if study else None,
+            }
+        )
+
+    def post(self, request: Request) -> Response:
+        body = request.data if isinstance(request.data, dict) else {}
+        length = body.get("length")
+        if not isinstance(length, str):
+            return Response(
+                {"detail": "길이를 골라주세요."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            study, token, question = daily_study.start(request.user, length)
+        except session.SessionError as exc:
+            return _fail(exc)
+
+        return Response(
+            {"token": token, "question": question, "study": _study_body(study)},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class DailyStudyAnswerView(APIView):
+    """일일공부 답 하나."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [DailyStudyAnswerThrottle]
+
+    def post(self, request: Request) -> Response:
+        try:
+            token = _token_of(request)
+        except session.SessionError as exc:
+            return _fail(exc)
+
+        body = request.data if isinstance(request.data, dict) else {}
+        picked = body.get("choice_id")
+        # bool 은 int 의 하위라 True 가 1 로 통과한다.
+        if isinstance(picked, bool) or not isinstance(picked, int):
+            return Response(
+                {"detail": "보기를 골라주세요."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            result, next_token, question, studied = daily_study.answer(
+                request.user, token, picked
+            )
+        except session.SessionError as exc:
+            return _fail(exc)
+
+        return Response(
+            {
+                "result": {
+                    "correct": result.correct,
+                    "score": result.score,
+                    "answer_type": result.answer_type,
+                    "answer_text": result.answer_text,
+                    "answer_extra": result.answer_extra,
+                },
+                "token": next_token,
+                "question": question,
+                "finished": question is None,
+                "study": _study_body(studied),
+            }
+        )
+
+
+def _study_body(study) -> dict:
+    """오늘 줄을 화면용으로."""
+    return {
+        "length": study.length,
+        "total": study.total_questions,
+        "answered": study.answered,
+        "correct": study.correct,
+        "score": study.score,
+        "bonus": study.bonus,
+        "done": study.is_done,
+    }

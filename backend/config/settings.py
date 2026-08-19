@@ -344,5 +344,11 @@ REST_FRAMEWORK = {
         # 이 값은 **순위표 하나당**이다 - 통을 셋으로 나눠 쓴다
         # (apps/learning/throttles.py 의 LeaderboardThrottle).
         "leaderboard": "5000/min" if sys.argv[1:2] == ["test"] else "60/min",
+        # 일일공부. 하루 최대 40문제라 분당 30이면 손으로 닿지 않는다.
+        # 로그인해야 쓸 수 있어 계정별로 센다.
+        "daily_study": "5000/min" if sys.argv[1:2] == ["test"] else "30/min",
+        # 답하기는 시작과 통을 나눈다. 40문제를 빠르게 푸는 것이 정상
+        # 사용이라 조회·시작과 같은 통을 쓰면 판 중간에 막힌다.
+        "daily_study_answer": "5000/min" if sys.argv[1:2] == ["test"] else "120/min",
     },
 }
