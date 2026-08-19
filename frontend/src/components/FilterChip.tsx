@@ -45,8 +45,8 @@ export function FilterChip({
       aria-label={ariaLabel}
       className={
         active
-          ? `${shape} border-transparent bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900`
-          : `${shape} border-slate-200 text-slate-600 hover:border-slate-400 dark:border-white/40 dark:text-slate-300 dark:hover:border-white/60`
+          ? `${shape} border-transparent bg-slate-100 text-slate-900`
+          : `${shape} border-white/40 text-slate-300 hover:border-white/60`
       }
     >
       {children}
