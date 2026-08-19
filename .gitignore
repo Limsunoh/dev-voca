@@ -70,3 +70,7 @@ Thumbs.db
 
 # Claude Code 가 만드는 격리 작업공간. 저장소에 들어갈 것이 아니다.
 .claude/worktrees/
+
+# skills CLI 가 다른 에이전트 도구용으로 만드는 사본. .claude/skills/ 와 내용이
+# 같아서 둘 다 커밋하면 3MB 가 두 벌이 된다. Claude Code 는 .claude/skills/ 를 읽는다.
+.agents/

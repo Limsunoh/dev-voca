@@ -82,7 +82,7 @@ export function CategoryChip({
   return (
     <Link
       href={href}
-      className={`${shape} border border-white/25 text-slate-100 underline decoration-white/30 underline-offset-4 transition hover:border-white/50 hover:decoration-white/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus`}
+      className={`${shape} border border-white/25 text-slate-100 underline decoration-white/30 underline-offset-4 transition-[scale,border-color,text-decoration-color] duration-[120ms] ease-press hover:border-white/50 hover:decoration-white/70 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus`}
     >
       {label}
     </Link>

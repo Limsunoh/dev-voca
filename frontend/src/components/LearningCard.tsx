@@ -47,7 +47,24 @@ export function LearningCard({
       // 반투명으로 두면 배경이 비쳐서 목록 전체가 한 화면으로 읽힌다.
       // backdrop-blur 는 일부러 쓰지 않는다 - 목록에 카드가 스무 개씩
       // 깔리는데 카드마다 백드롭 필터를 걸면 폰에서 스크롤이 끊긴다.
-      className="group block rounded-lg border border-slate-200 bg-white p-4 transition hover:border-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/12 dark:bg-slate-950/45 dark:hover:border-white/25"
+      //
+      // 누르면 살짝 들어간다. 이게 없으면 폰에서 이 카드는 완전히 무반응이다 -
+      // hover 는 터치에 없어서 탭한 순간부터 다음 화면이 뜰 때까지 손가락
+      // 아래에서 아무 일도 일어나지 않는다. 웹 문서는 그렇게 동작하지만
+      // 앱은 그렇지 않다.
+      //
+      // 0.985 인 이유: 카드가 화면 폭을 다 쓰고 세로로 붙어 있어서, 더 줄이면
+      // 눌린 카드와 이웃 사이가 눈에 띄게 벌어진다.
+      //
+      // transition 을 속성으로 좁힌다. 맨 transition 은 all 이라 카드 스무
+      // 장에 걸리면 폰에서 낭비다(위에서 backdrop-blur 를 뺀 것과 같은 이유).
+      //
+      // 목록에 transform 이 아니라 scale 을 적는다. Tailwind v4 의
+      // active:scale-* 는 transform 이 아니라 별개의 scale 속성을 쓴다.
+      // transform 만 적어두면 전환 대상에 안 잡혀서 크기가 툭 바뀐다
+      // (실측으로 확인했다 - scale 은 0.985 로 바뀌는데 transitionProperty
+      // 에는 없었다).
+      className="group block rounded-lg border border-slate-200 bg-white p-4 transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/12 dark:bg-slate-950/45 dark:hover:border-white/25"
     >
       <div className="flex items-start justify-between gap-3">
         {/* min-w-0 이 없으면 flex 항목이 내용보다 작아지지 못한다. 제목에
