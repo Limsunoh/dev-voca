@@ -239,7 +239,7 @@ function SaveButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition-[scale,background-color] duration-[120ms] ease-press hover:bg-slate-700 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-6 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+      className="w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition-[scale,background-color] duration-[120ms] ease-press hover:bg-slate-700 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-6 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
     >
       {pending ? "저장하는 중" : "저장"}
     </button>

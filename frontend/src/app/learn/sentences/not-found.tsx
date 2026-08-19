@@ -15,7 +15,7 @@ export default function SentenceNotFound() {
 
       <Link
         href={routes.sentences}
-        className="mt-6 inline-flex min-h-12 items-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="mt-6 inline-flex min-h-12 items-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         문장으로 돌아가기
       </Link>

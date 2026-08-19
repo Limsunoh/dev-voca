@@ -34,7 +34,7 @@ export default function TestSentencesPage() {
       <div className="mt-6 flex flex-wrap gap-2.5">
         <Link
           href={contentPath("test", "words")}
-          className="flex min-h-12 flex-1 items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="flex min-h-12 flex-1 items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           단어 문제풀기
         </Link>
@@ -43,7 +43,7 @@ export default function TestSentencesPage() {
           // 테두리가 유일한 "여기가 버튼" 신호라 white/40 아래로 내리지
           // 않는다. WCAG 1.4.11 이 컨트롤 경계에 3:1 을 요구하는데
           // white/15 는 1.5:1 이라 떠 있는 글자로 읽힌다.
-          className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/40 px-5 font-semibold text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/40 px-5 font-semibold text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           문장 익히기
         </Link>

@@ -285,7 +285,7 @@ export function QuizBoard({ category }: Props) {
             setScore({ solved: 0, correct: 0 });
             void load();
           }}
-          className="mt-4 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="mt-4 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           처음부터 다시
         </button>
@@ -343,14 +343,19 @@ export function QuizBoard({ category }: Props) {
         </p>
       )}
 
-      {result && <Explanation result={result} />}
+      {/* aria-live 를 바깥에 두고 항상 렌더한다. 리전 자체가 내용과 함께
+          새로 생기면 화면 낭독기가 대부분 그 등장을 알리지 않는다 - 리전은
+          미리 있어야 이후 변화를 감시한다. 안쪽만 조건부로 바꾼다. */}
+      <div aria-live="polite">
+        {result && <Explanation result={result} />}
+      </div>
 
       {picked !== null && (
         <button
           ref={nextButtonRef}
           type="button"
           onClick={() => void load()}
-          className="mt-6 min-h-12 w-full rounded-full bg-focus px-4 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="mt-6 min-h-12 w-full rounded-full bg-focus px-4 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           다음 문제
         </button>
@@ -444,10 +449,23 @@ function ChoiceButton({
   // WCAG 1.4.11 은 컨트롤 경계에 3:1 을 요구한다 - SearchInput 이 같은
   // 이유로 이미 white/40 을 쓰고 있다.
   const style = {
-    idle: "border-white/40 bg-slate-950/45 hover:border-white/60",
+    // 누르면 배경이 밝아진다. 축소만으로는 이 버튼에서 거의 안 보인다 -
+    // 높이가 50px 뿐이라 0.96 이어도 위아래로 1px 밖에 안 움직인다(카드는
+    // 133px 이라 같은 값에서 2.7px 움직여 눈에 띈다). 납작한 요소는 크기
+    // 대신 색이 신호를 맡아야 한다.
+    // hover·active 를 enabled: 로 감싼다. 채점이 끝나면 고르지 않은 보기도
+    // idle 로 돌아오는데, 그때는 disabled 라 누를 수 없다. 그런데 hover 는
+    // disabled 와 무관하게 걸려서, 마우스를 올리면 테두리가 밝아져 아직
+    // 누를 수 있는 것처럼 보인다(실측: 알파 0.4 -> 0.6).
+    idle: "border-white/40 bg-slate-950/45 enabled:hover:border-white/60 enabled:active:border-white/70 enabled:active:bg-slate-800/70",
     // 고른 직후. 채점을 기다리는 짧은 순간이라 강조색으로 "이걸 골랐다" 만
     // 말하고, 맞았는지는 아직 말하지 않는다.
-    picked: "border-focus bg-slate-950/45",
+    //
+    // 배경을 누름 상태와 같은 밝기로 유지한다. 기본 배경으로 돌려놓으면
+    // 손을 뗀 순간 밝기가 원래대로 내려가서, 서버 응답을 기다리는 바로 그
+    // 구간에 "눌렀다" 는 신호가 꺼진다. 그 구간이 이 화면에서 피드백이
+    // 가장 필요한 자리다(느린 응답을 흉내내 재현했다).
+    picked: "border-focus bg-slate-800/70",
     // 정답·오답은 채도를 낮춘 톤으로 둔다. emerald-950 같은 원색을 깔면
     // 청록 팔레트와 따로 놀고, 배경 그라디언트도 덮어버린다.
     // MetaBadge 의 난이도 배지가 쓰는 -400/N 문법과 같은 계열이다.
@@ -469,8 +487,9 @@ function ChoiceButton({
       // 누르면 살짝 들어간다. 채점은 서버 왕복이라 이게 없으면 손가락을 뗀
       // 뒤 응답이 올 때까지 아무 반응이 없다 - 눌리긴 한 건지 알 수 없다.
       //
-      // 0.98 인 이유: 버튼이 화면 폭을 다 쓰고 grid gap-2 로 촘촘히 붙어
-      // 있다. 더 줄이면 눌린 것만 눈에 띄게 작아져서 흔들려 보인다.
+      // 0.96 은 globals.css 의 "누름 피드백" 절이 정한 값이다. 보기 넷이
+      // 붙어 있어 흔들려 보일까 봐 0.98 로 뒀었는데, 그 정도로는 눌러도
+      // 보이지 않아 있으나 마나였다.
       //
       // 채점 뒤에는 disabled 라 브라우저가 :active 를 주지 않는다. 따로 끌
       // 필요가 없다.
@@ -478,7 +497,7 @@ function ChoiceButton({
       // 목록에 transform 이 아니라 scale 을 적는다. Tailwind v4 의
       // active:scale-* 는 transform 이 아니라 별개의 scale 속성을 쓴다.
       // transform 만 적어두면 전환 대상에 안 잡혀서 크기가 툭 바뀐다.
-      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-[scale,border-color,background-color] duration-[120ms] ease-press active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default ${style}`}
+      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-[scale,border-color,background-color] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default ${style}`}
     >
       {/* min-w-0 이 있어야 flex 항목이 내용보다 작아진다. 글자를 끊는 쪽은
           globals.css 의 base 규칙(body 상속)이 맡는다. 둘 중 하나만 있으면
@@ -514,11 +533,19 @@ function Explanation({ result }: { result: GradeResult }) {
 
   return (
     // 채점 결과는 버튼 색으로만 알리면 화면을 못 보는 사람에게 안 닿는다.
-    // 새로 나타나는 영역이라 aria-live 로 읽어준다.
+    // 읽어주는 것은 이 카드를 감싼 바깥 div 의 aria-live 가 맡는다 - 여기에
+    // 또 걸면 리전 안에 리전이 생겨 낭독이 겹친다.
     <section
-      aria-live="polite"
       // 보기 버튼과 같은 표면. 해설만 불투명하게 두면 이 카드만 떠 보인다.
-      className="mt-6 rounded-lg border border-white/12 bg-slate-950/45 p-4"
+      //
+      // 올라오며 나타난다. 이게 없으면 답을 고른 순간 화면 아래가 갑자기
+      // 길어지고 곧바로 스크롤이 따라붙어서, 무엇이 생겼는지 모른 채 화면만
+      // 움직인 것처럼 보인다.
+      //
+      // 높이는 애니메이트하지 않는다. 해설이 붙은 뒤 버튼 위치를 재서
+      // 스크롤할 자리를 정하는데(위 useEffect), 그때 높이가 아직 변하는
+      // 중이면 목표가 어긋난다. 자리는 즉시 잡고 그 안에서 떠오르기만 한다.
+      className="rise mt-6 rounded-lg border border-white/12 bg-slate-950/45 p-4"
     >
       {/* 맞았는지 틀렸는지가 이 카드에서 가장 먼저 읽혀야 한다. 회색으로
           두면 보기 버튼의 테두리 색이 유일한 신호가 된다. */}
