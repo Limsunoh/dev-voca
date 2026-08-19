@@ -55,9 +55,7 @@ export function ChoiceFilter({
       aria-label={`${label} 필터`}
       className="mt-4 flex flex-wrap items-center gap-2"
     >
-      <span className="text-sm text-slate-500 dark:text-slate-300">
-        {label}
-      </span>
+      <span className="text-sm text-slate-300">{label}</span>
       {/* "전체" 는 화면에 여러 줄이 나란히 설 때 이름이 겹친다(문장 화면은
           종류·난이도·분류 셋). 스크린리더의 링크 목록에서는 nav 이름이
           안 읽히므로 여기서 한정해 준다. */}
