@@ -4,6 +4,8 @@ from .views import (
     AllTimeBestView,
     DailyStudyAnswerView,
     DailyStudyStartView,
+    ReviewAnswerView,
+    ReviewStartView,
     RoundAnswerView,
     RoundFinishView,
     RoundStartView,
@@ -29,4 +31,7 @@ urlpatterns = [
     # 마지막 문제를 풀면 서버가 닫는다.
     path("daily/", DailyStudyStartView.as_view(), name="daily-study"),
     path("daily/answer/", DailyStudyAnswerView.as_view(), name="daily-study-answer"),
+    # 복습. 점수가 없어 끝내기도 없다 - 목록을 다 풀면 끝난다.
+    path("review/", ReviewStartView.as_view(), name="review"),
+    path("review/answer/", ReviewAnswerView.as_view(), name="review-answer"),
 ]

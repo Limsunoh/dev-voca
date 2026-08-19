@@ -25,7 +25,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from . import calendar_kst
-from .models import DailyScore, QuizAnswer, QuizSession, SessionKind
+from .models import DailyScore, QuizAnswer, QuizSession, ReviewState, SessionKind
 from .session import ANSWER_FIELDS
 
 logger = logging.getLogger(__name__)
@@ -62,10 +62,23 @@ def save_round(user, summary: dict) -> QuizSession | None:
             )
 
             _bump_daily(session)
+
+            # **자기 savepoint 안에서 부른다.** 여기서 IntegrityError 가
+            # 바깥으로 나가면 save_round 가 그걸 "이미 기록된 판" 으로
+            # 오인해 판 전체를 롤백한다 - 점수가 조용히 사라진다.
+            # 복습 목록이 한 판 밀리는 것이 판을 잃는 것보다 낫다.
+            try:
+                with transaction.atomic():
+                    _bump_review(user, summary["answers"])
+            except IntegrityError:
+                logger.warning(
+                    "복습 목록 갱신에 실패했습니다. token_id=%s", summary["token_id"]
+                )
     except IntegrityError:
         # 판 식별자가 겹쳤다 = 이미 기록된 판이다. 그 밖의 무결성 오류는
-        # 여기까지 오지 않는다 - 아래 _bump_daily 는 UPDATE 만 쓰고,
-        # get_or_create 는 안에서 자기 savepoint 로 경합을 처리한다.
+        # 여기까지 오지 않는다 - _bump_daily 는 UPDATE 만 쓰고,
+        # get_or_create 는 안에서 자기 savepoint 로 경합을 처리하며,
+        # _bump_review 는 위에서 savepoint 로 감싸 자기 오류를 삼킨다.
         logger.info("이미 기록된 판입니다. token_id=%s", summary["token_id"])
         return None
 
@@ -104,6 +117,89 @@ def _answer_rows(session: QuizSession, answers) -> list[QuizAnswer]:
 
     return rows
 
+
+
+def _bump_review(user, answers) -> None:
+    """푼 항목들의 복습 상태를 채운다.
+
+    **복습 목록이 여기서 생긴다.** 이 쓰기가 없으면 review 화면은 표만
+    있고 행이 없어 영원히 빈 목록이 된다.
+
+    맞은 것도 남긴다 - "언제 마지막으로 맞혔나" 가 있어야 오래된 것을
+    고를 수 있다. 다만 **연속 횟수는 안 올린다.** 그건 복습에서 확인한
+    것만 세야 의미가 있다(review._record 참고).
+
+    넘긴 답은 건너뛴다. 모르는 것일 수도 있지만 시간이 없어 넘긴 것일
+    수도 있어, 틀렸다고 단정하면 목록이 넘긴 것으로 채워진다.
+    """
+    seen: dict[tuple[str, int], bool] = {}
+
+    for one in answers:
+        if not isinstance(one, (list, tuple)) or len(one) != ANSWER_FIELDS:
+            continue
+
+        _kind, target_type, target_id, correct, skipped, _elapsed, _score = one
+        if skipped:
+            continue
+
+        try:
+            key = (str(target_type), int(target_id))
+        except (TypeError, ValueError):
+            continue
+
+        # 한 판에 같은 항목이 두 번 나오면 마지막 결과를 쓴다.
+        seen[key] = bool(correct)
+
+    if not seen:
+        return
+
+    now = timezone.now()
+    # **종류까지 걸어 조회한다.** id 만으로 좁히면 단어 5번과 문장 5번이
+    # 같이 걸려, 하나를 고치려다 다른 하나를 덮는다.
+    lookup = Q()
+    for target_type, target_id in seen:
+        lookup |= Q(target_type=target_type, target_id=target_id)
+
+    existing = {
+        (row.target_type, row.target_id): row
+        for row in ReviewState.objects.filter(user=user).filter(lookup)
+    }
+
+    new_rows = []
+    changed = []
+    for (target_type, target_id), correct in seen.items():
+        row = existing.get((target_type, target_id))
+        if row is None:
+            new_rows.append(
+                ReviewState(
+                    user=user,
+                    target_type=target_type,
+                    target_id=target_id,
+                    is_wrong=not correct,
+                    last_correct_at=now if correct else None,
+                )
+            )
+            continue
+
+        row.is_wrong = not correct
+        if correct:
+            row.last_correct_at = now
+        else:
+            # **틀리면 연속을 끊는다.** 자유 문제풀이에서 맞힌 것은 연속을
+            # 올리지 않지만(그건 복습에서 확인한 것만 센다), 틀린 것은
+            # 끊어야 한다. 안 그러면 복습 1회 + 자유 오답 + 복습 1회 로
+            # "연속" 아닌 두 번에 졸업한다.
+            row.streak = 0
+        changed.append(row)
+
+    if new_rows:
+        # 동시에 같은 판을 두 번 기록하면 겹칠 수 있다. 겹친 줄은 이미
+        # 있는 것이니 버린다.
+        ReviewState.objects.bulk_create(new_rows, ignore_conflicts=True)
+    if changed:
+        ReviewState.objects.bulk_update(
+            changed, ["is_wrong", "last_correct_at", "streak"]
+        )
 
 def _bump_daily(session: QuizSession) -> None:
     """그날 한 줄을 갱신한다.

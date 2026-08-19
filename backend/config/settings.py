@@ -350,5 +350,7 @@ REST_FRAMEWORK = {
         # 답하기는 시작과 통을 나눈다. 40문제를 빠르게 푸는 것이 정상
         # 사용이라 조회·시작과 같은 통을 쓰면 판 중간에 막힌다.
         "daily_study_answer": "5000/min" if sys.argv[1:2] == ["test"] else "120/min",
+        "review": "5000/min" if sys.argv[1:2] == ["test"] else "30/min",
+        "review_answer": "5000/min" if sys.argv[1:2] == ["test"] else "120/min",
     },
 }
