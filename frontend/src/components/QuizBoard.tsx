@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Burst } from "@/components/Burst";
 import type { GradeResult, Question } from "@/lib/api/quiz";
 
 /**
@@ -59,21 +60,26 @@ const RECENT_LIMIT = 100;
 /**
  * 아래 탭바가 덮는 높이(px).
  *
+ * **지금은 항상 0 이다.** 이 컴포넌트를 쓰는 /test/words 가 탭바를 숨기는
+ * 화면이기 때문이다(routes 의 immersiveRoutes 참고). 탭바 높이를 재고 있는
+ * 것으로 읽고 값을 믿지 마라 - 재는 대상이 화면에 없다.
+ *
+ * 그래도 남겨두는 이유: 이 컴포넌트가 탭바 있는 화면에서 쓰일 여지가 있다.
+ * 문장 문제가 열리면 그 화면이 판이 아니라 연습이라 탭바를 둘 수 있고,
+ * 그때 이 계산이 없으면 채점 뒤 "다음 문제" 버튼이 탭바 뒤로 들어간다.
+ * 판단을 호출부에 흩지 않고 여기가 한다.
+ *
  * 상수로 두지 않고 실측하는 이유: 탭바는 `pb-[env(safe-area-inset-bottom)]`
  * 로 기기마다 두꺼워진다(layout.tsx 가 viewportFit: "cover" 를 켜서 아이폰
- * 에서 이 값이 0 이 아니다). 5rem 만 박아두면 그 차이만큼 버튼이 탭바에
- * 물린다.
- *
- * 탭바는 fixed 라 스크롤 계산에 잡히지 않으므로, 채점 뒤 버튼 위치를 구할
- * 때 이 높이를 직접 빼줘야 한다.
+ * 에서 이 값이 0 이 아니다). 5rem 만 박아두면 그 차이만큼 버튼이 물린다.
  */
 function tabBarHeight(): number {
   // aria-label 이 아니라 data 속성으로 찾는다. 라벨 문구는 접근성을 다듬다
   // 바뀌기 쉬운데, 그때 조용히 못 찾게 되고 스크롤만 탭바 높이만큼 어긋난다.
   const bar = document.querySelector("[data-tabbar]");
-  // 로그인·가입 화면에는 탭바가 없다. 거기엔 이 화면도 없지만, 못 찾았을
-  // 때 0 을 쓰면 버튼이 가려지므로 5rem 으로 물러선다.
-  return bar ? bar.getBoundingClientRect().height : 80;
+  // 못 찾으면 0. 예전에는 5rem 으로 물러섰는데, 탭바를 없앤 뒤로는 그것이
+  // 없는 탭바만큼 더 스크롤해서 문제를 화면 위로 밀어 올렸다.
+  return bar ? bar.getBoundingClientRect().height : 0;
 }
 
 type Props = {
@@ -97,6 +103,8 @@ export function QuizBoard({ category }: Props) {
   const [combo, setCombo] = useState(0);
   /** 방금 판정. 오답일 때 화면을 짧게 흔든다. */
   const [shake, setShake] = useState(0);
+  /** 방금 판정. 정답일 때 조각이 터진다. */
+  const [burst, setBurst] = useState(0);
   // 방금 푼 단어들. state 로 두면 load 가 렌더 시점의 값을 클로저로
   // 잡아서, 채점 직후 바로 "다음 문제" 를 누르면 방금 푼 단어가
   // 제외 목록에 안 들어간다.
@@ -207,43 +215,73 @@ export function QuizBoard({ category }: Props) {
     // 탭바와 버튼 사이 숨 쉴 틈. tabBarHeight() 가 safe-area 를 포함한
     // 실측값이라 이건 순수한 여백이고, 기기가 달라져도 줄어들지 않는다.
     const gap = 16;
-    const target =
-      window.scrollY +
-      button.getBoundingClientRect().bottom -
-      window.innerHeight +
-      tabBarHeight() +
-      gap;
 
-    // 이미 보이면 화면은 그대로 둔다. 답을 고를 때마다 흔들리면 방금 고른
-    // 보기를 눈으로 다시 찾아야 한다. 데스크톱처럼 화면이 길면 대개 여기다.
-    if (target > window.scrollY) {
-      // behavior 를 "auto" 로 둔다. smooth 를 쓰면 이 화면에서는 아무 일도
-      // 일어나지 않는다 - 채점 직후의 리렌더와 겹치면 브라우저가 진행 중인
-      // 부드러운 이동을 버린다(실측: scrollTo({top:156}) 가 불렸는데
-      // scrollY 가 0 이었고, 같은 시점에 수동 scrollTo 는 정상이었다).
+    // 맞혔으면 축포가 먼저다.
+    //
+    // 둘을 같은 순간에 하면 서로를 지운다. 폭죽은 화면 한가운데에서 터지는데
+    // 그 순간 화면이 300px 튀어서, 눈이 새 위치를 찾는 사이에 조각이 다
+    // 사라진다(실측: scrollY 0 -> 301, 조각은 화면 밖으로). 요청받아 만든
+    // 연출이 스스로 만든 스크롤에 묻히는 셈이었다.
+    //
+    // 그래서 순서를 준다 - 터지는 것을 보고, 그 다음 화면이 움직인다.
+    // 480ms 는 폭죽(900ms)의 절반쯤이다. 다 끝날 때까지 기다리면 다음
+    // 문제로 넘어가려는 손이 먼저 움직여 답답하다.
+    //
+    // 틀렸을 때는 미루지 않는다. 그쪽 연출(흔들림)은 보기 버튼 위에서
+    // 일어나므로 화면이 움직이면 오히려 같이 보인다.
+    const delay = result?.correct ? 480 : 0;
+
+    const move = () => {
+      // 목표를 그때 다시 잰다. 위에서 구한 값은 480ms 전 것이라, 그 사이
+      // 글꼴이 늦게 붙거나 사용자가 손으로 스크롤하면 어긋난다.
+      const now = nextButtonRef.current;
+      if (!now) return;
+      const fresh =
+        window.scrollY +
+        now.getBoundingClientRect().bottom -
+        window.innerHeight +
+        tabBarHeight() +
+        gap;
+
+      // 이미 보이면 화면은 그대로 둔다. 답을 고를 때마다 흔들리면 방금 고른
+      // 보기를 눈으로 다시 찾아야 한다. 데스크톱처럼 화면이 길면 대개 여기다.
+      if (fresh > window.scrollY) {
+        // behavior 를 "auto" 로 둔다. smooth 를 쓰면 이 화면에서는 아무 일도
+        // 일어나지 않는다 - 채점 직후의 리렌더와 겹치면 브라우저가 진행 중인
+        // 부드러운 이동을 버린다(실측: scrollTo({top:156}) 가 불렸는데
+        // scrollY 가 0 이었고, 같은 시점에 수동 scrollTo 는 정상이었다).
+        //
+        // 움직임을 줄이겠다고 한 설정을 따로 보지 않는 이유: auto 는 애초에
+        // 애니메이션이 없어서 그 설정과 무관하게 같은 결과다.
+        window.scrollTo({ top: fresh, behavior: "auto" });
+      }
+
+      // 포커스도 옮긴다. 화면만 움직이면 포커스는 방금 고른 보기에 남는데,
+      // 그 보기는 해설 카드 높이만큼 화면 위로 밀려나 있다. 키보드로 풀던
+      // 사람은 보이지 않는 곳에 서 있게 되고, 화면 낭독기의 읽는 위치와
+      // 눈에 보이는 위치도 어긋난다.
       //
-      // 부드럽게 만들려고 rAF 뒤에 smooth 를 한 번 더 부르는 방법도 써봤는데,
-      // 그 사이(약 16ms)에 사용자가 손으로 스크롤하면 두 번째 호출이 그것을
-      // 도로 끌어내린다. auto 로 이미 목표에 도착해 있으므로 두 번째가
-      // 다듬을 거리도 없다 - 얻는 것 없이 위험만 남는다.
+      // 스크롤 여부와 무관하게 옮긴다. 화면이 안 움직인 경우에도 방금 고른
+      // 보기는 disabled 가 되어 포커스를 잃는다.
       //
-      // 움직임을 줄이겠다고 한 설정을 따로 보지 않는 이유: auto 는 애초에
-      // 애니메이션이 없어서 그 설정과 무관하게 같은 결과다.
-      window.scrollTo({ top: target, behavior: "auto" });
+      // preventScroll 이 있어야 방금 계산한 자리를 브라우저가 다시 건드리지
+      // 않는다. 마우스로 고른 사람에게 포커스 링이 뜨지는 않는다 - 버튼이
+      // focus-visible 만 쓴다.
+      now.focus({ preventScroll: true });
+    };
+
+    // 틀렸을 때는 지체 없이 옮긴다. delay 가 0 이면 타이머를 거치지 않고
+    // 바로 부른다 - setTimeout(0) 도 한 틱 뒤라서, 그 사이 사용자가 이미
+    // 손으로 스크롤했을 수 있다.
+    if (delay === 0) {
+      move();
+      return;
     }
 
-    // 포커스도 옮긴다. 화면만 움직이면 포커스는 방금 고른 보기에 남는데,
-    // 그 보기는 해설 카드 높이만큼 화면 위로 밀려나 있다. 키보드로 풀던
-    // 사람은 보이지 않는 곳에 서 있게 되고, 화면 낭독기의 읽는 위치와
-    // 눈에 보이는 위치도 어긋난다.
-    //
-    // 스크롤 여부와 무관하게 옮긴다. 화면이 안 움직인 경우에도 방금 고른
-    // 보기는 disabled 가 되어 포커스를 잃는다.
-    //
-    // preventScroll 이 있어야 방금 계산한 자리를 브라우저가 다시 건드리지
-    // 않는다. 마우스로 고른 사람에게 포커스 링이 뜨지는 않는다 - 버튼이
-    // focus-visible 만 쓴다.
-    button.focus({ preventScroll: true });
+    const id = setTimeout(move, delay);
+    // 그 사이 다음 문제로 넘어가면 취소한다. 안 그러면 새 문제가 뜬 화면을
+    // 옛 계산으로 끌어내린다.
+    return () => clearTimeout(id);
   }, [picked, result, error]);
 
   async function pick(choiceId: number) {
@@ -265,6 +303,9 @@ export function QuizBoard({ category }: Props) {
       // 틀렸을 때만 화면을 짧게 흔든다. 값을 올려 애니메이션을 다시
       // 재생시킨다 - boolean 이면 연속으로 틀렸을 때 두 번째부터 안 뛴다.
       if (!graded.correct) setShake((n) => n + 1);
+      // 맞혔을 때는 화면 가운데에서 조각이 터진다. 흔들림과 같은 이유로
+      // 카운터다.
+      if (graded.correct) setBurst((n) => n + 1);
       // 채점 뒤 화면을 옮기는 일은 아래 useEffect 가 맡는다. 여기서 하면
       // 해설 카드가 아직 DOM 에 없어 버튼 좌표를 잘못 읽는다.
       //
@@ -307,6 +348,9 @@ export function QuizBoard({ category }: Props) {
             recentRef.current = [];
             setScore({ solved: 0, correct: 0 });
             setCombo(0);
+            // 축포 카운터도 되돌린다. 안 그러면 판이 바뀌어도 이전 값이
+            // 남아, 여기서 초기화하는 다른 것들과 규율이 어긋난다.
+            setBurst(0);
             void load();
           }}
           className="mt-4 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
@@ -321,6 +365,10 @@ export function QuizBoard({ category }: Props) {
 
   return (
     <div className="mt-6">
+      {/* 맞혔을 때 화면 가운데에서 터진다. fixed 라 이 자리에 두어도
+          문제 위치와 무관하게 화면 중앙에서 난다. */}
+      <Burst fire={burst} />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         {/* 분류 칩(CategoryChip)의 비링크 모양과 같은 문법. 같은 화면에
             필터 칩이 이미 여러 줄 서 있어서, 여기까지 다른 회색을 쓰면
@@ -380,7 +428,11 @@ export function QuizBoard({ category }: Props) {
           새 애니메이션으로 보고 매번 재생한다. DOM 은 그대로라 레이아웃이
           흔들리지 않는다. */}
       <ul
-        className={`mt-6 grid gap-2 ${
+        // 데스크톱에서 두 칸으로 나눈다. 한 줄에 하나씩 두면 보기 하나가
+        // 768px 막대가 되어, 게임 선택지가 아니라 설문 문항처럼 읽힌다.
+        // 두 칸이면 시선 이동도 짧다. 폰에서는 한 칸이 맞다 - 두 칸으로
+        // 쪼개면 긴 뜻풀이가 줄바꿈되어 높이가 들쭉날쭉해진다.
+        className={`mt-6 grid gap-2 sm:grid-cols-2 ${
           result && !result.correct
             ? shake % 2 === 0
               ? "shake"

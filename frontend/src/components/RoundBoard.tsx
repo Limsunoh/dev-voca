@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Burst } from "@/components/Burst";
+import { ExitGuard } from "@/components/ExitGuard";
 import type {
   RoundAnswered,
   RoundQuestion,
@@ -56,7 +58,14 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
   const [skipsLeft, setSkipsLeft] = useState(0);
   // 서버가 정한 한 판 길이. 막대 분모와 aria 값에 함께 쓴다.
   const [seconds, setSeconds] = useState(90);
-  const [tally, setTally] = useState({ answered: 0, correct: 0, score: 0 });
+  const [tally, setTally] = useState({
+    answered: 0,
+    correct: 0,
+    score: 0,
+    late: 0,
+  });
+  /** 방금 판정. 정답일 때 조각이 터진다. 카운터인 이유는 Burst 주석 참고. */
+  const [burst, setBurst] = useState(0);
 
   // 마감 시각(ms). 남은 시간을 매 초 다시 계산하는 근거다. setInterval 로
   // 1씩 빼면 탭이 백그라운드로 갔을 때 타이머가 멈춰 시간이 남아 보인다.
@@ -138,13 +147,30 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       const started = await call<RoundStarted>({ action: "start" });
       if (!aliveRef.current) return;
 
+      // 응답에 문제가 없으면 여기서 멈춘다.
+      //
+      // 그냥 진행하면 phase 만 playing 이 되고 PlayCard 는 question 이
+      // null 이라 아무것도 안 그린다 - 문제도 보기도 타이머도 에러 문구도
+      // 없이 나가기 버튼 하나만 뜬다. throw 를 안 했으니 error.tsx 도
+      // 안 뜬다. 사용자는 왜 비었는지 모른 채 나갈 수밖에 없다.
+      //
+      // catch 는 네트워크 실패만 잡지 응답 모양은 안 본다. 서버가 배포
+      // 중이거나 중계가 빈 응답을 흘리면 실제로 이 모양이 온다.
+      if (!started.question || !started.token) {
+        setError("판을 여는 응답이 올바르지 않습니다. 다시 시도해주세요.");
+        return;
+      }
+
       closingRef.current = false;
       deadlineRef.current = Date.now() + started.round_seconds * 1000;
       setSeconds(started.round_seconds);
       tokenRef.current = started.token;
       setQuestion(started.question);
       setSkipsLeft(started.max_skips);
-      setTally({ answered: 0, correct: 0, score: 0 });
+      setTally({ answered: 0, correct: 0, score: 0, late: 0 });
+      // 축포 카운터도 되돌린다. 판마다 0 에서 시작해야 다른 리셋들과
+      // 규율이 맞는다.
+      setBurst(0);
       setResult(null);
       setSummary(null);
       setPhase("playing");
@@ -183,8 +209,21 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         answered: prev.answered + 1,
         correct: prev.correct + (answered.result.correct ? 1 : 0),
         score: prev.score + answered.result.score,
+        // 맞혔는데 시간이 지나 0 점이 된 것. 결과에서 "2개 맞혔는데 왜
+        // 0점?" 을 설명하는 데 쓴다. 서버 요약(finish)에는 이 수가 없어서
+        // 여기서 센다 - 채점 응답마다 in_time 이 오므로 셀 수 있다.
+        late:
+          prev.late +
+          (answered.result.correct && !answered.result.in_time ? 1 : 0),
       }));
       if (answered.result.skipped) setSkipsLeft((n) => Math.max(0, n - 1));
+
+      // 맞혔을 때 조각이 터진다. 넘긴 것은 제외한다 - 서버가 skipped 를
+      // correct: false 로 주지만, 혹시 바뀌더라도 넘긴 문제에 축포가
+      // 터지지 않게 여기서 한 번 더 막는다.
+      if (answered.result.correct && !answered.result.skipped) {
+        setBurst((n) => n + 1);
+      }
 
       if (answered.finished || !answered.question) {
         await finish(answered.token);
@@ -221,34 +260,81 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
   };
 
   if (phase === "idle") {
-    return <StartCard onStart={start} busy={busy} error={error} />;
+    return (
+      // 세로 가운데. 시작 카드 하나뿐이라 위에 붙이면 아래가 통째로 빈다.
+      // 판이 시작되면(아래 playing) 위에 붙는다 - 그때는 타이머가 화면
+      // 맨 위에 있어야 한다.
+      <div className="flex flex-1 flex-col justify-center">
+        {/* 아직 판이 안 열렸다. 점수로 잃을 게 없으니 묻지 않고 나간다.
+            대신 갈 곳을 여럿 둔다 - 여기는 고르는 자리다. */}
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <ExitGuard to={routes.home} label="홈" />
+          <Link
+            href={routes.board()}
+            className="min-h-11 rounded-lg px-2.5 py-2 text-sm text-slate-400 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          >
+            순위표
+          </Link>
+        </div>
+        <StartCard onStart={start} busy={busy} error={error} />
+      </div>
+    );
   }
 
   if (phase === "done") {
     return (
-      <RoundResultCard
-        summary={summary}
-        error={error}
-        isGuest={isGuest}
-        onAgain={start}
-        busy={busy}
-      />
+      // 결과 카드도 하나뿐이라 가운데가 맞다.
+      <div className="flex flex-1 flex-col justify-center">
+        {/* 판이 끝났다. 점수는 이미 서버에 올라갔으니 경고할 것이 없다. */}
+        <div className="mb-5 flex items-center gap-3">
+          <ExitGuard to={routes.profile} label="내 기록" />
+        </div>
+        <RoundResultCard
+          summary={summary}
+          error={error}
+          isGuest={isGuest}
+          onAgain={start}
+          busy={busy}
+          late={tally.late}
+        />
+      </div>
     );
   }
 
   return (
-    <PlayCard
-      question={question}
-      result={result}
-      left={left}
-      total={seconds}
-      skipsLeft={skipsLeft}
-      tally={tally}
-      busy={busy}
-      error={error}
-      onPick={(id) => send(id)}
-      onSkip={() => send(null, true)}
-    />
+    <>
+      {/* 푸는 동안에만 둔다. 시작 카드와 결과 카드에는 판정이 없다. */}
+      <Burst fire={burst} />
+
+      {/* 판이 도는 중이다. 나가는 길은 이것 하나뿐이고, 여기서만 묻는다.
+          지금 나가면 서버가 판을 안 닫아서 점수가 안 남는다. */}
+      <div className="mb-4 flex items-center gap-3">
+        {/* 라벨이 "그만두기" 인 이유: 확인창 안의 확정 버튼이 "나가기" 라
+            같은 이름이 한 화면에 둘이면 낭독기가 같은 말을 두 번 읽고,
+            무엇을 눌러야 진짜 나가는지 헷갈린다. 여는 쪽과 확정하는 쪽의
+            이름을 다르게 둔다. */}
+        <ExitGuard
+          to={routes.home}
+          label="그만두기"
+          confirm
+          score={tally.score}
+          countdown
+        />
+      </div>
+
+      <PlayCard
+        question={question}
+        result={result}
+        left={left}
+        total={seconds}
+        skipsLeft={skipsLeft}
+        tally={tally}
+        busy={busy}
+        error={error}
+        onPick={(id) => send(id)}
+        onSkip={() => send(null, true)}
+      />
+    </>
   );
 }
 
@@ -453,12 +539,20 @@ function RoundResultCard({
   isGuest,
   onAgain,
   busy,
+  late,
 }: {
   summary: RoundSummary | null;
   error: string;
   isGuest: boolean;
   onAgain: () => void;
   busy: boolean;
+  /**
+   * 맞혔지만 시간이 지나 0 점이 된 개수.
+   *
+   * 서버 요약에는 없어서 클라이언트가 센다. 이게 없으면 "3문제 중 2개
+   * 정답 / 0점" 이 설명 없이 나와 버그로 읽힌다.
+   */
+  late: number;
 }) {
   return (
     <div className="rise rounded-2xl border border-white/10 bg-slate-950/40 px-6 py-8 text-center">
@@ -472,6 +566,11 @@ function RoundResultCard({
           <p className="mt-2 text-sm text-slate-400">
             {summary.answered}문제 중 {summary.correct}개 정답
             {summary.skipped > 0 && ` · ${summary.skipped}개 넘김`}
+            {/* 시간 지나 맞힌 것은 0 점이다. 이 줄이 없으면 "2개 맞혔는데
+                왜 0점?" 이 되어 버그로 읽힌다(실측: 3문제 중 2개 정답인데
+                0점이었다). 푸는 중에는 "정답 · 시간 초과" 로 알려주면서
+                결과에서만 빠뜨리면 앞뒤가 안 맞는다. */}
+            {late > 0 && ` · ${late}개는 시간이 지나 0점`}
           </p>
 
           {/* 기록됐을 때만 순위 얘기를 한다. 게스트에게 "17위" 를 보여주면

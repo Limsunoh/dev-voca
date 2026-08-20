@@ -54,9 +54,17 @@
      않는 보기를 Enter 로 고르게 된다.
 
      body 의 padding 으로는 안 된다. 그건 문서 흐름만 밀 뿐 스크롤이
-     멈추는 위치에는 관여하지 않는다. 값은 body 의 아래 여백과 같이 간다. */
+     멈추는 위치에는 관여하지 않는다.
+
+     값을 변수로 두고 기본을 0 으로 둔다. 탭바가 있는 화면에서만 TabBar 가
+     이 변수를 켠다(--tabbar-space, TabBar.tsx 참고).
+
+     리터럴로 박으면 안 된다. 탭바가 없는 문제풀이 화면에서도 브라우저가
+     없는 탭바를 위해 80px 을 더 스크롤해서, 마지막 보기에 포커스가 갈 때
+     화면 아래에 빈 공간이 생기고 문제가 그만큼 위로 밀린다. 마우스로는
+     멀쩡한데 키보드로만 어긋나서 알아채기 어렵다. */
   html {
-    scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: var(--tabbar-space, 0px);
   }
 
   /* 사용자가 넣은 문자열은 끊을 자리가 없을 수 있다 - 에러 메시지 안의 URL,
@@ -432,5 +440,102 @@
   animation-name: rise;
   animation-duration: 320ms;
   animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  animation-fill-mode: both;
+}
+
+/* ---------------------------------------------------------------------------
+   화면 전환 - 문제풀이 드나들기
+   ---------------------------------------------------------------------------
+   문제풀이는 탭바가 없는 별도 화면이다(TabBar 의 return null 참고). 앱에서
+   전체 화면이 열릴 때 아래에서 올라오고 닫을 때 내려가는 그 동작을 흉내낸다.
+   그 움직임이 "다른 층으로 들어왔다" 를 말해주기 때문에, 돌아가려면 나가기를
+   눌러야 한다는 것이 설명 없이 전달된다.
+
+   진짜 화면을 움직이지 않고 같은 색 장막을 덮은 채로 움직인다. 화면 자체를
+   translate 하면 그 안의 fixed 요소(대화상자·탭바)가 따라오지 않아 어긋나고,
+   position: fixed 의 기준이 바뀌는 브라우저 버그도 밟는다.
+
+   거리를 100% 로 두는 이유: 화면 절반만 움직이면 아래 끝에서 배경이 비쳐
+   "덮고 있다" 가 아니라 "떠 있다" 로 보인다.
+--------------------------------------------------------------------------- */
+@keyframes enter-veil {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* 들어올 때. 장막이 화면을 덮고 있다가 아래로 빠지면서 문제가 드러난다. */
+@utility enter-veil {
+  animation-name: enter-veil;
+  animation-duration: 260ms;
+  /* 나갈 때보다 살짝 길고 더 부드럽다. 들어오는 것은 기대가 실리는 순간이라
+     충분히 보여야 하고, 나가는 것은 이미 결정한 일이라 빠를수록 좋다. */
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  animation-fill-mode: both;
+}
+
+@keyframes exit-veil {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* 나갈 때. 아래에서 장막이 올라와 화면을 덮고, 그 사이 이동이 일어난다.
+   ExitGuard 의 setTimeout(220) 이 이 시간에 맞춰져 있다 - 여기를 고치면
+   그쪽도 같이 고친다. 어긋나면 덮이기 전에 이동해서 다음 화면이 번쩍인다. */
+@utility exit-veil {
+  animation-name: exit-veil;
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  animation-fill-mode: both;
+}
+
+/* ---------------------------------------------------------------------------
+   정답 폭죽
+   ---------------------------------------------------------------------------
+   맞혔을 때 화면 가운데에서 조각이 터져 나간다.
+
+   오답에는 흔들림이 있는데 정답에는 아무것도 없었다. 틀린 것만 몸으로
+   느껴지고 맞힌 것은 글자로만 오면, 계속 풀 이유가 약해진다.
+
+   canvas 를 쓰지 않는다. 조각 열몇 개를 한 번 날리는 데 렌더 루프와
+   requestAnimationFrame 관리를 들이는 것은 과하고, 화면을 벗어난 뒤에도
+   루프가 돌지 않게 하는 뒤처리가 매번 새는 자리다. span 에 CSS 애니메이션을
+   걸면 끝나는 것을 브라우저가 알아서 한다.
+
+   각 조각의 방향·거리·회전은 화면 쪽에서 CSS 변수로 넘긴다. 여기서 정하면
+   조각마다 keyframes 를 따로 써야 한다.
+--------------------------------------------------------------------------- */
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(0.4) rotate(0deg);
+  }
+  /* 70% 에서 이미 목적지 근처다. 나머지 30% 는 사라지는 데 쓴다. 끝까지
+     같은 속도로 날아가면 조각이 갑자기 사라지는 것으로 보인다. */
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--burst-x), var(--burst-y), 0) scale(0.9)
+      rotate(var(--burst-rot));
+  }
+}
+
+@utility burst-piece {
+  animation-name: burst;
+  /* 620ms 로는 짧았다. 채점 직후 화면이 한 번 움직이는데, 눈이 새 위치에
+     다시 초점을 맞추는 데만 200~300ms 가 간다. 그 뒤로 남는 시간이 있어야
+     "터졌다" 가 전달된다. */
+  animation-duration: 900ms;
+  /* 처음 빠르고 끝이 느리다. 터지는 것은 초기 속도가 전부다. */
+  animation-timing-function: cubic-bezier(0.15, 0.8, 0.3, 1);
   animation-fill-mode: both;
 }
