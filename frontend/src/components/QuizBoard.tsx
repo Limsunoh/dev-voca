@@ -88,6 +88,15 @@ export function QuizBoard({ category }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [score, setScore] = useState({ solved: 0, correct: 0 });
+  /**
+   * 연속 정답 수.
+   *
+   * 맞은 개수와 따로 센다. "12문제 중 8개" 는 지난 성적이고, 연속은 지금
+   * 얼마나 잘 가고 있는지다 - 틀리는 순간 0 으로 떨어져야 의미가 있다.
+   */
+  const [combo, setCombo] = useState(0);
+  /** 방금 판정. 오답일 때 화면을 짧게 흔든다. */
+  const [shake, setShake] = useState(0);
   // 방금 푼 단어들. state 로 두면 load 가 렌더 시점의 값을 클로저로
   // 잡아서, 채점 직후 바로 "다음 문제" 를 누르면 방금 푼 단어가
   // 제외 목록에 안 들어간다.
@@ -208,13 +217,19 @@ export function QuizBoard({ category }: Props) {
     // 이미 보이면 화면은 그대로 둔다. 답을 고를 때마다 흔들리면 방금 고른
     // 보기를 눈으로 다시 찾아야 한다. 데스크톱처럼 화면이 길면 대개 여기다.
     if (target > window.scrollY) {
-      // 움직임을 줄이겠다고 한 사용자에게는 즉시 이동한다. globals.css 의
-      // reduced-motion 블록은 CSS transition/animation 만 줄이는데, 여기
-      // behavior 는 JS 인자라 그 규칙이 닿지 않는다.
-      const reduce = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-      window.scrollTo({ top: target, behavior: reduce ? "auto" : "smooth" });
+      // behavior 를 "auto" 로 둔다. smooth 를 쓰면 이 화면에서는 아무 일도
+      // 일어나지 않는다 - 채점 직후의 리렌더와 겹치면 브라우저가 진행 중인
+      // 부드러운 이동을 버린다(실측: scrollTo({top:156}) 가 불렸는데
+      // scrollY 가 0 이었고, 같은 시점에 수동 scrollTo 는 정상이었다).
+      //
+      // 부드럽게 만들려고 rAF 뒤에 smooth 를 한 번 더 부르는 방법도 써봤는데,
+      // 그 사이(약 16ms)에 사용자가 손으로 스크롤하면 두 번째 호출이 그것을
+      // 도로 끌어내린다. auto 로 이미 목표에 도착해 있으므로 두 번째가
+      // 다듬을 거리도 없다 - 얻는 것 없이 위험만 남는다.
+      //
+      // 움직임을 줄이겠다고 한 설정을 따로 보지 않는 이유: auto 는 애초에
+      // 애니메이션이 없어서 그 설정과 무관하게 같은 결과다.
+      window.scrollTo({ top: target, behavior: "auto" });
     }
 
     // 포커스도 옮긴다. 화면만 움직이면 포커스는 방금 고른 보기에 남는데,
@@ -242,6 +257,14 @@ export function QuizBoard({ category }: Props) {
         solved: s.solved + 1,
         correct: s.correct + (graded.correct ? 1 : 0),
       }));
+
+      // 연속은 맞으면 오르고 틀리면 0 이다. 틀렸을 때 유지하면 "연속" 이
+      // 아니라 그냥 누적이 된다.
+      setCombo((c) => (graded.correct ? c + 1 : 0));
+
+      // 틀렸을 때만 화면을 짧게 흔든다. 값을 올려 애니메이션을 다시
+      // 재생시킨다 - boolean 이면 연속으로 틀렸을 때 두 번째부터 안 뛴다.
+      if (!graded.correct) setShake((n) => n + 1);
       // 채점 뒤 화면을 옮기는 일은 아래 useEffect 가 맡는다. 여기서 하면
       // 해설 카드가 아직 DOM 에 없어 버튼 좌표를 잘못 읽는다.
       //
@@ -283,6 +306,7 @@ export function QuizBoard({ category }: Props) {
             // 이어지면 몇 개를 맞혔는지 알 수 없다.
             recentRef.current = [];
             setScore({ solved: 0, correct: 0 });
+            setCombo(0);
             void load();
           }}
           className="mt-4 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
@@ -305,9 +329,28 @@ export function QuizBoard({ category }: Props) {
           {question.kind_label}
         </span>
         {score.solved > 0 && (
-          <span className="text-sm text-slate-400">
-            {score.solved}문제 중 {score.correct}개 정답
-          </span>
+          <div className="flex items-center gap-2.5">
+            {/* 연속 정답. 두 개부터 보여준다 - 하나는 그냥 맞힌 것이지
+                연속이 아니다. 끊기면 사라져서 "지금 몇 개째" 가 한눈에
+                보인다.
+
+                key 로 숫자를 넘겨 오를 때마다 다시 마운트시킨다. 그래야
+                등장 애니메이션이 매번 재생된다. */}
+            {combo >= 2 && (
+              <span
+                key={combo}
+                className="pop inline-flex items-center gap-1 rounded-full bg-focus/15 px-2.5 py-1 text-sm font-semibold text-focus"
+              >
+                <span aria-hidden>연속</span>
+                {combo}
+              </span>
+            )}
+            {/* 숫자가 바뀔 때 자리가 밀리지 않게 고정폭 숫자를 쓴다.
+                9 에서 10 이 되면 글자가 옆으로 밀려 눈에 거슬린다. */}
+            <span className="text-sm text-slate-400 tabular-nums">
+              {score.solved}문제 중 {score.correct}개
+            </span>
+          </div>
         )}
       </div>
 
@@ -317,7 +360,34 @@ export function QuizBoard({ category }: Props) {
 
       <Prompt kind={question.kind} text={question.prompt} />
 
-      <ul className="mt-6 grid gap-2">
+      {/* 틀리면 보기 묶음이 짧게 흔들린다.
+          key 로 횟수를 넘겨 매번 다시 마운트시킨다 - 클래스만 토글하면
+          연속으로 틀렸을 때 두 번째부터 애니메이션이 안 뛴다.
+
+          조건이 `shake > 0` 이 아니라 `result 가 오답` 인 이유: 누적값은
+          한 번 틀리면 계속 참이라, 그 뒤로는 맞혀도 새 문제로 넘어가도
+          클래스가 붙은 채 남는다(실측으로 14번 중 14번 붙어 있었다).
+          지금 문제의 판정을 봐야 이번에 틀렸을 때만 흔들린다.
+
+          움직임을 줄인 사용자에게는 globals.css 의 reduced-motion 블록이
+          시간을 0 으로 만들어 흔들리지 않는다. */}
+      {/* 흔들림에 key 를 쓰지 않는다. 요소를 다시 마운트시키면 그 사이에
+          스크롤 effect 가 버튼 좌표를 읽어 목표가 어긋난다(실측: 버튼이
+          993px 인데 목표가 214px 로 계산돼 화면이 제자리였다).
+
+          대신 animationName 을 짝수/홀수로 번갈아 준다. 같은 이름이면
+          두 번째 오답부터 애니메이션이 안 뛰는데, 이름이 바뀌면 브라우저가
+          새 애니메이션으로 보고 매번 재생한다. DOM 은 그대로라 레이아웃이
+          흔들리지 않는다. */}
+      <ul
+        className={`mt-6 grid gap-2 ${
+          result && !result.correct
+            ? shake % 2 === 0
+              ? "shake"
+              : "shake-alt"
+            : ""
+        }`}
+      >
         {question.choices.map((choice) => (
           <li key={choice.id}>
             <ChoiceButton

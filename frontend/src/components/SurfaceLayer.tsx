@@ -2,7 +2,11 @@
  * 쓸 수 있는 배경. 유니온으로 두면 오타(surface-lern)가 컴파일에서 걸린다.
  * string 으로 두면 배경만 조용히 사라지고 아무도 모른다.
  */
-export type Surface = "surface-learn" | "surface-quiz" | "surface-profile";
+export type Surface =
+  | "surface-learn"
+  | "surface-detail"
+  | "surface-quiz"
+  | "surface-profile";
 
 /**
  * 화면 뒤에 깔리는 배경 레이어.
@@ -24,9 +28,13 @@ export type Surface = "surface-learn" | "surface-quiz" | "surface-profile";
 export function SurfaceLayer({ variant }: { variant: Surface }) {
   return (
     // 장식이라 스크린리더에서 숨기고, 클릭도 통과시킨다.
+    // surface-grain 을 같이 붙인다. 그라디언트만 있으면 다크 배경에서
+    // 계단(밴딩)이 보이는데, 아주 옅은 노이즈가 그것을 흩는다.
+    // 결을 이 레이어에 얹는 이유: 화면 요소마다 걸면 글자 위에도 노이즈가
+    // 앉아 읽기가 나빠진다. 배경에만 둔다.
     <div
       aria-hidden
-      className={`${variant} pointer-events-none fixed inset-0 -z-10`}
+      className={`${variant} surface-grain pointer-events-none fixed inset-0 -z-10`}
     />
   );
 }
