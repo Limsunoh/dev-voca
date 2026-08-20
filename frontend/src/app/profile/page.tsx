@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 
 import { logoutAction } from "@/app/(auth)/actions";
 import { updateProfileAction } from "@/app/profile/actions";
+import { MyStandings } from "@/components/MyStandings";
 import { ProfileForm } from "@/components/ProfileForm";
-import { getCurrentUser } from "@/lib/session";
+import { fetchMyStandings } from "@/lib/api/leaderboards";
+import { getCurrentUser, getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "내 프로필 · devvoca",
@@ -13,16 +15,23 @@ export const metadata: Metadata = {
 /**
  * 내 프로필.
  *
- * 사진과 이름을 바꾸고, 계정 정보를 보고, 로그아웃한다. 학습 기록(최고점,
- * 푼 문제 수, 출석)은 아직 저장하는 곳이 없어서 자리만 잡아뒀다. 없는
- * 숫자를 0 으로 채워두지 않는 이유: 0 은 "아직 안 함" 으로 읽혀서, 기능이
- * 없는 것인지 내가 안 한 것인지 구분되지 않는다.
+ * 사진과 이름을 바꾸고, 순위를 보고, 계정 정보를 보고, 로그아웃한다.
+ *
+ * 순위는 세 종류(주간·전체·꾸준함)의 내 줄만 본다 - 여기는 남과 비교하러
+ * 오는 자리가 아니라 자기 상태를 보러 오는 자리라 스무 줄 목록이 필요
+ * 없다. 아직 못 오른 종류는 0 이 아니라 - 로 둔다. 0 은 "0점을 냈다" 로
+ * 읽혀서 안 한 것과 구분되지 않는다.
  */
 export default async function ProfilePage() {
   const user = await getCurrentUser();
 
   // 로그인해야 볼 수 있다. 돌아올 곳을 넘겨 로그인 뒤 여기로 오게 한다.
   if (!user) redirect("/login?next=/profile");
+
+  // 순위는 곁들이는 정보라 하나가 실패해도 나머지를 보여준다
+  // (fetchMyStandings 가 안에서 처리한다).
+  const token = await getToken();
+  const standings = token ? await fetchMyStandings(token) : {};
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
@@ -43,7 +52,19 @@ export default async function ProfilePage() {
         />
       </section>
 
-      <Records />
+      {/* dark: 쌍을 안 쓴다. 이 앱은 어두운 화면 하나로 가고(globals.css
+          첫머리), 파일에 남은 라이트 전용 클래스는 걷어낼 잔재다. */}
+      <section
+        className="mt-10 border-t border-white/15 pt-6"
+        aria-labelledby="records"
+      >
+        <h2 id="records" className="text-sm font-medium text-slate-300">
+          학습 기록
+        </h2>
+        <div className="mt-3">
+          <MyStandings standings={standings} />
+        </div>
+      </section>
 
       <section
         className="mt-10 border-t border-slate-200 pt-6 dark:border-white/15"
@@ -81,63 +102,5 @@ export default async function ProfilePage() {
         </form>
       </section>
     </main>
-  );
-}
-
-/**
- * 학습 기록.
- *
- * 지금은 안내만 있다. 3단계에서 값을 받아 이 자리에 꽂는다 - 그때 화면을
- * 다시 짜지 않도록 칸을 미리 잡아둔다.
- */
-function Records() {
-  const slots = [
-    { label: "최고 점수", hint: "문제풀기 한 판의 최고점" },
-    { label: "푼 문제", hint: "지금까지 푼 문제 수" },
-    { label: "출석", hint: "학습한 날의 수" },
-    { label: "연속", hint: "하루도 빠지지 않은 날" },
-  ];
-
-  return (
-    <section
-      className="mt-10 border-t border-slate-200 pt-6 dark:border-white/15"
-      aria-labelledby="records"
-    >
-      <h2
-        id="records"
-        className="text-sm font-medium text-slate-700 dark:text-slate-300"
-      >
-        학습 기록
-      </h2>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        문제풀기 기록을 저장하기 시작하면 여기에 쌓입니다.
-      </p>
-
-      <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {slots.map((slot) => (
-          <div
-            key={slot.label}
-            // 이 칸은 배경 채움이 없어서 테두리 하나로만 구분된다.
-            // slate-800 은 따뜻한 배경 위에서 1:1 에 가까워 칸이 사라지고,
-            // 그러면 위 주석대로 살려둔 "-" 가 아무 구획 없이 떠 있게 된다.
-            className="rounded-lg border border-slate-200 p-3 dark:border-white/25"
-          >
-            <dt className="text-xs text-slate-500 dark:text-slate-400">
-              {slot.label}
-            </dt>
-            {/* 0 이 아니라 - 로 둔다. 0 은 "내가 안 한 것" 으로 읽힌다. */}
-            <dd
-              // slate-700 은 어두운 배경에서 대비가 1.84:1 이라 - 가 아예 안
-              // 보인다. 그러면 0 도 - 도 아닌 빈 칸이 되어 위 주석의 의도가
-              // 무산된다.
-              className="mt-1 text-xl font-semibold text-slate-300 dark:text-slate-400"
-              title={slot.hint}
-            >
-              -
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </section>
   );
 }
