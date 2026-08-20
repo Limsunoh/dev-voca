@@ -116,10 +116,26 @@
      그 버튼들이 가장 먼저 더 나빠진다. */
   .surface-learn {
     background-image:
-      radial-gradient(115% 58% at 4% 0%, rgb(45 212 205 / 0.175), transparent 70%),
-      radial-gradient(100% 55% at 100% 20%, rgb(38 132 205 / 0.16), transparent 70%),
-      radial-gradient(105% 50% at 78% 58%, rgb(45 212 205 / 0.13), transparent 68%),
-      radial-gradient(110% 48% at 12% 92%, rgb(38 150 190 / 0.13), transparent 68%),
+      radial-gradient(
+        115% 58% at 4% 0%,
+        rgb(45 212 205 / 0.175),
+        transparent 70%
+      ),
+      radial-gradient(
+        100% 55% at 100% 20%,
+        rgb(38 132 205 / 0.16),
+        transparent 70%
+      ),
+      radial-gradient(
+        105% 50% at 78% 58%,
+        rgb(45 212 205 / 0.13),
+        transparent 68%
+      ),
+      radial-gradient(
+        110% 48% at 12% 92%,
+        rgb(38 150 190 / 0.13),
+        transparent 68%
+      ),
       linear-gradient(170deg, #0c1a22 0%, #0a141b 48%, #080d13 100%);
   }
 
@@ -173,11 +189,59 @@
      자기 것을 보는 화면이라 나머지보다 온도를 올린다. 색상만 따뜻한 쪽으로
      옮기고 밝기는 다른 화면과 같은 선을 지킨다 - 여기만 밝히면 그 위의
      보조 텍스트가 대비 기준 아래로 떨어진다. */
+  /* 순위표. 자수정에서 호박으로.
+
+     단어·문장이 청록인데 여기만 색을 바꾸는 이유는 성격이 다르기
+     때문이다. 학습 화면은 오래 머물며 읽는 곳이라 차분해야 하고,
+     순위표는 잠깐 보고 나가는 곳이라 한 번 눈에 들어오면 된다.
+
+     오른쪽 아래를 호박으로 둔 것은 1~3위가 그 색을 쓰기 때문이다.
+     등수 색이 배경과 완전히 겉돌면 금·은·동만 붕 떠 보인다.
+
+     알파는 학습 화면보다 낮게 잡았다. 여기는 숫자를 줄줄이 읽는
+     화면이라, 배경이 밝으면 표를 훑는 눈이 배경에 걸린다. */
+  .surface-board {
+    background-image:
+      radial-gradient(
+        120% 60% at 8% 0%,
+        rgb(167 139 250 / 0.15),
+        transparent 70%
+      ),
+      radial-gradient(
+        95% 52% at 96% 12%,
+        rgb(129 140 248 / 0.13),
+        transparent 70%
+      ),
+      radial-gradient(
+        110% 55% at 88% 78%,
+        rgb(251 191 36 / 0.1),
+        transparent 68%
+      ),
+      radial-gradient(
+        100% 45% at 16% 96%,
+        rgb(139 122 220 / 0.11),
+        transparent 68%
+      ),
+      linear-gradient(168deg, #12101f 0%, #0d0c17 46%, #0a0a11 100%);
+  }
+
   .surface-profile {
     background-image:
-      radial-gradient(110% 50% at 12% 0%, rgb(214 150 90 / 0.16), transparent 66%),
-      radial-gradient(95% 45% at 95% 18%, rgb(198 110 120 / 0.13), transparent 66%),
-      radial-gradient(100% 45% at 60% 95%, rgb(180 130 90 / 0.1), transparent 68%),
+      radial-gradient(
+        110% 50% at 12% 0%,
+        rgb(214 150 90 / 0.16),
+        transparent 66%
+      ),
+      radial-gradient(
+        95% 45% at 95% 18%,
+        rgb(198 110 120 / 0.13),
+        transparent 66%
+      ),
+      radial-gradient(
+        100% 45% at 60% 95%,
+        rgb(180 130 90 / 0.1),
+        transparent 68%
+      ),
       linear-gradient(170deg, #17140f 0%, #100d0b 50%, #0b0908 100%);
   }
 }
@@ -286,11 +350,22 @@
    좌우로만 움직이고 진폭을 4px 로 둔다. 위아래로 흔들면 읽던 줄을 놓치고,
    더 크게 흔들면 화면이 고장 난 것처럼 보인다. */
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(2px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
 }
 
 /* 이름만 다른 같은 흔들림.
@@ -300,11 +375,22 @@
    바뀌게 한다. key 로 다시 마운트시키는 방법도 있지만, 그러면 그 사이에
    스크롤 계산이 어긋난다(실측으로 확인). */
 @keyframes shake-alt {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(2px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
 }
 
 @utility shake {

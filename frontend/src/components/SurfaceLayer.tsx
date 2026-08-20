@@ -5,6 +5,7 @@
 export type Surface =
   | "surface-learn"
   | "surface-detail"
+  | "surface-board"
   | "surface-quiz"
   | "surface-profile";
 

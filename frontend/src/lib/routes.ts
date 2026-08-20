@@ -28,6 +28,18 @@ export const routes = {
   login: "/login",
   signup: "/signup",
   profile: "/profile",
+  testWords: "/test/words",
+  /** 90초 한 판. 점수가 순위표에 오른다. */
+  testRound: "/test/round",
+  /**
+   * 순위표. 종류를 안 주면 이번 주.
+   *
+   * 모드/콘텐츠 두 축을 안 따르는 이유: 순위표는 콘텐츠(단어·문장)에
+   * 걸리지 않는다. 단어로 얻은 점수와 문장으로 얻은 점수가 한 표에 같이
+   * 오르므로 /learn/board 도 /test/board 도 맞지 않는다.
+   */
+  board: (kind?: string) =>
+    kind && kind !== "weekly" ? `/board/${kind}` : "/board",
 } as const;
 
 /**

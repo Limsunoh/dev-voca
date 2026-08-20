@@ -1,11 +1,13 @@
 import Link from "next/link";
 
 import { Avatar } from "@/components/Avatar";
+import { BoardPreview } from "@/components/BoardPreview";
 import { SurfaceLayer } from "@/components/SurfaceLayer";
 import type { User } from "@/lib/api/accounts";
+import { type Board, fetchBoard } from "@/lib/api/leaderboards";
 import { getDailyWord, type WordListItem } from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, getToken } from "@/lib/session";
 
 /**
  * 홈.
@@ -33,10 +35,22 @@ export default async function Home() {
     return null;
   });
 
-  const [user, word]: [User | null, WordListItem | null] = await Promise.all([
-    userPromise,
-    wordPromise,
-  ]);
+  // **토큰은 catch 밖에서 읽는다.** 안에 넣으면 쿠키 접근이 일으키는
+  // DynamicServerError 까지 잡혀서, 정상 동작인데 빌드 로그에 에러가
+  // 쌓인다. 그러면 진짜 오류가 그 사이에 묻힌다.
+  const token = await getToken();
+
+  // 순위 카드는 곁들이는 것이라 실패해도 홈을 막지 않는다. 오늘의 단어와
+  // 같은 이유로 조용히 삼키지 않고 로그는 남긴다.
+  const boardPromise = fetchBoard("weekly", token ?? undefined).catch(
+    (error: unknown) => {
+      console.error("순위표를 불러오지 못했습니다.", error);
+      return null;
+    },
+  );
+
+  const [user, word, board]: [User | null, WordListItem | null, Board | null] =
+    await Promise.all([userPromise, wordPromise, boardPromise]);
 
   return (
     <>
@@ -47,6 +61,11 @@ export default async function Home() {
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pt-6">
         <Greeting user={user} />
         {word ? <DailyWord word={word} /> : <DailyWordUnavailable />}
+
+        {/* 오늘의 단어가 주인공이라 순위는 그 아래에 조용히 둔다. 상위
+            셋과 내 줄만 - 스무 줄을 여기 펼치면 홈이 순위표 화면이 되고
+            그러면 순위표 화면이 있을 이유가 없어진다. */}
+        {board && <BoardPreview board={board} />}
       </main>
     </>
   );
