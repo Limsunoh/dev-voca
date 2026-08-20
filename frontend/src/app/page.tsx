@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Avatar } from "@/components/Avatar";
 import { BoardPreview } from "@/components/BoardPreview";
+import { StudyEntry } from "@/components/StudyEntry";
 import { SurfaceLayer } from "@/components/SurfaceLayer";
 import type { User } from "@/lib/api/accounts";
 import { type Board, fetchBoard } from "@/lib/api/leaderboards";
@@ -62,6 +63,15 @@ export default async function Home() {
         <Greeting user={user} />
         {word ? <DailyWord word={word} /> : <DailyWordUnavailable />}
 
+        {/* 읽었으면 풀어본다. 전에는 홈의 링크가 전부 읽으러 가는 길이라,
+            문제를 풀려면 아래 탭바에서 "문제풀기" 를 찾아야 했다 - 처음
+            온 사람은 그게 있는 줄 모른다.
+
+            오늘의 단어 아래에 두는 이유: 읽고 나서 하는 일이라 순서가
+            그렇고, 단어를 못 불러온 날에도 공부는 시작할 수 있어야 한다
+            (그래서 word 조건 밖에 있다). */}
+        <StudyEntry isGuest={!user} />
+
         {/* 오늘의 단어가 주인공이라 순위는 그 아래에 조용히 둔다. 상위
             셋과 내 줄만 - 스무 줄을 여기 펼치면 홈이 순위표 화면이 되고
             그러면 순위표 화면이 있을 이유가 없어진다. */}
@@ -114,7 +124,16 @@ function DailyWord({ word }: { word: WordListItem }) {
   return (
     <section
       aria-labelledby="daily-word"
-      className="mt-8 flex flex-1 flex-col justify-center pb-10"
+      // flex-1 justify-center 를 쓰지 않는다. 홈에 이 카드 하나뿐일 때의
+      // 설계였는데, 지금은 공부 진입과 순위까지 셋이라 세로 가운데가 의미
+      // 없다. 더 나쁜 건 flex-1 이 남는 공간을 다 흡수해서, 아래 블록을
+      // 하나 넣을 때마다 이 카드가 눌리다가 더 눌릴 곳이 없어지는 순간
+      // 곧바로 스크롤이 된다는 것이다. 그 경계가 1px 이었다.
+      //
+      // 위에서부터 쌓으면 뜻이 길거나 발음기호가 있는 날, 글자를 키운
+      // 사람에게 스크롤이 조금 생겨도 화면이 깨지지 않는다. 여백 8px 을
+      // 찾아 헤매지 않아도 블록을 더 넣을 수 있다.
+      className="mt-8 flex flex-col pb-6"
     >
       {/* 네 덩이가 80ms 씩 차이를 두고 올라온다: 라벨(0) · 단어(80) ·
           발음과 뜻(160) · 구분선과 버튼(240). 마지막 덩이는 요소가 둘이지만
@@ -192,7 +211,9 @@ function DailyWordUnavailable() {
     // role="alert" 는 쓰지 않는다. 그건 "지금 막 나타난 것" 을 알리는
     // 라이브 리전인데 이건 첫 렌더부터 있는 요소라 리더마다 동작이 갈린다.
     // h1 이라 어차피 읽힌다.
-    <section className="mt-8 flex flex-1 flex-col justify-center pb-10">
+    // 위 DailyWord 와 같은 이유로 flex-1 을 뺀다. 아래에 공부 진입과
+    // 순위가 이어지므로 이 안내만 세로 가운데에 두면 그것들이 밀린다.
+    <section className="mt-8 flex flex-col pb-6">
       <h1 className="text-xl font-semibold tracking-tight text-slate-100">
         오늘의 단어를 불러오지 못했습니다.
       </h1>
