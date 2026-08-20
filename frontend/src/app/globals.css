@@ -123,15 +123,49 @@
       linear-gradient(170deg, #0c1a22 0%, #0a141b 48%, #080d13 100%);
   }
 
-  /* 문제풀이. 조용하게.
+  /* 문제풀이. 단색.
 
-     여기는 집중하는 화면이라 배경이 눈을 끌면 안 된다. 색을 거의 빼고
-     위아래 밝기 차이만 아주 얕게 준다. 단어·문장과 구분은 되지만 무엇이
-     그려져 있다고 말하기 어려운 정도가 목표다. */
+     그라디언트를 뺐다. 겹친 층이 보기 버튼 뒤에서 밝기를 계속 바꿔
+     읽기를 방해했고, 아래로 갈수록 어두워져서 네 번째 보기가 거의
+     검은 바탕에 놓였다.
+
+     밝기를 올렸다(#080b10 -> #101720). 전에는 거의 검정이라 화면이
+     꺼진 것처럼 보였다. 집중하는 화면이라 조용해야 하지만, 조용한 것과
+     어두운 것은 다르다. */
   .surface-quiz {
-    background-image:
-      radial-gradient(120% 55% at 50% 0%, rgb(90 120 150 / 0.09), transparent 68%),
-      linear-gradient(180deg, #0d1218 0%, #0a0e13 55%, #080b10 100%);
+    background-color: #101720;
+  }
+
+  /* 단어·문장 상세. 단색.
+
+     그라디언트를 쓰지 않는다. 읽는 화면이라 배경이 눈을 끌면 안 되고,
+     겹친 층은 글자 뒤에서 밝기가 계속 달라져 읽기를 방해한다. 카드가
+     반투명이라 단색 위에서도 경계는 충분히 보인다.
+
+     목록(surface-learn)보다 어둡게 둔다. 목록에서 이 화면으로 들어오면
+     한 단계 안으로 들어온 느낌이 나야 한다. */
+  .surface-detail {
+    background-color: #0a0f15;
+  }
+
+  /* 화면 전체에 얹는 아주 옅은 결.
+
+     다크 배경의 매끈한 그라디언트는 계단(밴딩)이 보인다. 특히 폰의
+     OLED 에서 눈에 띈다. 노이즈를 아주 옅게 깔면 그 계단이 흩어져서
+     인쇄물처럼 앉는다.
+
+     SVG 를 data URI 로 인라인한다. 이미지 파일이나 라이브러리를 쓰지
+     않으므로 네트워크 요청도, 의존성도 늘지 않는다.
+
+     alpha 를 0.035 로 둔다. 더 올리면 글자 위에 먼지가 앉은 것처럼
+     보이고, 배경 위 본문의 대비도 같이 떨어진다. */
+  .surface-grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
   /* 내정보. 조금 더 밝고 따뜻하게.
@@ -221,6 +255,70 @@
    transform 과 opacity 만 건드린다. 둘 다 GPU 가 합성만 하면 되는 속성이라
    레이아웃을 다시 계산하지 않는다.
 --------------------------------------------------------------------------- */
+/* 튀어오르며 나타난다. 콤보 배지처럼 "방금 올랐다" 를 알리는 자리에 쓴다.
+   등장(rise)과 달리 살짝 넘겼다 제자리로 온다 - 그 반동이 성취를 표현한다.
+   자주 보는 것이 아니라 맞혔을 때만 나오므로 이 정도 과장이 허용된다. */
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility pop {
+  animation-name: pop;
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  animation-fill-mode: both;
+}
+
+/* 틀렸을 때 짧게 흔든다. 오답은 색과 글자로도 알리지만, 그것만으로는
+   "아 틀렸구나" 가 한 박자 늦게 온다. 움직임은 읽기 전에 전달된다.
+
+   좌우로만 움직이고 진폭을 4px 로 둔다. 위아래로 흔들면 읽던 줄을 놓치고,
+   더 크게 흔들면 화면이 고장 난 것처럼 보인다. */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+/* 이름만 다른 같은 흔들림.
+   연속으로 틀렸을 때 두 번째부터 애니메이션이 안 뛰는 것을 막는다 -
+   같은 animation-name 이 계속 붙어 있으면 브라우저가 이미 끝난 것으로
+   보고 다시 재생하지 않는다. 화면에서 짝수·홀수로 번갈아 걸어 이름이
+   바뀌게 한다. key 로 다시 마운트시키는 방법도 있지만, 그러면 그 사이에
+   스크롤 계산이 어긋난다(실측으로 확인). */
+@keyframes shake-alt {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+@utility shake {
+  animation-name: shake;
+  animation-duration: 320ms;
+  animation-timing-function: ease-out;
+}
+
+@utility shake-alt {
+  animation-name: shake-alt;
+  animation-duration: 320ms;
+  animation-timing-function: ease-out;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
