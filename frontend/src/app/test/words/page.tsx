@@ -1,10 +1,14 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { ContentTabs } from "@/components/ContentTabs";
+import { ExitGuard } from "@/components/ExitGuard";
 import { QuizBoard } from "@/components/QuizBoard";
 import { getCategories } from "@/lib/api/vocab";
-import { contentPath } from "@/lib/routes";
+import { contentPath, routes } from "@/lib/routes";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "단어 문제풀기 | devvoca",
   description: "외운 단어를 문제로 확인합니다.",
 };
@@ -37,6 +41,21 @@ export default async function TestWordsPage({ searchParams }: PageProps) {
           이 화면이 무엇인지 알 방법이 없다. 탭은 이동 수단이지 제목이
           아니다. */}
       <h1 className="sr-only">단어 문제풀기</h1>
+
+      {/* 이 화면에는 탭바가 없다(TabBar 의 return null 참고). 나가는 길이
+          여기뿐이라 빠지면 막다른 화면이 된다.
+
+          묻지 않고 나간다 - 낱개 연습은 점수가 안 남아서 잃을 게 없다.
+          매번 물으면 성가시기만 하다. 묻는 것은 한 판 모드다. */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <ExitGuard to={routes.home} label="홈" />
+        <Link
+          href={routes.testRound}
+          className="min-h-11 rounded-lg px-2.5 py-2 text-sm text-slate-400 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+          한 판 풀기
+        </Link>
+      </div>
 
       <ContentTabs mode="test" current="words" />
 

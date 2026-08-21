@@ -59,13 +59,11 @@ export default function RootLayout({
       // dark 는 고정이다. globals.css 의 @custom-variant 설명 참고.
       className={`dark ${notoSansKr.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
-      {/* 아래 탭바가 가리는 만큼 본문을 띄운다. 없으면 목록 마지막 항목과
-          페이지네이션이 탭바 뒤로 들어가 눌리지 않는다.
-
-          5rem 은 탭바 높이(테두리 1px + 48px)에 여유를 더한 값이고,
-          safe-area 를 더하는 이유는 탭바 자신도 그만큼 두꺼워지기 때문이다.
-          이 둘이 어긋나면 아이폰에서만 마지막 항목이 가려진다. */}
-      <body className="flex min-h-full flex-col bg-background pb-[calc(5rem+env(safe-area-inset-bottom))] font-sans text-foreground">
+      {/* 탭바가 가리는 만큼의 여백은 여기가 아니라 TabBar 자신이 만든다.
+          여기에 두면 탭바가 없는 화면(문제풀이·로그인)에도 5rem 이 남아,
+          게임 화면 아래에 아무것도 없는 띠가 생긴다. 탭바가 자기 자리를
+          스스로 비우면 숨는 조건이 늘어도 여기를 같이 고칠 일이 없다. */}
+      <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
         {children}
         <TabBar />
       </body>

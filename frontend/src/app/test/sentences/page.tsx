@@ -1,9 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LearnHeader } from "@/components/LearnHeader";
 import { contentPath } from "@/lib/routes";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "문장 문제풀기 | devvoca",
   description: "문장 문제는 준비 중입니다.",
 };
