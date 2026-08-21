@@ -25,7 +25,14 @@ export function TabBar() {
   //
   // startsWith 가 아니라 정확 일치인 이유: /loginxyz 같은 없는 경로에서도
   // 탭바가 사라져 404 화면이 막다른 곳이 된다.
-  if (pathname === "/login" || pathname === "/signup") {
+  //
+  // /start 도 같다. 앱을 처음 열었을 때 "누구로 시작할지" 를 묻는
+  // 화면이라, 고르기 전에 이동 수단이 보이면 그냥 빠져나갈 수 있다.
+  if (
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/start"
+  ) {
     return null;
   }
 

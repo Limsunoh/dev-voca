@@ -22,6 +22,9 @@ node_modules/
 .next-*/
 out/
 
+# DB 재구축용 임시 덤프. 로컬에서 dumpdata 로 만들고 loaddata 후 지운다.
+backend/vocab_backup.json
+
 # 로컬 작업 노트 (커밋 안 함)
 .claude/TROUBLESHOOTING.md
 .claude/CODE_INSIGHTS.md

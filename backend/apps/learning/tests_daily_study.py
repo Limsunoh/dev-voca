@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import secrets
+from uuid import uuid4
 from unittest import mock
 from datetime import timedelta
 
@@ -51,9 +52,10 @@ def seed_words(count: int = 120) -> None:
     판은 서버가 닫아주지만 40문제를 약속하고 30문제만 낸다. "넉넉히" 라고
     쓰고 30 을 뒀다가 실제로 그 자리에서 걸렸다.
     """
+    tag = uuid4().hex[:6]
     Word.objects.bulk_create(
         Word(
-            term=f"word{i}",
+            term=f"{tag}word{i}",
             meaning=f"뜻{i}",
             description=f"설명{i} 입니다",
             is_reviewed=True,

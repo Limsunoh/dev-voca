@@ -1,4 +1,5 @@
 import type { AvatarDisplay } from "@/components/Avatar";
+import type { BoardKind as RouteBoardKind } from "@/lib/routes";
 
 import { request } from "./client";
 
@@ -14,6 +15,19 @@ const BASE = "/api/learning/leaderboards/";
 /** 순위표 종류. URL 조각이자 탭 식별자다. */
 export const BOARD_KINDS = ["weekly", "all_time", "streak"] as const;
 export type BoardKind = (typeof BOARD_KINDS)[number];
+
+/**
+ * routes 의 같은 유니온과 어긋나지 않는지 컴파일 때 확인한다.
+ *
+ * routes 는 아무것도 import 하지 않는 순수 모듈이라 여기 타입을 못
+ * 가져간다. 그래서 값을 두 번 적게 되는데, 한쪽만 고치면 순위표 링크가
+ * 조용히 깨진다 - 눌러보기 전까지 모른다. 이 두 줄이 그때 빌드를
+ * 멈춘다(런타임 비용 0).
+ */
+type _SameAsRoutes = RouteBoardKind extends BoardKind ? true : never;
+type _SameAsApi = BoardKind extends RouteBoardKind ? true : never;
+const _kindsAgree: [_SameAsRoutes, _SameAsApi] = [true, true];
+void _kindsAgree;
 
 /**
  * 종류별 화면 문구.

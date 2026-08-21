@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import secrets
+from uuid import uuid4
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -35,9 +36,10 @@ def make_user(name: str):
 
 
 def seed_words(count: int = 40) -> None:
+    tag = uuid4().hex[:6]
     Word.objects.bulk_create(
         Word(
-            term=f"word{i}",
+            term=f"{tag}word{i}",
             meaning=f"뜻{i}",
             description=f"설명{i} 입니다",
             is_reviewed=True,

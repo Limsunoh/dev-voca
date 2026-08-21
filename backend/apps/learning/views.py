@@ -227,7 +227,21 @@ class DailyStudyStartView(APIView):
             logger.exception("일일공부 정산에 실패했습니다. user=%s", request.user.pk)
 
         study = daily_study.today_of(request.user)
-        return Response(
+
+        # **이어 풀 토큰을 함께 내려준다.** 없으면 하다 만 사람이 오늘 판을
+        # 영영 못 끝낸다 - 답하려면 토큰이 필요한데 시작은 하루 한 번
+        # 제약에 막히기 때문이다. 제한 시간이 없는 기능이라 중간에 나가는
+        # 것이 예외가 아니다.
+        token, question = None, None
+        if study is not None and not study.is_done:
+            resumed = daily_study.resume(study)
+            if resumed is not None:
+                token, question = resumed
+
+        # **캐시하지 않는다.** 응답에 매번 다른 서명 토큰이 실리므로,
+        # 어디든 캐시가 붙으면 여러 사용자가 같은 토큰을 받는다. GET 은
+        # 기본적으로 캐시 가능한 메서드라 프록시·중계 어디서든 붙을 수 있다.
+        body = Response(
             {
                 "lengths": [
                     {
@@ -239,8 +253,12 @@ class DailyStudyStartView(APIView):
                     for value, label in StudyLength.choices
                 ],
                 "today": _study_body(study) if study else None,
+                "token": token,
+                "question": question,
             }
         )
+        body["Cache-Control"] = "no-store"
+        return body
 
     def post(self, request: Request) -> Response:
         body = request.data if isinstance(request.data, dict) else {}

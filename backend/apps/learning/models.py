@@ -314,6 +314,19 @@ class DailyStudy(models.Model):
     # 있으니 칸 하나면 된다.
     step = models.PositiveIntegerField("다음 순번", default=0)
 
+    # 이 순번에 낼 문제. 답하면 다음 문제로 덮인다.
+    #
+    # **한 순번에 문제 하나를 고정하려고 저장한다.** 이게 없으면 화면을
+    # 새로 열 때마다 문제를 다시 뽑게 되고, 순번은 답할 때만 오르므로
+    # 아는 문제가 나올 때까지 돌린 뒤 답하면 된다. _take_step 은 "한
+    # 순번은 한 번만 소비된다" 를 지킬 뿐 "한 순번에 문제는 하나다" 를
+    # 지키지 않는다 - 지금까지는 문제 발급이 순번 소비와 붙어 있어 그
+    # 차이가 드러날 자리가 없었다.
+    #
+    # 서명하지 않은 원본을 담는다. 화면에 나갈 때 daily_study 가 서명하고,
+    # 여기 있는 값은 서버만 읽는다.
+    question = models.JSONField("이 순번의 문제", null=True, blank=True)
+
     answered = models.PositiveIntegerField("푼 문제 수", default=0)
     correct = models.PositiveIntegerField("맞힌 문제 수", default=0)
 

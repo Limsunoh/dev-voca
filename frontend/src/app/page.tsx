@@ -1,13 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/Avatar";
 import { BoardPreview } from "@/components/BoardPreview";
+import { DailyCard } from "@/components/DailyCard";
 import { SurfaceLayer } from "@/components/SurfaceLayer";
 import type { User } from "@/lib/api/accounts";
+import { fetchDailyStatus, type StudyProgress } from "@/lib/api/daily";
 import { type Board, fetchBoard } from "@/lib/api/leaderboards";
 import { getDailyWord, type WordListItem } from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
-import { getCurrentUser, getToken } from "@/lib/session";
+import { getCurrentUser, getToken, isGuestChosen } from "@/lib/session";
 
 /**
  * 홈.
@@ -21,6 +24,15 @@ import { getCurrentUser, getToken } from "@/lib/session";
  * 아직 안 한 것" 으로 읽혀서 기능이 없는 것인지 구분되지 않는다.
  */
 export default async function Home() {
+  // **아직 아무것도 안 고른 사람은 첫 화면으로.** 앱은 열자마자 "누구로
+  // 시작할지" 를 묻는다. 로그인했거나 게스트를 고른 적이 있으면 건너뛴다.
+  //
+  // 홈에서만 보는 이유: 앱의 진입점이 홈이다. 다른 경로로 바로 들어온
+  // 사람(공유 링크 등)까지 막으면 그 링크가 안 열린다.
+  if (!(await getCurrentUser()) && !(await isGuestChosen())) {
+    redirect("/start");
+  }
+
   // 두 요청을 동시에 띄운다. 순서대로 기다리면 두 번의 왕복이 그대로
   // 대기 시간이 되고, 그게 앱을 열자마자 보이는 시간이다.
   const userPromise = getCurrentUser();
@@ -49,8 +61,23 @@ export default async function Home() {
     },
   );
 
-  const [user, word, board]: [User | null, WordListItem | null, Board | null] =
-    await Promise.all([userPromise, wordPromise, boardPromise]);
+  // 일일공부는 로그인해야 쓸 수 있다. 게스트에게는 아예 안 물어본다 -
+  // 못 누르는 카드를 띄워두면 눌러보고 로그인으로 튕기는 경험이 된다.
+  const dailyPromise = token
+    ? fetchDailyStatus(token)
+        .then((s) => s.today)
+        .catch((error: unknown) => {
+          console.error("일일공부 상태를 불러오지 못했습니다.", error);
+          return null;
+        })
+    : Promise.resolve(null);
+
+  const [user, word, board, daily]: [
+    User | null,
+    WordListItem | null,
+    Board | null,
+    StudyProgress | null,
+  ] = await Promise.all([userPromise, wordPromise, boardPromise, dailyPromise]);
 
   return (
     <>
@@ -62,9 +89,14 @@ export default async function Home() {
         <Greeting user={user} />
         {word ? <DailyWord word={word} /> : <DailyWordUnavailable />}
 
-        {/* 오늘의 단어가 주인공이라 순위는 그 아래에 조용히 둔다. 상위
-            셋과 내 줄만 - 스무 줄을 여기 펼치면 홈이 순위표 화면이 되고
+        {/* 오늘 할 일이 먼저, 결과가 그다음이다. 순위는 스무 줄이 아니라
+            상위 셋과 내 줄만 - 여기 다 펼치면 홈이 순위표 화면이 되고
             그러면 순위표 화면이 있을 이유가 없어진다. */}
+        {user && (
+          <div className="mb-3">
+            <DailyCard today={daily} />
+          </div>
+        )}
         {board && <BoardPreview board={board} />}
       </main>
     </>

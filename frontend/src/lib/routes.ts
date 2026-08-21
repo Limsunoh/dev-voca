@@ -19,6 +19,18 @@ export function contentPath(mode: string, content: string): string {
   return `/${mode}/${content}`;
 }
 
+/**
+ * 순위표 종류. lib/api/leaderboards 의 BOARD_KINDS 와 같은 값이다.
+ *
+ * 거기서 import 하지 않는 이유: routes 는 아무것도 안 가져오는 순수
+ * 모듈이라, API 계층을 끌어오면 의존 방향이 뒤집힌다. 값이 셋뿐이고
+ * 백엔드 URL 과 묶여 있어 자주 바뀌지도 않는다.
+ *
+ * string 으로 두면 routes.board("weekli") 같은 오타가 타입 검사를
+ * 통과해 /board/weekli 로 나간다 - 눌러보기 전까지 모른다.
+ */
+export type BoardKind = "weekly" | "all_time" | "streak";
+
 export const routes = {
   home: "/",
   words: "/learn/words",
@@ -31,6 +43,8 @@ export const routes = {
   testWords: "/test/words",
   /** 90초 한 판. 점수가 순위표에 오른다. */
   testRound: "/test/round",
+  /** 하루 한 번 일일공부. 로그인이 필요하다. */
+  testDaily: "/test/daily",
   /**
    * 순위표. 종류를 안 주면 이번 주.
    *
@@ -38,7 +52,7 @@ export const routes = {
    * 걸리지 않는다. 단어로 얻은 점수와 문장으로 얻은 점수가 한 표에 같이
    * 오르므로 /learn/board 도 /test/board 도 맞지 않는다.
    */
-  board: (kind?: string) =>
+  board: (kind?: BoardKind) =>
     kind && kind !== "weekly" ? `/board/${kind}` : "/board",
 } as const;
 
