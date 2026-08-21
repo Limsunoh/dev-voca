@@ -18,6 +18,7 @@ import { ApiError } from "./api/client";
  */
 
 const COOKIE_NAME = "devvoca_token";
+const GUEST_COOKIE = "devvoca_guest";
 
 // 30일. 학습 앱이라 자주 로그인시킬 이유가 없다. 백엔드 토큰 자체는
 // 만료가 없고 로그아웃할 때 지워지므로, 이 값은 "이 브라우저에서
@@ -42,6 +43,35 @@ export async function setToken(token: string): Promise<void> {
 export async function clearToken(): Promise<void> {
   const store = await cookies();
   store.delete(COOKIE_NAME);
+  // 게스트 선택도 함께 지운다. 로그아웃했는데 첫 화면을 건너뛰면
+  // 나가는 문만 있고 들어오는 문이 없는 상태가 된다.
+  store.delete(GUEST_COOKIE);
+}
+
+/**
+ * "게스트로 둘러보기" 를 고른 적이 있나.
+ *
+ * 첫 화면(/start)을 다시 띄울지 정하는 데만 쓴다. 로그인과 달리 아무
+ * 권한도 주지 않으므로 httpOnly 가 아니어도 되지만, 다른 쿠키와 같은
+ * 규칙으로 두는 편이 읽기 쉽다.
+ *
+ * 로그인과 같은 30일. 앱을 한 달 넘게 안 열었으면 처음 온 사람과
+ * 다를 바 없어서 다시 물어보는 것이 자연스럽다.
+ */
+export async function setGuest(): Promise<void> {
+  const store = await cookies();
+  store.set(GUEST_COOKIE, "1", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: MAX_AGE,
+  });
+}
+
+export async function isGuestChosen(): Promise<boolean> {
+  const store = await cookies();
+  return store.get(GUEST_COOKIE)?.value === "1";
 }
 
 export async function getToken(): Promise<string | null> {

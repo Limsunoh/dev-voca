@@ -111,11 +111,22 @@ def settle_stale(user) -> None:
     점수는 이미 _publish 로 그날 줄에 가 있으므로 여기서 잃는 것은
     완주 보너스뿐이고, 완주했다면 애초에 _take_step 이 닫았을 것이다.
     """
+    # pk 순으로 고정한다. **이것이 교착을 막지는 않는다** - 여기엔 행
+    # 잠금이 없고 판마다 트랜잭션이 따로 돌아서, 한 트랜잭션이 여러 행을
+    # 쥐는 상황 자체가 없다. Meta.ordering 으로 이미 결정적이기도 했다.
+    #
+    # Postgres 에서 관측한 교착의 실제 자리는 _publish 안쪽이다 -
+    # add_daily_study 의 get_or_create 가 같은 (user, day) 로 동시에
+    # INSERT 하면 유일 인덱스에서 서로를 기다린다. 답하기와 정산이 겹칠
+    # 때 그 경합이 그대로 남아 있다.
+    #
+    # 그래도 순서를 적어두는 것은, 나중에 여기에 select_for_update 가
+    # 붙었을 때 순서가 정의돼 있어야 하기 때문이다.
     stale = DailyStudy.objects.filter(
         user=user,
         finished_at__isnull=True,
         day__lt=calendar_kst.today(),
-    )
+    ).order_by("pk")
     for study in stale:
         _finish(study)
 
@@ -180,6 +191,53 @@ def start(user, length: str) -> tuple[DailyStudy, str, dict]:
         raise SessionError("낼 수 있는 문제가 없습니다.")
 
     return study, token, question
+
+
+def resume(study: DailyStudy) -> tuple[str, dict] | None:
+    """하다 만 판을 이어 풀 토큰과 문제를 만든다. 못 만들면 None.
+
+    **이게 없으면 중간에 나간 사람이 오늘 판을 영영 못 끝낸다.** 답하려면
+    토큰이 필요한데 토큰은 시작할 때와 답할 때만 나오고, 시작은 하루 한 번
+    제약에 막힌다. 제한 시간이 없어 천천히 푸는 것이 이 기능의 의도라
+    중간에 나가는 것은 예외가 아니라 흔한 경로다.
+
+    되돌리기(옛 토큰 재사용)는 _take_step 이 막는다 - 순번을 DB 의 step
+    에서 읽으므로 새 토큰이든 옛 토큰이든 조건이 같다.
+
+    **하지만 그것만으로는 부족하다.** _take_step 은 "한 순번은 한 번만
+    소비된다" 를 지킬 뿐 "한 순번에 문제는 하나다" 는 지키지 않는다.
+    문제를 매번 새로 뽑아주면 순번을 소비하지 않고 문제만 갈아탈 수 있어,
+    아는 것이 나올 때까지 화면을 다시 열면 된다. 그래서 발급한 문제를
+    DailyStudy.question 에 저장해두고 여기서는 그것을 다시 서명만 한다.
+    """
+    if study.is_done:
+        return None
+
+    # **저장해둔 문제를 다시 서명해 내려준다.** 새로 뽑으면 순번을 소비
+    # 하지 않고 문제만 바꾸는 길이 열린다 - 아는 것이 나올 때까지 화면을
+    # 새로 열면 되므로 사실상 만점이다. _take_step 은 "한 순번은 한 번만
+    # 소비된다" 만 지키지 그것까지 막지 못한다.
+    saved = study.question
+    if isinstance(saved, dict) and "state" in saved and "body" in saved:
+        if _still_visible(saved):
+            body = {**saved["body"], "answered": study.answered}
+            return _sign(saved["state"]), body
+
+        # 저장한 뒤 검수가 취소됐거나 지워졌다. 그대로 내보내면 아무도
+        # 확인하지 않은 내용을 정답이라고 알려주게 된다(_describe 가 같은
+        # 이유로 낼 때마다 visible() 을 다시 건다). 새로 뽑는다 - 문제를
+        # 갈아탈 수 있게 되지만, 그건 검수가 실제로 바뀐 판에서만이고
+        # 미검수 노출보다 작은 값이다.
+        logger.info("보기가 더는 보이지 않아 새로 냅니다. study=%s", study.pk)
+
+    # 저장된 것이 없다. 이 칸이 생기기 전에 시작한 판이거나 저장에 실패한
+    # 경우다. 새로 뽑되 그때 저장되므로 다음부터는 고정된다.
+    logger.info("저장된 문제가 없어 새로 냅니다. study=%s", study.pk)
+    token, question = _next_question(study, [], [])
+    if question is None:
+        logger.warning("이어 풀 문제를 못 만들었습니다. study=%s", study.pk)
+        return None
+    return token, question
 
 
 def answer(
@@ -334,6 +392,30 @@ def _finish(study: DailyStudy) -> None:
     _publish(study)
 
 
+def _still_visible(saved: dict) -> bool:
+    """저장해둔 문제의 보기가 아직 사용자에게 보여도 되는가.
+
+    낼 때 visible() 로 걸렀어도 그 뒤에 검수가 취소되거나 지워질 수 있다.
+    토큰 수명이 6시간이라 그 사이에 충분히 일어난다.
+
+    보기 하나라도 사라졌으면 문제를 통째로 버린다 - 그 자리만 비우면
+    보기가 셋이 되어 찍기 확률이 올라가고, 정답이 사라진 경우에는 답이
+    없는 문제가 된다.
+    """
+    body = saved.get("body")
+    if not isinstance(body, dict):
+        return False
+
+    ids = [c.get("id") for c in body.get("choices") or [] if isinstance(c, dict)]
+    if not ids:
+        return False
+
+    # 보기의 종류는 정답의 종류와 같다(같은 표에서 뽑는다).
+    target_type = (saved.get("state") or {}).get("q", {}).get("tt")
+    model = Word if target_type == quiz.TARGET_WORD else Sentence
+    return model.objects.visible().filter(pk__in=ids).count() == len(ids)
+
+
 def _next_question(
     study: DailyStudy, recent_words: list, recent_sentences: list
 ) -> tuple[str | None, dict | None]:
@@ -364,7 +446,7 @@ def _next_question(
         "rs": recent_sentences,
     }
 
-    return _sign(state), {
+    body = {
         "kind": question.kind,
         "kind_label": question.kind_label,
         "question": question.question,
@@ -375,6 +457,14 @@ def _next_question(
         "answered": study.answered,
         "total": study.total_questions,
     }
+
+    # **이 순번의 문제를 못박는다.** 저장해두지 않으면 화면을 새로 열
+    # 때마다 다시 뽑게 되고, 순번은 답할 때만 오르므로 아는 문제가 나올
+    # 때까지 돌린 뒤 답할 수 있다(resume 참고).
+    study.question = {"state": state, "body": body}
+    study.save(update_fields=["question"])
+
+    return _sign(state), body
 
 
 def _sign(state: dict) -> str:

@@ -15,6 +15,7 @@ tests_daily_study.py 가 규칙이 지켜지는지를 본다면, 여기는 규�
 from __future__ import annotations
 
 import secrets
+from uuid import uuid4
 from unittest import mock
 import threading
 from datetime import timedelta
@@ -23,6 +24,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
+from django.core.management import call_command
 from django.db import connections
 from django.test import TestCase, TransactionTestCase
 
@@ -55,10 +57,16 @@ def seed_words(count: int = 120) -> None:
     빼므로, 단어가 40개 이하면 30분 코스(40문제)가 중간에 후보 고갈로
     끊긴다 - 판은 서버가 닫아주지만 40문제를 약속하고 30문제만 낸다.
     운영 DB 는 검수된 단어가 그보다 훨씬 많다.
+
+    **term 을 호출마다 다르게 짓는다.** Word.term 은 unique 인데,
+    TransactionTestCase 는 트랜잭션이 아니라 실제 커밋을 하므로 그 뒤에
+    도는 TestCase 가 같은 term 을 또 넣으면 유니크 충돌이다. Postgres 로
+    옮기고 나서야 드러났다 - SQLite 에서는 정리 순서가 달라 안 겹쳤다.
     """
+    tag = uuid4().hex[:6]
     Word.objects.bulk_create(
         Word(
-            term=f"word{i}",
+            term=f"{tag}word{i}",
             meaning=f"뜻{i}",
             description=f"설명{i} 입니다",
             is_reviewed=True,
@@ -755,7 +763,30 @@ class StreakLinkTest(TestCase):
         self.assertIn(self.user.display_name, names)
 
 
-class ConcurrencyTest(TransactionTestCase):
+class _KeepsCacheTable:
+    """TransactionTestCase 뒤에도 캐시 표가 남게 한다.
+
+    **Postgres 에서만 드러난다.** TransactionTestCase 는 테스트가 끝날
+    때 flush 를 부르고, flush 는 post_migrate 를 쏜다. 그 신호를 받은
+    쪽이 throttle_cache 를 없앤다 - 이 표는 마이그레이션이 아니라
+    createcachetable 로 만들어지므로 아무도 다시 만들지 않는다.
+
+    그러면 뒤따르는 테스트가 setUp 의 cache.clear() 에서 통째로 죽는다.
+    SQLite 에서는 안 났고 운영은 Postgres 라, 여기 맞춘다.
+
+    **복구를 _fixture_teardown 에 건다.** 파괴가 테스트 메서드마다
+    일어나므로 tearDownClass 로는 늦다 - 같은 클래스의 두 번째 테스트가
+    이미 죽은 뒤다. accounts.ThrottleCacheTableTest 가 tearDown 에서
+    같은 일을 하고 있어 단위를 그쪽에 맞췄다.
+    """
+
+    def _fixture_teardown(self):
+        super()._fixture_teardown()
+        # 이미 있으면 조용히 넘어간다.
+        call_command("createcachetable", verbosity=0)
+
+
+class ConcurrencyTest(_KeepsCacheTable, TransactionTestCase):
     """동시에 온 요청. 읽고 나서 쓰면 여기서 드러난다.
 
     TransactionTestCase 를 쓰는 이유: 스레드마다 다른 커넥션을 쓰는데
@@ -1400,7 +1431,7 @@ class NormalUseThrottleTest(TestCase):
         )
 
 
-class SettlingConcurrencyTest(TransactionTestCase):
+class SettlingConcurrencyTest(_KeepsCacheTable, TransactionTestCase):
     """정산이 동시에 일어날 때. GET 이 정산을 부르므로 실제로 겹친다."""
 
     reset_sequences = True
@@ -1552,3 +1583,560 @@ class ThinContentTest(TestCase):
         study, _, _ = daily_study.start(self.user, StudyLength.LONG)
 
         self.assertEqual(study.total_questions, total)
+
+
+# ---------------------------------------------------------------------------
+# 재개(resume) - 하다 만 판을 이어 푸는 길.
+# ---------------------------------------------------------------------------
+
+
+class ResumeTest(TestCase):
+    """중간에 나갔다 돌아온 사람.
+
+    이 기능이 없으면 25문제짜리를 3문제 풀고 나간 사람은 오늘 판을 영영
+    못 끝낸다 - 답하려면 토큰이 필요한데 시작은 하루 한 번 제약에 막힌다.
+    열어준 만큼 새는 곳이 없는지를 본다.
+    """
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("재개")
+
+    def test_resume_continues_the_same_row_without_resetting_progress(self):
+        """이어 풀어도 진행이 처음부터 다시 세어지지 않는다.
+
+        재개가 새 판을 만들거나 순번을 되감으면 여기서 드러난다.
+        """
+        study, earned = answer_n(self.user, StudyLength.SHORT, 3)
+
+        resumed = daily_study.resume(study)
+        self.assertIsNotNone(resumed, "하다 만 판인데 이어 풀 수 없다")
+        token, question = resumed
+
+        self.assertEqual(question["answered"], 3, "진행이 되감겼다")
+        self.assertEqual(
+            DailyStudy.objects.filter(user=self.user).count(), 1, "판이 새로 생겼다"
+        )
+
+        result, _, _, _ = daily_study.answer(
+            self.user, token, question["choices"][0]["id"]
+        )
+
+        study.refresh_from_db()
+        self.assertEqual(study.answered, 4, "이어 푼 답이 안 세어졌다")
+        self.assertEqual(study.score, earned + result.score, "점수가 어긋났다")
+
+    def test_a_resumed_study_can_be_finished_and_still_gets_the_bonus(self):
+        """중간에 나간 사람이 이어 풀어 완주하면 보너스를 받는다.
+
+        이 기능을 만든 이유 그 자체다 - 25문제짜리를 3문제 풀고 나가면
+        완주 보너스를 영영 못 받는 것이 원래 문제였다.
+        """
+        total, bonus = STUDY_PLANS[StudyLength.SHORT]
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 2)
+
+        token, question = daily_study.resume(study)
+        while question is not None:
+            picked = question["choices"][0]["id"]
+            _r, token, question, _s = daily_study.answer(self.user, token, picked)
+
+        study.refresh_from_db()
+        self.assertTrue(study.is_done, "이어 풀어 다 채웠는데 안 끝났다")
+        self.assertEqual(study.answered, total)
+        self.assertEqual(study.score, study.correct + bonus, "완주 보너스가 없다")
+        self.assertEqual(
+            DailyScore.objects.get(user=self.user, day=study.day).daily_study_score,
+            study.score,
+            "점수판이 판과 다르다",
+        )
+
+    def test_resume_on_a_finished_study_is_none(self):
+        """끝난 판은 이어 풀 수 없다. 안 막으면 하루 한 번이 무너진다."""
+        study, token, question = daily_study.start(self.user, StudyLength.SHORT)
+        while question is not None:
+            picked = question["choices"][0]["id"]
+            _r, token, question, _s = daily_study.answer(self.user, token, picked)
+
+        study.refresh_from_db()
+        self.assertIsNone(daily_study.resume(study), "끝난 판에 토큰이 나왔다")
+
+    def test_a_resume_token_does_not_replay_an_already_used_step(self):
+        """재개 토큰을 받아두고 한 문제 푼 뒤 그 토큰을 쓰면 거절한다.
+
+        재개가 순번 방어를 우회하는지 보는 핵심 테스트다. 토큰의 순번은
+        DB 의 step 에서 읽으므로, 받아둔 사이에 순번이 지나가면 안 맞는다.
+        """
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 1)
+
+        stale_token, stale_question = daily_study.resume(study)
+
+        # 받아둔 토큰을 쓰기 전에 다른 토큰으로 한 문제를 푼다.
+        fresh_token, fresh_question = daily_study.resume(study)
+        daily_study.answer(self.user, fresh_token, fresh_question["choices"][0]["id"])
+
+        with self.assertRaises(SessionError):
+            daily_study.answer(
+                self.user, stale_token, stale_question["choices"][0]["id"]
+            )
+
+        study.refresh_from_db()
+        self.assertEqual(study.answered, 2, "되돌린 답이 세어졌다")
+
+    def test_two_resume_tokens_only_one_can_be_spent(self):
+        """재개 토큰을 두 번 받아 각각으로 답하면 하나만 통과한다.
+
+        둘 다 같은 순번을 담으므로 첫 번째가 그 순번을 가져가면 두 번째는
+        조건이 안 맞는다. 안 막으면 재개를 반복해 문제 하나로 여러 번
+        +1 을 만들 수 있다.
+        """
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 1)
+
+        token_a, question_a = daily_study.resume(study)
+        token_b, question_b = daily_study.resume(study)
+
+        daily_study.answer(self.user, token_a, question_a["choices"][0]["id"])
+
+        with self.assertRaises(SessionError):
+            daily_study.answer(self.user, token_b, question_b["choices"][0]["id"])
+
+        study.refresh_from_db()
+        self.assertEqual(study.answered, 2, "재개 토큰 둘이 다 세어졌다")
+
+    def test_resume_cannot_be_farmed_past_the_promised_count(self):
+        """문제가 마음에 안 들 때마다 새로 받아도 기회가 늘지 않는다.
+
+        재개는 새 문제를 주므로 "마음에 안 드는 문제 버리고 다시 받기" 가
+        열린다. 그래도 순번이 하나씩만 소비되므로 답할 수 있는 횟수는
+        약속한 문제 수 그대로여야 한다.
+        """
+        total, _bonus = STUDY_PLANS[StudyLength.SHORT]
+        daily_study.start(self.user, StudyLength.SHORT)
+
+        spent = 0
+        for _ in range(total * 3):
+            study = DailyStudy.objects.get(user=self.user)
+            resumed = daily_study.resume(study)
+            if resumed is None:
+                break
+            token, question = resumed
+            try:
+                daily_study.answer(self.user, token, question["choices"][0]["id"])
+                spent += 1
+            except SessionError:
+                break
+
+        study = DailyStudy.objects.get(user=self.user)
+        self.assertEqual(spent, total, "약속한 수보다 많이 답했다")
+        self.assertEqual(study.answered, total, "약속한 수와 다르게 세어졌다")
+        self.assertLessEqual(study.correct, total, "맞힌 수가 문제 수를 넘었다")
+
+    def test_a_resume_token_cannot_be_spent_by_another_account(self):
+        """재개 토큰을 남에게 줘도 그 계정은 못 쓴다.
+
+        토큰에는 판 pk 만 있고 누구 것인지가 없다. _study_of_token 이
+        user 를 함께 걸지 않으면 남의 판에 답이 들어간다.
+        """
+        other = make_user("남")
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 1)
+
+        token, question = daily_study.resume(study)
+
+        with self.assertRaises(SessionError):
+            daily_study.answer(other, token, question["choices"][0]["id"])
+
+        study.refresh_from_db()
+        self.assertEqual(study.answered, 1, "남이 내 판을 채웠다")
+
+    def test_resume_never_hands_out_unreviewed_content(self):
+        """검수 안 된 단어는 이어 풀 문제에 안 나온다.
+
+        저장된 문제가 없어 새로 뽑는 경로(이 칸이 생기기 전에 시작한 판)를
+        재현한다. 그쪽이 visible() 을 안 거치면 검수 전 단어가 샌다 -
+        CLAUDE.md 의 검수 규칙이 걸리는 자리다.
+        """
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 1)
+
+        # 저장된 문제를 지워 "새로 뽑는" 경로로 보낸다.
+        DailyStudy.objects.filter(pk=study.pk).update(question=None)
+        study.refresh_from_db()
+
+        Word.objects.update(is_reviewed=False)
+        secret_term = f"{uuid4().hex[:6]}secret"
+        Word.objects.create(
+            term=secret_term,
+            meaning="검수 안 된 뜻",
+            description="검수 안 된 설명 입니다",
+            is_reviewed=False,
+        )
+
+        self.assertIsNone(
+            daily_study.resume(study), "검수 안 된 단어로 문제를 만들어줬다"
+        )
+
+    def test_resume_does_not_reveal_unreviewed_words_in_the_saved_question(self):
+        """저장해둔 문제를 다시 낼 때도 검수 전 단어가 보기에 안 섞인다.
+
+        저장은 발급 시점의 보기를 그대로 들고 있으므로, 그때 검수됐던
+        것만 들어 있어야 한다. 뒤늦게 만든 검수 전 단어가 끼어들면 샌다.
+        """
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 1)
+
+        secret_term = f"{uuid4().hex[:6]}secret"
+        secret = Word.objects.create(
+            term=secret_term,
+            meaning="검수 안 된 뜻",
+            description="검수 안 된 설명 입니다",
+            is_reviewed=False,
+        )
+
+        _token, question = daily_study.resume(study)
+
+        shown = [c["text"] for c in question["choices"]]
+        self.assertNotIn(secret_term, shown, "검수 안 된 단어가 보기에 나왔다")
+        self.assertNotIn(
+            secret.pk, [c["id"] for c in question["choices"]], "검수 안 된 id 가 나왔다"
+        )
+
+    def test_the_saved_question_moves_on_after_it_is_answered(self):
+        """답한 뒤 다시 열면 다음 문제다. 푼 문제가 다시 나오지 않는다.
+
+        저장된 문제를 답한 뒤에도 그대로 두면, 이어 풀기가 이미 답한
+        문제를 계속 내놓아 판이 앞으로 못 간다.
+        """
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 1)
+
+        before = daily_study.resume(study)[1]
+        token = daily_study.resume(study)[0]
+
+        daily_study.answer(self.user, token, before["choices"][0]["id"])
+
+        study.refresh_from_db()
+        after = daily_study.resume(study)[1]
+
+        self.assertEqual(after["answered"], 2, "진행이 안 올라갔다")
+        self.assertNotEqual(
+            [c["id"] for c in after["choices"]],
+            [c["id"] for c in before["choices"]],
+            "답한 문제가 또 나왔다",
+        )
+
+    def test_resume_replays_the_saved_question_instead_of_rerolling(self):
+        """이어 풀 때 문제가 매번 바뀌지 않는다.
+
+        새로 뽑아주면 순번을 소비하지 않고 문제만 갈아탈 수 있다 - 아는
+        것이 나올 때까지 화면을 다시 열면 되므로 사실상 만점이다.
+        _take_step 은 "한 순번은 한 번만 소비된다" 만 지키지 이것까지
+        막지 못하므로, 발급한 문제를 저장해두고 그대로 다시 내려준다.
+        """
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 1)
+
+        first = daily_study.resume(study)[1]
+        seen = set()
+        for _ in range(8):
+            again = daily_study.resume(study)[1]
+            seen.add(again["prompt"])
+            self.assertEqual(
+                [c["id"] for c in again["choices"]],
+                [c["id"] for c in first["choices"]],
+                "이어 풀 때마다 보기가 바뀐다",
+            )
+
+        self.assertEqual(len(seen), 1, f"문제를 갈아탈 수 있다: {seen}")
+
+    def test_resume_does_not_publish_score_twice(self):
+        """이어 풀 토큰을 여러 번 받아도 점수판이 부풀지 않는다.
+
+        resume 이 _publish 나 _finish 를 건드리면 여기서 드러난다.
+        """
+        study, earned = answer_n(self.user, StudyLength.SHORT, 3)
+
+        for _ in range(5):
+            daily_study.resume(study)
+
+        study.refresh_from_db()
+        self.assertEqual(study.score, earned, "점수가 부풀었다")
+        self.assertEqual(
+            DailyScore.objects.get(user=self.user, day=study.day).daily_study_score,
+            earned,
+            "점수판이 부풀었다",
+        )
+        self.assertEqual(
+            DailyScore.objects.filter(user=self.user).count(), 1, "점수 줄이 늘었다"
+        )
+
+    def test_resuming_a_settled_study_hands_nothing(self):
+        """자정을 넘겨 정산된 판은 재개되지 않는다."""
+        study, _earned = answer_n(self.user, StudyLength.SHORT, 2)
+
+        with mock.patch.object(calendar_kst, "today", tomorrow()):
+            daily_study.settle_stale(self.user)
+
+        study.refresh_from_db()
+        self.assertTrue(study.is_done, "정산됐는데 안 닫혔다")
+        self.assertIsNone(daily_study.resume(study), "닫힌 판이 재개됐다")
+
+
+class ResumeApiTest(TestCase):
+    """재개를 HTTP 경로로. GET 이 토큰을 내려주는 계약을 본다."""
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("재개api")
+        self.client.force_login(self.user)
+
+    def _start(self) -> dict:
+        return self.client.post(
+            START_URL, {"length": StudyLength.SHORT}, content_type="application/json"
+        ).json()
+
+    def _answer(self, client, token, choice_id):
+        return client.post(
+            ANSWER_URL,
+            {"token": token, "choice_id": choice_id},
+            content_type="application/json",
+        )
+
+    def test_a_guest_gets_no_resume_token(self):
+        """게스트에게는 조회 자체가 막힌다. 토큰이 샐 자리가 없다."""
+        self.client.logout()
+
+        res = self.client.get(START_URL)
+
+        self.assertIn(res.status_code, (401, 403))
+
+    def test_the_get_hands_a_usable_token_when_a_study_is_in_progress(self):
+        """하다 만 판이 있으면 GET 이 이어 풀 토큰과 문제를 함께 준다."""
+        data = self._start()
+        self._answer(
+            self.client, data["token"], data["question"]["choices"][0]["id"]
+        )
+
+        body = self.client.get(START_URL).json()
+
+        self.assertIsNotNone(body["token"], "이어 풀 토큰이 없다")
+        self.assertIsNotNone(body["question"], "이어 풀 문제가 없다")
+        self.assertEqual(body["question"]["answered"], 1, "진행이 안 이어졌다")
+
+        res = self._answer(
+            self.client, body["token"], body["question"]["choices"][0]["id"]
+        )
+
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["study"]["answered"], 2)
+
+    def test_the_get_hands_no_token_before_starting(self):
+        """시작 전에는 토큰이 없다. 있으면 시작 없이 푸는 길이 열린다."""
+        body = self.client.get(START_URL).json()
+
+        self.assertIsNone(body["today"])
+        self.assertIsNone(body["token"], "시작도 안 했는데 토큰이 나왔다")
+        self.assertIsNone(body["question"])
+
+    def test_the_get_hands_no_token_after_finishing(self):
+        """끝낸 뒤에는 토큰이 없다. 있으면 하루 한 번을 넘어 계속 푼다."""
+        data = self._start()
+        token, question = data["token"], data["question"]
+        while question is not None:
+            body = self._answer(
+                self.client, token, question["choices"][0]["id"]
+            ).json()
+            token, question = body.get("token"), body.get("question")
+
+        body = self.client.get(START_URL).json()
+
+        self.assertTrue(body["today"]["done"])
+        self.assertIsNone(body["token"], "끝난 판에 토큰이 나왔다")
+        self.assertIsNone(body["question"])
+
+    def test_another_account_cannot_resume_my_study(self):
+        """남의 계정으로 조회하면 내 판의 토큰이 안 나온다."""
+        self._start()
+
+        stranger = self.client_class()
+        stranger.force_login(make_user("남api"))
+
+        body = stranger.get(START_URL).json()
+
+        self.assertIsNone(body["today"], "남의 판이 보인다")
+        self.assertIsNone(body["token"], "남의 판 토큰이 나왔다")
+
+    def test_a_resume_token_from_yesterday_cannot_fill_todays_study(self):
+        """어제 받아둔 재개 토큰으로 오늘 판을 채울 수 없다.
+
+        자정을 넘기면 어제 판은 정산되어 닫힌다. 그 전에 받아둔 토큰은
+        닫힌 판을 가리키므로 거절되어야 한다 - 오늘 판으로 흘러들면
+        하루 한 번이 무너진다.
+        """
+        data = self._start()
+        self._answer(
+            self.client, data["token"], data["question"]["choices"][0]["id"]
+        )
+
+        stale = self.client.get(START_URL).json()
+        stale_token = stale["token"]
+        stale_choice = stale["question"]["choices"][0]["id"]
+
+        with mock.patch.object(calendar_kst, "today", tomorrow()):
+            # 자정을 넘겨 조회하면 어제 판이 정산되고 오늘 판은 아직 없다.
+            body = self.client.get(START_URL).json()
+            self.assertIsNone(body["today"], "어제 판이 오늘로 보인다")
+            self.assertIsNone(body["token"], "정산된 판의 토큰이 나왔다")
+
+            self._start()
+
+            res = self._answer(self.client, stale_token, stale_choice)
+
+            self.assertEqual(res.status_code, 400, "어제 토큰이 통과했다")
+
+            today_study = DailyStudy.objects.get(
+                user=self.user, day=calendar_kst.today()
+            )
+            self.assertEqual(today_study.answered, 0, "어제 토큰이 오늘 판을 채웠다")
+
+    def test_repeated_gets_do_not_inflate_progress(self):
+        """조회를 여러 번 해도 진행이 늘지 않는다.
+
+        GET 이 문제를 만들므로 조회가 상태를 바꾸면 여기서 드러난다.
+        """
+        data = self._start()
+        self._answer(
+            self.client, data["token"], data["question"]["choices"][0]["id"]
+        )
+
+        for _ in range(6):
+            res = self.client.get(START_URL)
+            self.assertEqual(res.status_code, 200, res.content)
+
+        study = DailyStudy.objects.get(user=self.user)
+        self.assertEqual(study.answered, 1, "조회가 진행을 늘렸다")
+        self.assertEqual(study.step, 1, "조회가 순번을 소비했다")
+
+    def test_the_get_survives_when_content_ran_out(self):
+        """콘텐츠가 사라져도 조회는 200 이다. 500 이면 화면을 못 연다."""
+        data = self._start()
+        self._answer(
+            self.client, data["token"], data["question"]["choices"][0]["id"]
+        )
+
+        # 저장된 문제까지 지워 새로 뽑아야 하는 상태로 만든다.
+        DailyStudy.objects.filter(user=self.user).update(question=None)
+        Word.objects.all().delete()
+
+        res = self.client.get(START_URL)
+
+        self.assertEqual(res.status_code, 200, res.content)
+        body = res.json()
+        self.assertIsNotNone(body["today"], "진행 중인 줄이 사라졌다")
+        self.assertIsNone(body["token"], "낼 문제가 없는데 토큰이 나왔다")
+        self.assertIsNone(body["question"])
+
+
+class ResumeConcurrencyTest(_KeepsCacheTable, TransactionTestCase):
+    """재개 토큰을 동시에 쓰는 경우. 읽고 나서 쓰면 여기서 드러난다."""
+
+    reset_sequences = True
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("재개동시")
+
+    @staticmethod
+    def _run_together(func, args_list):
+        """같은 순간에 여러 요청을 보낸다. ConcurrencyTest 와 같은 방식."""
+        results = [None] * len(args_list)
+        barrier = threading.Barrier(len(args_list))
+
+        def one(index, args):
+            barrier.wait()
+            try:
+                results[index] = ("ok", func(*args))
+            except Exception as exc:
+                results[index] = ("err", exc)
+            finally:
+                connections.close_all()
+
+        threads = [
+            threading.Thread(target=one, args=(i, args))
+            for i, args in enumerate(args_list)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+        return results
+
+    def test_four_resume_tokens_sent_at_once_consume_one_step(self):
+        """재개 토큰 넷을 한꺼번에 보내도 순번은 하나만 소비된다.
+
+        각 토큰이 다른 문제를 담으므로 넷 다 통과하면 정답을 몰라도
+        하나는 맞는다 - 문제 하나에 네 번의 기회가 생긴다.
+        """
+        study, _token, _question = daily_study.start(self.user, StudyLength.SHORT)
+
+        tokens = [daily_study.resume(study) for _ in range(4)]
+        args = [
+            (self.user, token, question["choices"][0]["id"])
+            for token, question in tokens
+        ]
+
+        results = self._run_together(daily_study.answer, args)
+
+        ok = [r for r in results if r[0] == "ok"]
+        errs = [r[1] for r in results if r[0] == "err"]
+
+        self.assertEqual(len(ok), 1, f"둘 이상이 통과했다: {results}")
+        self.assertTrue(
+            all(isinstance(e, SessionError) for e in errs), f"500 이 났다: {errs}"
+        )
+
+        study.refresh_from_db()
+        self.assertEqual(study.answered, 1, "한 문제에 여러 답이 세어졌다")
+        self.assertLessEqual(study.correct, 1, "한 문제로 여러 번 맞혔다")
+
+    def test_concurrent_resume_does_not_change_the_row(self):
+        """동시에 재개해도 판이 늘거나 순번이 소비되지 않는다."""
+        study, _token, _question = daily_study.start(self.user, StudyLength.SHORT)
+
+        results = self._run_together(daily_study.resume, [(study,)] * 4)
+
+        errs = [r[1] for r in results if r[0] == "err"]
+        self.assertFalse(errs, f"재개가 터졌다: {errs}")
+        self.assertEqual(
+            DailyStudy.objects.filter(user=self.user).count(), 1, "판이 늘었다"
+        )
+
+        study.refresh_from_db()
+        self.assertEqual(study.answered, 0, "재개가 진행을 늘렸다")
+        self.assertEqual(study.step, 0, "재개가 순번을 소비했다")
+
+    def test_resuming_while_the_last_answer_lands_cannot_overfill(self):
+        """마지막 답과 재개한 답이 겹쳐도 약속한 수를 넘지 않는다."""
+        total, _bonus = STUDY_PLANS[StudyLength.SHORT]
+        study, token, question = daily_study.start(self.user, StudyLength.SHORT)
+
+        for _ in range(total - 1):
+            picked = question["choices"][0]["id"]
+            _r, token, question, _s = daily_study.answer(self.user, token, picked)
+
+        study.refresh_from_db()
+        spare_token, spare_question = daily_study.resume(study)
+
+        results = self._run_together(
+            daily_study.answer,
+            [
+                (self.user, token, question["choices"][0]["id"]),
+                (self.user, spare_token, spare_question["choices"][0]["id"]),
+            ],
+        )
+
+        errs = [r[1] for r in results if r[0] == "err"]
+        self.assertTrue(
+            all(isinstance(e, SessionError) for e in errs), f"500 이 났다: {errs}"
+        )
+
+        study.refresh_from_db()
+        self.assertEqual(study.answered, total, "약속한 수를 넘겼다")
+        self.assertTrue(study.is_done)
