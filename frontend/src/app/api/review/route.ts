@@ -1,23 +1,22 @@
 import { NextResponse } from "next/server";
 
 import { relayError } from "@/lib/api/relay";
-import { answerDaily, startDaily } from "@/lib/api/daily";
+import { answerReview, startReview } from "@/lib/api/review";
 import { getToken } from "@/lib/session";
 
 /**
- * 일일공부 중계.
+ * 복습 중계.
  *
  * 이유는 /api/rounds/route.ts 첫머리와 같다 - 백엔드 주소는 서버 전용
  * 환경변수이고, 인증 토큰은 httpOnly 쿠키에 있어 브라우저 스크립트가
  * 읽을 수 없다. 그것을 꺼내 헤더에 붙이는 일은 여기서만 일어난다.
  *
- * 자유 문제풀이와 다른 점: **로그인이 없으면 아예 막는다.** 진행이
- * 서버에 남아야 하는 기능이라 게스트에게는 이어 볼 자리가 없다.
+ * 일일공부와 달리 시작에 딸린 값이 없다. 무엇을 낼지는 서버가 정한다 -
+ * 무엇을 틀렸는지가 서버에 있기 때문이다.
  */
 
 type Body = {
   action?: "start" | "answer";
-  length?: string;
   token?: string;
   choice_id?: number | null;
 };
@@ -50,13 +49,7 @@ export async function POST(request: Request) {
 
   try {
     if (body.action === "start") {
-      if (typeof body.length !== "string" || !body.length) {
-        return NextResponse.json(
-          { detail: "길이를 골라주세요." },
-          { status: 400 },
-        );
-      }
-      return NextResponse.json(await startDaily(body.length, auth));
+      return NextResponse.json(await startReview(auth));
     }
 
     if (!body.token || typeof body.token !== "string") {
@@ -66,8 +59,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // bool 은 number 의 하위가 아니지만, 화면이 보낸 값이 정수가 아니면
-    // 백엔드까지 갈 것도 없이 막는다.
+    // 화면이 보낸 값이 정수가 아니면 백엔드까지 갈 것도 없이 막는다.
     if (
       typeof body.choice_id !== "number" ||
       !Number.isInteger(body.choice_id)
@@ -79,7 +71,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      await answerDaily(body.token, body.choice_id, auth),
+      await answerReview(auth, body.token, body.choice_id),
     );
   } catch (error) {
     return relayError(error);

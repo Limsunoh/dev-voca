@@ -352,6 +352,17 @@ class ApiTest(TestCase):
         self.assertEqual(body["due"], 2)
         self.assertEqual(body["round_size"], review.ROUND_SIZE)
 
+    def test_the_graduate_streak_is_told_to_the_screen(self):
+        """졸업 기준을 화면에 알려준다.
+
+        화면이 "한 번 더 맞히면 끝" 을 이 값으로 센다. 안 주면 화면이
+        2 를 박아두게 되고, 기준을 3 으로 올린 날 화면만 옛말을 계속한다 -
+        실제로는 두 번 더 맞혀야 하는데 틀렸다는 신호가 어디에도 안 뜬다.
+        """
+        body = self.client.get(START_URL).json()
+
+        self.assertEqual(body["graduate_streak"], review.GRADUATE_STREAK)
+
     def test_starting_with_nothing_due_is_a_400(self):
         """복습할 것이 없으면 400 이지 500 이 아니다."""
         got = self.client.post(START_URL)
@@ -1122,3 +1133,172 @@ class SecondCycleTest(TestCase):
         self.assertEqual(
             review.count_due(self.user), 1, "한 번 맞히고 목록에서 빠졌다"
         )
+
+
+class ProgressContractTest(TestCase):
+    """화면이 진행률을 그리는 근거. 서버가 준 값만 쓴다.
+
+    화면(ReviewBoard)은 answered/total 을 스스로 세지 않고 문제 본문에
+    실려 온 것을 그대로 그린다. 그래서 이 두 값의 약속이 깨지면 화면이
+    "17/20 에서 끝나는 20문제" 같은 것을 보여준다 - 화면 코드는 멀쩡한데
+    숫자만 틀리는, 눈으로 잡기 어려운 자리다.
+    """
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("진행률")
+        self.client.force_login(self.user)
+
+    def test_the_first_question_starts_the_count_at_zero(self):
+        """첫 문제의 answered 는 0 이다.
+
+        1 로 시작하면 마지막 문제가 total+1 이 되어 "21/20" 이 뜬다.
+        화면이 이 값에 1 을 더하지 않기로 한 약속의 반대편이다.
+        """
+        words = list(Word.objects.values_list("pk", flat=True)[:3])
+        a_round(self.user, [(pk, False) for pk in words])
+
+        body = self.client.post(START_URL).json()
+
+        self.assertEqual(body["question"]["answered"], 0)
+        self.assertEqual(body["question"]["total"], 3)
+
+    def test_a_vanished_target_still_moves_the_count_forward(self):
+        """대상이 사라져 건너뛰어도 진행이 그만큼 앞선다.
+
+        목록을 뽑은 뒤 단어가 검수에서 내려가면 서버가 그 자리를
+        건너뛴다. 건너뛴 만큼 answered 가 안 오르면 다음 요청이 같은
+        자리에서 또 건너뛰어 살아 있는 항목을 두 번 낸다 - 화면에는
+        같은 문제가 연달아 나오고 진행률이 제자리걸음을 한다.
+
+        가운데 하나만 내린다. 뒤에 살아 있는 것을 남겨야 판이 끝나지
+        않고 "건너뛴 다음 자리" 가 실제로 나온다.
+        """
+        words = list(Word.objects.values_list("pk", flat=True)[:4])
+        a_round(self.user, [(pk, False) for pk in words])
+
+        started = self.client.post(START_URL).json()
+        targets = self._targets(started["token"])
+        total = started["question"]["total"]
+        self.assertGreaterEqual(total, 3, "이 시나리오는 세 자리 이상이 필요하다")
+
+        # 지금 낸 것이 0 번, 그 다음 1 번을 내린다. 2 번은 살려둔다.
+        vanished = int(targets[1][1])
+        survivor = int(targets[2][1])
+        Word.objects.filter(pk=vanished).update(is_reviewed=False)
+
+        got = self.client.post(
+            ANSWER_URL,
+            {"token": started["token"], "choice_id": 1},
+            content_type="application/json",
+        )
+
+        self.assertEqual(got.status_code, 200)
+        body = got.json()
+        self.assertIsNotNone(body["question"], "살아 있는 자리가 남았는데 끝났다")
+
+        # 1 번을 건너뛰었으므로 2 번 자리가 나와야 한다.
+        self.assertEqual(
+            body["question"]["answered"],
+            2,
+            "건너뛴 만큼 진행이 안 올랐다 - 다음 요청이 같은 자리를 또 낸다",
+        )
+        self.assertEqual(body["question"]["total"], total, "판 크기가 도중에 바뀌었다")
+        self.assertEqual(
+            int(self._targets(body["token"])[body["question"]["answered"]][1]),
+            survivor,
+            "건너뛴 뒤 낸 문제가 살아 있는 그 항목이 아니다",
+        )
+
+    def test_the_count_never_passes_the_total(self):
+        """끝까지 풀어도 answered 가 total 을 넘지 않는다.
+
+        넘으면 화면 진행 막대가 100% 를 지나 칸 밖으로 자란다.
+        """
+        words = list(Word.objects.values_list("pk", flat=True)[:3])
+        a_round(self.user, [(pk, False) for pk in words])
+
+        body = self.client.post(START_URL).json()
+        total = body["question"]["total"]
+        token = body["token"]
+
+        seen = [body["question"]["answered"]]
+        for _ in range(total + 2):
+            got = self.client.post(
+                ANSWER_URL,
+                {"token": token, "choice_id": 1},
+                content_type="application/json",
+            ).json()
+            if got["question"] is None:
+                break
+            seen.append(got["question"]["answered"])
+            token = got["token"]
+
+        for value in seen:
+            self.assertLess(value, total, f"answered({value}) 가 total({total}) 이상")
+        self.assertEqual(seen, sorted(seen), "진행이 뒤로 갔다")
+
+    def _targets(self, token: str) -> list:
+        """이 판이 낼 항목들. (종류, pk) 목록."""
+        state = signing.loads(token, salt=review._SALT, max_age=review.TOKEN_MAX_AGE)
+        return state["t"]
+
+
+class GraduateStreakContractTest(TestCase):
+    """졸업 기준을 화면에 내려주는 약속.
+
+    화면은 "한 번 더 맞히면 끝" 을 이 값으로 센다. 숫자를 화면에 박으면
+    기준이 바뀐 날 화면만 옛말을 계속한다.
+    """
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("졸업기준")
+        self.client.force_login(self.user)
+
+    def test_it_is_a_positive_whole_number(self):
+        """정수이고 1 이상이다.
+
+        0 이나 음수가 내려가면 화면이 "연속 0번 맞히면 빠집니다" 처럼
+        말이 안 되는 문구를 그린다. bool 은 파이썬에서 int 라 따로 막는다.
+        """
+        value = self.client.get(START_URL).json()["graduate_streak"]
+
+        self.assertIsInstance(value, int)
+        self.assertNotIsInstance(value, bool)
+        self.assertGreaterEqual(value, 1)
+
+    def test_it_matches_the_streak_that_actually_graduates(self):
+        """내려준 값만큼 맞히면 실제로 목록에서 빠진다.
+
+        상수만 복사해 내려주고 실제 졸업은 다른 수를 쓰면, 화면이 센
+        "한 번 더" 뒤에도 항목이 그대로 남는다. 이 값이 진짜인지 본다.
+        """
+        word = Word.objects.first()
+        a_round(self.user, [(word.pk, False)])
+
+        need = self.client.get(START_URL).json()["graduate_streak"]
+
+        for i in range(need - 1):
+            _streak, graduated = review._record(
+                self.user, "word", word.pk, correct=True
+            )
+            self.assertFalse(graduated, f"{i + 1}번 만에 졸업했다")
+
+        _streak, graduated = review._record(self.user, "word", word.pk, correct=True)
+
+        self.assertTrue(graduated, f"{need}번 맞혔는데 졸업이 안 됐다")
+        self.assertEqual(review.count_due(self.user), 0)
+
+    def test_it_is_told_to_everyone_including_the_empty_list(self):
+        """복습할 것이 없어도 기준은 내려준다.
+
+        화면이 빈 상태에서도 "연속 N번" 을 그린다. due 가 0 일 때만
+        빼면 그 화면에서 숫자가 사라진다.
+        """
+        body = self.client.get(START_URL).json()
+
+        self.assertEqual(body["due"], 0)
+        self.assertIn("graduate_streak", body)

@@ -346,11 +346,18 @@ class ReviewStartView(APIView):
     throttle_classes = [ReviewThrottle]
 
     def get(self, request: Request) -> Response:
-        """복습할 것이 몇 개인가. 화면이 시작 버튼을 그릴지 정한다."""
+        """복습할 것이 몇 개인가. 화면이 시작 버튼을 그릴지 정한다.
+
+        **졸업 기준도 함께 내려준다.** 화면이 "한 번 더 맞히면 끝" 을
+        띄우는데, 그 문구가 2 라는 숫자에 묶여 있다. 여기서 안 주면
+        화면이 그 값을 따로 들고 있게 되고, 기준을 3 으로 올린 날
+        화면만 옛말을 계속한다 - 틀렸다는 신호가 어디에도 안 뜬다.
+        """
         return Response(
             {
                 "due": review.count_due(request.user),
                 "round_size": review.ROUND_SIZE,
+                "graduate_streak": review.GRADUATE_STREAK,
             }
         )
 
