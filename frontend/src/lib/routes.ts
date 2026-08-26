@@ -40,11 +40,21 @@ export const routes = {
   login: "/login",
   signup: "/signup",
   profile: "/profile",
+  /*
+   * 아래 넷 중 words 만 콘텐츠 축을 따른다.
+   *
+   * round·daily·review 는 콘텐츠가 아니라 **판의 종류**다. 한 판에
+   * 단어와 문장이 섞여 나오므로 /test/words 옆에 나란히 두면 같은 축인
+   * 것처럼 보이지만 아니다. 다음에 /test/errors 를 만들 때 두 종류가
+   * 섞여 있다는 것을 알고 놓으라고 적어둔다.
+   */
   testWords: "/test/words",
   /** 90초 한 판. 점수가 순위표에 오른다. */
   testRound: "/test/round",
   /** 하루 한 번 일일공부. 로그인이 필요하다. */
   testDaily: "/test/daily",
+  /** 틀린 것 다시 풀기. 점수가 없고 로그인이 필요하다. */
+  testReview: "/test/review",
   /**
    * 순위표. 종류를 안 주면 이번 주.
    *

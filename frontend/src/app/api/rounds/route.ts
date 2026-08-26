@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ApiError } from "@/lib/api/client";
+import { relayError } from "@/lib/api/relay";
 import { answerRound, finishRound, startRound } from "@/lib/api/rounds";
 import { getToken } from "@/lib/session";
 
@@ -85,26 +85,8 @@ export async function POST(request: Request) {
       return NextResponse.json(await finishRound(body.token, auth));
     }
   } catch (error) {
-    return errorResponse(error);
+    return relayError(error);
   }
 
   return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });
-}
-
-/**
- * 백엔드 오류를 그대로 흘려보낸다.
- *
- * 상태 코드를 200 으로 뭉개면 화면이 "문제 없음" 으로 착각한다.
- * 다만 백엔드 주소나 스택은 담지 않는다.
- */
-function errorResponse(error: unknown) {
-  if (error instanceof ApiError) {
-    // 0 은 연결 자체가 안 된 경우다. 그대로 쓰면 fetch 가 깨진다.
-    const status = error.status === 0 ? 503 : error.status;
-    return NextResponse.json({ detail: error.message }, { status });
-  }
-  return NextResponse.json(
-    { detail: "알 수 없는 오류가 발생했습니다." },
-    { status: 500 },
-  );
 }

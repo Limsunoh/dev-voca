@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BoardPreview } from "@/components/BoardPreview";
 import { DailyCard } from "@/components/DailyCard";
+import { ReviewCard } from "@/components/ReviewCard";
 import { SurfaceLayer } from "@/components/SurfaceLayer";
 import type { User } from "@/lib/api/accounts";
 import { fetchDailyStatus, type StudyProgress } from "@/lib/api/daily";
 import { type Board, fetchBoard } from "@/lib/api/leaderboards";
+import { fetchDue, type ReviewDue } from "@/lib/api/review";
 import { getDailyWord, type WordListItem } from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
 import { getCurrentUser, getToken, isGuestChosen } from "@/lib/session";
@@ -72,12 +74,28 @@ export default async function Home() {
         })
     : Promise.resolve(null);
 
-  const [user, word, board, daily]: [
+  // 복습도 로그인해야 쓴다. 실패해도 홈을 막지 않는다 - 카드 하나가
+  // 안 뜰 뿐이고, 없으면 어차피 안 그리는 카드다.
+  const duePromise = token
+    ? fetchDue(token).catch((error: unknown) => {
+        console.error("복습 개수를 불러오지 못했습니다.", error);
+        return null;
+      })
+    : Promise.resolve(null);
+
+  const [user, word, board, daily, due]: [
     User | null,
     WordListItem | null,
     Board | null,
     StudyProgress | null,
-  ] = await Promise.all([userPromise, wordPromise, boardPromise, dailyPromise]);
+    ReviewDue | null,
+  ] = await Promise.all([
+    userPromise,
+    wordPromise,
+    boardPromise,
+    dailyPromise,
+    duePromise,
+  ]);
 
   return (
     <>
@@ -93,8 +111,9 @@ export default async function Home() {
             상위 셋과 내 줄만 - 여기 다 펼치면 홈이 순위표 화면이 되고
             그러면 순위표 화면이 있을 이유가 없어진다. */}
         {user && (
-          <div className="mb-3">
+          <div className="mb-3 flex flex-col gap-2">
             <DailyCard today={daily} />
+            {due && <ReviewCard due={due} />}
           </div>
         )}
         {board && <BoardPreview board={board} />}

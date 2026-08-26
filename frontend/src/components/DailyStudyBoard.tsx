@@ -13,6 +13,8 @@ import type {
 import type { RoundQuestion, RoundResult } from "@/lib/api/rounds";
 import { routes } from "@/lib/routes";
 
+import { QuestionCard } from "./QuestionCard";
+
 /**
  * 하루 한 번 일일공부.
  *
@@ -281,36 +283,7 @@ function PlayCard({
         />
       </div>
 
-      <div className="rounded-2xl border border-white/12 bg-slate-950/40 px-5 py-6">
-        <p className="text-xs text-slate-500">{question.kind_label}</p>
-        <p className="mt-1 text-sm text-slate-400">{question.question}</p>
-        <p
-          className={[
-            "mt-3 text-xl font-semibold text-slate-100 sm:text-2xl",
-            // 단어·에러 메시지는 고정폭, 사람이 쓴 문장은 가변폭.
-            question.kind === "situation" || question.kind === "blank"
-              ? ""
-              : "font-mono",
-          ].join(" ")}
-        >
-          {question.prompt}
-        </p>
-      </div>
-
-      <ul className="flex flex-col gap-2">
-        {question.choices.map((choice) => (
-          <li key={choice.id}>
-            <button
-              type="button"
-              onClick={() => onPick(choice.id)}
-              disabled={busy}
-              className="min-h-12 w-full rounded-xl border border-white/40 px-4 py-3 text-left text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
-            >
-              {choice.text}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <QuestionCard question={question} busy={busy} onPick={onPick} />
 
       {/* 새로 나타나는 영역이라 읽어준다. */}
       <p aria-live="polite" className="min-h-6 text-sm">
