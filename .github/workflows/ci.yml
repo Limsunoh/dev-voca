@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 같은 브랜치에 연속 push 하면 옛 실행을 취소한다. 안 그러면 이미 의미 없는
+# 실행이 러너를 잡고 있어 새 커밋의 결과가 늦게 온다.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # **PostgreSQL 컨테이너에서 돈다.** sqlite 는 NUL 바이트·컬럼 길이 초과·
+    # select_for_update 를 조용히 통과시켜서, 로컬만 sqlite 로 두면 "로컬은
+    # 초록인데 CI 에서만 터지는" 결함이 계속 샌다. 이 저장소는 로컬도
+    # PostgreSQL 이라(docker-compose.yml) 로컬 통과가 곧 CI 통과다.
+    services:
+      postgres:
+        image: postgres:16
+        # **비밀번호를 아예 두지 않는다.** trust 는 이 컨테이너에 붙는 것을
+        # 무조건 허용한다. 잡이 도는 동안만 살고 러너 밖으로 열려 있지 않아
+        # 안전하고, 파일에 비밀번호 같은 문자열이 남지 않아 비밀 스캐너가
+        # 오해할 자리도 없앤다.
+        #
+        # 운영 DB 에는 절대 쓰면 안 되는 값이다. 여기서만 성립한다.
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_USER: postgres
+          POSTGRES_DB: devvoca_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # settings.py 가 DATABASE_URL 을 가장 먼저 본다(우선순위: DATABASE_URL >
+      # USE_SQLITE > 개별 POSTGRES_*). 로컬은 5433 이지만 CI 컨테이너는 5432 다.
+      DATABASE_URL: postgres://postgres@localhost:5432/devvoca_test
+
+      # **DJANGO_DEBUG 를 켜지 않는다.** 켜면 SECRET_KEY·ALLOWED_HOSTS 가
+      # 없어도 폴백으로 뜨는데, 그 폴백들이 바로 운영에서 사고가 나는 자리다
+      # (커밋된 키로 세션이 서명되거나, 도메인을 깜빡해 전 요청이 400).
+      # 운영과 같은 조건으로 둬야 그 가드가 실제로 서는지 CI 가 검증한다.
+      #
+      # 키는 아래 스텝에서 그 자리에 만들어 넣는다. 저장소에 문자열로
+      # 적으면 비밀 스캐너가 진짜 키로 오해하고, 그 경고가 반복되면
+      # 사람이 스캐너를 무시하게 된다.
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+
+      # 이것만 끈다. 켜두면 테스트 클라이언트의 http 요청이 전부 301 로
+      # 튕겨 아무것도 확인 못 한다. 나머지 운영 가드(SECRET_KEY 요구,
+      # ALLOWED_HOSTS 요구, 쿠키 Secure)는 그대로 검증된다.
+      SECURE_SSL_REDIRECT: "false"
+
+      # 테스트가 실제 Claude API 를 부르지 않게 비워 둔다. 키가 있으면
+      # mock 을 빠뜨린 테스트가 그 자리에서 과금된다.
+      ANTHROPIC_API_KEY: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 실행마다 새 SECRET_KEY
+        # DJANGO_DEBUG 를 안 켜므로 키가 있어야 뜬다. 매 실행 새로 만들면
+        # 저장소에 남지 않고, 키가 고정이라 생기는 오해도 없다.
+        run: echo "DJANGO_SECRET_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: 의존성 설치
+        run: |
+          pip install -r requirements.txt
+          pip install ruff tblib
+
+      - name: 린트 (ruff)
+        # 규칙은 ruff.toml 이 정한다. 여기에 --select 를 주면 그 파일의
+        # 설정이 덮여, 설정을 고쳐도 CI 에 반영되지 않는다.
+        run: ruff check .
+
+      - name: Django 시스템 체크
+        working-directory: backend
+        run: python manage.py check
+
+      - name: 마이그레이션 누락 검사
+        # 모델은 바꿨는데 마이그레이션을 안 만든 커밋을 여기서 끊는다.
+        # 그게 나가면 ORM 과 DB 스키마가 갈린 채로 배포된다.
+        working-directory: backend
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: 테스트 (PostgreSQL)
+        # tblib 이 있어야 --parallel 이 실패 트레이스백을 프로세스 사이로
+        # 넘긴다. 없으면 무엇이 왜 실패했는지 안 보인다.
+        working-directory: backend
+        run: python manage.py test --parallel auto
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 타입 검사
+        # 백엔드 응답 모양과 프론트 타입이 갈리는 것을 여기서 잡는다.
+        run: npx tsc --noEmit
+
+      - name: 린트
+        run: npm run lint
+
+      - name: 빌드
+        run: npm run build

@@ -15,11 +15,11 @@ tests_daily_study.py 가 규칙이 지켜지는지를 본다면, 여기는 규�
 from __future__ import annotations
 
 import secrets
-from uuid import uuid4
-from unittest import mock
 import threading
 from datetime import timedelta
+from unittest import mock
 from unittest.mock import patch
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core import signing

@@ -15,9 +15,9 @@
 from __future__ import annotations
 
 import secrets
-from uuid import uuid4
-from unittest import mock
 from datetime import timedelta
+from unittest import mock
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
