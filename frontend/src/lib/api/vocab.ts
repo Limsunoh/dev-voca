@@ -19,6 +19,16 @@ export type WordListItem = {
   term: string;
   /** IPA 발음기호. 확실하지 않은 단어는 빈 문자열이다. */
   pronunciation: string;
+  /**
+   * 한글만 읽어도 통하게 적은 발음. 규칙은 apps/ai_pipeline/prompts/korean-reading.md.
+   *
+   * **검수되지 않았으면 빈 문자열로 온다.** 백엔드가 그 판단을 전담하므로
+   * 화면은 "있으면 그린다" 만 하면 된다. 발음기호와 같은 처리다.
+   *
+   * 강세가 `**...**` 로 감싸여 있다. 그대로 그리면 별표가 보이므로
+   * Reading 컴포넌트가 굵게 바꿔 그린다.
+   */
+  reading: string;
   meaning: string;
   difficulty: number;
   difficulty_label: string;
@@ -40,6 +50,8 @@ export type WordListItem = {
  * 다시 새어나가지 않는다. 출처가 필요한 곳은 Admin 이다.
  */
 export type WordDetail = WordListItem & {
+  /** 그 발음을 왜 그렇게 읽는지. 특별히 설명할 것이 없으면 빈 문자열. */
+  reading_note: string;
   description: string;
   example: string;
   example_translation: string;

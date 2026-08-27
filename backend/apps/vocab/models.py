@@ -9,6 +9,12 @@ class LearningItemQuerySet(models.QuerySet):
 
         뷰마다 filter(is_reviewed=True) 를 손으로 쓰면 언젠가 한 곳을 빠뜨린다.
         사용자 노출 경로는 이 메서드를 쓴다(CLAUDE.md 의 검수 규칙).
+
+        **칸 하나만 가리는 게이트는 여기 못 담는다.** 발음(reading)은
+        항목이 아니라 칸 단위로 검수되므로 쿼리셋으로 표현할 수 없다 -
+        그쪽은 serializers.ReviewedReadingField 가 맡는다. 이 프로젝트의
+        노출 게이트가 둘인 이유이고, 새 게이트를 만들 때 어느 쪽인지
+        먼저 정해야 한다.
         """
         return self.filter(is_reviewed=True)
 
@@ -79,6 +85,24 @@ class Word(LearningItem):
     # 틀린 발음을 가르치느니 그 자리를 비우는 편이 낫다. 타겟이 영어가
     # 약한 사람이라 잘못 외우면 되돌리기 어렵다.
     pronunciation = models.CharField("발음기호", max_length=100, blank=True)
+    # 발음기호 옆에 나란히 두는 한글. "한글만 읽어도 통한다" 가 이 칸의
+    # 목적이고, 왜 그렇게 적는지는 prompts/korean-reading.md 에 있다.
+    #
+    # 발음기호와 마찬가지로 비워둘 수 있다. 갈리는 것을 억지로 채우면
+    # 틀린 발음을 가르치게 된다.
+    reading = models.CharField("한글 발음", max_length=120, blank=True)
+    # 위 표기를 왜 그렇게 읽는지. 상세 화면에서 눌러야 보인다.
+    #
+    # 목록에는 안 나온다 - 짧게 훑는 자리에 설명이 끼면 훑기가 안 된다.
+    reading_note = models.TextField("발음 설명", blank=True)
+    # 발음을 따로 검수한다.
+    #
+    # is_reviewed 는 항목 단위라 이미 검수가 끝난 단어에 AI 발음을 채우면
+    # 아무도 확인하지 않은 표기가 그대로 화면에 뜬다. 단어 자체는 멀쩡한데
+    # 발음만 미검수인 상태를 나타낼 칸이 없어 생기는 구멍이다.
+    #
+    # 사람이 Admin 에서 직접 적은 것은 True 로 두면 된다.
+    reading_reviewed = models.BooleanField("발음 검수됨", default=False)
     meaning = models.CharField("한글 뜻", max_length=200)
     description = models.TextField("설명", blank=True)
     example = models.TextField("예문", blank=True)
@@ -150,6 +174,20 @@ class Sentence(LearningItem):
     slug = models.CharField("시드 키", max_length=100, blank=True)
 
     text = models.TextField("영어 문장")
+    # 한글만 읽어도 통하게 적은 발음. 규칙은 apps/ai_pipeline/prompts/korean-reading.md.
+    #
+    # 문장에는 단어와 달리 "자세히" 를 두지 않는다. 길어서 화면이 감당하지
+    # 못하고, 문장에서 정작 알아야 할 것은 단어 경계가 뭉개지는 것
+    # ("Could you" -> "쿠쥬") 하나라 그건 표기 자체에 담긴다.
+    #
+    # 에러 메시지에도 넣는다. 눈으로 읽는 문장이지만 동료에게 말로 옮길
+    # 일이 있다.
+    #
+    # 길이를 TextField 로 두는 이유는 text 와 같다 - 문장 길이에 상한을
+    # 두면 긴 에러 메시지가 들어올 때 그 자리에서 막힌다.
+    reading = models.TextField("한글 발음", blank=True)
+    # 단어와 같은 이유로 발음을 따로 검수한다(Word.reading_reviewed 주석).
+    reading_reviewed = models.BooleanField("발음 검수됨", default=False)
     translation = models.TextField("한글 해석")
     kind = models.CharField(
         "종류",

@@ -50,6 +50,7 @@ export default async function SentenceDetailPage({ params }: PageProps) {
 
       <DetailHero
         title={sentence.text}
+        reading={sentence.reading || undefined}
         mono={isError}
         meta={
           <>

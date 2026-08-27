@@ -177,6 +177,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
                 href={routes.wordDetail(word.id)}
                 title={word.term}
                 aside={word.pronunciation || undefined}
+                reading={word.reading || undefined}
                 subtitle={word.meaning}
                 badge={
                   <DifficultyBadge

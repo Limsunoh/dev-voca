@@ -41,6 +41,7 @@ export default async function WordDetailPage({ params }: PageProps) {
       <DetailHero
         title={word.term}
         aside={word.pronunciation || undefined}
+        reading={word.reading || undefined}
         meta={
           <>
             <DifficultyBadge
@@ -58,6 +59,22 @@ export default async function WordDetailPage({ params }: PageProps) {
       />
 
       <DetailMeaning>{word.meaning}</DetailMeaning>
+
+      {/* 발음 설명은 접어둔다. 목록에서 훑을 때는 필요 없고, 상세에서도
+          "왜 그렇게 읽는지" 가 궁금한 사람만 연다. 펼친 채로 두면 뜻보다
+          먼저 눈에 들어와 읽는 순서가 뒤집힌다.
+
+          details/summary 를 쓰는 이유: 여는 상태를 브라우저가 들고 있어
+          클라이언트 컴포넌트로 만들 필요가 없고, 키보드와 스크린리더가
+          그냥 동작한다. */}
+      {word.reading_note && (
+        <details className="rise mt-4 [animation-delay:240ms]">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-slate-400 transition-colors hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+            발음 자세히
+          </summary>
+          <p className="mt-2 text-pretty text-slate-300">{word.reading_note}</p>
+        </details>
+      )}
 
       {word.description && (
         <DetailCard label="설명" delay="[animation-delay:280ms]">

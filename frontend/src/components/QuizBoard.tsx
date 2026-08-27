@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Burst } from "@/components/Burst";
 import type { GradeResult, Question } from "@/lib/api/quiz";
+import { Reading } from "./Reading";
 
 /**
  * 백엔드를 직접 부르지 않고 같은 출처의 중계(/api/quiz)를 부른다.
@@ -690,6 +691,9 @@ function Explanation({ result }: { result: GradeResult }) {
           <span lang="en-US" className="text-slate-300">
             {word.pronunciation}
           </span>
+        )}
+        {word.reading && (
+          <Reading text={word.reading} className="text-slate-400" />
         )}
       </div>
 

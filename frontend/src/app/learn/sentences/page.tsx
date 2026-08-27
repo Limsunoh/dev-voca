@@ -189,6 +189,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
               <LearningCard
                 href={routes.sentenceDetail(sentence.id)}
                 title={sentence.text}
+                reading={sentence.reading || undefined}
                 subtitle={sentence.translation}
                 badge={
                   <DifficultyBadge
