@@ -81,7 +81,7 @@ export default async function StartPage() {
             </Link>
           </p>
 
-          <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">
+          <p className="mt-2 text-center text-xs leading-relaxed text-slate-400">
             게스트로 시작하면 점수와 순위가 남지 않습니다.
             <br />
             나중에 로그인하면 그때부터 쌓입니다.

@@ -159,6 +159,9 @@ export const learningModes: LearningMode[] = [
 export const immersiveRoutes: readonly string[] = [
   routes.testWords,
   routes.testRound,
+  // 일일공부는 문제 앞에 훑어보기가 붙어 화면 전체를 쓴다. 탭바가 남아
+  // 있으면 카드를 아래로 밀 때 탭이 먼저 눌린다.
+  routes.testDaily,
 ];
 
 /**

@@ -2,9 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/Avatar";
-import { BoardPreview } from "@/components/BoardPreview";
-import { DailyCard } from "@/components/DailyCard";
-import { ReviewCard } from "@/components/ReviewCard";
+import { HomeTasks } from "@/components/HomeTasks";
+import { RecordSheet } from "@/components/RecordSheet";
 import { SurfaceLayer } from "@/components/SurfaceLayer";
 import type { User } from "@/lib/api/accounts";
 import { fetchDailyStatus, type StudyProgress } from "@/lib/api/daily";
@@ -63,6 +62,22 @@ export default async function Home() {
     },
   );
 
+  // 공부한 날 수. 칩에만 쓴다.
+  //
+  // **연속 일수가 아니다.** 백엔드의 꾸준함 순위표 entries 는
+  // Sum(_DAY_COUNTS) - 점수를 얻은 날을 모두 더한 값이라, 띄엄띄엄
+  // 해도 쌓인다(leaderboards.py:323). 그래서 화면에도 "연속" 이라고
+  // 쓰지 않는다. 진짜 연속 일수는 백엔드에 계산이 없다.
+  //
+  // 주간 순위표의 entries 로는 못 구한다 - 저건 이번 주 판 수다.
+  // 로그인 안 했으면 내 줄이 없으므로 아예 안 부른다.
+  const streakPromise = token
+    ? fetchBoard("streak", token).catch((error: unknown) => {
+        console.error("연속 학습을 불러오지 못했습니다.", error);
+        return null;
+      })
+    : Promise.resolve(null);
+
   // 일일공부는 로그인해야 쓸 수 있다. 게스트에게는 아예 안 물어본다 -
   // 못 누르는 카드를 띄워두면 눌러보고 로그인으로 튕기는 경험이 된다.
   const dailyPromise = token
@@ -83,19 +98,27 @@ export default async function Home() {
       })
     : Promise.resolve(null);
 
-  const [user, word, board, daily, due]: [
+  const [user, word, board, daily, due, streakBoard]: [
     User | null,
     WordListItem | null,
     Board | null,
     StudyProgress | null,
     ReviewDue | null,
+    Board | null,
   ] = await Promise.all([
     userPromise,
     wordPromise,
     boardPromise,
     dailyPromise,
     duePromise,
+    streakPromise,
   ]);
+
+  // 내 줄이 상위권이면 rows 안에, 밖이면 me 에 있다.
+  const studiedDays =
+    streakBoard?.me?.entries ??
+    streakBoard?.rows.find((row) => row.is_me)?.entries ??
+    0;
 
   return (
     <>
@@ -104,19 +127,27 @@ export default async function Home() {
       <SurfaceLayer variant="surface-learn" />
 
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pt-6">
-        <Greeting user={user} />
+        <Greeting
+          user={user}
+          studiedDays={studiedDays}
+          board={board}
+          daily={daily}
+          due={due}
+        />
         {word ? <DailyWord word={word} /> : <DailyWordUnavailable />}
 
-        {/* 오늘 할 일이 먼저, 결과가 그다음이다. 순위는 스무 줄이 아니라
-            상위 셋과 내 줄만 - 여기 다 펼치면 홈이 순위표 화면이 되고
-            그러면 순위표 화면이 있을 이유가 없어진다. */}
-        {user && (
-          <div className="mb-3 flex flex-col gap-2">
-            <DailyCard today={daily} />
-            {due && <ReviewCard due={due} />}
-          </div>
-        )}
-        {board && <BoardPreview board={board} />}
+        {/* 오늘 할 일. 카드가 아니라 줄이다 - 위의 오늘의 단어와 같은
+            무게로 보이면 화면이 무엇을 먼저 보라고 말하지 않는다.
+
+            순위표를 여기 펼치지 않는다. 상위 셋을 늘어놓으면 홈이 순위표
+            화면이 되고, 그러면 순위표 화면이 있을 이유가 없어진다. 내
+            순위 한 줄만 두고 나머지는 그 화면에 맡긴다. */}
+        <HomeTasks
+          daily={daily}
+          due={due}
+          board={board}
+          signedIn={user !== null}
+        />
       </main>
     </>
   );
@@ -129,7 +160,19 @@ export default async function Home() {
  * 버튼을 나란히 둔 줄이 "웹 사이트를 폰에서 연 것" 처럼 보이게 만들던
  * 부분이라, 이름을 부르는 한 줄로 바꿨다. 계정은 "나" 탭이 맡는다.
  */
-function Greeting({ user }: { user: User | null }) {
+function Greeting({
+  user,
+  studiedDays,
+  board,
+  daily,
+  due,
+}: {
+  user: User | null;
+  studiedDays: number;
+  board: Board | null;
+  daily: StudyProgress | null;
+  due: ReviewDue | null;
+}) {
   if (!user) {
     return (
       // 로그인 입구를 여기 둔다. 웹 머리말을 없애면서 "가입하기" 버튼이
@@ -156,7 +199,103 @@ function Greeting({ user }: { user: User | null }) {
         <span className="text-slate-100">{user.name}</span>
         <span className="font-normal text-slate-300">님</span>
       </p>
+
+      {/* 공부한 날이 0 이면 칩을 안 그린다. "0일" 은 격려가 아니라
+          아직 아무것도 안 했다는 통보라 첫 화면에 둘 것이 못 된다.
+          그 대신 아래 일일공부 줄이 무엇을 할지 말해준다. */}
+      {studiedDays > 0 && (
+        <RecordSheet studiedDays={studiedDays}>
+          <TodayRecord
+            daily={daily}
+            due={due}
+            board={board}
+            studiedDays={studiedDays}
+          />
+        </RecordSheet>
+      )}
     </header>
+  );
+}
+
+/**
+ * 기록 시트 안에 들어가는 내용.
+ *
+ * 홈 화면에 이미 있는 것(오늘 할 일 줄)을 그대로 되풀이하지 않는다.
+ * 여기 두는 것은 "쌓여온 것" 이다 - 연속 며칠인지, 이번 주에 몇 점인지.
+ * 화면에 늘 띄우기엔 오늘 할 일보다 급하지 않고, 그렇다고 없으면
+ * 매일 여는 이유가 약해지는 값들이다.
+ */
+function TodayRecord({
+  daily,
+  due,
+  board,
+  studiedDays,
+}: {
+  daily: StudyProgress | null;
+  due: ReviewDue | null;
+  board: Board | null;
+  studiedDays: number;
+}) {
+  const mine = board?.me ?? board?.rows.find((row) => row.is_me);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="공부한 날" value={`${studiedDays}일`} accent />
+        <Stat
+          label="오늘 일일공부"
+          value={
+            daily?.done
+              ? "마침"
+              : daily
+                ? `${daily.answered}/${daily.total}`
+                : "아직"
+          }
+        />
+      </div>
+
+      <dl className="flex flex-col">
+        <Line label="다시 볼 것" value={due ? `${due.due}개` : "없음"} />
+        <Line label="이번 주 순위" value={mine ? `${mine.rank}위` : "기록 없음"} />
+        <Line label="이번 주 점수" value={mine ? `${mine.score}점` : "0점"} />
+      </dl>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-white/12 bg-slate-950/50 px-3 py-2.5">
+      <p className="font-mono text-[10px] tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p
+        className={`mt-0.5 font-mono text-lg font-bold tracking-tight tabular-nums ${
+          accent ? "text-focus" : "text-slate-50"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Line({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between border-t border-white/10 py-2.5 text-sm">
+      <dt className="text-slate-400">{label}</dt>
+      <dd className="font-mono text-xs font-semibold text-focus tabular-nums">
+        {value}
+      </dd>
+    </div>
   );
 }
 

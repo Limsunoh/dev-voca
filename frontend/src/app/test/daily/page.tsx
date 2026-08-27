@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { DailyStudyBoard } from "@/components/DailyStudyBoard";
 import { ApiError } from "@/lib/api/client";
 import { fetchDailyStatus } from "@/lib/api/daily";
+import { fetchStudyDeck } from "@/lib/api/study-deck";
+import type { StudyCard } from "@/lib/study-plan";
 import { routes } from "@/lib/routes";
 import { getToken } from "@/lib/session";
 
@@ -23,9 +25,23 @@ export default async function DailyPage() {
   const token = await getToken();
   if (!token) redirect(`/login?next=${routes.testDaily}`);
 
+  // 훑어볼 카드를 미리 받아둔다. 길이를 고른 뒤에 받으면 판이 열린
+  // 직후에 빈 화면으로 기다리게 된다.
+  //
+  // **실패해도 화면을 막지 않는다.** 카드가 없으면 공부 단계만 건너뛰고
+  // 곧장 문제풀이로 간다 - 훑어보기가 없다고 일일공부를 못 하면 곁들이가
+  // 본체를 막는 셈이다. 조용히 삼키지는 않고 로그는 남긴다.
+  const deckPromise: Promise<StudyCard[]> = fetchStudyDeck().catch(
+    (error: unknown) => {
+      console.error("공부 카드를 불러오지 못했습니다.", error);
+      return [];
+    },
+  );
+
   let status;
+  let deck: StudyCard[];
   try {
-    status = await fetchDailyStatus(token);
+    [status, deck] = await Promise.all([fetchDailyStatus(token), deckPromise]);
   } catch (error) {
     const offline = error instanceof ApiError && error.status === 0;
     return (
@@ -50,7 +66,7 @@ export default async function DailyPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-8">
-      <DailyStudyBoard status={status} />
+      <DailyStudyBoard status={status} deck={deck} />
     </main>
   );
 }
