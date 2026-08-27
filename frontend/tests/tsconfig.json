@@ -1,0 +1,13 @@
+{
+  // 테스트는 Node 가 직접 .ts 를 읽으므로 import 에 확장자가 붙는다.
+  // 앱 쪽 tsconfig 는 번들러 규칙(확장자 없음)이라 둘을 섞을 수 없어
+  // 여기서만 allowImportingTsExtensions 를 켠다.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["**/*.ts", "**/*.mjs"],
+  "exclude": []
+}

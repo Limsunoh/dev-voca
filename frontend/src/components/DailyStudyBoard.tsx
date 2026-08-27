@@ -10,10 +10,16 @@ import type {
   StudyLength,
   StudyProgress,
 } from "@/lib/api/daily";
+import { ExitGuard } from "@/components/ExitGuard";
 import type { RoundQuestion, RoundResult } from "@/lib/api/rounds";
+// planFor 는 순수 함수라 화면에서 불러도 된다. fetchStudyDeck 은 서버
+// 전용이므로 여기서 부르지 않는다 - 부르면 백엔드 주소가 브라우저
+// 번들에 실린다.
+import { planFor, type StudyCard } from "@/lib/study-plan";
 import { routes } from "@/lib/routes";
 
 import { QuestionCard } from "./QuestionCard";
+import { StudyDeck } from "./StudyDeck";
 
 /**
  * 하루 한 번 일일공부.
@@ -29,7 +35,14 @@ import { QuestionCard } from "./QuestionCard";
  * 사이에 다른 클릭이 들어오면 state 는 한 틱 낡은 값을 본다.
  */
 
-type Phase = "choosing" | "playing" | "done";
+/**
+ * 화면 단계.
+ *
+ * studying 만 서버가 모르는 단계다. 나머지 셋은 서버 상태로 되살릴 수
+ * 있지만(오늘 판이 있나·끝났나), 훑어보기는 답을 안 내므로 남는 자국이
+ * 없다. 그래서 시작 직후 한 번만 지나가고 새로고침하면 건너뛴다.
+ */
+type Phase = "choosing" | "studying" | "playing" | "done";
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
   const res = await fetch("/api/daily", {
@@ -46,10 +59,21 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function DailyStudyBoard({ status }: { status: DailyStatus }) {
+export function DailyStudyBoard({
+  status,
+  deck,
+}: {
+  status: DailyStatus;
+  /** 문제 전에 훑어볼 카드들. 못 가져왔으면 비어 있고, 그러면 건너뛴다. */
+  deck: StudyCard[];
+}) {
   // 오늘 이미 다 한 사람은 결과부터, 하다 만 사람은 이어서 푸는 화면부터
   // 본다. 길이는 시작할 때 정해져 바꿀 수 없으므로 고르기로 돌아가지
   // 않는다 - 돌아가봐야 어느 길이를 눌러도 "이미 시작했다" 로 막힌다.
+  //
+  // **studying 은 여기 없다.** 새로고침으로 돌아온 사람은 서버가 "시작함"
+  // 이라 답이 0개여도 playing 이 맞다. 한 번 더 훑는 것보다 문제를 못 푸는
+  // 쪽이 나쁘다.
   const initial: Phase = status.today?.done
     ? "done"
     : status.token && status.question
@@ -64,6 +88,8 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
   const [study, setStudy] = useState<StudyProgress | null>(status.today);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // 고른 길이만큼 잘라낸 카드. 길이를 고르기 전에는 볼 일이 없다.
+  const [cards, setCards] = useState<StudyCard[]>([]);
 
   const tokenRef = useRef("");
   const busyRef = useRef(false);
@@ -96,7 +122,14 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
       setQuestion(started.question);
       setStudy(started.study);
       setResult(null);
-      setPhase("playing");
+      // **판을 먼저 열고 그다음에 훑는다.** 반대로 하면 다 훑고 나서
+      // "이미 시작했다" 로 막히는 경우에 그 시간이 통째로 버려진다.
+      //
+      // setPhase 가 try 안에 있어야 하는 것도 같은 이유다. catch 나
+      // finally 로 옮기면 판이 안 열렸는데 덱이 뜬다.
+      const picked = planFor(deck, length);
+      setCards(picked);
+      setPhase(picked.length > 0 ? "studying" : "playing");
     } catch (err) {
       if (!aliveRef.current) return;
       setError(err instanceof Error ? err.message : "시작하지 못했습니다.");
@@ -142,30 +175,71 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
   };
 
   if (phase === "done") {
-    return <DoneCard study={study} />;
+    // 이미 끝났다. 카드 안에 순위표·홈 링크가 있지만 나가는 자리를
+    // 다른 셋과 같은 곳에 둔다 - 매번 다른 데를 찾게 하지 않는다.
+    return (
+      <div className="flex flex-1 flex-col">
+        <div className="mb-4 flex items-center">
+          <ExitGuard to={routes.home} label="홈" />
+        </div>
+        <DoneCard study={study} />
+      </div>
+    );
+  }
+
+  // 훑어보기는 네트워크를 안 탄다. 판은 이미 열렸고 첫 문제도 손에
+  // 있어서, 여기서는 error 도 busy 도 쓸 일이 없다.
+  //
+  // **나가기를 묻지 않는다.** 아직 답한 것이 없고, 판은 서버에 이미
+  // 열려 있어서 다시 들어오면 이어서 푼다. 훑어보기를 못 한 것뿐인데
+  // 그건 채점이 아니다.
+  if (phase === "studying") {
+    return (
+      <div className="flex flex-1 flex-col">
+        <div className="mb-4 flex items-center">
+          <ExitGuard to={routes.home} label="홈" />
+        </div>
+        <StudyDeck cards={cards} onDone={() => setPhase("playing")} />
+      </div>
+    );
   }
 
   if (phase === "playing" && question) {
     return (
-      <PlayCard
-        question={question}
-        result={result}
-        study={study}
-        busy={busy}
-        error={error}
-        onPick={send}
-      />
+      <div className="flex flex-1 flex-col">
+        {/* 여기도 안 묻는다. 일일공부는 답할 때마다 서버에 저장돼서
+            (모듈 머리말 참고) 중간에 나가도 푼 만큼 남는다. 90초 판이
+            묻는 이유 - 끝내기를 안 부르면 점수가 통째로 날아감 - 가
+            여기엔 없다. 없는 손실을 경고하면 성가심만 남는다. */}
+        <div className="mb-4 flex items-center">
+          <ExitGuard to={routes.home} label="그만두기" />
+        </div>
+        <PlayCard
+          question={question}
+          result={result}
+          study={study}
+          busy={busy}
+          error={error}
+          onPick={send}
+        />
+      </div>
     );
   }
 
   return (
-    <ChooseCard
-      lengths={status.lengths}
-      resuming={status.today}
-      busy={busy}
-      error={error}
-      onStart={start}
-    />
+    <div className="flex flex-1 flex-col">
+      {/* 아직 시작 전이라 잃을 것이 없다. */}
+      <div className="mb-4 flex items-center">
+        <ExitGuard to={routes.home} label="홈" />
+      </div>
+      <ChooseCard
+        lengths={status.lengths}
+        resuming={status.today}
+        busy={busy}
+        error={error}
+        onStart={start}
+      />
+    </div>
   );
 }
 
