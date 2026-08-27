@@ -1,0 +1,49 @@
+# 파이썬 린트 규칙. CI 가 `ruff check .` 한 줄로 이 파일을 읽는다.
+#
+# 명령에 --select 를 주지 않는다. 주면 아래 select 가 덮여서, 이 파일을
+# 고쳐도 CI 에 반영되지 않고 로컬에서 `ruff check` 를 그냥 돌린 사람과
+# 결과가 갈린다.
+
+line-length = 100
+
+[lint]
+select = [
+    "E",    # pycodestyle - 들여쓰기·공백·구문 배치
+    "F",    # pyflakes - 미정의 이름·안 쓰는 import 등 실질 버그
+    "I",    # isort - import 정렬
+]
+
+ignore = [
+    # 줄 길이. 이 저장소는 주석에 "왜" 를 길게 적어서 위반이 554건,
+    # 전체 569건의 97% 다. 켜면 CI 가 영구 빨간불이 되고 나머지 규칙의
+    # 신호까지 그 안에 묻힌다.
+    #
+    # 검사만 끈 것이고 위 line-length 값은 남아 있다. 나중에 ruff format
+    # 을 붙이면 그 값이 기준이 된다.
+    "E501",
+    # l·I·O 처럼 헷갈리는 한 글자 이름. 남은 2건이 전부 짧은 지역 변수라
+    # 실익이 없었다.
+    "E741",
+]
+
+[lint.per-file-ignores]
+# settings.py 는 환경변수를 먼저 읽고 그 값으로 분기해야 해서 import 가
+# 아래로 밀린다. Django 의 흔한 구조라 순서를 맞추면 오히려 깨진다.
+"backend/config/settings.py" = ["E402"]
+
+# 마이그레이션은 Django 생성물이다. 손으로 정렬하면 다음 생성 때 다시
+# 어긋나고 diff 만 늘어난다.
+"*/migrations/*" = ["E402", "I001"]
+
+# 테스트에서 `n = make_word(...)` 처럼 결과를 안 쓰는 변수는 "이 행이 DB 에
+# 있다" 를 적는 용도다. 프로덕션에서 같은 것은 로직이 빠졌다는 신호라
+# 전역으로 끄면 안 된다.
+"*/tests.py" = ["E702", "F841"]
+"*/tests_*.py" = ["E702", "F841"]
+
+# 순환 참조를 피하려고 import 를 아래로 내린 자리.
+"backend/apps/accounts/views.py" = ["E402"]
+
+# 문자열 타입힌트("ClaudeGenerator")가 가리키는 이름을 함수 안에서 import
+# 한다. ruff 는 그 구조를 못 보고 미정의로 읽는다.
+"backend/apps/ai_pipeline/tests.py" = ["E702", "F841", "F821"]

@@ -89,7 +89,12 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     # 위 프록시 헤더를 신뢰하도록 설정했으므로 안전하게 켤 수 있다.
     # (헤더 설정 없이 켜면 프록시 뒤에서 무한 리다이렉트에 빠진다.)
-    SECURE_SSL_REDIRECT = True
+    #
+    # 끌 수 있게 열어둔 이유는 CI 하나다. CI 는 운영과 같은 조건(DEBUG=False)
+    # 으로 돌려야 SECRET_KEY·ALLOWED_HOSTS 가드가 실제로 서는지 검증되는데,
+    # 이것까지 켜면 테스트 클라이언트의 http 요청이 전부 301 로 튕겨 아무것도
+    # 확인 못 한다. 기본값이 True 라 운영에서 깜빡할 자리는 없다.
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
     # HSTS 는 브라우저가 기억해버려 되돌리기 어렵다. 도메인이 확정되고 https 가
     # 안정적으로 뜬 뒤에 늘린다. 0 이면 헤더를 보내지 않는다.
     SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))

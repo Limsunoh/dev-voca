@@ -7,13 +7,13 @@
 from __future__ import annotations
 
 import secrets
-from uuid import uuid4
 from datetime import timedelta
+from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
-from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils import timezone
 

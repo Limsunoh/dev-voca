@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 import random
 import secrets
-import unittest
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from unittest import mock
