@@ -3,6 +3,35 @@ from rest_framework import serializers
 from .models import LearningItem, Sentence, Word
 
 
+class ReviewedReadingField(serializers.CharField):
+    """검수된 한글 발음만 내보낸다. 아니면 빈 문자열.
+
+    is_reviewed 는 항목 단위라 이 자리를 못 지킨다 - 이미 검수가 끝난
+    단어에 AI 가 발음을 채우면 아무도 확인하지 않은 표기가 그대로 나간다.
+    단어 자체는 멀쩡한데 발음만 미검수인 상태라 항목 플래그로는 표현할
+    수 없는 구멍이다.
+
+    설명(reading_note)도 같은 플래그를 따른다. 필드 이름을 인자로 받아
+    한 클래스가 둘을 다 맡는다 - 하위 클래스로 나누면 그 클래스가 어느
+    칸을 읽는지가 메서드 본문에만 있어 호출부에서 안 보인다.
+
+    빈 문자열로 내보내는 이유: 화면이 이미 "발음이 없으면 안 그린다" 를
+    하고 있다(발음기호가 갈리는 용어는 원래 비워둔다). 그 처리를 그대로
+    타므로 화면을 안 고쳐도 된다.
+    """
+
+    def __init__(self, field_name: str = "reading", **kwargs) -> None:
+        # 위치 인자로 받는다. DRF 가 필드를 deepcopy 할 때 _args 를 그대로
+        # 넘기므로, kwargs 에서 꺼내면 복제본이 기본값으로 돌아간다.
+        kwargs.setdefault("read_only", True)
+        kwargs.setdefault("source", "*")
+        self.field_name = field_name
+        super().__init__(**kwargs)
+
+    def to_representation(self, instance) -> str:
+        return getattr(instance, self.field_name) if instance.reading_reviewed else ""
+
+
 class UnreviewOnContentChangeMixin:
     """내용을 고치면 검수 상태를 되돌린다.
 
@@ -41,6 +70,14 @@ class UnreviewOnContentChangeMixin:
         )
         if content_changed:
             instance.is_reviewed = False
+            # **발음 검수도 함께 되돌린다.** 단어나 발음기호가 바뀌면 그
+            # 한글 발음은 더는 확인된 것이 아니다 - "deploy" 를 "deploys"
+            # 로 고쳤는데 "드플로이" 가 검수 완료로 남아 있으면, 다시
+            # 검수를 통과시킨 순간 아무도 확인 안 한 발음이 나간다.
+            #
+            # 이 믹스인이 막으려던 사고와 같은 형태이고, 발음은 IPA 보다
+            # 더 그대로 외우는 값이라 더 위험하다.
+            instance.reading_reviewed = False
         return super().update(instance, validated_data)
 
 
@@ -53,6 +90,7 @@ class WordListSerializer(serializers.ModelSerializer):
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
     # 화면은 이 라벨만 쓴다. category(영어 코드)는 필터 링크를 만들 때 필요해서 함께 준다.
     category_label = serializers.CharField(source="get_category_display", read_only=True)
+    reading = ReviewedReadingField()
 
     class Meta:
         model = Word
@@ -60,6 +98,7 @@ class WordListSerializer(serializers.ModelSerializer):
             "id",
             "term",
             "pronunciation",
+            "reading",
             "meaning",
             "difficulty",
             "difficulty_label",
@@ -76,12 +115,15 @@ class QuizWordSerializer(serializers.ModelSerializer):
     검수 워크플로우 내부 정보를 익명에게 흘리지 않는다.
     """
 
+    reading = ReviewedReadingField()
+
     class Meta:
         model = Word
         fields = [
             "id",
             "term",
             "pronunciation",
+            "reading",
             "meaning",
             "description",
             "example",
@@ -97,6 +139,11 @@ class WordDetailSerializer(
 
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
     category_label = serializers.CharField(source="get_category_display", read_only=True)
+    # 읽기 전용이다. API 로 고치게 하면 고쳤을 때 reading_reviewed 를
+    # 되돌리는 처리가 또 필요한데, 발음은 Admin 에서만 손보므로 그 경로를
+    # 아예 안 만든다.
+    reading = ReviewedReadingField()
+    reading_note = ReviewedReadingField("reading_note")
 
     class Meta:
         model = Word
@@ -104,6 +151,8 @@ class WordDetailSerializer(
             "id",
             "term",
             "pronunciation",
+            "reading",
+            "reading_note",
             "meaning",
             "description",
             "example",
@@ -154,12 +203,14 @@ class SentenceListSerializer(serializers.ModelSerializer):
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
     category_label = serializers.CharField(source="get_category_display", read_only=True)
     kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    reading = ReviewedReadingField()
 
     class Meta:
         model = Sentence
         fields = [
             "id",
             "text",
+            "reading",
             "translation",
             "kind",
             "kind_label",
@@ -179,12 +230,14 @@ class SentenceDetailSerializer(
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
     category_label = serializers.CharField(source="get_category_display", read_only=True)
     kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    reading = ReviewedReadingField()
 
     class Meta:
         model = Sentence
         fields = [
             "id",
             "text",
+            "reading",
             "translation",
             "kind",
             "kind_label",

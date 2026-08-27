@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { Reading } from "./Reading";
+
 /**
  * 학습 콘텐츠 카드.
  *
@@ -12,6 +14,14 @@ export type LearningCardProps = {
   subtitle: string;
   /** 제목 옆에 붙는 보조 문구. 단어의 발음기호 같은 것. */
   aside?: string;
+  /**
+   * 한글 발음. aside(발음기호) 옆에 온다.
+   *
+   * aside 를 ReactNode 로 넓혀 한 자리에 몰아넣지 않는 이유: 그 자리에는
+   * lang="en-US" 가 걸려 있어 한글이 영어 글꼴로 그려지고 스크린리더도
+   * 영어로 읽는다.
+   */
+  reading?: string;
   /**
    * 제목 오른쪽에 놓일 표시. 난이도 배지 같은 것.
    *
@@ -36,6 +46,7 @@ export function LearningCard({
   title,
   subtitle,
   aside,
+  reading,
   badge,
   tag,
   monoTitle = true,
@@ -90,6 +101,12 @@ export function LearningCard({
             >
               {aside}
             </span>
+          )}
+          {reading && (
+            <Reading
+              text={reading}
+              className="text-base text-slate-500 dark:text-slate-400"
+            />
           )}
         </div>
         {badge}

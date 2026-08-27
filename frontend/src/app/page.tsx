@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BoardPreview } from "@/components/BoardPreview";
 import { DailyCard } from "@/components/DailyCard";
+import { Reading } from "@/components/Reading";
 import { ReviewCard } from "@/components/ReviewCard";
 import { SurfaceLayer } from "@/components/SurfaceLayer";
 import type { User } from "@/lib/api/accounts";
@@ -200,6 +201,17 @@ function DailyWord({ word }: { word: WordListItem }) {
           <p lang="en-US" className="mt-4 text-base text-slate-300">
             {word.pronunciation}
           </p>
+        )}
+
+        {/* 한글 발음을 발음기호 아래 줄에 둔다. 옆에 붙이면 폰 폭에서
+            넘친다 - 둘 다 짧지 않고 발음기호는 줄바꿈이 어색하다.
+            lang 을 en-US 로 두지 않는 이유: 한글이라 한국어 글꼴로
+            그려져야 하고, 스크린리더도 한국어로 읽어야 한다. */}
+        {word.reading && (
+          <Reading
+            text={word.reading}
+            className="mt-1.5 block text-base text-slate-400"
+          />
         )}
 
         <p className="mt-5 text-xl leading-snug font-semibold tracking-tight text-slate-100">

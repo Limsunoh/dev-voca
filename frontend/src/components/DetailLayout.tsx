@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Reading } from "./Reading";
 
 /**
  * 단어·문장 상세의 공통 뼈대.
@@ -55,12 +56,20 @@ export function DetailShell({ children }: { children: React.ReactNode }) {
 export function DetailHero({
   title,
   aside,
+  reading,
   meta,
   mono = true,
 }: {
   title: string;
   /** 제목 옆 보조 문구. 발음기호 같은 것. */
   aside?: string;
+  /**
+   * 한글 발음. 발음기호 아래 줄에 온다.
+   *
+   * aside 를 ReactNode 로 넓히지 않는 이유는 LearningCard 와 같다 -
+   * 그 자리에 lang="en-US" 가 걸려 있다.
+   */
+  reading?: string;
   /** 난이도·분류 배지 줄. */
   meta?: React.ReactNode;
   /** 제목을 고정폭으로 둘지. 단어는 true, 사람이 쓴 문장은 false. */
@@ -109,6 +118,13 @@ export function DetailHero({
         >
           {aside}
         </p>
+      )}
+
+      {reading && (
+        <Reading
+          text={reading}
+          className="rise mt-1.5 block text-lg text-slate-400 [animation-delay:80ms]"
+        />
       )}
 
       {meta && (

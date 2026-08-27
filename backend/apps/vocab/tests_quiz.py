@@ -1156,6 +1156,7 @@ class GradeResponseShapeTest(TestCase):
                 "id",
                 "term",
                 "pronunciation",
+                "reading",
                 "meaning",
                 "description",
                 "example",

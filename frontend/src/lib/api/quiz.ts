@@ -60,6 +60,8 @@ export type GradeResult = {
     id: number;
     term: string;
     pronunciation: string;
+    /** 한글 발음. 검수 안 됐으면 빈 문자열이다(백엔드가 거른다). */
+    reading: string;
     meaning: string;
     description: string;
     example: string;
