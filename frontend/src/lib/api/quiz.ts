@@ -2,7 +2,19 @@ import { buildQuery, request } from "./client";
 
 /** 문제풀기 API 클라이언트. 공통 규칙은 client.ts 에 있다. */
 
-const BASE = "/api/vocab/words/";
+/**
+ * 어느 콘텐츠로 문제를 내는가.
+ *
+ * 백엔드가 콘텐츠마다 quiz/grade 를 따로 갖고 있다. 경로만 다르고
+ * 주고받는 모양은 같아서 이 한 값으로 가른다 - 에러 메시지·아티클이
+ * 붙어도 여기에 한 줄만 늘어난다.
+ */
+export type QuizContent = "words" | "sentences";
+
+const BASE: Record<QuizContent, string> = {
+  words: "/api/vocab/words/",
+  sentences: "/api/vocab/sentences/",
+};
 
 /** 보기 하나. */
 export type QuizChoice = {
@@ -17,7 +29,7 @@ export type QuizChoice = {
  * 대신 서명된 token 을 받아 채점할 때 그대로 돌려준다.
  */
 export type Question = {
-  /** meaning / term / description */
+  /** 단어: meaning / term / description. 문장: blank / situation */
   kind: string;
   kind_label: string;
   /** "이 단어의 뜻은?" 같은 물음. */
@@ -29,6 +41,16 @@ export type Question = {
   choices: QuizChoice[];
   /** 정답을 서명한 값. 읽을 수 없고 채점할 때 그대로 보낸다. */
   token: string;
+  /**
+   * 정답이 무엇의 id 인가. 문장 문제에만 온다.
+   *
+   * 빈칸 채우기는 문장을 보여주지만 답은 단어다. 그래서 지문의 종류와
+   * 정답의 종류가 다르고, 방금 낸 것을 다시 안 내려면 문장 id 를 따로
+   * 봐야 한다(source_sentence_id).
+   */
+  answer_type?: "word" | "sentence";
+  /** 빈칸 문제를 낸 문장. 다음 문제의 exclude 에 쓴다. */
+  source_sentence_id?: number | null;
 };
 
 export type QuizParams = {
@@ -43,8 +65,11 @@ export type QuizParams = {
  *
  * cache() 로 감싸지 않는다. 같은 조건이라도 매번 다른 문제가 나와야 한다.
  */
-export function getQuestion(params: QuizParams = {}): Promise<Question> {
-  return request(`${BASE}quiz/${buildQuery(params)}`);
+export function getQuestion(
+  params: QuizParams = {},
+  content: QuizContent = "words",
+): Promise<Question> {
+  return request(`${BASE[content]}quiz/${buildQuery(params)}`);
 }
 
 /**
@@ -53,10 +78,34 @@ export function getQuestion(params: QuizParams = {}): Promise<Question> {
  * 단어 상세보다 좁다. 채점은 로그인 없이 되는 경로라 백엔드가
  * 검수 상태나 출처 같은 내부 정보를 빼고 보낸다.
  */
+/** 채점 뒤 보여줄 정답 문장. 상황 고르기가 이걸 받는다. */
+export type GradedSentence = {
+  id: number;
+  text: string;
+  reading: string;
+  translation: string;
+  /** 이 말이 나오는 상황. 상황 고르기의 정답 보기가 이 값이다. */
+  context: string;
+  description: string;
+  kind: string;
+  kind_label: string;
+  category: string;
+};
+
 export type GradeResult = {
   correct: boolean;
   answer_id: number;
-  word: {
+  /**
+   * 정답이 무엇인가. 없으면 단어다(옛 응답 호환).
+   *
+   * 빈칸 채우기는 문장 문제인데 정답은 단어라, 화면이 이 값을 보고
+   * 어느 쪽 해설을 그릴지 고른다.
+   */
+  answer_type?: "word" | "sentence";
+  /** 정답이 문장일 때만 온다. */
+  sentence?: GradedSentence;
+  /** 정답이 단어일 때 온다. */
+  word?: {
     id: number;
     term: string;
     pronunciation: string;
@@ -79,8 +128,9 @@ export type GradeResult = {
 export async function gradeAnswer(
   token: string,
   pickedId: number,
+  content: QuizContent = "words",
 ): Promise<GradeResult> {
-  return request(`${BASE}grade/`, {
+  return request(`${BASE[content]}grade/`, {
     method: "POST",
     body: { token, picked: pickedId },
   });

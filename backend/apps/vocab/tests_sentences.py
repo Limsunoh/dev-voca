@@ -16,9 +16,12 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .management.commands.seed_sentences import RETIRED_SLUGS, SENTENCES
-from .models import Sentence, SentenceKind
+from .models import Sentence, SentenceKind, Word
 
 LIST_URL = "/api/vocab/sentences/"
+QUIZ_URL = f"{LIST_URL}quiz/"
+GRADE_URL = f"{LIST_URL}grade/"
+WORD_GRADE_URL = "/api/vocab/words/grade/"
 
 
 class SentenceModelTest(TestCase):
@@ -394,3 +397,181 @@ class SentenceAPITest(TestCase):
 
     def test_reverse_url_matches_hardcoded_path(self):
         self.assertEqual(reverse("vocab:sentence-list"), LIST_URL)
+
+
+class SentenceQuizTest(TestCase):
+    """문장 낱개 문제풀기.
+
+    일일공부·복습이 이미 같은 생성 함수를 쓰지만 그쪽은 로그인 뒤 경로다.
+    여기는 익명으로 열려 있고 채점까지 하므로 따로 확인한다.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # 상황 고르기는 context 가 있어야, 빈칸 채우기는 문장 안에 단어가
+        # 있어야 낼 수 있다. 보기가 넷이라 각각 넷 이상 필요하다.
+        for i in range(6):
+            Sentence.objects.create(
+                text=f"Deploy the service to staging {i}.",
+                translation=f"스테이징에 배포합니다 {i}",
+                context=f"배포를 알릴 때 {i}",
+                kind=SentenceKind.PHRASE,
+                is_reviewed=True,
+            )
+        for i in range(6):
+            Word.objects.create(
+                term=f"rollback{i}",
+                meaning=f"되돌리기 {i}",
+                is_reviewed=True,
+            )
+            Sentence.objects.create(
+                text=f"We should rollback{i} the release.",
+                translation=f"배포를 되돌려야 합니다 {i}",
+                context=f"장애 대응 {i}",
+                kind=SentenceKind.PHRASE,
+                is_reviewed=True,
+            )
+
+    def test_anonymous_can_get_a_question(self):
+        """로그인 없이 둘러보는 경로에도 문제풀이가 있다."""
+        res = self.client.get(QUIZ_URL)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(res.json()["kind"], ("blank", "situation"))
+
+    def test_question_carries_no_answer(self):
+        """정답을 응답에 담으면 개발자도구로 미리 보인다."""
+        body = self.client.get(QUIZ_URL).json()
+
+        self.assertNotIn("answer_id", body)
+        self.assertIn("token", body)
+
+    def test_unknown_kind_is_rejected(self):
+        """단어 유형을 문장 쪽에 넣으면 지문과 묻는 말이 어긋난다."""
+        res = self.client.get(QUIZ_URL, {"kind": "meaning"})
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_unknown_category_is_rejected(self):
+        res = self.client.get(QUIZ_URL, {"category": "그런분류없음"})
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_unreviewed_sentences_are_never_asked(self):
+        """검수 안 된 내용을 정답이라고 채점하면 그대로 잘못 외운다."""
+        Sentence.objects.update(is_reviewed=False)
+
+        res = self.client.get(QUIZ_URL)
+
+        self.assertEqual(res.status_code, 404)
+
+    def test_blank_question_answers_with_a_word(self):
+        """빈칸 채우기는 문장을 보여주지만 정답은 단어다."""
+        body = self.client.get(QUIZ_URL, {"kind": "blank"}).json()
+
+        self.assertEqual(body["kind"], "blank")
+        self.assertEqual(body["answer_type"], "word")
+        # 어느 문장에서 냈는지 알려줘야 화면이 그 문장을 다시 안 낸다.
+        self.assertIsNotNone(body["source_sentence_id"])
+        self.assertIn("____", body["prompt"])
+
+    def test_situation_question_answers_with_a_sentence(self):
+        body = self.client.get(QUIZ_URL, {"kind": "situation"}).json()
+
+        self.assertEqual(body["kind"], "situation")
+        self.assertEqual(body["answer_type"], "sentence")
+
+    def _solve(self, kind: str) -> dict:
+        """문제를 받아 보기 넷을 다 넣어보고 정답이 나온 응답을 돌려준다."""
+        body = self.client.get(QUIZ_URL, {"kind": kind}).json()
+        for choice in body["choices"]:
+            res = self.client.post(
+                GRADE_URL,
+                {"token": body["token"], "picked": choice["id"]},
+                content_type="application/json",
+            )
+            self.assertEqual(res.status_code, 200)
+            if res.json()["correct"]:
+                return res.json()
+        self.fail("보기 넷 중에 정답이 없었다")
+
+    def test_grading_a_blank_question_explains_the_word(self):
+        graded = self._solve("blank")
+
+        self.assertEqual(graded["answer_type"], "word")
+        self.assertIn("word", graded)
+        self.assertNotIn("sentence", graded)
+
+    def test_grading_a_situation_question_explains_the_sentence(self):
+        graded = self._solve("situation")
+
+        self.assertEqual(graded["answer_type"], "sentence")
+        self.assertIn("sentence", graded)
+        # 상황 고르기는 이 값이 정답 보기라 채점 뒤에도 보여줘야 한다.
+        self.assertTrue(graded["sentence"]["context"])
+
+    def test_grade_hides_review_workflow_fields(self):
+        """채점은 익명 경로다. 무엇이 AI 생성인지 알려주지 않는다."""
+        graded = self._solve("situation")
+
+        self.assertNotIn("is_reviewed", graded["sentence"])
+        self.assertNotIn("source", graded["sentence"])
+
+    def test_a_sentence_token_cannot_be_graded_as_a_word(self):
+        """토큰 salt 가 단어·문장 공용이라 남의 토큰도 풀린다.
+
+        종류를 안 보면 정답 id 가 Sentence pk 인 채로 Word 를 조회해,
+        같은 번호의 엉뚱한 단어가 응답에 실린다. 보기를 돌려가며 부르면
+        pk 로 표를 훑는 통로가 되고, 미검수 단어는 404 라 검수 상태까지
+        드러난다.
+        """
+        body = self.client.get(QUIZ_URL, {"kind": "situation"}).json()
+
+        for choice in body["choices"]:
+            res = self.client.post(
+                WORD_GRADE_URL,
+                {"token": body["token"], "picked": choice["id"]},
+                content_type="application/json",
+            )
+            self.assertEqual(
+                res.status_code,
+                400,
+                "문장 토큰이 단어 채점에서 받아들여졌다",
+            )
+            self.assertNotIn("word", res.json())
+
+    def test_bad_token_is_rejected(self):
+        res = self.client.post(
+            GRADE_URL,
+            {"token": "아무거나", "picked": 1},
+            content_type="application/json",
+        )
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_non_dict_body_does_not_crash(self):
+        """본문 전체가 사용자 입력이다. 배열이어도 500 이 나면 안 된다."""
+        res = self.client.post(
+            GRADE_URL, [1, 2, 3], content_type="application/json"
+        )
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_true_is_not_treated_as_choice_one(self):
+        """파이썬에서 True 는 int 라 1 번 보기를 고른 것이 될 수 있다."""
+        body = self.client.get(QUIZ_URL).json()
+
+        res = self.client.post(
+            GRADE_URL,
+            {"token": body["token"], "picked": True},
+            content_type="application/json",
+        )
+
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(res.json()["correct"])
+
+    def test_exclude_is_capped(self):
+        """긴 문자열을 보내 pk__in 을 무겁게 만들 수 없다."""
+        res = self.client.get(QUIZ_URL, {"exclude": ",".join(str(i) for i in range(5000))})
+
+        self.assertIn(res.status_code, (200, 404))

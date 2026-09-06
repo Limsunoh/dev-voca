@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Burst } from "@/components/Burst";
-import type { GradeResult, Question } from "@/lib/api/quiz";
+import type { GradeResult, QuizContent, Question } from "@/lib/api/quiz";
 import { Reading } from "./Reading";
 
 /**
@@ -14,10 +14,12 @@ import { Reading } from "./Reading";
 async function fetchQuestion(params: {
   category?: string;
   exclude?: string;
+  content: QuizContent;
 }): Promise<Question> {
   const query = new URLSearchParams();
   if (params.category) query.set("category", params.category);
   if (params.exclude) query.set("exclude", params.exclude);
+  if (params.content !== "words") query.set("content", params.content);
 
   const res = await fetch(`/api/quiz?${query}`, { cache: "no-store" });
   if (!res.ok) throw new Error(String(res.status));
@@ -27,8 +29,12 @@ async function fetchQuestion(params: {
 async function submitAnswer(
   token: string,
   picked: number,
+  content: QuizContent,
 ): Promise<GradeResult> {
-  const res = await fetch("/api/quiz", {
+  // 채점도 같은 콘텐츠로 보낸다. 문장 문제를 단어 쪽에 채점시키면
+  // 토큰은 유효한데 정답을 엉뚱한 표에서 찾는다.
+  const query = content === "words" ? "" : `?content=${content}`;
+  const res = await fetch(`/api/quiz${query}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, picked }),
@@ -86,9 +92,11 @@ function tabBarHeight(): number {
 type Props = {
   /** 분류를 좁힐 때. 없으면 전체에서 낸다. */
   category?: string;
+  /** 무엇으로 문제를 낼지. 기본은 단어. */
+  content?: QuizContent;
 };
 
-export function QuizBoard({ category }: Props) {
+export function QuizBoard({ category, content = "words" }: Props) {
   const [question, setQuestion] = useState<Question | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
   const [result, setResult] = useState<GradeResult | null>(null);
@@ -155,6 +163,7 @@ export function QuizBoard({ category }: Props) {
         const q = await fetchQuestion({
           category,
           exclude: recentRef.current.join(","),
+          content,
         });
         setQuestion(q);
       } catch (e) {
@@ -172,7 +181,7 @@ export function QuizBoard({ category }: Props) {
         loadingRef.current = false;
       }
     },
-    [category],
+    [category, content],
   );
 
   // 첫 문제. 화면은 그대로 둔다 - 분류 칩을 누르고 온 자리일 수 있다.
@@ -290,7 +299,7 @@ export function QuizBoard({ category }: Props) {
 
     setPicked(choiceId);
     try {
-      const graded = await submitAnswer(question.token, choiceId);
+      const graded = await submitAnswer(question.token, choiceId, content);
       setResult(graded);
       setScore((s) => ({
         solved: s.solved + 1,
@@ -312,8 +321,23 @@ export function QuizBoard({ category }: Props) {
       //
       // 맞힌 것만 제외 목록에 넣는다. 틀린 단어야말로 다시 봐야 하는데
       // 여기에 넣으면 그 세션에서 가장 확실하게 안 나오는 단어가 된다.
+      //
+      // **무엇의 id 를 넣느냐가 유형마다 다르다.** 백엔드의 exclude 는
+      // 그 콘텐츠의 id 를 기대하는데, 정답의 종류가 늘 그것과 같지는 않다.
+      //
+      //   단어 문제      answer_id 가 단어 id      -> 그대로
+      //   상황 고르기    answer_id 가 문장 id      -> 그대로
+      //   빈칸 채우기    answer_id 가 단어 id인데   -> 낸 문장을 따로 쓴다
+      //                  걸러야 할 것은 문장이다
+      //
+      // 마지막 줄이 핵심이다. 그대로 넣으면 문장이 안 걸러져 같은 문장이
+      // 다시 나오고, 어쩌다 그 번호의 다른 문장이 조용히 빠진다.
       if (graded.correct) {
-        recentRef.current = [graded.answer_id, ...recentRef.current].slice(
+        const excludeId =
+          question.answer_type === "word" && question.source_sentence_id
+            ? question.source_sentence_id
+            : graded.answer_id;
+        recentRef.current = [excludeId, ...recentRef.current].slice(
           0,
           RECENT_LIMIT,
         );
@@ -513,6 +537,28 @@ function Prompt({ kind, text }: { kind: string; text: string }) {
     );
   }
 
+  // 문장 지문은 고정폭으로, 크기도 한 급 낮춘다.
+  //
+  // 에러 메시지와 실무 표현이라 코드에 가깝다 - 같은 문자열을 아래 해설이
+  // 이미 고정폭으로 그리고 있어서, 지문만 본문체면 한 화면에서 같은 문장이
+  // 두 서체로 나온다. 단어 목록·상세가 쓰는 것과 같은 구분이다.
+  //
+  // 크기를 3xl 로 두지 않는 이유: 지문이 한 줄짜리 문장이라 단어 하나보다
+  // 훨씬 길다. "IndexError: list ____ out of range" 가 390px 에서 세 줄로
+  // 감기고, 그러면 보기 넷이 첫 화면에서 밀린다.
+  //
+  // lang 은 한글 폰트가 라틴·기호를 잘못 렌더하는 것을 막는다.
+  if (kind === "blank" || kind === "situation") {
+    return (
+      <p
+        lang="en"
+        className="mt-3 font-mono text-xl leading-snug font-bold text-slate-50"
+      >
+        {text}
+      </p>
+    );
+  }
+
   // 홈의 "오늘의 단어" 와 같은 급으로 둔다. 이 화면에서 가장 먼저 읽어야
   // 할 것이 문제이므로, 필터 칩 줄보다 확실히 커야 눈이 여기서 멈춘다.
   //
@@ -652,7 +698,14 @@ function ChoiceButton({
 }
 
 function Explanation({ result }: { result: GradeResult }) {
-  const { word } = result;
+  const { word, sentence } = result;
+
+  // 정답이 무엇이냐에 따라 보여줄 것이 다르다. 빈칸 채우기는 문장 문제인데
+  // 정답은 단어라, 유형이 아니라 정답의 종류로 갈라야 한다.
+  //
+  // 둘 다 없으면 아무것도 그리지 않는다. 백엔드가 항상 하나는 주지만,
+  // 없는 채로 그리면 "정답은 이것입니다" 아래가 비어 더 혼란스럽다.
+  if (!word && !sentence) return null;
 
   return (
     // 채점 결과는 버튼 색으로만 알리면 화면을 못 보는 사람에게 안 닿는다.
@@ -680,6 +733,16 @@ function Explanation({ result }: { result: GradeResult }) {
         {result.correct ? "맞았습니다" : "정답은 이것입니다"}
       </p>
 
+      {word ? <WordAnswer word={word} /> : null}
+      {sentence ? <SentenceAnswer sentence={sentence} /> : null}
+    </section>
+  );
+}
+
+/** 정답이 단어일 때. 뜻 고르기·단어 고르기·설명 문제와 빈칸 채우기가 쓴다. */
+function WordAnswer({ word }: { word: NonNullable<GradeResult["word"]> }) {
+  return (
+    <>
       <div className="mt-2 flex flex-wrap items-baseline gap-2">
         <h3 className="font-mono text-xl font-bold text-slate-50">
           {word.term}
@@ -715,6 +778,45 @@ function Explanation({ result }: { result: GradeResult }) {
           )}
         </div>
       )}
-    </section>
+    </>
+  );
+}
+
+/**
+ * 정답이 문장일 때. 상황 고르기가 쓴다.
+ *
+ * 단어와 순서가 다르다. 상황 고르기는 **상황이 정답 보기**라 그걸 먼저
+ * 크게 보여주고, 그 아래에 무슨 문장이었는지를 둔다. 문장을 위에 두면
+ * 방금 지문에서 읽은 것을 한 번 더 읽게 된다.
+ */
+function SentenceAnswer({
+  sentence,
+}: {
+  sentence: NonNullable<GradeResult["sentence"]>;
+}) {
+  return (
+    <>
+      <h3 className="mt-2 text-xl font-bold text-slate-50">
+        {sentence.context}
+      </h3>
+
+      {/* 문장 본문은 고정폭이다. 에러 메시지와 실무 표현이라 코드에 가깝다.
+          단어 목록·상세가 쓰는 것과 같은 구분이다. */}
+      <p lang="en" className="mt-3 font-mono text-sm text-slate-200">
+        {sentence.text}
+      </p>
+      {sentence.reading && (
+        <Reading text={sentence.reading} className="mt-1 block text-slate-400" />
+      )}
+      {sentence.translation && (
+        <p className="mt-1 text-sm text-slate-400">{sentence.translation}</p>
+      )}
+
+      {sentence.description && (
+        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-300">
+          {sentence.description}
+        </p>
+      )}
+    </>
   );
 }

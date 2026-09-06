@@ -49,6 +49,8 @@ export const routes = {
    * 섞여 있다는 것을 알고 놓으라고 적어둔다.
    */
   testWords: "/test/words",
+  /** 문장 낱개 문제풀기. 빈칸 채우기와 상황 고르기가 나온다. */
+  testSentences: "/test/sentences",
   /** 90초 한 판. 점수가 순위표에 오른다. */
   testRound: "/test/round",
   /** 하루 한 번 일일공부. 로그인이 필요하다. */
@@ -148,16 +150,16 @@ export const learningModes: LearningMode[] = [
  * 없는 막다른 화면이 된다.
  *
  * 경로 앞부분으로 거르지 않고 하나씩 적는 이유: "/test/" 로 시작하는 것을
- * 전부 숨겼더니 판이 없는 화면까지 걸렸다. /test/sentences 는 "준비 중"
- * 안내만 있고, /test/words 의 error.tsx 는 문제를 못 불러왔을 때 뜬다.
- * 둘 다 지킬 점수가 없는데 탭바가 사라져서, 특히 에러 화면은 그 안에
- * 링크가 있느냐에 따라 막다른 곳이 됐다.
+ * 전부 숨겼더니 판이 없는 화면까지 걸렸다. /test/words 의 error.tsx 는
+ * 문제를 못 불러왔을 때 뜨는데, 지킬 점수가 없으면서 탭바만 사라져서
+ * 그 안에 링크가 있느냐에 따라 막다른 곳이 됐다.
  *
  * 새 문제 화면을 만들면 여기 한 줄을 더한다. 빠뜨리면 탭바가 남아
  * 연출이 어긋날 뿐이지만, 반대(자동으로 숨김)는 빠뜨렸을 때 갇힌다.
  */
 export const immersiveRoutes: readonly string[] = [
   routes.testWords,
+  routes.testSentences,
   routes.testRound,
 ];
 

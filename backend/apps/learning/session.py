@@ -343,6 +343,9 @@ def _issue(state: dict, now: datetime) -> dict | None:
     if question is None:
         return None
 
+    # 정답 종류는 아래 "tt" 로 따로 담는다. answer_payload 가 넣는 "at" 은
+    # 이 판에서 아무도 안 읽는다 - 낱개 채점(vocab 의 grade)이 쓰는 값이고,
+    # 여기는 resolve_answer 를 직접 불러 종류를 자기 상태에서 꺼낸다.
     payload = quiz.answer_payload(question.answer_id, [c.id for c in question.choices])
     state["q"] = {
         **payload,

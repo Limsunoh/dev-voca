@@ -132,6 +132,34 @@ class QuizWordSerializer(serializers.ModelSerializer):
         ]
 
 
+class QuizSentenceSerializer(serializers.ModelSerializer):
+    """채점 후 해설용. 단어 쪽 QuizWordSerializer 와 같은 이유로 필드를 좁힌다.
+
+    상세 시리얼라이저를 그대로 쓰면 is_reviewed 와 source 까지 나간다.
+    채점은 로그인 없이 되는 경로라, 어떤 항목이 AI 생성인지 같은 검수
+    워크플로우 내부 정보를 익명에게 흘리지 않는다.
+    """
+
+    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    reading = ReviewedReadingField()
+
+    class Meta:
+        model = Sentence
+        fields = [
+            "id",
+            "text",
+            "reading",
+            "translation",
+            # 상황 고르기는 이 값이 정답 보기다. 채점 뒤에도 보여줘야
+            # 무엇을 골랐어야 했는지 읽을 수 있다.
+            "context",
+            "description",
+            "kind",
+            "kind_label",
+            "category",
+        ]
+
+
 class WordDetailSerializer(
     UnreviewOnContentChangeMixin, serializers.ModelSerializer
 ):

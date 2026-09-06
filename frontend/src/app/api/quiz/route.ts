@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { ApiError } from "@/lib/api/client";
-import { getQuestion, gradeAnswer } from "@/lib/api/quiz";
+import { getQuestion, gradeAnswer, type QuizContent } from "@/lib/api/quiz";
 
 /**
  * 문제풀기 중계.
@@ -15,16 +15,29 @@ import { getQuestion, gradeAnswer } from "@/lib/api/quiz";
  * Next 서버가 대신한다.
  */
 
+/**
+ * ?content=sentences 로 무엇을 풀지 고른다. 없으면 단어다.
+ *
+ * 화이트리스트로 받는 이유: 이 값이 백엔드 경로가 된다. 그대로 넘기면
+ * 임의의 경로를 부르게 만들 수 있다.
+ */
+function toContent(raw: string | null): QuizContent {
+  return raw === "sentences" ? "sentences" : "words";
+}
+
 /** 문제 받기. */
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
 
   try {
-    const question = await getQuestion({
-      category: params.get("category") ?? undefined,
-      kind: params.get("kind") ?? undefined,
-      exclude: params.get("exclude") ?? undefined,
-    });
+    const question = await getQuestion(
+      {
+        category: params.get("category") ?? undefined,
+        kind: params.get("kind") ?? undefined,
+        exclude: params.get("exclude") ?? undefined,
+      },
+      toContent(params.get("content")),
+    );
     return NextResponse.json(question);
   } catch (error) {
     return errorResponse(error);
@@ -50,7 +63,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await gradeAnswer(body.token, body.picked);
+    // 채점도 같은 콘텐츠로 보내야 한다. 문장 문제를 단어 쪽에 채점시키면
+    // 토큰은 유효한데 정답을 엉뚱한 표에서 찾는다.
+    const content = toContent(new URL(request.url).searchParams.get("content"));
+    const result = await gradeAnswer(body.token, body.picked, content);
     return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error);
