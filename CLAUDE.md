@@ -208,6 +208,41 @@ py ~/.claude/hooks/record_verification.py qa --skip --note 'UI 변경 없음 - �
 
 **코드를 고치면 지문이 무효가 되어 정적 검증부터 다시** 돌려야 한다. 이건 버그가 아니라 "검증한 뒤 몰래 수정" 을 막는 설계다.
 
+## 코드 구조는 grep 말고 그래프에 묻는다
+
+`graphify-out/graph.json` 에 이 저장소의 **3142 노드 / 5695 엣지** 지도가 있다.
+"무엇이 무엇을 부르는가" 는 여기서 답이 나온다. 토큰 비용 0(로컬 AST)이고
+질문 하나에 몇 초다.
+
+```
+graphify explain "app/page.tsx"        # 이 파일이 무엇을 import 하고 누가 부르나
+graphify explain "DailyStudy"          # 이 모델을 누가 쓰나
+graphify path "QuizBoard.tsx" "Word"   # 둘 사이가 어떻게 이어지나
+graphify query "복습 점수는 어디서 계산되나"
+```
+
+**언제 쓰나** - 파일을 고치기 전에 "이걸 누가 쓰나" 를 물을 때, 기능이
+있는지 없는지 확인할 때, 어디에 붙일지 자리를 찾을 때.
+
+**왜 이 규칙이 있나**: 2026-09-06 에 홈 화면을 고치겠다며 `learning` 앱이
+없다고 단정했다. 있었다. `DailyCard` 가 이미 홈에 렌더되는 것도 못 봤다 -
+`{user && ...}` 안에 있어서 게스트로 본 화면에는 안 떴는데, 그것을 "기능이
+없다" 로 읽었다. 둘 다 `grep` 으로 파일 몇 개만 보고 내린 결론이었고,
+`graphify explain "app/page.tsx"` 한 줄이면 36개 연결이 다 나왔다.
+
+**코드를 바꾼 뒤에는 갱신한다.** 안 하면 지도가 옛 코드를 가리킨다.
+
+```
+graphify . --update --code-only --no-viz   # 증분, API 키 불필요
+graphify cluster-only .                    # 리포트까지 다시
+```
+
+`--code-only` 를 빼면 문서·이미지까지 훑느라 LLM API 키를 요구한다.
+구조를 물으려는 것이면 코드만으로 충분하다.
+
+GRAPH_REPORT.md 머리에 `Built from commit:` 이 적혀 있다. `git rev-parse HEAD`
+와 다르면 지도가 낡은 것이다.
+
 ## `.claude/CODE_INSIGHTS.md` 를 먼저 읽는다 (조건 없음)
 
 **기능 작업을 시작할 때 무조건 읽는다.** 전역 지침은 "관련 있을 때만" 이지만
