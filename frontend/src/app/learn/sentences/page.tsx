@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { ChoiceFilter } from "@/components/ChoiceFilter";
+import { FilterPanel } from "@/components/FilterPanel";
 import { LearnHeader } from "@/components/LearnHeader";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { LearningCard } from "@/components/LearningCard";
@@ -142,46 +144,61 @@ export default async function SentencesPage({ searchParams }: PageProps) {
 
       {/* 필터 링크에는 시드를 싣지 않는다. 누를 때마다 그 조건 안에서
           새로 섞인 목록이 나온다. */}
-      <ChoiceFilter
-        label="종류"
-        paramName="kind"
-        options={kinds}
-        basePath={routes.sentences}
-        selected={kind}
-        keep={{ search, category, difficulty }}
-      />
+      <FilterPanel active={[kind, difficulty, category]}>
+        <ChoiceFilter
+          label="종류"
+          paramName="kind"
+          options={kinds}
+          basePath={routes.sentences}
+          selected={kind}
+          keep={{ search, category, difficulty }}
+        />
 
-      <ChoiceFilter
-        label="난이도"
-        paramName="difficulty"
-        options={difficulties}
-        basePath={routes.sentences}
-        selected={difficulty}
-        keep={{ search, category, kind }}
-      />
+        <ChoiceFilter
+          label="난이도"
+          paramName="difficulty"
+          options={difficulties}
+          basePath={routes.sentences}
+          selected={difficulty}
+          keep={{ search, category, kind }}
+        />
 
-      <CategoryFilter
-        options={categories}
-        basePath={routes.sentences}
-        selected={category}
-        search={search}
-        difficulty={difficulty}
-        extra={{ kind }}
-      />
+        <CategoryFilter
+          options={categories}
+          basePath={routes.sentences}
+          selected={category}
+          search={search}
+          difficulty={difficulty}
+          extra={{ kind }}
+        />
+      </FilterPanel>
 
-      <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">
+      {/* 여백을 줄인 이유는 learn/words/page.tsx 쪽에 적어뒀다. */}
+      <p className="mt-4 text-sm text-slate-500 dark:text-slate-300">
         {search ? `"${search}" 검색 결과 ` : "전체 "}
         {data.count}개
       </p>
 
       {data.results.length === 0 ? (
-        <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
+        // div 인 이유는 learn/words/page.tsx 쪽에 적어뒀다.
+        <div className="mt-8 flex flex-col items-center rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
           {/* 조건을 걸어 비었을 때 "등록된 문장이 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
-          {search || category || kind || difficulty
-            ? "조건에 맞는 문장이 없습니다. 위에서 조건을 바꿔보세요."
-            : "아직 등록된 문장이 없습니다."}
-        </p>
+          {search || category || kind || difficulty ? (
+            <>
+              <p>조건에 맞는 문장이 없습니다.</p>
+              {/* 접힌 필터를 가리키지 않는다. 이유는 learn/words/page.tsx 참고. */}
+              <Link
+                href={routes.sentences}
+                className="mt-4 inline-flex min-h-11 items-center rounded-full border border-white/40 px-4 text-sm text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              >
+                조건 지우기
+              </Link>
+            </>
+          ) : (
+            <p>아직 등록된 문장이 없습니다.</p>
+          )}
+        </div>
       ) : (
         <ul className="mt-4 grid gap-3">
           {data.results.map((sentence) => (
