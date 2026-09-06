@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { ChoiceFilter } from "@/components/ChoiceFilter";
+import { FilterPanel } from "@/components/FilterPanel";
 import { LearnHeader } from "@/components/LearnHeader";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { LearningCard } from "@/components/LearningCard";
@@ -139,36 +141,60 @@ export default async function VocabPage({ searchParams }: PageProps) {
 
       {/* 필터 링크에는 시드를 싣지 않는다. 그래서 난이도나 분류를 누르면
           그 조건 안에서 새로 섞인 목록이 나온다. */}
-      <ChoiceFilter
-        label="난이도"
-        paramName="difficulty"
-        options={difficulties}
-        basePath={routes.words}
-        selected={difficulty}
-        keep={{ search, category }}
-      />
+      <FilterPanel active={[difficulty, category]}>
+        <ChoiceFilter
+          label="난이도"
+          paramName="difficulty"
+          options={difficulties}
+          basePath={routes.words}
+          selected={difficulty}
+          keep={{ search, category }}
+        />
 
-      <CategoryFilter
-        options={categories}
-        basePath={routes.words}
-        selected={category}
-        search={search}
-        difficulty={difficulty}
-      />
+        <CategoryFilter
+          options={categories}
+          basePath={routes.words}
+          selected={category}
+          search={search}
+          difficulty={difficulty}
+        />
+      </FilterPanel>
 
-      <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">
+      {/* 24px 이던 것을 줄였다. 필터 상자가 테두리를 갖고 있어 그대로 두면
+          사이가 벌어져 보인다. 접혔을 때는 상자가 없지만 그때는 위가 알약
+          하나뿐이라 역시 16px 이 맞다. */}
+      <p className="mt-4 text-sm text-slate-500 dark:text-slate-300">
         {search ? `"${search}" 검색 결과 ` : "전체 "}
         {data.count}개
       </p>
 
       {data.results.length === 0 ? (
-        <p className="mt-8 rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
+        // 바깥이 div 인 이유: 조건을 걸어 비었을 때 안내 아래에 "조건
+        // 지우기" 링크가 붙는데, 그 둘을 p 하나에 넣으면 브라우저가 문단을
+        // 끊는다. 안내 문구는 안쪽에서 다시 p 로 감싼다 - 그래야 문단으로
+        // 읽히고, 두 줄로 접혔을 때 text-center 가 둘째 줄에도 걸린다
+        // (익명 flex 아이템에는 클래스가 안 붙는다).
+        <div className="mt-8 flex flex-col items-center rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
           {/* 분류만 걸어 비었을 때 "등록된 단어가 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
-          {search || category || difficulty
-            ? "조건에 맞는 단어가 없습니다. 위에서 조건을 바꿔보세요."
-            : "아직 등록된 단어가 없습니다."}
-        </p>
+          {search || category || difficulty ? (
+            <>
+              <p>조건에 맞는 단어가 없습니다.</p>
+              {/* 필터가 접혀 있으면 "위에서 조건을 바꿔보세요" 는 안 보이는
+                  것을 가리키게 된다. 조건을 좁히다 0 이 되는 것은 흔한
+                  경로라(분류 9 x 난이도 4) 여기서 바로 풀 수 있게 둔다.
+                  링크라 서버 컴포넌트 그대로이고 접힘과 무관하게 보인다. */}
+              <Link
+                href={routes.words}
+                className="mt-4 inline-flex min-h-11 items-center rounded-full border border-white/40 px-4 text-sm text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              >
+                조건 지우기
+              </Link>
+            </>
+          ) : (
+            <p>아직 등록된 단어가 없습니다.</p>
+          )}
+        </div>
       ) : (
         <ul className="mt-4 grid gap-3">
           {data.results.map((word) => (
