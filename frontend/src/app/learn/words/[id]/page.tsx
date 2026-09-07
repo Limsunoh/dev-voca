@@ -54,6 +54,20 @@ export default async function WordDetailPage({ params }: PageProps) {
                 href={`${routes.words}?category=${encodeURIComponent(word.category)}`}
               />
             )}
+            {/* 상세는 목록 카드와 달리 과목 이름을 통째로 보여준다. 카드에서는
+                자리가 없어 "N과목" 만 잘라 쓰는데, 여기는 그 과목이 무엇인지
+                읽을 공간이 있다. 정처기 준비생은 과목 단위로 공부하므로 그
+                과목만 모아 볼 수 있게 링크로 둔다. */}
+            {word.is_exam && (
+              <CategoryChip
+                label={word.exam_subject_label || "정처기 범위"}
+                href={
+                  word.exam_subject
+                    ? `${routes.words}?is_exam=true&exam_subject=${encodeURIComponent(word.exam_subject)}`
+                    : `${routes.words}?is_exam=true`
+                }
+              />
+            )}
           </>
         }
       />

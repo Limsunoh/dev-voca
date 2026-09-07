@@ -9,8 +9,51 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
+from .management.commands.seed_exam_words import EXAM_WORDS
 from .management.commands.seed_words import WORDS
 from .models import Word
+
+# 저장소에 박힌 단어 **전부**. 전수 검사는 이걸 돈다.
+#
+# **seed 명령이 늘면 여기에 한 덩이를 더한다.** 명령마다 자기 리스트를
+# 갖고 있어서, 안 넣으면 그 명령의 단어는 검사를 통째로 건너뛴다 -
+# is_reviewed=True 로 바로 들어가는 통로라 아무도 안 본 데이터가 그대로
+# 화면에 뜬다. 2026-09-07 에 실제로 그랬고, 합쳐서 돌리자 발음 7개가
+# 잡혔다.
+#
+# **dict 로 맞추는 이유**: 두 리스트의 열 순서가 3번째부터 갈린다.
+#
+#     seed_words       (term, pron, meaning, category,    difficulty, desc, ex, ex_ko)
+#     seed_exam_words  (term, pron, meaning, description, ex, ex_ko, difficulty, category)
+#
+# 위치로 뽑으면 category 자리에 description 이 들어가도 문자열이라 그냥
+# 통과한다. 이름을 붙여두면 새 리스트를 더할 때 어긋난 열이 KeyError 로
+# 드러난다.
+ALL_SEEDED: list[dict] = [
+    {
+        "term": r[0],
+        "pron": r[1],
+        "meaning": r[2],
+        "category": r[3],
+        "difficulty": r[4],
+        "description": r[5],
+        "example": r[6],
+        "example_translation": r[7],
+    }
+    for r in WORDS
+] + [
+    {
+        "term": r[0],
+        "pron": r[1],
+        "meaning": r[2],
+        "description": r[3],
+        "example": r[4],
+        "example_translation": r[5],
+        "difficulty": r[6],
+        "category": r[7],
+    }
+    for r in EXAM_WORDS
+]
 
 
 class WordModelTest(TestCase):
@@ -170,10 +213,13 @@ class SeedWordsTest(TestCase):
 
     def test_data_quality(self):
         """빠진 필드나 잘못된 난이도가 없어야 한다."""
-        terms = [w[0] for w in WORDS]
+        terms = [row["term"] for row in ALL_SEEDED]
         self.assertEqual(len(terms), len(set(terms)), "중복된 단어가 있다")
 
-        for term, pron, meaning, category, difficulty, desc, ex, ex_ko in WORDS:
+        for row in ALL_SEEDED:
+            term, pron, meaning = row["term"], row["pron"], row["meaning"]
+            difficulty, desc = row["difficulty"], row["description"]
+            ex, ex_ko = row["example"], row["example_translation"]
             with self.subTest(term=term):
                 self.assertTrue(term.strip())
                 self.assertTrue(meaning.strip())
@@ -199,7 +245,8 @@ class SeedWordsTest(TestCase):
         형식이 섞이면 화면에서 슬래시가 있다 없다 한다. 확신이 없어 비우는
         것은 허용하되, 적을 거면 형식을 지킨다.
         """
-        for term, pron, *_rest in WORDS:
+        for row in ALL_SEEDED:
+            term, pron = row["term"], row["pron"]
             with self.subTest(term=term):
                 if not pron:
                     continue
@@ -241,7 +288,8 @@ class SeedWordsTest(TestCase):
 
         양쪽 다 1강세를 주면 어디를 세게 읽어야 할지 알 수 없다.
         """
-        for term, pron, *_rest in WORDS:
+        for row in ALL_SEEDED:
+            term, pron = row["term"], row["pron"]
             if not pron or " " not in pron:
                 continue
             with self.subTest(term=term):
@@ -255,7 +303,8 @@ class SeedWordsTest(TestCase):
         분류별 개수 균형은 편집 방침이라 테스트로 고정하지 않는다.
         나중에 특정 분류를 집중적으로 늘리는 것도 정당한 변경이다.
         """
-        for term, _pron, _meaning, category, *_rest in WORDS:
+        for row in ALL_SEEDED:
+            term, category = row["term"], row["category"]
             with self.subTest(term=term):
                 self.assertTrue(category.strip(), f"{term} 에 분류가 없다")
 

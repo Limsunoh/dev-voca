@@ -725,7 +725,7 @@ class DescriptionQuizLeakTest(TestCase):
             )
 
     def test_seed_data_has_no_leaking_description(self):
-        """실제로 배포되는 566개를 전수로 본다.
+        """저장소에 박힌 단어를 전수로 본다.
 
         단위 테스트는 만들어 넣은 문장만 보므로, 실데이터의 예상 못 한
         모양을 못 잡는다. 실제로 괄호가 낀 "Atomicity(원자성),
@@ -741,13 +741,17 @@ class DescriptionQuizLeakTest(TestCase):
         여기서 잡히지만 코드로는 못 지운다 - 그때는 설명 문장을 고쳐야
         한다. 코드 검사가 아니라 데이터 품질 검사에 가깝다.
         """
-        from .management.commands.seed_words import WORDS
+        # tests.py 가 두 seed 리스트를 이름으로 맞춰 합쳐둔 것을 쓴다.
+        # 여기서 WORDS 만 보면 seed_exam_words 의 단어는 이 검사를
+        # 건너뛰는데, 그쪽에 "black box"·"test case" 같은 두 낱말 구가
+        # 많아 마스킹이 특히 새기 쉽다.
+        from .tests import ALL_SEEDED
 
         word_pattern = re.compile(r"[A-Za-z]['’A-Za-z]*")
         leaks = []
 
-        for row in WORDS:
-            term, description = row[0], row[5]
+        for row in ALL_SEEDED:
+            term, description = row["term"], row["description"]
             if not description:
                 continue
 

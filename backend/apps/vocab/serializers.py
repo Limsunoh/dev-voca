@@ -90,6 +90,9 @@ class WordListSerializer(serializers.ModelSerializer):
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
     # 화면은 이 라벨만 쓴다. category(영어 코드)는 필터 링크를 만들 때 필요해서 함께 준다.
     category_label = serializers.CharField(source="get_category_display", read_only=True)
+    exam_subject_label = serializers.CharField(
+        source="get_exam_subject_display", read_only=True
+    )
     reading = ReviewedReadingField()
 
     class Meta:
@@ -104,6 +107,12 @@ class WordListSerializer(serializers.ModelSerializer):
             "difficulty_label",
             "category",
             "category_label",
+            # 카드에 "정처기" 배지를 달려면 목록에도 있어야 한다. 과목은
+            # 목록에서 안 쓰지만 같이 내려보낸다 - 상세로 들어가지 않고도
+            # 몇 과목인지 보이는 편이 훑을 때 낫다.
+            "is_exam",
+            "exam_subject",
+            "exam_subject_label",
         ]
 
 
@@ -130,6 +139,40 @@ class QuizWordSerializer(serializers.ModelSerializer):
             "example_translation",
             "category",
         ]
+
+
+class ExamScopeValidationMixin:
+    """정처기 범위와 과목이 앞뒤가 맞는지 본다.
+
+    DB 에도 같은 제약(CheckConstraint)이 있지만 그건 최후 방어라, 거기까지
+    가면 IntegrityError 가 500 으로 나간다. 관리자가 Admin 이 아니라 API 로
+    과목만 보내는 것은 흔한 실수이므로 여기서 400 과 이유를 준다.
+
+    부분 수정(PATCH)도 봐야 해서 인스턴스의 현재 값과 합쳐서 판단한다 -
+    이미 정처기인 항목에 과목만 보내는 것은 정상이다.
+    """
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        current = getattr(self, "instance", None)
+        is_exam = attrs.get(
+            "is_exam", getattr(current, "is_exam", False) if current else False
+        )
+        subject = attrs.get(
+            "exam_subject", getattr(current, "exam_subject", "") if current else ""
+        )
+
+        if subject and not is_exam:
+            raise serializers.ValidationError(
+                {
+                    "exam_subject": [
+                        "정처기 범위가 아닌 항목에는 과목을 넣을 수 없습니다. "
+                        "is_exam 을 먼저 켜세요."
+                    ]
+                }
+            )
+        return attrs
 
 
 class QuizSentenceSerializer(serializers.ModelSerializer):
@@ -161,12 +204,15 @@ class QuizSentenceSerializer(serializers.ModelSerializer):
 
 
 class WordDetailSerializer(
-    UnreviewOnContentChangeMixin, serializers.ModelSerializer
+    ExamScopeValidationMixin, UnreviewOnContentChangeMixin, serializers.ModelSerializer
 ):
     """상세 조회 + 생성/수정 공용."""
 
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
     category_label = serializers.CharField(source="get_category_display", read_only=True)
+    exam_subject_label = serializers.CharField(
+        source="get_exam_subject_display", read_only=True
+    )
     # 읽기 전용이다. API 로 고치게 하면 고쳤을 때 reading_reviewed 를
     # 되돌리는 처리가 또 필요한데, 발음은 Admin 에서만 손보므로 그 경로를
     # 아예 안 만든다.
@@ -189,6 +235,9 @@ class WordDetailSerializer(
             "difficulty_label",
             "category",
             "category_label",
+            "is_exam",
+            "exam_subject",
+            "exam_subject_label",
             "source",
             "is_reviewed",
             "created_at",
@@ -231,6 +280,9 @@ class SentenceListSerializer(serializers.ModelSerializer):
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
     category_label = serializers.CharField(source="get_category_display", read_only=True)
     kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    exam_subject_label = serializers.CharField(
+        source="get_exam_subject_display", read_only=True
+    )
     reading = ReviewedReadingField()
 
     class Meta:
@@ -247,17 +299,24 @@ class SentenceListSerializer(serializers.ModelSerializer):
             "difficulty_label",
             "category",
             "category_label",
+            # 카드에 정처기 배지를 달려면 목록에도 있어야 한다.
+            "is_exam",
+            "exam_subject",
+            "exam_subject_label",
         ]
 
 
 class SentenceDetailSerializer(
-    UnreviewOnContentChangeMixin, serializers.ModelSerializer
+    ExamScopeValidationMixin, UnreviewOnContentChangeMixin, serializers.ModelSerializer
 ):
     """상세 조회 + 생성/수정 공용."""
 
     difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
     category_label = serializers.CharField(source="get_category_display", read_only=True)
     kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    exam_subject_label = serializers.CharField(
+        source="get_exam_subject_display", read_only=True
+    )
     reading = ReviewedReadingField()
 
     class Meta:
@@ -275,6 +334,9 @@ class SentenceDetailSerializer(
             "difficulty_label",
             "category",
             "category_label",
+            "is_exam",
+            "exam_subject",
+            "exam_subject_label",
             "source",
             "is_reviewed",
             "created_at",
