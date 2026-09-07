@@ -16,7 +16,32 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .management.commands.seed_sentences import RETIRED_SLUGS, SENTENCES
+from .management.commands.seed_sentences_more import SENTENCES as MORE_SENTENCES
 from .models import Sentence, SentenceKind, Word
+
+# 저장소에 박힌 문장 전부. 전수 검사는 이걸 돈다.
+#
+# **seed 명령이 늘면 여기에 한 덩이를 더한다.** 단어 쪽 tests.py 의
+# ALL_SEEDED 와 같은 이유다 - 명령마다 자기 리스트를 갖고 있어서, 안 넣으면
+# 그 명령의 문장은 검사를 통째로 건너뛴다. is_reviewed=True 로 바로 들어가는
+# 통로라 아무도 안 본 데이터가 그대로 화면에 뜬다.
+#
+# 두 리스트의 열 순서는 같다(slug, text, translation, kind, category,
+# difficulty, context, description). 그래도 위치로 쓰지 않고 이름을 붙이는
+# 것은 다음 덩이를 더할 때 순서가 갈릴 수 있어서다.
+ALL_SEEDED_SENTENCES: list[dict] = [
+    {
+        "slug": r[0],
+        "text": r[1],
+        "translation": r[2],
+        "kind": r[3],
+        "category": r[4],
+        "difficulty": r[5],
+        "context": r[6],
+        "description": r[7],
+    }
+    for r in list(SENTENCES) + list(MORE_SENTENCES)
+]
 
 LIST_URL = "/api/vocab/sentences/"
 QUIZ_URL = f"{LIST_URL}quiz/"
@@ -188,7 +213,10 @@ class SeedSentencesTest(TestCase):
         valid_categories = set(Sentence.Category.values)
         valid_difficulties = set(Sentence.Difficulty.values)
 
-        for slug, text, translation, kind, category, difficulty, context, desc in SENTENCES:
+        for row in ALL_SEEDED_SENTENCES:
+            slug, text, translation = row["slug"], row["text"], row["translation"]
+            kind, category, difficulty = row["kind"], row["category"], row["difficulty"]
+            context, desc = row["context"], row["description"]
             with self.subTest(slug=slug):
                 self.assertTrue(slug.strip(), "slug 가 비었다")
                 self.assertLessEqual(len(slug), slug_max)
@@ -202,13 +230,13 @@ class SeedSentencesTest(TestCase):
 
     def test_slugs_are_unique(self):
         """중복되면 뒤 항목이 앞 항목을 덮어써 문장이 조용히 사라진다."""
-        slugs = [s[0] for s in SENTENCES]
+        slugs = [row["slug"] for row in ALL_SEEDED_SENTENCES]
 
         self.assertEqual(len(slugs), len(set(slugs)))
 
     def test_has_both_kinds(self):
         """실무 표현과 에러 메시지가 둘 다 있어야 kind 필터가 의미를 가진다."""
-        kinds = {s[3] for s in SENTENCES}
+        kinds = {row["kind"] for row in ALL_SEEDED_SENTENCES}
 
         self.assertEqual(kinds, set(SentenceKind.values))
 
@@ -218,7 +246,7 @@ class SeedSentencesTest(TestCase):
         단어 쪽 문제풀기가 보기 넷을 같은 분류에서 뽑는다. 문장에도
         같은 방식을 쓸 텐데, 분류 하나에 셋 이하면 문제를 못 만든다.
         """
-        counts = Counter(s[4] for s in SENTENCES)
+        counts = Counter(row["category"] for row in ALL_SEEDED_SENTENCES)
 
         for category in Sentence.Category.values:
             with self.subTest(category=category):
