@@ -11,6 +11,7 @@ from django.urls import reverse
 
 from .management.commands.seed_exam_words import EXAM_WORDS
 from .management.commands.seed_words import WORDS
+from .management.commands.seed_words_more import WORDS as MORE_WORDS
 from .models import Word
 
 # 저장소에 박힌 단어 **전부**. 전수 검사는 이걸 돈다.
@@ -51,8 +52,26 @@ ALL_SEEDED: list[dict] = [
         "example_translation": r[5],
         "difficulty": r[6],
         "category": r[7],
+        # 9번째 칸이다. 안 담으면 조용히 빠지는데, 아래 주석이 "어긋난 열은
+        # KeyError 로 드러난다" 고 약속하므로 여기서 그 약속을 지킨다 -
+        # 인덱스 접근은 칸이 남아도 예외가 안 난다.
+        "exam_subject": r[8],
     }
     for r in EXAM_WORDS
+] + [
+    # seed_words_more 는 seed_words 와 열 순서가 같다. 그래도 이름을 붙여
+    # 담는다 - 같다는 것을 눈으로 확인하고 적는 것이 이 목록의 요점이다.
+    {
+        "term": r[0],
+        "pron": r[1],
+        "meaning": r[2],
+        "category": r[3],
+        "difficulty": r[4],
+        "description": r[5],
+        "example": r[6],
+        "example_translation": r[7],
+    }
+    for r in MORE_WORDS
 ]
 
 
@@ -303,10 +322,17 @@ class SeedWordsTest(TestCase):
         분류별 개수 균형은 편집 방침이라 테스트로 고정하지 않는다.
         나중에 특정 분류를 집중적으로 늘리는 것도 정당한 변경이다.
         """
+        # 목록에 있는 값인지까지 본다. strip() 만 보면 "testing" 처럼
+        # 그럴듯한 오타가 통과하고, 배포 때 DB 의 CheckConstraint 에서
+        # IntegrityError 로 터진다 - 그때는 어느 항목인지 안 알려준다.
+        # 문장 쪽(tests_sentences.py)이 이미 멤버십을 본다.
+        valid = set(Word.Category.values)
+
         for row in ALL_SEEDED:
             term, category = row["term"], row["category"]
             with self.subTest(term=term):
                 self.assertTrue(category.strip(), f"{term} 에 분류가 없다")
+                self.assertIn(category, valid, f"{term} 의 분류가 목록에 없다")
 
 
 class WordAPITest(TestCase):
