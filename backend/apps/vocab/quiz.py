@@ -434,6 +434,7 @@ def make_question(
     pool: QuerySet[Word],
     kind: str | None = None,
     exclude_ids: list[int] | None = None,
+    choices_from: QuerySet[Word] | None = None,
 ) -> Question | None:
     """문제 하나를 만든다. 만들 수 없으면 None.
 
@@ -443,6 +444,11 @@ def make_question(
     exclude_ids 는 방금 낸 문제를 다시 내지 않기 위한 것이다. 정답에만
     적용한다 - 오답 보기까지 빼면 최근 푼 만큼 보기 후보가 줄어드는데,
     같은 단어가 오답으로 다시 나오는 건 문제가 되지 않는다.
+
+    **choices_from 을 주면 오답 보기를 거기서 뽑는다.** 안 주면 pool 에서
+    뽑는다(지금까지의 동작). 정답 범위를 좁혀 낼 때 필요하다 - 좁힌 것
+    몇 개끼리만 보기를 채우면 넷이 전부 방금 본 단어라 소거법으로 풀리고,
+    범위가 보기 수(4)보다 작으면 아예 문제를 못 만든다.
     """
     # WORD_KINDS 로 좁힌다. 이 함수는 단어만 만들 수 있는데, ALL 에는
     # 문장 유형(blank/situation)도 들어 있다. 그대로 두면 지문은 단어
@@ -460,7 +466,7 @@ def make_question(
     if answer is None:
         return None
 
-    return _with_answer(kind, answer, pool)
+    return _with_answer(kind, answer, choices_from if choices_from is not None else pool)
 
 
 def make_for_word(answer: Word, pool: QuerySet[Word], kind: str | None = None) -> Question | None:

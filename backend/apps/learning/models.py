@@ -12,6 +12,8 @@ DailyScore 를 따로 두는 이유가 이 앱의 핵심이다. 꾸준함 점수
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from django.conf import settings
 from django.db import models
 
@@ -88,8 +90,11 @@ class QuizAnswer(models.Model):
 
     **자유 문제풀이만 여기 남는다.** 일일공부는 DailyStudy 에 개수만
     쌓고 답 하나하나를 남기지 않는다 - 답마다 쓰기가 두 번이 되는 것을
-    피했다(daily_study.py 첫머리). 복습이 일일공부 오답까지 필요해지면
-    그때 답 표를 따로 만든다.
+    피했다(daily_study.py 첫머리).
+
+    다만 **복습 상태(ReviewState)는 일일공부도 갱신한다.** 여기 행이
+    없다고 해서 복습에 안 들어가는 것이 아니다 - 틀린 문제 다시풀기는
+    이 표에서 나오고, "이 단어를 아나" 는 저 표에서 나온다.
     """
 
     session = models.ForeignKey(
@@ -257,10 +262,42 @@ class StudyLength(models.TextChoices):
 # 보너스를 길이에 비례시키는 이유: 전부 같은 값이면 짧은 것을 고르는 쪽이
 # 항상 이득이라 긴 선택지가 사실상 죽는다. 자기 사정에 맞춰 고르게 하려면
 # 어느 것을 골라도 손해가 없어야 한다.
-STUDY_PLANS: dict[str, tuple[int, int]] = {
-    StudyLength.SHORT: (10, 5),
-    StudyLength.MEDIUM: (25, 10),
-    StudyLength.LONG: (40, 25),
+@dataclass(frozen=True)
+class StudyPlan:
+    """길이 하나의 구성.
+
+    학습분 문제 수는 `chunk_size * chunk_count` 다. 따로 두지 않는 이유:
+    두 값이 어긋나면(학습은 8개인데 학습분 문제가 9개) 마지막 문제를
+    낼 곳이 없는데, 그게 판 중간에 드러난다.
+
+    나머지(`total - chunk_size * chunk_count`)는 전체에서 낸다. 맨 뒤에
+    몰아 둔다 - 중간에 섞으면 "방금 본 것" 이라는 약속이 깨져서, 틀렸을 때
+    자기 탓인지 안 배운 것인지 구분할 수 없다.
+    """
+
+    total: int
+    bonus: int
+    chunk_size: int
+    chunk_count: int
+
+    @property
+    def from_study(self) -> int:
+        """학습분 문제 수."""
+        return self.chunk_size * self.chunk_count
+
+
+# 길이별 구성. 학습분 비율은 75~80% 다.
+#
+#   5분   문제 10 = 학습분  8(2개씩 4묶음) + 전체 2   80%
+#   10분  문제 25 = 학습분 20(5개씩 4묶음) + 전체 5   80%
+#   30분  문제 40 = 학습분 30(5개씩 6묶음) + 전체 10  75%
+#
+# 묶음이 딱 떨어지게 잡았다. 안 떨어지면 마지막 묶음만 크기가 달라지고,
+# 그걸 화면에 설명할 방법이 없다.
+STUDY_PLANS: dict[str, StudyPlan] = {
+    StudyLength.SHORT: StudyPlan(total=10, bonus=5, chunk_size=2, chunk_count=4),
+    StudyLength.MEDIUM: StudyPlan(total=25, bonus=10, chunk_size=5, chunk_count=4),
+    StudyLength.LONG: StudyPlan(total=40, bonus=25, chunk_size=5, chunk_count=6),
 }
 
 
@@ -301,6 +338,42 @@ class DailyStudy(models.Model):
     # 0 이 된다.
     total_questions = models.PositiveIntegerField("문제 수")
     bonus = models.PositiveIntegerField("완주 보너스", default=0)
+
+    # 한 묶음에서 학습할 단어 수와 묶음 개수. 위 둘과 같은 이유로 판에
+    # 새긴다 - STUDY_PLANS 를 바꿔도 진행 중인 판은 옛 규칙으로 끝난다.
+    #
+    # **0 이면 학습 없이 문제만 푸는 옛 판이다.** 이 기능이 나오기 전에
+    # 시작한 판이 그렇고, 그때는 지금 코드가 학습 단계를 건너뛴다.
+    # null 이 아니라 0 을 쓰는 이유: 이 값으로 산술을 하는데(묶음 번호를
+    # 나눗셈으로 구한다) null 이면 계산하는 자리마다 분기가 생긴다.
+    chunk_size = models.PositiveSmallIntegerField("묶음당 학습 단어", default=0)
+    chunk_count = models.PositiveSmallIntegerField("묶음 수", default=0)
+
+    # 지금까지 뽑은 묶음 수. 다음에 뽑을 묶음 번호이기도 하다.
+    #
+    # **learned_ids 의 길이로 세지 않는다.** 그렇게 하면 "길이는 항상
+    # chunk_size 의 배수" 라는 불변식에 기대게 되는데, 그것을 강제하는
+    # 자리가 없다. 묶음을 다 못 채우거나(후보 부족) 같은 묶음을 두 번
+    # 이어붙이면 그 뒤 슬라이싱이 영구히 밀려, 화면에 보인 카드와 다른
+    # 단어로 문제가 나간다. 이 값은 조건부 UPDATE 로만 올린다.
+    issued_chunks = models.PositiveSmallIntegerField("뽑은 묶음 수", default=0)
+
+    # 학습으로 보여준 단어 id. 묶음 순서대로 이어 붙는다.
+    #
+    # **문제를 여기서 낸다.** 학습분 문제는 "지금 묶음에서 방금 본 것"
+    # 안에서만 정답이 나온다. 저장하지 않으면 화면을 새로 열 때 다른
+    # 단어가 뽑혀서, 방금 본 것과 문제가 어긋난다.
+    #
+    # 순서를 유지한다 - 몇 번째 묶음의 것인지가 순서로 정해진다.
+    # **단어 id 만 담는다.** 학습분 문제는 make_question(word_ids=...) 로
+    # 내는데 그쪽이 Word 만 받는다(session.py). 문장이나 에러 메시지를
+    # 학습 대상으로 넣으려면 여기를 [(종류, id), ...] 로 바꾸고 _study_scope
+    # 의 슬라이스를 함께 고쳐야 한다 - 지금 모양으로 문장 id 를 섞으면
+    # 그것을 Word 로 조회해 조용히 빈 목록이 된다.
+    #
+    # 지금 (종류, id) 로 일반화하지 않는 이유는 슬라이스 계산에 분기가
+    # 하나 늘기 때문이다. 그 계산이 이 기능에서 제일 자주 틀린 자리다.
+    learned_ids = models.JSONField("학습한 단어 id", default=list, blank=True)
 
     # 다음에 받을 순번. 답 하나가 이 값을 **원자적으로 가져간다**.
     #
@@ -372,8 +445,15 @@ class ReviewState(models.Model):
     답을 거슬러 봐야 한다. 항목 수만큼 스캔이 늘어 목록 한 번 그리는 데
     표 전체를 훑게 된다. 그래서 연속 횟수만 여기 들고 있는다.
 
-    자유 문제풀이의 답이 이 표를 갱신한다. 일일공부는 답을 하나하나
-    남기지 않으므로 여기 안 들어온다(QuizAnswer docstring 참고).
+    **자유 문제풀이와 일일공부가 모두 이 표를 갱신한다.** 둘 다
+    record.bump_review_states 를 거치므로 규칙이 갈릴 자리가 없다.
+    일일공부는 QuizAnswer 행을 안 남기지만(그쪽 docstring 참고) 복습
+    상태는 남긴다 - 답 하나하나를 보관하는 것과 "이 단어를 아나" 를
+    갱신하는 것은 다른 일이다.
+
+    **어느 쪽도 streak 을 올리지 않는다.** 연속은 복습 화면에서 확인한
+    것만 센다(review.py). 문제풀이에서 맞힌 것으로 졸업하면 "복습했다"
+    가 아니라 "우연히 나왔다" 가 된다.
     """
 
     user = models.ForeignKey(

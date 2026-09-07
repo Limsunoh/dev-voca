@@ -42,6 +42,7 @@ from datetime import datetime, timedelta
 
 from django.core import signing
 from django.db import IntegrityError, transaction
+from django.db.models import QuerySet
 from django.utils import timezone
 
 from apps.vocab import quiz
@@ -386,7 +387,9 @@ def _make(state: dict) -> quiz.Question | None:
 
 
 def make_question(
-    recent_words: list[int], recent_sentences: list[int]
+    recent_words: list[int],
+    recent_sentences: list[int],
+    word_ids: list[int] | None = None,
 ) -> quiz.Question | None:
     """유형을 골라 문제를 만든다.
 
@@ -395,9 +398,30 @@ def make_question(
 
     문장 문제를 못 만드는 경우가 정상 흐름이라(빈칸으로 만들 수 있는
     문장이 절반쯤이다) 실패하면 단어 문제로 떨어진다.
+
+    **word_ids 를 주면 정답이 그 안에서만 나온다.** 일일공부가 "방금
+    학습한 단어로 낸다" 를 이걸로 한다. 오답 보기는 좁히지 않는다 -
+    학습한 것 몇 개끼리만 섞으면 보기 넷이 전부 아는 단어라 소거법으로
+    풀리고, 묶음이 작을수록(2개) 사실상 답이 보인다.
+
+    좁힌 범위로 문장 문제는 만들지 않는다. 문장은 단어와 짝이 지어져
+    있지 않아서, 그 단어들이 든 문장을 고르려면 본문을 훑어야 하고
+    빈칸 대상이 그 단어라는 보장도 없다.
     """
     words = Word.objects.visible()
     sentences = Sentence.objects.visible()
+
+    if word_ids:
+        # **최근에 낸 목록으로 좁힌 범위를 또 거르지 않는다.** 저 목록은
+        # 40개인데 묶음은 2~5개라, 묶음 단어가 하나라도 거기 들어가면
+        # 남은 문제 수보다 후보가 적어진다. 그러면 마지막 문제에서 후보가
+        # 비어 전체 폴백으로 떨어지고, **학습 안 한 단어가 학습분 문제로
+        # 나간다** - 이 기능이 없애려던 바로 그 경험이다.
+        #
+        # 같은 묶음에서 같은 단어가 두 번 나오는 것은 손해가 아니다.
+        # 방금 본 것을 다시 묻는 것이라 오히려 학습 의도에 맞고, 애초에
+        # 후보가 2개면 "연달아 같은 문제" 를 피할 여지가 없다.
+        return _word_question(words.filter(pk__in=word_ids), words, [])
 
     kind = random.choice(quiz.QuizKind.ALL)
 
@@ -435,6 +459,25 @@ def make_question(
         if made is not None:
             return made
 
+    return None
+
+
+def _word_question(
+    pool: QuerySet[Word], choices_from: QuerySet[Word], recent_words: list[int]
+) -> quiz.Question | None:
+    """좁힌 범위에서 단어 문제 하나. 유형을 다 훑고도 안 되면 None.
+
+    pool 은 정답 후보, choices_from 은 오답 보기 후보다. 둘을 나눈 이유는
+    make_question docstring 에 적었다.
+
+    유형을 하나씩 다 도는 것은 위 폴백과 같은 이유다. 다만 여기는 범위가
+    좁아 실패 확률이 더 높다 - 설명 문제는 description 이 있는 단어만
+    쓸 수 있는데 학습 묶음이 두 개뿐일 수도 있다.
+    """
+    for kind in random.sample(quiz.QuizKind.WORD_KINDS, len(quiz.QuizKind.WORD_KINDS)):
+        made = quiz.make_question(pool, kind, recent_words, choices_from=choices_from)
+        if made is not None:
+            return made
     return None
 
 

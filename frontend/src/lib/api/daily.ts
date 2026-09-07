@@ -29,6 +29,8 @@ export type StudyLength = {
   questions: number;
   /** 다 풀면 붙는 점수. 길수록 크다. */
   bonus: number;
+  /** 이 판에서 학습하는 단어 수. 나머지 문제는 전체에서 나온다. */
+  words: number;
 };
 
 /** 오늘 판의 진행 상태. */
@@ -40,6 +42,32 @@ export type StudyProgress = {
   score: number;
   bonus: number;
   done: boolean;
+  /** 한 묶음에서 학습하는 단어 수. 0 이면 학습 없이 문제만 푸는 판이다. */
+  chunk_size: number;
+  /** 학습 묶음 개수. 이 뒤의 문제는 전체에서 나온다. */
+  chunk_count: number;
+  /** 지금 몇 번째 묶음인가(0부터). 화면이 "2/4" 를 그린다. */
+  chunk_index: number;
+};
+
+/**
+ * 학습 카드 한 장.
+ *
+ * 단어 상세(WordDetail)와 따로 두는 이유: 저기는 목록·상세 화면이 쓰는
+ * 타입이라 created_at 같은 칸이 붙어 있고, 이쪽은 백엔드가 카드용으로
+ * 추린 것이다. 한 타입으로 합치면 어느 화면이 무엇을 쓰는지 흐려진다.
+ */
+export type StudyCard = {
+  id: number;
+  term: string;
+  pronunciation: string;
+  /** 한글 발음. 검수 전이면 빈 문자열. */
+  reading: string;
+  meaning: string;
+  description: string;
+  example: string;
+  example_translation: string;
+  category_label: string;
 };
 
 export type DailyStatus = {
@@ -54,12 +82,21 @@ export type DailyStatus = {
    */
   token: string | null;
   question: RoundQuestion | null;
+  /**
+   * 이번 묶음에서 학습할 단어들. 학습할 차례가 아니면 빈 배열.
+   *
+   * **문제와 함께 온다.** 카드를 다 넘기면 그 자리에서 문제로 넘어가므로
+   * 서버에 "봤다" 를 알릴 필요가 없다 - 그건 점수와 무관한 요청이라
+   * 되돌리기를 막을 이유가 없고, 막지 않으면 왕복만 늘어난다.
+   */
+  learning: StudyCard[];
 };
 
 export type DailyStarted = {
   token: string;
   question: RoundQuestion;
   study: StudyProgress;
+  learning: StudyCard[];
 };
 
 export type DailyAnswered = {
@@ -69,6 +106,8 @@ export type DailyAnswered = {
   question: RoundQuestion | null;
   finished: boolean;
   study: StudyProgress;
+  /** 묶음이 넘어가는 답에만 채워진다. 묶음 안에서는 빈 배열. */
+  learning: StudyCard[];
 };
 
 export type { RoundChoice, RoundQuestion };

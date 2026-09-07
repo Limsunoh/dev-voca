@@ -7,6 +7,7 @@ import type {
   DailyAnswered,
   DailyStarted,
   DailyStatus,
+  StudyCard,
   StudyLength,
   StudyProgress,
 } from "@/lib/api/daily";
@@ -14,6 +15,7 @@ import type { RoundQuestion, RoundResult } from "@/lib/api/rounds";
 import { routes } from "@/lib/routes";
 
 import { QuestionCard } from "./QuestionCard";
+import { StudyCards } from "./StudyCards";
 
 /**
  * 하루 한 번 일일공부.
@@ -29,7 +31,13 @@ import { QuestionCard } from "./QuestionCard";
  * 사이에 다른 클릭이 들어오면 state 는 한 틱 낡은 값을 본다.
  */
 
-type Phase = "choosing" | "playing" | "done";
+/**
+ * 화면 단계.
+ *
+ * learning 은 문제 앞에 온다. 문제는 그때 이미 받아둔 상태라(서버가
+ * 학습과 함께 내려준다) 카드를 다 넘기면 왕복 없이 playing 으로 간다.
+ */
+type Phase = "choosing" | "learning" | "playing" | "done";
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
   const res = await fetch("/api/daily", {
@@ -52,14 +60,18 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
   // 않는다 - 돌아가봐야 어느 길이를 눌러도 "이미 시작했다" 로 막힌다.
   const initial: Phase = status.today?.done
     ? "done"
-    : status.token && status.question
-      ? "playing"
-      : "choosing";
+    : status.learning.length > 0
+      ? "learning"
+      : status.token && status.question
+        ? "playing"
+        : "choosing";
 
   const [phase, setPhase] = useState<Phase>(initial);
   const [question, setQuestion] = useState<RoundQuestion | null>(
     status.question,
   );
+  // 이번 묶음의 학습 카드. 다 넘기면 비우고 playing 으로 간다.
+  const [cards, setCards] = useState<StudyCard[]>(status.learning);
   const [result, setResult] = useState<RoundResult | null>(null);
   const [study, setStudy] = useState<StudyProgress | null>(status.today);
   const [error, setError] = useState("");
@@ -96,7 +108,10 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
       setQuestion(started.question);
       setStudy(started.study);
       setResult(null);
-      setPhase("playing");
+      // 학습이 먼저다. 카드가 없는 판(콘텐츠가 적어 묶음을 못 만든 경우)은
+      // 곧바로 문제로 간다.
+      setCards(started.learning);
+      setPhase(started.learning.length > 0 ? "learning" : "playing");
     } catch (err) {
       if (!aliveRef.current) return;
       setError(err instanceof Error ? err.message : "시작하지 못했습니다.");
@@ -132,6 +147,12 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
         return;
       }
       setQuestion(answered.question);
+
+      // **다음 묶음이 시작되면 학습부터다.** 이 화면은 채점 결과를
+      // 다음 문제 위에 인라인으로 띄우므로(별도 "다음" 버튼이 없다),
+      // 학습으로 넘어가면 그 줄이 사라진다. 그래서 카드를 들고만 있고
+      // 넘기는 것은 사용자가 결과를 본 뒤다 - 아래 PlayCard 의 onLearn 이 한다.
+      setCards(answered.learning);
     } catch (err) {
       if (!aliveRef.current) return;
       setError(err instanceof Error ? err.message : "채점하지 못했습니다.");
@@ -145,7 +166,32 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
     return <DoneCard study={study} />;
   }
 
-  if (phase === "playing" && question) {
+  if (phase === "learning" && cards.length > 0) {
+    return (
+      <StudyCards
+        // 묶음이 바뀌면 카드 번호를 처음으로 되돌린다. 안 주면 다음
+        // 묶음이 마지막 카드부터 시작한다.
+        key={study?.chunk_index ?? 0}
+        cards={cards}
+        chunkIndex={study?.chunk_index ?? 0}
+        chunkCount={study?.chunk_count ?? 0}
+        onDone={() => {
+          // 문제는 이미 받아둔 상태다. 카드를 비우고 넘어가기만 한다 -
+          // 여기서 서버를 부르면 왕복이 늘고, 그 요청은 점수와 무관해
+          // 되돌리기를 막을 이유도 없다.
+          setCards([]);
+          setResult(null);
+          setPhase("playing");
+        }}
+      />
+    );
+  }
+
+  // 학습할 카드가 없으면 문제로 간다. 후보가 모자라 묶음을 못 뽑으면
+  // 서버가 빈 목록을 주는데, phase 만 보고 분기하면 그 판이 아래 길이
+  // 고르기로 떨어진다 - 판이 도는 중에 "길이를 고르세요" 가 뜨면
+  // 사용자는 진행이 날아간 줄 안다.
+  if (phase !== "choosing" && question) {
     return (
       <PlayCard
         question={question}
@@ -154,6 +200,11 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
         busy={busy}
         error={error}
         onPick={send}
+        // 다음 묶음이 시작되면 결과 줄 아래에 "이어서 익히기" 가 뜬다.
+        // 자동으로 넘기지 않는 이유: 이 화면은 채점 결과를 다음 문제
+        // 위에 인라인으로 띄우는데, 곧바로 학습으로 가면 방금 맞았는지
+        // 틀렸는지를 못 보고 화면이 튄다.
+        onLearn={cards.length > 0 ? () => setPhase("learning") : undefined}
       />
     );
   }
@@ -192,14 +243,17 @@ function ChooseCard({
         오늘 얼마나 해볼까요
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-400">
-        제한 시간은 없습니다. 맞히면 1점, 틀려도 깎이지 않습니다.
+        {/* 무엇을 하는 시간인지 먼저 말한다. "문제를 푼다" 로만 안내하면
+            학습 카드가 나왔을 때 잘못 들어온 화면으로 읽힌다. */}
+        몇 개를 익히고 그것으로 문제를 풉니다.
         <br />
-        다 풀면 길이에 따라 보너스가 붙습니다.
+        제한 시간은 없고, 틀려도 점수가 깎이지 않습니다.
       </p>
 
-      {/* 여기까지 왔다는 것은 이어 풀 토큰을 못 받았다는 뜻이다(낼 수 있는
-          문제가 없는 등). 길이를 다시 고를 수는 없으므로 - 어느 것을 눌러도
-          "이미 시작했다" 로 막힌다 - 상황을 사실대로 알린다. */}
+      {/* 하다 만 판이 있으면 아래 버튼이 전부 비활성이다. 이유를 안 적으면
+          흐릿한 버튼 세 개만 보이고 왜 못 누르는지 알 수 없다. 이 화면은
+          한 번의 응답 사이클에만 뜨는데(다음 GET 에서는 판이 닫혀 결과로
+          간다), 그 한 번이 "진행이 날아갔다" 고 읽는 순간이다. */}
       {resuming && !resuming.done && (
         <p className="mt-5 rounded-xl border border-white/25 px-4 py-3 text-sm text-slate-300">
           오늘 {resuming.answered}/{resuming.total}문제까지 풀었습니다. 지금은
@@ -226,6 +280,12 @@ function ChooseCard({
           >
             <span className="font-semibold text-slate-100">{one.label}</span>
             <span className="text-right text-sm text-slate-400">
+              {/* 몇 개를 배우는지 먼저 보여준다. 문제 수만 있으면 길이
+                  선택이 "얼마나 오래 걸리나" 로만 읽히는데, 이 기능의
+                  값은 그날 몇 단어를 익히느냐에 있다. */}
+              {one.words > 0 && (
+                <span className="text-slate-300">{one.words}단어 · </span>
+              )}
               {one.questions}문제
               <span className="ml-2 text-focus">+{one.bonus}</span>
             </span>
@@ -245,6 +305,7 @@ function PlayCard({
   busy,
   error,
   onPick,
+  onLearn,
 }: {
   question: RoundQuestion;
   result: RoundResult | null;
@@ -252,6 +313,8 @@ function PlayCard({
   busy: boolean;
   error: string;
   onPick: (id: number) => void;
+  /** 다음 묶음의 학습이 기다릴 때만 온다. 없으면 버튼을 안 그린다. */
+  onLearn?: () => void;
 }) {
   const answered = study?.answered ?? 0;
   const total = study?.total ?? 0;
@@ -283,7 +346,13 @@ function PlayCard({
         />
       </div>
 
-      <QuestionCard question={question} busy={busy} onPick={onPick} />
+      {/* 학습이 기다리면 보기를 막는다. 안 막으면 아직 안 배운 단어로
+          답하게 되고, "먼저 익히고 푼다" 는 이 기능의 전제가 깨진다. */}
+      <QuestionCard
+        question={question}
+        busy={busy || onLearn !== undefined}
+        onPick={onPick}
+      />
 
       {/* 새로 나타나는 영역이라 읽어준다. */}
       <p aria-live="polite" className="min-h-6 text-sm">
@@ -293,6 +362,18 @@ function PlayCard({
           </span>
         )}
       </p>
+
+      {/* 다음 묶음이 기다릴 때만. 이 버튼이 없으면 아래 보기를 눌러
+          답하게 되는데, 그 문제는 아직 안 배운 단어로 나온다. */}
+      {onLearn && (
+        <button
+          type="button"
+          onClick={onLearn}
+          className="flex min-h-12 w-full items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+          이어서 익히기
+        </button>
+      )}
 
       {error && (
         <p role="alert" className="text-sm text-rose-300">
@@ -306,18 +387,33 @@ function PlayCard({
 /* ---- 끝난 뒤 ---- */
 
 function DoneCard({ study }: { study: StudyProgress | null }) {
+  // **done 으로는 못 가른다.** 여기 오는 두 경로(초기 phase 판정, 답한 뒤
+  // finished)가 둘 다 판을 닫고 온다 - 서버가 _finish 를 부른 뒤 그 인스턴스를
+  // 그대로 내려주므로 done 은 항상 참이다. 다 풀었는지는 개수로 본다.
+  // 모르면 "여기까지" 쪽으로 둔다. 다 풀지 않았는데 "완료" 라고 하는
+  // 것이 그 반대보다 나쁘다.
+  const short = study === null || study.answered < study.total;
+
   return (
     <div className="rise flex flex-1 flex-col justify-center text-center">
-      <p className="text-sm text-slate-400">오늘 몫 완료</p>
+      <p className="text-sm text-slate-400">
+        {short ? "오늘은 여기까지" : "오늘 몫 완료"}
+      </p>
       <p className="pop mt-2 font-mono text-5xl font-bold tabular-nums text-focus">
         {study?.score ?? 0}
       </p>
       {study && (
         <p className="mt-3 text-sm text-slate-400">
           {study.total}문제 중 {study.correct}개 정답
-          {study.done && study.bonus > 0 && (
+          {!short && study.bonus > 0 && (
             <span className="ml-1 text-focus">+{study.bonus} 보너스</span>
           )}
+        </p>
+      )}
+
+      {short && (
+        <p className="mt-3 text-sm text-slate-400">
+          낼 수 있는 문제가 떨어져 먼저 마쳤습니다.
         </p>
       )}
 

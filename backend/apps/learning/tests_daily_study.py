@@ -64,16 +64,70 @@ def seed_words(count: int = 120) -> None:
     )
 
 
-def run_to_end(user, length: str) -> DailyStudy:
-    """한 판을 끝까지 푼다. 늘 첫 보기를 고른다."""
-    study, token, question = daily_study.start(user, length)
+def pass_learning(study: DailyStudy) -> tuple[str, dict] | None:
+    """학습 차례면 넘기고 다음 문제를 받는다. 문제가 없으면 None.
 
-    while question is not None:
+    화면이 하는 일을 흉내낸다 - 학습 카드를 받아 넘기면 그다음이 문제다.
+    테스트마다 이 흐름을 적으면 학습 구성이 바뀔 때 전부 고쳐야 한다.
+    """
+    study.refresh_from_db()
+    daily_study.issue_chunk(study)  # 학습을 봤다고 친다
+    study.refresh_from_db()
+    return daily_study.resume(study)
+
+
+def answer_n(user, study: DailyStudy, token: str, question, count: int):
+    """count 번 답한다. 중간에 학습이 끼면 넘긴다. (토큰, 문제)를 돌려준다.
+
+    학습 단계가 생기기 전에는 답이 곧바로 다음 문제를 줬다. 이제는
+    묶음 끝에서 (None, None) 이 오고 학습을 봐야 이어진다 - 테스트마다
+    그 분기를 적으면 구성을 바꿀 때 전부 고쳐야 한다.
+    """
+    for _ in range(count):
+        if question is None:
+            resumed = pass_learning(study)
+            if resumed is None:
+                return token, None
+            token, question = resumed
         picked = question["choices"][0]["id"]
         _, token, question, _s = daily_study.answer(user, token, picked)
+    return token, question
+
+
+def drain(user, study: DailyStudy, token: str, question, answer_fn=None) -> DailyStudy:
+    """판이 끝날 때까지 답한다. 학습 차례가 오면 넘긴다.
+
+    answer_fn 을 주면 그것으로 답한다(틀린 답으로 푸는 테스트 등).
+    기본은 첫 보기를 고른다.
+
+    학습은 점수에 영향이 없어서, 다 푼 판의 결과는 학습이 있든 없든
+    같아야 한다. 이 헬퍼가 그 전제를 지켜준다.
+    """
+    while True:
+        if question is None:
+            study.refresh_from_db()
+            if study.is_done:
+                break
+            resumed = pass_learning(study)
+            if resumed is None:
+                break  # 학습도 문제도 없다. 낼 것이 떨어진 판
+            token, question = resumed
+            continue
+
+        if answer_fn is not None:
+            _, token, question, _s = answer_fn(user, token, question)
+        else:
+            picked = question["choices"][0]["id"]
+            _, token, question, _s = daily_study.answer(user, token, picked)
 
     study.refresh_from_db()
     return study
+
+
+def run_to_end(user, length: str) -> DailyStudy:
+    """한 판을 끝까지 푼다. 늘 첫 보기를 고른다."""
+    study, token, question = daily_study.start(user, length)
+    return drain(user, study, token, question)
 
 
 def tomorrow():
@@ -105,10 +159,10 @@ class PlanTest(TestCase):
         medium = STUDY_PLANS[StudyLength.MEDIUM]
         long_ = STUDY_PLANS[StudyLength.LONG]
 
-        self.assertLess(short[0], medium[0], "문제 수가 안 늘어난다")
-        self.assertLess(medium[0], long_[0], "문제 수가 안 늘어난다")
-        self.assertLess(short[1], medium[1], "보너스가 안 늘어난다")
-        self.assertLess(medium[1], long_[1], "보너스가 안 늘어난다")
+        self.assertLess(short.total, medium.total, "문제 수가 안 늘어난다")
+        self.assertLess(medium.total, long_.total, "문제 수가 안 늘어난다")
+        self.assertLess(short.bonus, medium.bonus, "보너스가 안 늘어난다")
+        self.assertLess(medium.bonus, long_.bonus, "보너스가 안 늘어난다")
 
     def test_the_plan_matches_what_was_promised(self):
         """화면에 약속한 숫자 그대로여야 한다.
@@ -116,9 +170,32 @@ class PlanTest(TestCase):
         단조성만 보면 (1,1)/(2,2)/(3,3) 으로 바뀌어도 통과한다. 이 값들은
         순위표 점수에 그대로 꽂히므로 조용히 바뀌면 아무도 모른다.
         """
-        self.assertEqual(STUDY_PLANS[StudyLength.SHORT], (10, 5))
-        self.assertEqual(STUDY_PLANS[StudyLength.MEDIUM], (25, 10))
-        self.assertEqual(STUDY_PLANS[StudyLength.LONG], (40, 25))
+        for length, total, bonus in [
+            (StudyLength.SHORT, 10, 5),
+            (StudyLength.MEDIUM, 25, 10),
+            (StudyLength.LONG, 40, 25),
+        ]:
+            with self.subTest(length=length):
+                self.assertEqual(STUDY_PLANS[length].total, total)
+                self.assertEqual(STUDY_PLANS[length].bonus, bonus)
+
+    def test_the_study_chunks_fit_the_question_count(self):
+        """학습분 문제 수가 총 문제 수를 넘지 않는다.
+
+        넘으면 마지막 묶음은 학습만 하고 문제가 안 나온다 - 화면이
+        "이제 풀어보세요" 를 띄우고 아무것도 없다.
+
+        비율도 함께 본다. 학습분이 전부면 "전체에서 나오는 것" 이 없어져
+        아는 것만 확인하는 판이 되고, 너무 적으면 학습한 의미가 없다.
+        """
+        for length, plan in STUDY_PLANS.items():
+            with self.subTest(length=length):
+                self.assertLessEqual(
+                    plan.from_study, plan.total, "학습분이 총 문제 수를 넘는다"
+                )
+                ratio = plan.from_study / plan.total
+                self.assertGreaterEqual(ratio, 0.7, "학습분이 너무 적다")
+                self.assertLessEqual(ratio, 0.85, "전체에서 내는 문제가 없다")
 
     def test_an_unknown_length_is_refused(self):
         with self.assertRaises(SessionError):
@@ -193,10 +270,7 @@ class ScoringTest(TestCase):
 
         # 늘 틀린 보기를 고른다. "첫 보기" 로 풀면 우연히 다 맞을 수
         # 있어(4지선다 10문제면 100만분의 1) 감점 여부를 검사 못 한다.
-        while question is not None:
-            _, token, question, _s = answer_wrong(self.user, token, question)
-
-        study.refresh_from_db()
+        drain(self.user, study, token, question, answer_fn=answer_wrong)
         self.assertEqual(study.correct, 0, "틀리게 풀었는데 맞은 것이 있다")
         self.assertEqual(
             study.score,
@@ -208,7 +282,7 @@ class ScoringTest(TestCase):
         """다 풀면 보너스가 붙는다."""
         study = run_to_end(self.user, StudyLength.SHORT)
 
-        bonus = STUDY_PLANS[StudyLength.SHORT][1]
+        bonus = STUDY_PLANS[StudyLength.SHORT].bonus
         self.assertTrue(study.is_done, "안 끝났다")
         self.assertEqual(study.score, study.correct + bonus, "보너스가 안 붙었다")
 
@@ -236,9 +310,7 @@ class ProgressTest(TestCase):
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
-        for _ in range(3):
-            picked = question["choices"][0]["id"]
-            _, token, question, _s = daily_study.answer(self.user, token, picked)
+        token, question = answer_n(self.user, study, token, question, 3)
 
         study.refresh_from_db()
 
@@ -300,8 +372,7 @@ class ProgressTest(TestCase):
 
         # 자정을 넘긴다. 판은 어제 것 그대로고 시계만 오늘로 온다.
         with mock.patch.object(calendar_kst, "today", tomorrow()):
-            picked = question["choices"][0]["id"]
-            _, token, question, _s = daily_study.answer(self.user, token, picked)
+            token, question = answer_n(self.user, study, token, question, 1)
 
         study.refresh_from_db()
         self.assertEqual(study.answered, 2, "자정을 넘기니 못 이어 푼다")
@@ -314,9 +385,7 @@ class ProgressTest(TestCase):
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
-        for _ in range(3):
-            picked = question["choices"][0]["id"]
-            _, token, question, _s = daily_study.answer(self.user, token, picked)
+        token, question = answer_n(self.user, study, token, question, 3)
 
         study.refresh_from_db()
         row = DailyScore.objects.filter(user=self.user, day=study.day).first()
@@ -377,8 +446,18 @@ class ProgressTest(TestCase):
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
+        # 마지막 토큰을 붙잡아야 해서 drain 을 못 쓴다.
         last_token = token
-        while question is not None:
+        while True:
+            if question is None:
+                study.refresh_from_db()
+                if study.is_done:
+                    break
+                resumed = pass_learning(study)
+                if resumed is None:
+                    break
+                token, question = resumed
+                continue
             last_token = token
             picked = question["choices"][0]["id"]
             _, token, question, _s = daily_study.answer(self.user, last_token, picked)
@@ -409,7 +488,7 @@ class ApiTest(TestCase):
         self.assertIn(self.client.post(START_URL, {}).status_code, (401, 403))
 
     def test_the_lengths_come_with_their_numbers(self):
-        """화면이 고르기 전에 문제 수와 보너스를 보여줄 수 있어야 한다."""
+        """화면이 고르기 전에 문제 수·보너스·학습 단어 수를 보여줄 수 있어야 한다."""
         self.client.force_login(self.user)
 
         body = self.client.get(START_URL).json()
@@ -418,8 +497,13 @@ class ApiTest(TestCase):
         self.assertIsNone(body["today"], "시작 전인데 오늘 줄이 있다")
         for row in body["lengths"]:
             self.assertEqual(
-                set(row), {"value", "label", "questions", "bonus"}, "칸이 바뀌었다"
+                set(row),
+                {"value", "label", "questions", "bonus", "words"},
+                "칸이 바뀌었다",
             )
+            # 학습 단어 수가 문제 수를 넘으면 화면이 "8개 공부하고 5문제"
+            # 처럼 앞뒤가 안 맞는 안내를 하게 된다.
+            self.assertLessEqual(row["words"], row["questions"])
 
     def test_a_full_run_ends_by_itself(self):
         """마지막 문제를 풀면 서버가 닫는다. 끝내기 요청이 없다."""
@@ -430,8 +514,22 @@ class ApiTest(TestCase):
         ).json()
         token = data["token"]
 
-        total = STUDY_PLANS[StudyLength.SHORT][0]
-        for _ in range(total):
+        total = STUDY_PLANS[StudyLength.SHORT].total
+        # 학습 묶음마다 GET 이 한 번 더 들어간다. 넉넉히 돈다.
+        finished = False
+        for _ in range(total * 3):
+            if data.get("question") is None:
+                if data.get("finished"):
+                    finished = True
+                    break
+                # 학습 차례. 화면이 카드를 보고 넘기면 다음 GET 이 문제를 준다.
+                # GET 응답에는 finished 가 없다 - 거기는 오늘 줄을 보는
+                # 자리라 "이 답으로 끝났나" 를 말할 것이 없다.
+                self.assertTrue(data["learning"], "문제도 학습도 없다")
+                data = self.client.get(START_URL).json()
+                token = data.get("token")
+                continue
+
             picked = data["question"]["choices"][0]["id"]
             data = self.client.post(
                 ANSWER_URL,
@@ -440,9 +538,10 @@ class ApiTest(TestCase):
             ).json()
             token = data.get("token")
             if data["finished"]:
+                finished = True
                 break
 
-        self.assertTrue(data["finished"], "다 풀었는데 안 끝났다")
+        self.assertTrue(finished, "다 풀었는데 안 끝났다")
         self.assertIsNone(data["question"])
         self.assertTrue(data["study"]["done"])
 

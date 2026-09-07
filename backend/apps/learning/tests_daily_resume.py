@@ -84,17 +84,29 @@ class ResumeTest(TestCase):
         )
 
     def test_answering_moves_to_the_next_question(self):
-        """답하면 다음 문제로 넘어간다. 고정이 진행을 막지 않는다."""
+        """답하면 다음 문제로 넘어간다. 고정이 진행을 막지 않는다.
+
+        **문제 내용이 바뀌는지는 안 본다.** 학습 단계가 생기면서 앞쪽
+        문제는 그 묶음 안에서만 나오는데, SHORT 는 묶음이 2개라 연속 두
+        문제가 같은 단어일 확률이 구조적으로 1/2 이다. 그건 의도한
+        동작이다 - 방금 본 것을 다시 묻는 것이라 학습에 손해가 아니고,
+        후보가 2개면 피할 여지도 없다(session.make_question).
+
+        여기서 못 박을 것은 "순번이 올랐고 다음 문제가 왔다" 이다.
+        """
         _study, token, question = daily_study.start(self.user, StudyLength.SHORT)
-        before = _prompt(question)
 
         _r, next_token, next_question, study = daily_study.answer(
             self.user, token, question["choices"][0]["id"]
         )
 
         self.assertIsNotNone(next_question, "다음 문제가 안 왔다")
-        self.assertNotEqual(before, _prompt(next_question), "같은 문제가 또 나왔다")
         self.assertEqual(study.answered, 1)
+        # 새 토큰이 새 순번을 실었나. 지운 내용 비교보다 이쪽이 강하다 -
+        # 순번이 안 오르면 같은 문제로 몇 번이든 답할 수 있다.
+        self.assertEqual(
+            daily_study._load(next_token)["n"], 1, "새 토큰이 옛 순번을 실었다"
+        )
 
         # 이어 풀기로 받아도 그 다음 문제다
         today = daily_study.today_of(self.user)
