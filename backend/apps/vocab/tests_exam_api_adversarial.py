@@ -151,7 +151,9 @@ class ExamFilterCombinationTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        mk = lambda **kw: Word.objects.create(is_reviewed=True, **kw)
+        def mk(**kw):
+            return Word.objects.create(is_reviewed=True, **kw)
+
         cls.a = mk(term="aa-db-hard", meaning="m", difficulty=3,
                    category=LearningItem.Category.CS,
                    is_exam=True, exam_subject=Subject.DATABASE)
