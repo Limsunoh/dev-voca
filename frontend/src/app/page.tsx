@@ -2,16 +2,19 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/Avatar";
-import { BoardPreview } from "@/components/BoardPreview";
 import { DailyCard } from "@/components/DailyCard";
+import { LearningCard } from "@/components/LearningCard";
 import { Reading } from "@/components/Reading";
 import { ReviewCard } from "@/components/ReviewCard";
 import { SurfaceLayer } from "@/components/SurfaceLayer";
 import type { User } from "@/lib/api/accounts";
 import { fetchDailyStatus, type StudyProgress } from "@/lib/api/daily";
-import { type Board, fetchBoard } from "@/lib/api/leaderboards";
 import { fetchDue, type ReviewDue } from "@/lib/api/review";
-import { getDailyWord, type WordListItem } from "@/lib/api/vocab";
+import {
+  getDailyWords,
+  HOME_WORDS,
+  type WordListItem,
+} from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
 import { getCurrentUser, getToken, isGuestChosen } from "@/lib/session";
 
@@ -22,8 +25,12 @@ import { getCurrentUser, getToken, isGuestChosen } from "@/lib/session";
  * 설명하지 않고 오늘 볼 것을 바로 보여준다. 이동은 아래 탭바가 맡으므로
  * 여기에 목록으로 가는 버튼을 늘어놓지 않는다.
  *
- * 무엇을 더 놓을지(학습 기록·점수·스트릭)는 아직 정해지지 않아서 지금
- * 있는 것만으로 채웠다. 없는 숫자를 0 으로 채워두지 않는다 - 0 은 "내가
+ * 위에서 아래로 오늘 할 일 → 오늘의 단어 → 이어서 볼 단어 순이다. 열자마자
+ * "뭘 해야 하나" 에 답하고, 그다음이 볼거리다.
+ *
+ * **순위와 점수는 여기 두지 않는다.** "나" 탭이 그 자리다. 홈에 숫자 카드를
+ * 늘어놓으면 같은 모양의 상자가 여섯 개가 되어 무엇이 오늘 할 일인지가
+ * 흐려진다. 없는 숫자를 0 으로 채우지 않는 것도 같은 이유다 - 0 은 "내가
  * 아직 안 한 것" 으로 읽혀서 기능이 없는 것인지 구분되지 않는다.
  */
 export default async function Home() {
@@ -45,9 +52,13 @@ export default async function Home() {
   //
   // 조용히 삼키지는 않는다. 로그가 없으면 백엔드가 죽은 것과 이 코드의
   // 버그를 구분할 수 없고, 화면에는 둘 다 "불러오지 못했습니다" 로만 뜬다.
-  const wordPromise = getDailyWord().catch((error: unknown) => {
+  //
+  // 첫 장과 아래에 깔 것을 한 번에 받는다. 나눠 부르면 같은 목록을 두 번
+  // 받는 셈이고, 그사이 검수가 하나 통과되면 count 가 늘어 첫 장과 나머지가
+  // 어긋난다.
+  const wordsPromise = getDailyWords(HOME_WORDS).catch((error: unknown) => {
     console.error("오늘의 단어를 불러오지 못했습니다.", error);
-    return null;
+    return [];
   });
 
   // **토큰은 catch 밖에서 읽는다.** 안에 넣으면 쿠키 접근이 일으키는
@@ -55,14 +66,8 @@ export default async function Home() {
   // 쌓인다. 그러면 진짜 오류가 그 사이에 묻힌다.
   const token = await getToken();
 
-  // 순위 카드는 곁들이는 것이라 실패해도 홈을 막지 않는다. 오늘의 단어와
-  // 같은 이유로 조용히 삼키지 않고 로그는 남긴다.
-  const boardPromise = fetchBoard("weekly", token ?? undefined).catch(
-    (error: unknown) => {
-      console.error("순위표를 불러오지 못했습니다.", error);
-      return null;
-    },
-  );
+  // 순위는 홈에서 뺐다. "나" 탭과 순위표 화면이 맡는다. 부르지도 않으므로
+  // 홈이 뜨는 데 필요한 왕복이 하나 줄었다.
 
   // 일일공부는 로그인해야 쓸 수 있다. 게스트에게는 아예 안 물어본다 -
   // 못 누르는 카드를 띄워두면 눌러보고 로그인으로 튕기는 경험이 된다.
@@ -84,19 +89,14 @@ export default async function Home() {
       })
     : Promise.resolve(null);
 
-  const [user, word, board, daily, due]: [
+  const [user, words, daily, due]: [
     User | null,
-    WordListItem | null,
-    Board | null,
+    WordListItem[],
     StudyProgress | null,
     ReviewDue | null,
-  ] = await Promise.all([
-    userPromise,
-    wordPromise,
-    boardPromise,
-    dailyPromise,
-    duePromise,
-  ]);
+  ] = await Promise.all([userPromise, wordsPromise, dailyPromise, duePromise]);
+
+  const [word, ...rest] = words;
 
   return (
     <>
@@ -104,20 +104,25 @@ export default async function Home() {
           문제풀이와 내정보는 각자 다른 배경을 받을 예정이다. */}
       <SurfaceLayer variant="surface-learn" />
 
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pt-6">
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pt-6 pb-8">
         <Greeting user={user} />
-        {word ? <DailyWord word={word} /> : <DailyWordUnavailable />}
 
-        {/* 오늘 할 일이 먼저, 결과가 그다음이다. 순위는 스무 줄이 아니라
-            상위 셋과 내 줄만 - 여기 다 펼치면 홈이 순위표 화면이 되고
-            그러면 순위표 화면이 있을 이유가 없어진다. */}
+        {/* 오늘 할 일이 맨 위다. 앱을 열었을 때 "뭘 해야 하나" 에 먼저
+            답하고, 그다음이 볼거리다. 아래에 두면 단어를 지나쳐야 보인다.
+
+            순위는 홈에서 뺐다. "나" 탭의 MyStandings 와 순위표 화면이
+            이미 그리고 있고, 홈에 두면 같은 모양의 카드가 늘어서서
+            무엇이 오늘 할 일인지가 흐려진다. */}
         {user && (
-          <div className="mb-3 flex flex-col gap-2">
+          <div className="mt-5 flex flex-col gap-2">
             <DailyCard today={daily} />
             {due && <ReviewCard due={due} />}
           </div>
         )}
-        {board && <BoardPreview board={board} />}
+
+        {word ? <DailyWord word={word} /> : <DailyWordUnavailable />}
+
+        {rest.length > 0 && <UpNext words={rest} />}
       </main>
     </>
   );
@@ -164,10 +169,11 @@ function Greeting({ user }: { user: User | null }) {
 /** 오늘의 단어. 포스터처럼 크게 두고 아래로 뜻과 진입을 붙인다. */
 function DailyWord({ word }: { word: WordListItem }) {
   return (
-    <section
-      aria-labelledby="daily-word"
-      className="mt-8 flex flex-1 flex-col justify-center pb-10"
-    >
+    // justify-center 를 쓰지 않는다. 남은 공간을 다 먹고 가운데에 서면
+    // 위아래가 크게 비는데, 아래에 "이어서 볼 단어" 가 붙으면서 그 자리가
+    // 채워졌다. flex-1 도 뺐다 - 이 상자가 늘어나면 아래 목록이 화면 밖으로
+    // 밀린다.
+    <section aria-labelledby="daily-word" className="mt-8">
       {/* 네 덩이가 80ms 씩 차이를 두고 올라온다: 라벨(0) · 단어(80) ·
           발음과 뜻(160) · 구분선과 버튼(240). 마지막 덩이는 요소가 둘이지만
           같은 240ms 를 공유해 한 덩이로 움직인다.
@@ -183,9 +189,19 @@ function DailyWord({ word }: { word: WordListItem }) {
           있는 것이 없으니 조작을 막지 않는다. */}
       <p className="rise text-sm font-medium text-focus">오늘의 단어</p>
 
+      {/* 글자 크기를 화면 폭에 맞춘다. 44px 고정이면 폰(390)에서 한 줄에
+          13자까지만 들어가는데, 지금 데이터의 최장 단어는 15자
+          (denormalization, maintainability)다. 넘치면 body 의
+          overflow-wrap: anywhere 가 글자 단위로 끊어서 "authenticatio / n"
+          처럼 한 글자만 다음 줄로 떨어진다 - 그 규칙은 가로 스크롤을 막는
+          것이라 풀 수 없으므로 이쪽을 줄인다.
+
+          8.2vw 는 390 폭에서 32px 이고, 그 크기로 15자가 한 줄에 들어간다.
+          아래를 32px 로 막아 더 좁은 화면(320)에서도 그 이상 안 줄고,
+          위를 44px 로 막아 넓은 화면에서는 지금 크기를 그대로 쓴다. */}
       <h1
         id="daily-word"
-        className="rise mt-3 font-mono text-[2.75rem] leading-none font-bold tracking-tighter text-slate-50 [animation-delay:80ms]"
+        className="rise mt-3 font-mono text-[clamp(2rem,8.2vw,2.75rem)] leading-none font-bold tracking-tighter text-slate-50 [animation-delay:80ms]"
       >
         {word.term}
       </h1>
@@ -246,6 +262,45 @@ function DailyWord({ word }: { word: WordListItem }) {
 }
 
 /**
+ * 오늘의 단어 다음에 이어지는 것들.
+ *
+ * 첫 장 하나만 두면 화면 아래가 비어서 스크롤할 것이 있다는 신호가 없다.
+ * 앱에서 그 신호가 없으면 첫 화면이 전부인 줄 안다.
+ *
+ * **목록 화면과 같은 카드를 쓴다.** 홈이라고 따로 그리면 누름 반응·포커스·
+ * 색이 두 벌이 되고, 저쪽에 쌓인 판단(active:scale 을 실측으로 0.96 으로
+ * 정한 것 같은)을 여기서 다시 밟게 된다. 크기만 compact 로 줄인다.
+ *
+ * 발음기호와 한글 발음은 넘기지 않는다. 여기 넣으면 한 줄이 세 줄이 되고
+ * 목록이 아니라 카드 더미가 된다. 눌러서 상세로 가면 다 있다.
+ */
+function UpNext({ words }: { words: WordListItem[] }) {
+  return (
+    // flex-1 로 남은 세로 공간을 먹는다. 이게 없으면 큰 폰에서 목록 아래가
+    // 비고, 카드 수로 그것을 맞추려 들면 화면 크기마다 값이 달라진다
+    // (390x844 에 맞춘 수가 430x932 에서는 85px 이 남는다).
+    <section aria-labelledby="up-next" className="mt-9 flex flex-1 flex-col">
+      <h2 id="up-next" className="text-xs font-medium text-slate-400">
+        오늘 이어서 볼 단어
+      </h2>
+
+      <ul className="mt-2.5 flex flex-col gap-2">
+        {words.map((word) => (
+          <li key={word.id}>
+            <LearningCard
+              href={routes.wordDetail(word.id)}
+              title={word.term}
+              subtitle={word.meaning}
+              compact
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
  * 단어를 못 불러왔을 때.
  *
  * 빈 화면을 두지 않는다. 여기서 막히면 사용자는 앱이 고장 난 것으로 본다.
@@ -255,7 +310,10 @@ function DailyWordUnavailable() {
     // role="alert" 는 쓰지 않는다. 그건 "지금 막 나타난 것" 을 알리는
     // 라이브 리전인데 이건 첫 렌더부터 있는 요소라 리더마다 동작이 갈린다.
     // h1 이라 어차피 읽힌다.
-    <section className="mt-8 flex flex-1 flex-col justify-center pb-10">
+    // 이쪽은 flex-1 justify-center 를 남긴다. 실패하면 아래에 붙을 목록도
+    // 없어서 화면이 정말로 비고, 그때는 문구가 가운데 있는 편이 낫다.
+    // pb 는 main 의 pb-8 이 맡는다.
+    <section className="mt-8 flex flex-1 flex-col justify-center">
       <h1 className="text-xl font-semibold tracking-tight text-slate-100">
         오늘의 단어를 불러오지 못했습니다.
       </h1>

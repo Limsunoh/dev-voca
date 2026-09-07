@@ -638,3 +638,56 @@ class CategoryLabelTest(TestCase):
         self.assertEqual(
             self.client.get(LIST_URL, {"category": "nonexistent"}).status_code, 400
         )
+
+
+class DailyWordsContractTest(TestCase):
+    """홈의 "오늘의 단어" 가 이 API 에 기대는 것 셋.
+
+    프론트(lib/api/vocab.ts 의 getDailyWords)는 날짜로 시작점을 정해 목록에서
+    연속 N개를 가져온다. 전용 엔드포인트가 없어 페이지 번호를 직접 계산하는데,
+    그 계산이 아래 셋을 전제한다. 하나라도 바뀌면 홈이 조용히 어긋난다 -
+    엉뚱한 단어가 나오거나(페이지 크기), 빈 자리를 가리키거나(count), 404 로
+    단어 칸이 통째로 빈다(범위 밖 페이지).
+
+    **창을 만드는 계산 자체는 여기서 다시 짜지 않는다.** 그건 프론트 테스트
+    (daily-words.test.mts)가 566일 전수로 본다. 여기서 흉내내면 두 벌이 따로
+    낡아가고, 정작 위험한 부분(페이지를 병렬로 받는 구조)은 재현되지도 않아
+    안전망처럼 보이기만 한다.
+    """
+
+    PAGE_SIZE = 20
+
+    def seed(self, reviewed, unreviewed=0):
+        Word.objects.bulk_create(
+            [
+                Word(term=f"daily-{i:04d}", meaning=f"뜻{i}", is_reviewed=True)
+                for i in range(reviewed)
+            ]
+            + [
+                Word(term=f"hidden-{i:04d}", meaning=f"미검수{i}", is_reviewed=False)
+                for i in range(unreviewed)
+            ]
+        )
+
+    def test_page_size_is_twenty(self):
+        """프론트가 인덱스를 페이지로 나눌 때 쓰는 값이다."""
+        self.seed(reviewed=25)
+
+        res = self.client.get(LIST_URL, {"page": 1})
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.json()["results"]), self.PAGE_SIZE)
+
+    def test_count_excludes_unreviewed(self):
+        """count 에 미검수가 섞이면 창이 빈 자리를 가리킨다."""
+        self.seed(reviewed=5, unreviewed=30)
+
+        self.assertEqual(self.client.get(LIST_URL).json()["count"], 5)
+
+    def test_page_past_the_end_is_404(self):
+        """범위 밖 페이지는 404 다. 프론트가 이걸 부르면 홈의 단어가 사라진다."""
+        self.seed(reviewed=25)
+
+        res = self.client.get(LIST_URL, {"page": 3})
+
+        self.assertEqual(res.status_code, 404)
