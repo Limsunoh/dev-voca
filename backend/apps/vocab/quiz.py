@@ -51,7 +51,9 @@ def _fingerprint(answer_id: int, nonce: str) -> str:
     return hmac.new(settings.SECRET_KEY.encode(), msg, hashlib.sha256).hexdigest()
 
 
-def answer_payload(answer_id: int, choice_ids: list[int]) -> dict:
+def answer_payload(
+    answer_id: int, choice_ids: list[int], answer_type: str = TARGET_WORD
+) -> dict:
     """문제 하나의 채점 정보. 서명하기 전의 알맹이다.
 
     정답 id 를 그대로 담지 않는다. signing.dumps 는 위조를 막을 뿐
@@ -77,15 +79,27 @@ def answer_payload(answer_id: int, choice_ids: list[int]) -> dict:
         # 정렬해서 담는다. 화면에 보이는 보기 순서와 토큰 안의 순서가
         # 같으면 "몇 번째에 담긴 것이 정답" 같은 단서가 생길 수 있다.
         "c": sorted(choice_ids),
+        # 정답을 어느 표에서 찾을지. 빈칸 문제는 문장을 보여주지만 답은
+        # 단어라, 이게 없으면 채점할 때 id 가 같은 엉뚱한 문장을 정답이라고
+        # 띄운다. 판(세션) 토큰이 같은 값을 "tt" 로 담는 것과 같은 이유다.
+        #
+        # 키 이름이 "t" 가 아닌 이유: 판(세션)은 이 알맹이를 자기 상태에
+        # 펼쳐 담는다(session.py 의 state["q"]). 거기에 이미 "t"(문제를 낸
+        # 시각)가 있어서, "t" 로 두면 스프레드에서 한쪽이 조용히 덮인다.
+        "at": answer_type,
     }
 
 
-def sign_question(answer_id: int, choice_ids: list[int]) -> str:
+def sign_question(
+    answer_id: int, choice_ids: list[int], answer_type: str = TARGET_WORD
+) -> str:
     """채점 정보를 그 자체로 하나의 토큰으로 만든다.
 
     문제를 하나씩 내주는 옛 경로(vocab 의 quiz/grade)가 쓴다.
     """
-    return signing.dumps(answer_payload(answer_id, choice_ids), salt=_SALT)
+    return signing.dumps(
+        answer_payload(answer_id, choice_ids, answer_type), salt=_SALT
+    )
 
 
 def resolve_answer(payload: dict, picked_id: int) -> tuple[bool, int] | None:
@@ -108,8 +122,8 @@ def resolve_answer(payload: dict, picked_id: int) -> tuple[bool, int] | None:
     return None
 
 
-def grade_answer(token: str, picked_id: int) -> tuple[bool, int] | None:
-    """(정답 여부, 정답 id) 를 돌려준다. 토큰이 위조·만료면 None.
+def grade_answer(token: str, picked_id: int) -> tuple[bool, int, str] | None:
+    """(정답 여부, 정답 id, 정답 종류) 를 돌려준다. 토큰이 위조·만료면 None.
 
     실패를 예외로 올리지 않는 이유: 사용자가 보내는 값이라 잘못된 토큰이
     정상 경로다. 여기서 터뜨리면 500 이 되고, 호출부는 400 으로 답해야 한다.
@@ -123,7 +137,23 @@ def grade_answer(token: str, picked_id: int) -> tuple[bool, int] | None:
     payload = _load(token)
     if payload is None:
         return None
-    return resolve_answer(payload, picked_id)
+    resolved = resolve_answer(payload, picked_id)
+    if resolved is None:
+        return None
+    correct, answer_id = resolved
+
+    # 종류가 없거나 모르는 값이면 채점하지 않는다.
+    #
+    # 단어로 떨어뜨리고 싶어지는 자리인데 그러면 안 된다. 배포 직전
+    # TOKEN_MAX_AGE 안에 발급된 문장 토큰이 그 창에 남아 있고, 그것을
+    # 단어로 읽으면 상황 고르기를 풀던 사람에게 **엉뚱한 단어 해설**이
+    # 뜬다(정답 id 가 Sentence pk 인데 같은 번호의 Word 를 찾는다).
+    # 잘못 외우게 하느니 "새 문제를 받아주세요" 가 낫다 - 호출부가 그
+    # 문구로 400 을 낸다. 창이 지나면 이 분기는 다시 안 걸린다.
+    answer_type = payload.get("at")
+    if answer_type not in (TARGET_WORD, TARGET_SENTENCE):
+        return None
+    return correct, answer_id, answer_type
 
 
 def _valid_payload(payload: object) -> bool:

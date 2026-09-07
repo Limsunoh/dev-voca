@@ -1,3 +1,5 @@
+import random
+
 from django.db.models import CharField, QuerySet, Value
 from django.db.models.functions import MD5, Cast, Concat
 from django_filters.rest_framework import DjangoFilterBackend
@@ -12,8 +14,18 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import LearningItem, Sentence, Word
-from .quiz import grade_answer, make_question, sign_question
+from .quiz import (
+    TARGET_SENTENCE,
+    TARGET_WORD,
+    QuizKind,
+    grade_answer,
+    make_blank_question,
+    make_question,
+    make_situation_question,
+    sign_question,
+)
 from .serializers import (
+    QuizSentenceSerializer,
     QuizWordSerializer,
     SentenceDetailSerializer,
     SentenceListSerializer,
@@ -305,7 +317,18 @@ class WordViewSet(LearningItemViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        correct, answer_id = graded
+        correct, answer_id, answer_type = graded
+
+        # **종류를 반드시 확인한다.** 토큰의 salt 가 단어·문장 공용이라
+        # 문장 문제의 토큰도 여기서 정상적으로 풀린다. 그대로 두면 정답
+        # id 가 Sentence pk 인 채로 Word 를 조회해, 같은 번호의 엉뚱한
+        # 단어가 응답에 실린다 - 보기 넷을 돌려가며 부르면 pk 로 표를
+        # 훑는 통로가 되고, 미검수 단어는 404 라 검수 상태까지 드러난다.
+        if answer_type != TARGET_WORD:
+            return Response(
+                {"detail": "문제 정보가 올바르지 않습니다. 새 문제를 받아주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # 정답 단어는 항상 내려준다. 틀렸을 때 무엇이 답이었는지 봐야
         # 학습이 된다.
@@ -380,6 +403,11 @@ class SentenceViewSet(LearningItemViewSet):
     ordering_fields = ["created_at", "difficulty", "id"]
     ordering = ["id"]
 
+    # 채점은 POST 지만 DB 에 쓰지 않는다 - 토큰을 풀어 맞는지 보고 정답을
+    # 조회할 뿐이다. 단어 쪽 grade 와 같은 이유로 익명에게 연다. 문제풀이는
+    # 로그인 없이 둘러보는 경로에도 있다.
+    SAFE_POST_ACTIONS = ("grade",)
+
     @action(detail=False)
     def kinds(self, request: Request) -> Response:
         """종류 목록(실무 표현/에러 메시지). 분류와 같은 이유로 서버가 준다."""
@@ -388,4 +416,165 @@ class SentenceViewSet(LearningItemViewSet):
                 {"value": value, "label": label}
                 for value, label in Sentence.Kind.choices
             ]
+        )
+
+    @action(detail=False)
+    def quiz(self, request: Request) -> Response:
+        """문장 문제 하나를 낸다.
+
+        단어 쪽 quiz 와 같은 이유로 출제를 서버에서 한다 - 오답을 프론트에서
+        뽑으면 전부 받아야 하고, 정답을 응답에 담으면 개발자도구로 보인다.
+
+        유형이 둘이고 **둘 다 실패할 수 있다.**
+        - blank(빈칸 채우기): 단어가 들어 있는 문장에서만 낼 수 있다.
+          2026-08 기준 380개 중 162개에는 단어가 없다.
+        - situation(상황 고르기): 상황(context)이 채워진 문장만.
+
+        그래서 하나가 안 되면 다른 쪽으로 넘어간다. 유형을 지정해서 왔는데
+        그 유형을 못 내면 그대로 404 다 - 조용히 다른 유형을 내면 사용자가
+        고른 것과 다른 문제가 나온다.
+
+        ?category=git     분류를 좁힌다
+        ?kind=blank       유형을 고정한다. 없으면 무작위
+        ?exclude=1,2,3    방금 낸 문장을 다시 내지 않는다
+        """
+        # 목록과 달리 filter_queryset 을 쓰지 않는다. 단어 쪽과 같은 이유다 -
+        # SearchFilter 로 풀을 좁혀 정답 후보를 추릴 수 있다.
+        pool = self.model.objects.visible()
+
+        category = request.query_params.get("category")
+        if category:
+            if category not in self.model.Category.values:
+                return Response(
+                    {"detail": "그런 분류는 없습니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            pool = pool.filter(category=category)
+
+        kind = request.query_params.get("kind")
+        if kind and kind not in QuizKind.SENTENCE_KINDS:
+            return Response(
+                {"detail": "그런 문제 유형은 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        exclude = _parse_ids(request.query_params.get("exclude", ""))
+
+        # 유형을 안 정했으면 무작위로 고르되, 못 내면 남은 쪽으로 넘어간다.
+        # 순서를 섞는 이유: 앞의 것을 늘 먼저 시도하면 그 유형이 실패하기
+        # 쉬울 때만 다른 유형이 나와서 비율이 한쪽으로 쏠린다.
+        order = (
+            [kind]
+            if kind
+            else random.sample(QuizKind.SENTENCE_KINDS, k=len(QuizKind.SENTENCE_KINDS))
+        )
+
+        question = None
+        for one in order:
+            if one == QuizKind.BLANK:
+                question = make_blank_question(
+                    pool, Word.objects.visible(), exclude_sentence_ids=exclude
+                )
+            else:
+                question = make_situation_question(pool, exclude_ids=exclude)
+            if question is not None:
+                break
+
+        if question is None:
+            return Response(
+                {"detail": "문제를 낼 문장이 모자랍니다. 분류를 넓혀보세요."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "kind": question.kind,
+                "kind_label": question.kind_label,
+                "question": question.question,
+                "prompt": question.prompt,
+                "category": question.category,
+                "category_label": question.category_label,
+                "choices": [{"id": c.id, "text": c.text} for c in question.choices],
+                # 빈칸 문제는 지문이 문장인데 정답은 단어다. 화면이 이걸 보고
+                # 다음 문제의 exclude 를 어느 쪽 id 로 보낼지 정한다.
+                "answer_type": question.answer_type,
+                "source_sentence_id": question.source_sentence_id,
+                "token": sign_question(
+                    question.answer_id,
+                    [c.id for c in question.choices],
+                    answer_type=question.answer_type,
+                ),
+            }
+        )
+
+    @action(detail=False, methods=["post"])
+    def grade(self, request: Request) -> Response:
+        """고른 보기가 정답인지 알려주고 해설을 준다.
+
+        단어 쪽 grade 와 규칙이 같다. 다른 것은 **정답을 어느 표에서
+        찾느냐** 하나뿐이고, 그건 토큰에 담아둔 종류로 갈린다. 빈칸 문제는
+        문장을 보여주지만 정답은 단어라, 여기서 갈리지 않으면 id 가 같은
+        엉뚱한 문장을 정답이라고 띄운다.
+        """
+        if not isinstance(request.data, dict):
+            return Response(
+                {"detail": "요청 형식이 올바르지 않습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        token = request.data.get("token")
+        picked = request.data.get("picked")
+
+        if not isinstance(token, str):
+            return Response(
+                {"detail": "문제 정보가 올바르지 않습니다. 새 문제를 받아주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # bool 을 빼는 이유는 단어 쪽과 같다 - True 는 int 라 1 번 보기를
+        # 고른 것으로 처리된다.
+        if isinstance(picked, bool) or not isinstance(picked, int):
+            picked = -1
+
+        graded = grade_answer(token, picked)
+        if graded is None:
+            return Response(
+                {"detail": "문제 정보가 올바르지 않습니다. 새 문제를 받아주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        correct, answer_id, answer_type = graded
+
+        # 단어 쪽과 같은 이유로 종류를 확인한다. 여기서는 두 종류를 다
+        # 다루지만(빈칸 문제의 정답은 단어다), 알 수 없는 값이면 어느
+        # 표를 봐야 할지 정할 수 없으므로 거절한다.
+        if answer_type not in (TARGET_WORD, TARGET_SENTENCE):
+            return Response(
+                {"detail": "문제 정보가 올바르지 않습니다. 새 문제를 받아주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # visible() 로 좁히는 이유는 단어 쪽과 같다. 문제를 낸 뒤 검수가
+        # 취소됐을 수 있고, 그때 정답을 보여주면 아무도 확인하지 않은
+        # 내용을 그대로 외우게 된다.
+        if answer_type == TARGET_WORD:
+            found = Word.objects.visible().filter(pk=answer_id).first()
+            body = {"word": QuizWordSerializer(found).data} if found else None
+        else:
+            found = Sentence.objects.visible().filter(pk=answer_id).first()
+            body = {"sentence": QuizSentenceSerializer(found).data} if found else None
+
+        if body is None:
+            return Response(
+                {"detail": "이 문제는 지금 풀 수 없습니다. 다음 문제로 넘어가주세요."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "correct": correct,
+                "answer_id": answer_id,
+                "answer_type": answer_type,
+                **body,
+            }
         )

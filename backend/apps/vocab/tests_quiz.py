@@ -19,11 +19,13 @@ from django.test import TestCase
 
 from .models import Word
 from .quiz import (
+    _SALT,
     CHOICE_COUNT,
     TARGET_WORD,
     TOKEN_MAX_AGE,
     QuizKind,
     _mask_term,
+    answer_payload,
     grade_answer,
     make_question,
     sign_question,
@@ -65,11 +67,11 @@ class QuizTokenTest(TestCase):
     """정답 토큰."""
 
     def test_grades_correct_pick(self):
-        self.assertEqual(grade_answer(sign(42), 42), (True, 42))
+        self.assertEqual(grade_answer(sign(42), 42), (True, 42, "word"))
 
     def test_grades_wrong_pick(self):
         """틀려도 정답 id 는 알려준다. 해설을 보여줘야 한다."""
-        self.assertEqual(grade_answer(sign(42), -2), (False, 42))
+        self.assertEqual(grade_answer(sign(42), -2), (False, 42, "word"))
 
     def test_forged_token_is_rejected(self):
         self.assertIsNone(grade_answer("아무거나", 1))
@@ -100,9 +102,14 @@ class QuizTokenTest(TestCase):
             base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
         )
 
-        # 담긴 것은 보기 넷과 지문·nonce 뿐이다. 정답을 따로 담은
-        # 자리가 있으면 풀자마자 답이 보인다.
-        self.assertEqual(set(payload), {"a", "n", "c"})
+        # 담긴 것은 보기 넷과 지문·nonce, 그리고 정답의 종류뿐이다.
+        # 정답 자체를 담은 자리가 있으면 풀자마자 답이 보인다.
+        #
+        # "at"(종류)는 word/sentence 둘 중 하나라 어느 보기가 정답인지는
+        # 알려주지 않는다. 빈칸 문제가 문장을 보여주면서 답은 단어라,
+        # 채점할 때 어느 표에서 찾을지 구분하려고 담는다.
+        self.assertEqual(set(payload), {"a", "n", "c", "at"})
+        self.assertIn(payload["at"], ("word", "sentence"))
         self.assertEqual(sorted(payload["c"]), choices)
         # 지문은 되돌릴 수 없는 값이라 보기와 무관해야 한다.
         # 정답이 무엇인지는 SECRET_KEY 로 넷을 하나씩 대조해야만 나온다.
@@ -114,7 +121,7 @@ class QuizTokenTest(TestCase):
 
     def test_pick_outside_choices_is_wrong(self):
         """보기에 없는 값을 보내도 터지지 않고 오답이 된다."""
-        self.assertEqual(grade_answer(sign(42), 999), (False, 42))
+        self.assertEqual(grade_answer(sign(42), 999), (False, 42, "word"))
 
 
 class MakeQuestionTest(TestCase):
@@ -424,11 +431,45 @@ class TokenSecrecyTest(TestCase):
         body = token.split(":")[0]
         return json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
 
+    def test_a_token_without_a_kind_is_refused(self):
+        """종류가 없는 토큰은 채점하지 않는다.
+
+        단어로 떨어뜨리면, 이 필드가 생기기 전(배포 직전 TOKEN_MAX_AGE)
+        에 발급된 문장 토큰이 단어로 읽혀 엉뚱한 해설이 뜬다. 정답 id 가
+        Sentence pk 인데 같은 번호의 Word 를 찾기 때문이다.
+        """
+        # salt 는 리터럴로 박지 않는다. 어긋나면 서명 단계에서 먼저
+        # 거절돼, 종류 검사에 닿지도 못한 채 이 테스트가 초록으로 남는다.
+        choices = [11, 22, 33, 44]
+
+        # 대조군. 같은 방식으로 만든 정상 토큰은 채점돼야 한다 - 이게
+        # 빨개지면 거절 이유가 "종류 없음" 이 아니라 서명 쪽이다.
+        ok = signing.dumps(answer_payload(11, choices), salt=_SALT)
+        self.assertIsNotNone(grade_answer(ok, 11))
+
+        # 옛 형식을 그대로 만든다 - 서명은 유효하고 "at" 만 없다.
+        payload = answer_payload(11, choices)
+        del payload["at"]
+        legacy = signing.dumps(payload, salt=_SALT)
+
+        self.assertIsNone(grade_answer(legacy, 11))
+
+    def test_a_token_with_an_unknown_kind_is_refused(self):
+        """모르는 종류면 어느 표를 봐야 할지 정할 수 없다."""
+        payload = answer_payload(11, [11, 22, 33, 44])
+        payload["at"] = "article"
+        forged = signing.dumps(payload, salt=_SALT)
+
+        self.assertIsNone(grade_answer(forged, 11))
+
     def test_payload_carries_no_answer_id(self):
         """보기 넷 말고 정답을 따로 담은 자리가 있으면 풀자마자 답이 보인다."""
         payload = self.decode(sign_question(11, [11, 22, 33, 44]))
 
-        self.assertEqual(set(payload), {"a", "n", "c"})
+        # "at" 는 정답의 종류(word/sentence)라 어느 보기가 정답인지는
+        # 드러내지 않는다. 그 값이 정답 id 를 유추하게 하지도 않는다.
+        self.assertEqual(set(payload), {"a", "n", "c", "at"})
+        self.assertNotIn(11, payload.values())
         self.assertEqual(sorted(payload["c"]), [11, 22, 33, 44])
 
     def test_fingerprint_is_not_a_plain_hash_of_the_id(self):
