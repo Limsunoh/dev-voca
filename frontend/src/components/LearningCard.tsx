@@ -39,6 +39,16 @@ export type LearningCardProps = {
    * 문장은 고정폭으로 길게 늘어놓으면 오히려 읽기 어렵다.
    */
   monoTitle?: boolean;
+  /**
+   * 한 줄짜리로 줄여 그린다. 기본은 false.
+   *
+   * 목록 화면은 카드 하나에 발음·분류·난이도까지 담아 크게 그리지만, 홈처럼
+   * 곁들이는 자리에서는 제목과 뜻만 있으면 되고 여러 장이 들어가야 한다.
+   * 크기만 다르고 나머지(누름 반응·포커스·색)는 같아야 해서 별도 컴포넌트로
+   * 나누지 않는다 - 나누면 여기 쌓인 판단(0.96 실측 같은 것)을 저쪽에서
+   * 다시 밟게 된다.
+   */
+  compact?: boolean;
 };
 
 export function LearningCard({
@@ -50,6 +60,7 @@ export function LearningCard({
   badge,
   tag,
   monoTitle = true,
+  compact = false,
 }: LearningCardProps) {
   return (
     <Link
@@ -76,7 +87,9 @@ export function LearningCard({
       // transform 만 적어두면 전환 대상에 안 잡혀서 크기가 툭 바뀐다
       // (실측으로 확인했다 - scale 은 0.985 로 바뀌는데 transitionProperty
       // 에는 없었다).
-      className="group block rounded-lg border border-slate-200 bg-white p-4 transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/12 dark:bg-slate-950/45 dark:hover:border-white/25"
+      className={`group block rounded-lg border border-slate-200 bg-white transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/12 dark:bg-slate-950/45 dark:hover:border-white/25 ${
+        compact ? "px-4 py-3" : "p-4"
+      }`}
     >
       <div className="flex items-start justify-between gap-3">
         {/* min-w-0 이 없으면 flex 항목이 내용보다 작아지지 못한다. 제목에
@@ -86,9 +99,9 @@ export function LearningCard({
             글자를 끊는 쪽은 globals.css 의 base 규칙이 맡는다. */}
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <h2
-            className={`text-xl font-semibold text-slate-900 group-hover:underline dark:text-slate-50 ${
-              monoTitle ? "font-mono" : ""
-            }`}
+            className={`font-semibold text-slate-900 group-hover:underline dark:text-slate-50 ${
+              compact ? "text-sm" : "text-xl"
+            } ${monoTitle ? "font-mono" : ""}`}
           >
             {title}
           </h2>
@@ -112,7 +125,13 @@ export function LearningCard({
         {badge}
       </div>
 
-      <p className="mt-1.5 text-lg text-slate-700 dark:text-slate-200">
+      {/* compact 에서는 한 줄로 자른다. 두 줄이 되면 카드 높이가 제각각이라
+          목록이 고르지 않게 보인다. 뜻 전체는 눌러서 상세로 가면 있다. */}
+      <p
+        className={`text-slate-700 dark:text-slate-200 ${
+          compact ? "mt-0.5 truncate text-xs" : "mt-1.5 text-lg"
+        }`}
+      >
         {subtitle}
       </p>
 

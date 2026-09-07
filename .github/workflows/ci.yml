@@ -128,5 +128,14 @@ jobs:
       - name: 린트
         run: npm run lint
 
+      - name: 테스트
+        # node 내장 러너(--test)를 tsx 로 감싸 돌린다. 별도 테스트
+        # 프레임워크를 넣지 않은 이유는 런타임 의존성 셋을 지키려던 것과
+        # 같다 - tsx 는 devDependency 라 번들에 안 들어간다.
+        #
+        # 빌드 앞에 둔다. 빌드가 1분 가까이 걸리는데 테스트는 몇 초라,
+        # 깨졌으면 빨리 아는 편이 낫다.
+        run: npm test
+
       - name: 빌드
         run: npm run build
