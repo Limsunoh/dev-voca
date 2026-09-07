@@ -51,6 +51,23 @@ class LearningItem(models.Model):
         FRONTEND = "frontend", "프론트엔드(Frontend)"
         CS = "cs", "CS 기초(Computer Science)"
 
+    class ExamSubject(models.TextChoices):
+        """정보처리기사 과목. 필기 5과목을 그대로 쓴다.
+
+        분류(Category)와 따로 두는 이유: 한 항목이 양쪽에 다 속한다.
+        deadlock 은 CS 기초이면서 정처기 "프로그래밍 언어 활용" 이다.
+        분류에 과목을 섞으면 그 단어를 어느 한쪽에서만 만나게 된다.
+
+        라벨에 과목 번호를 붙인다. 수험생은 "2과목" 으로 부르고 교재도
+        그 순서를 따르므로, 이름만 적으면 자기가 아는 것과 맞춰보기 어렵다.
+        """
+
+        DESIGN = "design", "1과목 소프트웨어 설계"
+        DEVELOP = "develop", "2과목 소프트웨어 개발"
+        DATABASE = "database", "3과목 데이터베이스 구축"
+        LANGUAGE = "language", "4과목 프로그래밍 언어 활용"
+        SYSTEM = "system", "5과목 정보시스템 구축 관리"
+
     difficulty = models.PositiveSmallIntegerField(
         "난이도", choices=Difficulty.choices, default=Difficulty.NORMAL
     )
@@ -61,6 +78,21 @@ class LearningItem(models.Model):
     )
     source = models.CharField(
         "출처", max_length=100, blank=True, help_text="예: 정처기 기출, AI 생성"
+    )
+    # 정처기 출제 범위인가. 분류(category)와 독립이다 - deadlock 은 CS 기초
+    # 이면서 정처기라, 어느 한쪽으로만 두면 다른 쪽에서 안 보인다.
+    #
+    # 과목(exam_subject)이 아니라 이 불리언이 노출을 가른다. 과목은 아직
+    # 안 정한 항목이 있을 수 있고, 그때도 "정처기 범위" 로는 묶여야 한다.
+    is_exam = models.BooleanField(
+        "정처기 범위", default=False, help_text="정보처리기사 출제 범위에 드는 항목"
+    )
+    exam_subject = models.CharField(
+        "정처기 과목",
+        max_length=20,
+        blank=True,
+        choices=ExamSubject.choices,
+        help_text="정처기 범위일 때만 채운다. 비워두면 과목 미분류.",
     )
     # AI가 생성한 항목은 False 로 저장되고, Admin 검수 후 True 가 된다.
     # 사용자에게 노출되는 조회는 반드시 is_reviewed=True 로 필터링한다.
@@ -129,6 +161,20 @@ class Word(LearningItem):
                     category__in=[*LearningItem.Category.values, ""]
                 ),
                 name="%(app_label)s_%(class)s_category_valid",
+            ),
+            # 과목도 같은 이유로 막는다. 위 category 주석 참고.
+            models.CheckConstraint(
+                condition=models.Q(
+                    exam_subject__in=[*LearningItem.ExamSubject.values, ""]
+                ),
+                name="%(app_label)s_%(class)s_exam_subject_valid",
+            ),
+            # 정처기 범위가 아닌데 과목이 붙어 있으면 앞뒤가 안 맞는다.
+            # 화면은 is_exam 으로 거르므로 그런 항목은 과목만 달린 채
+            # 어디에도 안 나오고, Admin 에서 보면 정처기인 줄 알게 된다.
+            models.CheckConstraint(
+                condition=models.Q(is_exam=True) | models.Q(exam_subject=""),
+                name="%(app_label)s_%(class)s_exam_subject_needs_flag",
             ),
         ]
 
@@ -219,6 +265,20 @@ class Sentence(LearningItem):
             models.CheckConstraint(
                 condition=models.Q(kind__in=SentenceKind.values),
                 name="%(app_label)s_%(class)s_kind_valid",
+            ),
+            # 과목도 같은 이유로 막는다. 위 category 주석 참고.
+            models.CheckConstraint(
+                condition=models.Q(
+                    exam_subject__in=[*LearningItem.ExamSubject.values, ""]
+                ),
+                name="%(app_label)s_%(class)s_exam_subject_valid",
+            ),
+            # 정처기 범위가 아닌데 과목이 붙어 있으면 앞뒤가 안 맞는다.
+            # 화면은 is_exam 으로 거르므로 그런 항목은 과목만 달린 채
+            # 어디에도 안 나오고, Admin 에서 보면 정처기인 줄 알게 된다.
+            models.CheckConstraint(
+                condition=models.Q(is_exam=True) | models.Q(exam_subject=""),
+                name="%(app_label)s_%(class)s_exam_subject_needs_flag",
             ),
             # slug 는 비어 있을 수 있으므로(Admin 에서 넣은 문장) unique=True 를
             # 못 쓴다. 빈 값이 아닐 때만 유일하게 만든다.

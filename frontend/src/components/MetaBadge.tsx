@@ -88,3 +88,48 @@ export function CategoryChip({
     </Link>
   );
 }
+
+
+/**
+ * 정처기 범위 표시.
+ *
+ * 분류 칩과 나란히 서지만 색이 다르다. 분류는 이 항목이 어느 갈래냐는
+ * 사실이고, 이건 "시험에 나온다" 는 다른 축이라 같은 회색으로 두면
+ * 분류가 하나 더 있는 것처럼 읽힌다.
+ *
+ * **앰버를 쓰지 않는다.** 난이도 "보통" 이 앰버라 한 카드에 같은 색
+ * 알약이 둘 뜬다 - 새로 넣은 15개 중 8개가 난이도 2 라 흔한 조합이다.
+ * DifficultyBadge 가 "강조색과 겹치지 않는 색을 쓴다" 로 세운 원칙을
+ * 이쪽도 따른다. 바이올렛은 난이도 세 단계(emerald·amber·rose) 어디와도
+ * 안 겹치고 분류 칩의 회색과도 구분된다.
+ *
+ * shrink-0 을 쓰는 것은 CategoryChip 과 반대다. 거기는 분류 이름이
+ * "CS 기초(Computer Science)" 처럼 길어 줄어들 수 있어야 하지만, 이쪽은
+ * "정처기 N과목" 으로 최대 일곱 자라 줄어들 일이 없다. DifficultyBadge 가
+ * 같은 이유로 shrink-0 을 유지한다.
+ *
+ * 과목까지 보여주는 이유: 정처기 준비생은 과목 단위로 공부한다. "정처기"
+ * 만 있으면 목록을 훑다가 이게 몇 과목인지 상세로 들어가야 알 수 있다.
+ * 라벨이 "3과목 데이터베이스 구축" 처럼 길어서 번호만 잘라 쓴다 - 카드에
+ * 통째로 넣으면 한 줄을 혼자 먹는다.
+ */
+export function ExamBadge({
+  subjectLabel,
+}: {
+  /** "3과목 데이터베이스 구축" 형태. 과목 미분류면 빈 문자열. */
+  subjectLabel?: string;
+}) {
+  // 라벨 앞의 "N과목" 만 뗀다. 없으면(미분류) 그냥 "정처기".
+  const short = subjectLabel?.match(/^\d+과목/)?.[0];
+
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-400/15 px-2.5 py-0.5 text-sm text-violet-200">
+      정처기
+      {short && (
+        // 과목 번호는 부가 정보라 한 단계 흐리게. 색까지 같으면 "정처기
+        // 3과목" 이 한 덩어리 이름처럼 읽힌다.
+        <span className="text-violet-200/70">{short}</span>
+      )}
+    </span>
+  );
+}

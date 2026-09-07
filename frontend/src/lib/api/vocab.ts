@@ -17,6 +17,12 @@ const BASE = "/api/vocab/words/";
 export type WordListItem = {
   id: number;
   term: string;
+  /** 정처기 출제 범위인가. 카드의 배지가 이걸 본다. */
+  is_exam?: boolean;
+  /** 정처기 과목 코드. 범위가 아니면 빈 문자열이다. */
+  exam_subject?: string;
+  /** "3과목 데이터베이스 구축" 처럼 번호가 앞에 붙은 이름. */
+  exam_subject_label?: string;
   /** IPA 발음기호. 확실하지 않은 단어는 빈 문자열이다. */
   pronunciation: string;
   /**
@@ -66,6 +72,16 @@ export type WordListParams = {
   category?: string;
   difficulty?: string;
   page?: string;
+  /**
+   * 정처기 범위만 볼 때 "true".
+   *
+   * 문자열인 이유: 그대로 쿼리스트링이 된다. 불리언으로 받으면 false 를
+   * 보낼지 말지를 여기서 또 판단해야 하는데, 안 보내는 것과 false 를
+   * 보내는 것이 백엔드에서 같은 뜻이라 굳이 구분할 것이 없다.
+   */
+  is_exam?: string;
+  /** 정처기 과목 코드(design·develop·database·language·system). */
+  exam_subject?: string;
   /**
    * 목록을 섞을 시드. 없으면 기본 정렬(가나다순)로 온다.
    *
@@ -201,6 +217,16 @@ export const getCategories = cache(() => fetchChoices(`${BASE}categories/`));
  */
 export const getDifficulties = cache(() =>
   fetchChoices(`${BASE}difficulties/`),
+);
+
+/**
+ * 정처기 과목 목록(1~5과목). 분류·난이도와 같은 이유로 백엔드에서 받는다.
+ *
+ * 화면에 적어두면 시험이 개편돼 과목이 바뀔 때 두 곳을 고쳐야 하고,
+ * 한쪽만 고치면 없는 과목으로 거르는 링크가 남는다.
+ */
+export const getExamSubjects = cache(() =>
+  fetchChoices(`${BASE}exam_subjects/`),
 );
 
 /**

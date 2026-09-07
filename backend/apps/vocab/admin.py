@@ -15,7 +15,16 @@ class WordAdmin(admin.ModelAdmin):
         "is_reviewed",
         "reading_reviewed",
     )
-    list_filter = ("is_reviewed", "reading_reviewed", "difficulty", "category")
+    list_filter = (
+        "is_reviewed",
+        "reading_reviewed",
+        "difficulty",
+        "category",
+        # 정처기 범위인데 과목이 안 붙은 것을 찾는 데 쓴다. 그 상태는
+        # 허용되지만(아직 안 정한 것) 과목 필터로는 영영 안 나온다.
+        "is_exam",
+        "exam_subject",
+    )
     search_fields = ("term", "meaning", "description")
     list_editable = ("is_reviewed", "reading_reviewed")
     readonly_fields = ("created_at", "updated_at")
@@ -38,6 +47,17 @@ class WordAdmin(admin.ModelAdmin):
         ),
         ("예문", {"fields": ("example", "example_translation")}),
         ("분류", {"fields": ("difficulty", "category", "source")}),
+        (
+            "정처기",
+            {
+                "fields": ("is_exam", "exam_subject"),
+                "description": (
+                    "분류와 다른 축이다. 한 항목이 CS 기초이면서 정처기 4과목일 수 있다. "
+                    "과목을 채우려면 먼저 '정처기 범위' 를 켜야 한다 - 안 켜고 과목만 "
+                    "고르면 DB 가 거절한다(어디에도 안 나오는 항목이 되기 때문)."
+                ),
+            },
+        ),
         ("검수", {"fields": ("is_reviewed", "created_at", "updated_at")}),
     )
 
@@ -70,7 +90,16 @@ class SentenceAdmin(admin.ModelAdmin):
         "is_reviewed",
         "reading_reviewed",
     )
-    list_filter = ("is_reviewed", "reading_reviewed", "kind", "difficulty", "category")
+    list_filter = (
+        "is_reviewed",
+        "reading_reviewed",
+        "kind",
+        "difficulty",
+        "category",
+        # 단어 쪽과 같은 이유. 위 WordAdmin 주석 참고.
+        "is_exam",
+        "exam_subject",
+    )
     search_fields = ("text", "translation", "context", "description")
     list_editable = ("is_reviewed", "reading_reviewed")
     readonly_fields = ("created_at", "updated_at")
@@ -91,6 +120,17 @@ class SentenceAdmin(admin.ModelAdmin):
         ),
         ("맥락", {"fields": ("kind", "context", "description")}),
         ("분류", {"fields": ("difficulty", "category", "source")}),
+        (
+            "정처기",
+            {
+                "fields": ("is_exam", "exam_subject"),
+                "description": (
+                    "분류와 다른 축이다. 한 항목이 CS 기초이면서 정처기 4과목일 수 있다. "
+                    "과목을 채우려면 먼저 '정처기 범위' 를 켜야 한다 - 안 켜고 과목만 "
+                    "고르면 DB 가 거절한다(어디에도 안 나오는 항목이 되기 때문)."
+                ),
+            },
+        ),
         ("검수", {"fields": ("is_reviewed", "created_at", "updated_at")}),
     )
 

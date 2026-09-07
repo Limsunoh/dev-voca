@@ -4,9 +4,14 @@ import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { ChoiceFilter } from "@/components/ChoiceFilter";
+import { ExamScopeFilter } from "@/components/ExamScopeFilter";
 import { FilterPanel } from "@/components/FilterPanel";
 import { LearnHeader } from "@/components/LearnHeader";
-import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
+import {
+  CategoryChip,
+  DifficultyBadge,
+  ExamBadge,
+} from "@/components/MetaBadge";
 import { LearningCard } from "@/components/LearningCard";
 import { Pagination } from "@/components/Pagination";
 import { SearchInput } from "@/components/SearchInput";
@@ -15,6 +20,7 @@ import {
   ApiError,
   getCategories,
   getDifficulties,
+  getExamSubjects,
   getWords,
 } from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
@@ -46,6 +52,11 @@ export default async function VocabPage({ searchParams }: PageProps) {
   const search = first(params.search);
   const category = first(params.category);
   const difficulty = first(params.difficulty);
+  // 정처기 범위만 보기. 값은 "true" 하나뿐이라 그것만 통과시킨다 -
+  // 아무 문자열이나 그대로 백엔드로 보내면 400 이 나고, 화면에는
+  // "불러오지 못했습니다" 만 뜬다.
+  const examOnly = first(params.is_exam) === "true" ? "true" : undefined;
+  const examSubject = first(params.exam_subject);
 
   // page 는 여기서 한 번만 정규화한다. 검증 없이 넘기면 "abc"·"2.7"·"-1" 이
   // 그대로 백엔드로 가 404 가 되고(DRF Paginator 가 거부한다), 화면에는
@@ -77,10 +88,19 @@ export default async function VocabPage({ searchParams }: PageProps) {
   // 분류 목록은 실패해도 빈 배열이라 절대 throw 하지 않으므로 그냥 await
   // 한다. 목록만 try 로 감싸면 catch 안에서도 분류를 그대로 쓸 수 있다
   // (백엔드가 죽어서 들어온 자리에서 백엔드를 다시 부르지 않는다).
-  const listPromise = getWords({ search, category, difficulty, page, shuffle });
-  const [categories, difficulties] = await Promise.all([
+  const listPromise = getWords({
+    search,
+    category,
+    difficulty,
+    page,
+    shuffle,
+    is_exam: examOnly,
+    exam_subject: examSubject,
+  });
+  const [categories, difficulties, examSubjects] = await Promise.all([
     getCategories(),
     getDifficulties(),
+    getExamSubjects(),
   ]);
 
   let data;
@@ -141,14 +161,40 @@ export default async function VocabPage({ searchParams }: PageProps) {
 
       {/* 필터 링크에는 시드를 싣지 않는다. 그래서 난이도나 분류를 누르면
           그 조건 안에서 새로 섞인 목록이 나온다. */}
-      <FilterPanel active={[difficulty, category]}>
+      <FilterPanel active={[difficulty, category, examOnly, examSubject]}>
+        {/* 정처기 줄이 맨 위다. 다른 조건은 목록을 좁히지만 이건 무엇을
+            공부하는지 자체를 바꾼다 - 정처기를 켠 사람에게 분류(Git·리뷰)는
+            부차적이고 과목이 먼저다.
+
+            ChoiceFilter 를 쓰지 않는 이유: 그건 여러 값 중 하나를 고르는
+            줄이고, 이건 켜고 끄는 하나다. 값이 하나뿐인 목록을 만들면
+            "전체 / 정처기" 처럼 읽혀 무엇이 기본인지 흐려진다. */}
+        <ExamScopeFilter
+          basePath={routes.words}
+          active={Boolean(examOnly)}
+          keep={{ search, category, difficulty }}
+        />
+
+        {/* 과목은 정처기를 켰을 때만 뜬다. 안 켠 사람에게는 5과목이
+            무슨 말인지 알 수 없는 줄이 하나 더 있는 셈이다. */}
+        {examOnly && (
+          <ChoiceFilter
+            label="과목"
+            paramName="exam_subject"
+            options={examSubjects}
+            basePath={routes.words}
+            selected={examSubject}
+            keep={{ search, category, difficulty, is_exam: examOnly }}
+          />
+        )}
+
         <ChoiceFilter
           label="난이도"
           paramName="difficulty"
           options={difficulties}
           basePath={routes.words}
           selected={difficulty}
-          keep={{ search, category }}
+          keep={{ search, category, is_exam: examOnly, exam_subject: examSubject }}
         />
 
         <CategoryFilter
@@ -157,6 +203,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
           selected={category}
           search={search}
           difficulty={difficulty}
+          extra={{ is_exam: examOnly, exam_subject: examSubject }}
         />
       </FilterPanel>
 
@@ -177,7 +224,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
         <div className="mt-8 flex flex-col items-center rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
           {/* 분류만 걸어 비었을 때 "등록된 단어가 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
-          {search || category || difficulty ? (
+          {search || category || difficulty || examOnly || examSubject ? (
             <>
               <p>조건에 맞는 단어가 없습니다.</p>
               {/* 필터가 접혀 있으면 "위에서 조건을 바꿔보세요" 는 안 보이는
@@ -212,10 +259,18 @@ export default async function VocabPage({ searchParams }: PageProps) {
                   />
                 }
                 tag={
-                  word.category_label ? (
-                    // 카드 전체가 이미 링크라 여기는 링크로 만들지 않는다.
-                    // 링크 안의 링크는 마크업이 깨지고 키보드 순서도 꼬인다.
-                    <CategoryChip label={word.category_label} />
+                  // 카드 전체가 이미 링크라 여기는 링크로 만들지 않는다.
+                  // 링크 안의 링크는 마크업이 깨지고 키보드 순서도 꼬인다.
+                  //
+                  // 정처기 배지가 앞이다. 분류는 566개 전부 갖고 있어 훑을 때
+                  // 눈에 안 들어오지만, 정처기는 일부만 달려서 그 자체가 신호다.
+                  word.is_exam || word.category_label ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {word.is_exam && (
+                        <ExamBadge subjectLabel={word.exam_subject_label} />
+                      )}
+                      <CategoryChip label={word.category_label} />
+                    </div>
                   ) : undefined
                 }
               />
@@ -229,7 +284,14 @@ export default async function VocabPage({ searchParams }: PageProps) {
           또 만나고 어떤 단어는 아예 못 만난다. */}
       <Pagination
         basePath={routes.words}
-        filters={{ search, category, difficulty, shuffle }}
+        filters={{
+          search,
+          category,
+          difficulty,
+          shuffle,
+          is_exam: examOnly,
+          exam_subject: examSubject,
+        }}
         currentPage={currentPage}
         hasPrevious={Boolean(data.previous)}
         hasNext={Boolean(data.next)}

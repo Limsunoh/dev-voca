@@ -68,7 +68,14 @@ class LearningItemViewSet(viewsets.ModelViewSet):
 
     permission_classes = [IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ["category", "difficulty"]
+    # is_exam·exam_subject 로 정처기 범위를 좁힌다.
+    #
+    # 두 파라미터의 오류 처리가 다르다. exam_subject 는 choices 라 없는
+    # 값이면 400 인데, is_exam 은 DjangoFilterBackend 가 true/True/1 과
+    # false/0 만 알아듣고 나머지(yes·on·2·abc)는 **필터를 통째로 무시**한다
+    # - 200 에 전체 목록이 나온다. 화면은 "true" 하나만 통과시키므로
+    # 그 경로로는 안 걸리고, API 를 직접 부르는 쪽에서만 드러난다.
+    filterset_fields = ["category", "difficulty", "is_exam", "exam_subject"]
 
     model: type[LearningItem]
     list_serializer: type[serializers.ModelSerializer]
@@ -154,6 +161,20 @@ class LearningItemViewSet(viewsets.ModelViewSet):
             [
                 {"value": value, "label": label}
                 for value, label in self.model.Category.choices
+            ]
+        )
+
+    @action(detail=False)
+    def exam_subjects(self, request: Request) -> Response:
+        """정처기 과목 목록. 분류·난이도와 같은 이유로 서버가 준다.
+
+        화면이 목록을 들고 있으면 과목이 바뀔 때(시험 개편) 두 곳을
+        고쳐야 하고, 한쪽만 고치면 없는 과목으로 거르는 링크가 남는다.
+        """
+        return Response(
+            [
+                {"value": value, "label": label}
+                for value, label in LearningItem.ExamSubject.choices
             ]
         )
 
@@ -399,7 +420,7 @@ class SentenceViewSet(LearningItemViewSet):
     # 문장은 본문·해석·나오는 상황까지 검색 대상이다. 에러 메시지를 찾을 때
     # 원문 일부를 그대로 붙여넣는 경우가 많아 text 검색이 특히 중요하다.
     search_fields = ["text", "translation", "context", "description"]
-    filterset_fields = ["category", "difficulty", "kind"]
+    filterset_fields = ["category", "difficulty", "kind", "is_exam", "exam_subject"]
     ordering_fields = ["created_at", "difficulty", "id"]
     ordering = ["id"]
 
