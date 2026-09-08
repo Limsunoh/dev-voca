@@ -153,6 +153,22 @@ def _bump_review(user, answers) -> None:
     if not seen:
         return
 
+    bump_review_states(user, seen)
+
+
+def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
+    """(종류, id) -> 맞았나 를 복습 상태에 반영한다.
+
+    자유 문제풀이(_bump_review)와 일일공부(daily_study)가 같이 쓴다.
+    **두 곳이 규칙을 따로 구현하면 한쪽만 고쳐지고, 그 차이는 복습
+    목록에서만 드러나 알아채기 어렵다.**
+
+    규칙은 위 _bump_review docstring 에 있다 - 맞히면 last_correct_at 만,
+    틀리면 is_wrong 과 streak=0. 어느 쪽도 streak 을 올리지 않는다.
+    """
+    if not seen:
+        return
+
     now = timezone.now()
     # **종류까지 걸어 조회한다.** id 만으로 좁히면 단어 5번과 문장 5번이
     # 같이 걸려, 하나를 고치려다 다른 하나를 덮는다.
@@ -166,7 +182,8 @@ def _bump_review(user, answers) -> None:
     }
 
     new_rows = []
-    changed = []
+    hit: list[ReviewState] = []
+    miss: list[ReviewState] = []
     for (target_type, target_id), correct in seen.items():
         row = existing.get((target_type, target_id))
         if row is None:
@@ -184,21 +201,33 @@ def _bump_review(user, answers) -> None:
         row.is_wrong = not correct
         if correct:
             row.last_correct_at = now
+            hit.append(row)
         else:
             # **틀리면 연속을 끊는다.** 자유 문제풀이에서 맞힌 것은 연속을
             # 올리지 않지만(그건 복습에서 확인한 것만 센다), 틀린 것은
             # 끊어야 한다. 안 그러면 복습 1회 + 자유 오답 + 복습 1회 로
             # "연속" 아닌 두 번에 졸업한다.
             row.streak = 0
-        changed.append(row)
+            miss.append(row)
 
     if new_rows:
         # 동시에 같은 판을 두 번 기록하면 겹칠 수 있다. 겹친 줄은 이미
         # 있는 것이니 버린다.
         ReviewState.objects.bulk_create(new_rows, ignore_conflicts=True)
-    if changed:
+
+    # **맞은 줄에는 streak 을 쓰지 않는다.** bulk_update 는 필드 목록에
+    # 있는 값을 읽은 시점 그대로 되쓴다. 맞았을 때는 streak 을 안 바꾸므로
+    # "읽은 값을 그대로" 인데, 그 사이 복습이 올린 값이 있으면 그것을
+    # 0 으로 되돌린다 - 사용자는 복습에서 맞힌 것이 사라져 졸업에 영영
+    # 못 닿는다.
+    #
+    # 일일공부가 이 함수를 답 하나마다 부르면서 그 창이 25배로 넓어졌다.
+    # 자유 문제풀이는 판이 끝날 때 한 번이라 눈에 안 띄었다.
+    if hit:
+        ReviewState.objects.bulk_update(hit, ["is_wrong", "last_correct_at"])
+    if miss:
         ReviewState.objects.bulk_update(
-            changed, ["is_wrong", "last_correct_at", "streak"]
+            miss, ["is_wrong", "last_correct_at", "streak"]
         )
 
 def _bump_daily(session: QuizSession) -> None:

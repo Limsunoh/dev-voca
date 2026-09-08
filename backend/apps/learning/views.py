@@ -17,11 +17,14 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict
 
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from apps.vocab.models import Word
+from apps.vocab.serializers import QuizWordSerializer
 
 from . import daily_study, leaderboards, record, review, session
 from .models import STUDY_PLANS, StudyLength
@@ -233,10 +236,37 @@ class DailyStudyStartView(APIView):
         # 제약에 막히기 때문이다. 제한 시간이 없는 기능이라 중간에 나가는
         # 것이 예외가 아니다.
         token, question = None, None
+        learning: list[dict] = []
         if study is not None and not study.is_done:
+            # **학습과 문제를 함께 내려준다.** 이번 묶음의 카드와, 그
+            # 묶음에서 낸 문제를 한 번에 준다. 화면은 카드를 다 넘긴 뒤
+            # 문제로 넘어간다 - 서버에 "봤다" 를 알릴 필요가 없다.
+            #
+            # 나눠서 주면 그 신호가 필요해지는데, 그건 점수와 무관한
+            # 요청이라 되돌리기를 막을 이유가 없고 막지 않으면 왕복만
+            # 늘어난다. 카드 몇 장은 그냥 같이 보내는 편이 싸다.
+            #
+            # **묶음 뽑기는 resume 에 맡긴다.** 여기서 먼저 부르면 그
+            # 사이에 검수가 취소됐을 때 카드는 나가고 범위는 비는 조합이
+            # 생긴다 - 화면이 보여준 카드와 무관한 단어로 문제가 나간다.
             resumed = daily_study.resume(study)
             if resumed is not None:
                 token, question = resumed
+                study.refresh_from_db()
+                if daily_study.is_chunk_start(study):
+                    learning = [
+                        _word_body(w) for w in daily_study.learn_targets(study)
+                    ]
+            else:
+                # **문제가 없으면 카드도 안 보낸다.** 화면은 카드를 다
+                # 넘긴 뒤 문제로 넘어가는데, 넘어갈 문제가 없으면 길이
+                # 고르기로 떨어진다 - 하다 만 판이 있으면 거기서 길이
+                # 버튼도 막혀 있어 아무것도 못 하는 화면에 갇힌다.
+                #
+                # 이어 풀 문제를 못 만드는 판은 드물지만(묶음이 좁아
+                # 보기를 못 채우고 전체 폴백까지 실패), 못 이어갈 카드를
+                # 애초에 안 주는 편이 화면에서 막는 것보다 확실하다.
+                learning = []
 
         # **캐시하지 않는다.** 응답에 매번 다른 서명 토큰이 실리므로,
         # 어디든 캐시가 붙으면 여러 사용자가 같은 토큰을 받는다. GET 은
@@ -247,14 +277,20 @@ class DailyStudyStartView(APIView):
                     {
                         "value": value,
                         "label": label,
-                        "questions": STUDY_PLANS[value][0],
-                        "bonus": STUDY_PLANS[value][1],
+                        "questions": STUDY_PLANS[value].total,
+                        "bonus": STUDY_PLANS[value].bonus,
+                        # 고르기 전에 "몇 개를 공부하는지" 를 보여준다.
+                        # 문제 수만 있으면 길이 선택이 "얼마나 오래
+                        # 걸리나" 로만 읽힌다.
+                        "words": STUDY_PLANS[value].from_study,
                     }
                     for value, label in StudyLength.choices
                 ],
                 "today": _study_body(study) if study else None,
                 "token": token,
                 "question": question,
+                # 이번 묶음의 학습 카드. 비어 있으면 문제를 풀 차례다.
+                "learning": learning,
             }
         )
         body["Cache-Control"] = "no-store"
@@ -273,8 +309,17 @@ class DailyStudyStartView(APIView):
         except session.SessionError as exc:
             return _fail(exc)
 
+        # 시작하자마자 학습부터다. 첫 묶음을 함께 내려줘 화면이 바로
+        # 그리게 한다 - 시작 직후 다시 GET 하면 그 사이가 빈 화면이다.
+        learning = [_word_body(w) for w in daily_study.issue_chunk(study)]
+
         return Response(
-            {"token": token, "question": question, "study": _study_body(study)},
+            {
+                "token": token,
+                "question": question,
+                "study": _study_body(study),
+                "learning": learning,
+            },
             status=status.HTTP_201_CREATED,
         )
 
@@ -317,8 +362,18 @@ class DailyStudyAnswerView(APIView):
                 },
                 "token": next_token,
                 "question": question,
-                "finished": question is None,
+                # **끝났는지는 판이 정한다.** question 이 없는 것만 보면
+                # 다음이 학습 차례일 때도 "끝" 으로 읽힌다.
+                "finished": studied.is_done,
                 "study": _study_body(studied),
+                # **묶음이 넘어가는 답에만 카드가 실린다.** 묶음 안에서
+                # 이어 푸는 답에는 빈 목록이라, 화면은 learning 이 오면
+                # 학습을 보여주고 아니면 바로 다음 문제로 간다.
+                "learning": (
+                    [_word_body(w) for w in daily_study.learn_targets(studied)]
+                    if not studied.is_done and daily_study.is_chunk_start(studied)
+                    else []
+                ),
             }
         )
 
@@ -333,7 +388,51 @@ def _study_body(study) -> dict:
         "score": study.score,
         "bonus": study.bonus,
         "done": study.is_done,
+        # 학습 진행. 화면이 "3묶음 중 2번째" 를 그린다.
+        "chunk_size": study.chunk_size,
+        "chunk_count": study.chunk_count,
+        # 학습분을 지나면 마지막 묶음 번호에서 멈춘다. 안 막으면
+        # answered 가 늘수록 계속 올라 화면이 "5/4묶음" 을 그린다.
+        "chunk_index": (
+            min(study.answered // study.chunk_size, max(study.chunk_count - 1, 0))
+            if study.chunk_size
+            else 0
+        ),
     }
+
+
+class StudyCardSerializer(QuizWordSerializer):
+    """학습 카드 하나. 출제용 직렬화에 분류 이름만 더한다.
+
+    **발음 게이트를 여기서 다시 쓰지 않는다.** reading 은 항목 검수와
+    별개인 reading_reviewed 를 따르는데, 그 규칙은 ReviewedReadingField
+    한 곳에만 두기로 한 것이다(vocab/models.py 의 visible() docstring 이
+    "노출 게이트가 둘인 이유" 로 적어뒀다). 손으로 한 줄 더 쓰면 규칙이
+    바뀔 때 이 자리만 남는다.
+
+    상세 화면(WordDetailSerializer)이 아니라 출제용을 물려받는 이유는
+    저기가 created_at 같은 관리용 칸까지 내려주기 때문이다.
+
+    **description 은 물려받은 그대로 들어간다.** 카드에서는 접어두지만
+    펼칠 때 왕복을 한 번 더 하면 그 순간 화면이 멈춘다 - 학습은 넘기는
+    속도가 중요한 화면이다.
+    """
+
+    category_label = serializers.SerializerMethodField()
+
+    class Meta(QuizWordSerializer.Meta):
+        # category(코드)는 화면이 안 쓴다. 라벨만 준다.
+        fields = [f for f in QuizWordSerializer.Meta.fields if f != "category"] + [
+            "category_label"
+        ]
+
+    def get_category_label(self, word) -> str:
+        return word.get_category_display() if word.category else ""
+
+
+def _word_body(word: Word) -> dict:
+    """학습 카드 하나."""
+    return StudyCardSerializer(word).data
 
 
 class ReviewStartView(APIView):

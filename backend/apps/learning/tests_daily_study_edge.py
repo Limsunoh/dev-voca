@@ -288,7 +288,9 @@ class ScoreRuleTest(TestCase):
             _, token, question, _ = answer_wrong(self.user, token, question)
 
         study = daily_study.today_of(self.user)
-        total, bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
+        bonus = _plan.bonus
 
         self.assertEqual(study.correct, 0, "틀리게만 풀었는데 맞은 것이 있다")
         self.assertEqual(study.answered, total)
@@ -301,7 +303,9 @@ class ScoreRuleTest(TestCase):
         9/10 을 푼 사람이 배포 한 번에 다른 규칙을 받는다.
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
-        total, bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
+        bonus = _plan.bonus
 
         changed = dict(STUDY_PLANS)
         changed[StudyLength.SHORT] = (999, 999)
@@ -428,7 +432,9 @@ class SecondAccountTest(TestCase):
         mule = self.client_class()
         mule.force_login(self.mule)
 
-        total, bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
+        bonus = _plan.bonus
 
         attacker.post(
             START_URL, {"length": StudyLength.SHORT}, content_type="application/json"
@@ -882,7 +888,9 @@ class ConcurrencyTest(_KeepsCacheTable, TransactionTestCase):
         answered 가 total 을 넘으면 그만큼 점수가 늘고, 닫기가 두 번 돌면
         보너스가 두 번 붙는다. 조건부 UPDATE 의 두 조건이 각각 막는다.
         """
-        total, bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
+        bonus = _plan.bonus
         _, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
         for _ in range(total - 1):
@@ -911,7 +919,7 @@ class ConcurrencyTest(_KeepsCacheTable, TransactionTestCase):
         _finish 가 UPDATE 반환값을 안 보면 진 쪽도 add_daily_study 를 불러
         DailyScore 가 DailyStudy 와 다른 값을 갖는다.
         """
-        total = STUDY_PLANS[StudyLength.SHORT][0]
+        total = STUDY_PLANS[StudyLength.SHORT].total
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
         for _ in range(total - 1):
@@ -1051,7 +1059,9 @@ class SkippedDaysTest(TestCase):
 
     def test_a_completed_but_unclosed_study_gets_its_bonus_on_settle(self):
         """다 풀고 자정만 넘긴 판은 정산 때 완주 보너스를 받는다."""
-        total, bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
+        bonus = _plan.bonus
         stuck = DailyStudy.objects.create(
             user=self.user,
             day=calendar_kst.today() - timedelta(days=1),
@@ -1213,7 +1223,9 @@ class PlanCeilingTest(TestCase):
             with self.subTest(length=length):
                 DailyStudy.objects.all().delete()
                 DailyScore.objects.all().delete()
-                total, bonus = STUDY_PLANS[length]
+                _plan = STUDY_PLANS[length]
+                total = _plan.total
+                bonus = _plan.bonus
 
                 study, token, question = daily_study.start(self.user, length)
                 while question is not None:
@@ -1228,7 +1240,8 @@ class PlanCeilingTest(TestCase):
 
     def test_the_progress_counter_matches_the_answers_so_far(self):
         """문제마다 answered 가 정확히 지금까지 푼 개수여야 한다."""
-        total, _bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
         _study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
         for i in range(total):
@@ -1414,7 +1427,7 @@ class NormalUseThrottleTest(TestCase):
             self.assertEqual(res.status_code, 200, res.content)
             token, question = res.json()["token"], res.json()["question"]
 
-        self.assertEqual(calls, STUDY_PLANS[StudyLength.LONG][0] + 1)
+        self.assertEqual(calls, STUDY_PLANS[StudyLength.LONG].total + 1)
 
     def test_answering_has_its_own_bucket_apart_from_starting(self):
         """답하기와 조회·시작이 통을 나눠 쓴다.
@@ -1554,7 +1567,9 @@ class ThinContentTest(TestCase):
         보너스는 줄이지 않는다. 콘텐츠가 적은 것은 사용자 잘못이 아니다.
         """
         seed_words(count=30)
-        total, bonus = STUDY_PLANS[StudyLength.LONG]
+        _plan = STUDY_PLANS[StudyLength.LONG]
+        total = _plan.total
+        bonus = _plan.bonus
 
         study, token, question = daily_study.start(self.user, StudyLength.LONG)
 
@@ -1578,7 +1593,8 @@ class ThinContentTest(TestCase):
     def test_a_full_pool_keeps_the_full_promise(self):
         """콘텐츠가 넉넉하면 약속이 그대로다."""
         seed_words(count=120)
-        total, _bonus = STUDY_PLANS[StudyLength.LONG]
+        _plan = STUDY_PLANS[StudyLength.LONG]
+        total = _plan.total
 
         study, _, _ = daily_study.start(self.user, StudyLength.LONG)
 
@@ -1633,7 +1649,9 @@ class ResumeTest(TestCase):
         이 기능을 만든 이유 그 자체다 - 25문제짜리를 3문제 풀고 나가면
         완주 보너스를 영영 못 받는 것이 원래 문제였다.
         """
-        total, bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
+        bonus = _plan.bonus
         study, _earned = answer_n(self.user, StudyLength.SHORT, 2)
 
         token, question = daily_study.resume(study)
@@ -1710,7 +1728,8 @@ class ResumeTest(TestCase):
         열린다. 그래도 순번이 하나씩만 소비되므로 답할 수 있는 횟수는
         약속한 문제 수 그대로여야 한다.
         """
-        total, _bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
         daily_study.start(self.user, StudyLength.SHORT)
 
         spent = 0
@@ -2114,7 +2133,8 @@ class ResumeConcurrencyTest(_KeepsCacheTable, TransactionTestCase):
 
     def test_resuming_while_the_last_answer_lands_cannot_overfill(self):
         """마지막 답과 재개한 답이 겹쳐도 약속한 수를 넘지 않는다."""
-        total, _bonus = STUDY_PLANS[StudyLength.SHORT]
+        _plan = STUDY_PLANS[StudyLength.SHORT]
+        total = _plan.total
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
         for _ in range(total - 1):
