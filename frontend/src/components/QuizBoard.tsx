@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Burst } from "@/components/Burst";
+import { Reaction } from "@/components/Reaction";
 import type { GradeResult, QuizContent, Question } from "@/lib/api/quiz";
 import { Reading } from "./Reading";
 
@@ -114,6 +115,18 @@ export function QuizBoard({ category, content = "words" }: Props) {
   const [shake, setShake] = useState(0);
   /** 방금 판정. 정답일 때 조각이 터진다. */
   const [burst, setBurst] = useState(0);
+  /**
+   * 걸어오는 사람. 맞히든 틀리든 오므로 burst·shake 를 못 쓴다.
+   *
+   * 횟수와 판정을 같이 들고 있는 이유: 판정만 두면 연속으로 같은 결과가
+   * 나왔을 때 값이 안 바뀌어 다시 안 뛴다. 횟수만 두면 따봉인지 뒤통수인지
+   * 모른다.
+   *
+   * 한 덩이로 묶은 것은 **둘이 한 사건이기 때문**이다. 따로 두면 나중에
+   * 누군가 한쪽만 갱신할 여지가 생긴다 - key 로 쓰는 fire 와 색을 정하는
+   * correct 가 어긋나면 지난 연출이 새 색으로 뜬다.
+   */
+  const [reaction, setReaction] = useState({ fire: 0, correct: false });
   // 방금 푼 단어들. state 로 두면 load 가 렌더 시점의 값을 클로저로
   // 잡아서, 채점 직후 바로 "다음 문제" 를 누르면 방금 푼 단어가
   // 제외 목록에 안 들어간다.
@@ -316,6 +329,8 @@ export function QuizBoard({ category, content = "words" }: Props) {
       // 맞혔을 때는 화면 가운데에서 조각이 터진다. 흔들림과 같은 이유로
       // 카운터다.
       if (graded.correct) setBurst((n) => n + 1);
+      // 사람은 맞히든 틀리든 온다. 따봉이냐 뒤통수냐만 갈린다.
+      setReaction((r) => ({ fire: r.fire + 1, correct: graded.correct }));
       // 채점 뒤 화면을 옮기는 일은 아래 useEffect 가 맡는다. 여기서 하면
       // 해설 카드가 아직 DOM 에 없어 버튼 좌표를 잘못 읽는다.
       //
@@ -376,6 +391,7 @@ export function QuizBoard({ category, content = "words" }: Props) {
             // 축포 카운터도 되돌린다. 안 그러면 판이 바뀌어도 이전 값이
             // 남아, 여기서 초기화하는 다른 것들과 규율이 어긋난다.
             setBurst(0);
+            setReaction({ fire: 0, correct: false });
             void load();
           }}
           className="mt-4 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
@@ -393,6 +409,16 @@ export function QuizBoard({ category, content = "words" }: Props) {
       {/* 맞혔을 때 화면 가운데에서 터진다. fixed 라 이 자리에 두어도
           문제 위치와 무관하게 화면 중앙에서 난다. */}
       <Burst fire={burst} />
+
+      {/* 화면 아래쪽에서 걸어와 반응하고 간다. Burst 와 같은 이유로
+          이 자리에 둔다 - fixed 라 문제 위치와 무관하다.
+
+          **한 판 모드(RoundBoard)에는 안 넣었다.** 90초 타이머가 돌아
+          문제가 빠르게 넘어가는데, 이 연출은 정답·오답 양쪽에 다 와서
+          여기보다 두 배로 자주 뜬다. 0.6초가 매번 잘리면 연출이 아니라
+          잔상이 된다. (넘긴 문제 처리는 걸림돌이 아니다 - 거기 축포가
+          이미 !skipped 로 막고 있어서 같은 조건 하나면 된다.) */}
+      <Reaction fire={reaction.fire} correct={reaction.correct} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         {/* 분류 칩(CategoryChip)의 비링크 모양과 같은 문법. 같은 화면에
