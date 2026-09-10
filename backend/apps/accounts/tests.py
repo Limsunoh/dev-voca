@@ -2093,3 +2093,56 @@ class AvatarPhotoBombTest(TestCase):
         self.assertEqual(res.status_code, 200)
         self.user.refresh_from_db()
         self.assertIsNotNone(self.user.avatar_photo_key)
+
+
+class AvatarPhotoThrottleTest(TestCase):
+    """사진 올리기 제한.
+
+    이 앱에서 제일 비싼 자리다 - 요청 하나가 5MB 를 받아 Pillow 로 열고
+    줄인 뒤 다시 인코딩한다. 제한이 없으면 계정 하나로 큰 사진을 반복해서
+    던지는 것만으로 CPU 와 메모리를 밀 수 있다.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.a = User.objects.create_user(
+            email="ta@example.com", password=PASSWORD, display_name="티에이"
+        )
+        self.b = User.objects.create_user(
+            email="tb@example.com", password=PASSWORD, display_name="티비"
+        )
+
+    def test_뷰에_실제로_달려_있다(self):
+        """**이 검사가 핵심이다.**
+
+        통을 잘 만들어도 뷰에 안 달면 아무것도 안 막는다. 그 줄을 누가
+        지워도 다른 테스트는 전부 초록이라 조용히 통과한다.
+        """
+        from .throttles import AvatarPhotoThrottle
+        from .views import AvatarPhotoView
+
+        self.assertIn(AvatarPhotoThrottle, AvatarPhotoView.throttle_classes)
+
+    def test_계정별로_통이_갈린다(self):
+        """통이 하나뿐이면 아무나 한도를 태워 전원의 사진 올리기를 막는다."""
+        from rest_framework.test import APIRequestFactory
+
+        from .throttles import AvatarPhotoThrottle
+
+        def key_for(user):
+            request = APIRequestFactory().post("/api/accounts/photo/")
+            request.user = user
+            return AvatarPhotoThrottle().get_cache_key(request, None)
+
+        self.assertNotEqual(key_for(self.a), key_for(self.b))
+
+    def test_익명은_세지_않는다(self):
+        """401 로 끝날 요청이 통을 채우면 그것이 전원을 막는 스위치가 된다."""
+        from rest_framework.test import APIRequestFactory
+
+        from .throttles import AvatarPhotoThrottle
+
+        request = APIRequestFactory().post("/api/accounts/photo/")
+        request.user = None
+
+        self.assertIsNone(AvatarPhotoThrottle().get_cache_key(request, None))
