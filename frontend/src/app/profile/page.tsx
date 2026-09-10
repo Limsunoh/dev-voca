@@ -2,18 +2,26 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { logoutAction } from "@/app/(auth)/actions";
-import { updateProfileAction } from "@/app/profile/actions";
+import {
+  changePasswordAction,
+  deletePhotoAction,
+  requestEmailChangeAction,
+  updateProfileAction,
+  uploadPhotoAction,
+} from "@/app/profile/actions";
+import { EmailCard } from "@/components/EmailCard";
+import { PasswordCard } from "@/components/PasswordCard";
 import { MyStandings } from "@/components/MyStandings";
 import { ProfileForm } from "@/components/ProfileForm";
 import { fetchMyStandings } from "@/lib/api/leaderboards";
 import { getCurrentUser, getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "내 프로필 · devvoca",
+  title: "내정보 · devvoca",
 };
 
 /**
- * 내 프로필.
+ * 내정보.
  *
  * 사진과 이름을 바꾸고, 순위를 보고, 계정 정보를 보고, 로그아웃한다.
  *
@@ -42,7 +50,7 @@ export default async function ProfilePage() {
           fontWeight: "var(--weight-black)",
         }}
       >
-        내 프로필
+        내정보
       </h1>
 
       <section className="mt-6" aria-labelledby="profile-edit">
@@ -55,6 +63,9 @@ export default async function ProfilePage() {
           initialAvatar={user.avatar}
           shown={user.avatar_display}
           googlePicture={user.google_picture}
+          uploadPhoto={uploadPhotoAction}
+          deletePhoto={deletePhotoAction}
+          uploadedPhoto={user.uploaded_photo}
         />
       </section>
 
@@ -99,8 +110,6 @@ export default async function ProfilePage() {
         >
           <div className="flex justify-between gap-4">
             <dt style={{ color: "var(--text-muted)" }}>이메일</dt>
-            {/* 이메일은 로그인 키라 바꿀 수 없다. 바꾸려면 본인 확인이
-                먼저인데 그 절차가 아직 없다. */}
             {/* min-w-0 이 없으면 truncate 가 아예 발동하지 않는다. flex 항목의
                 min-width 는 auto = min-content 인데, truncate 가 건
                 white-space: nowrap 때문에 min-content 가 이메일 전체 폭이
@@ -113,6 +122,22 @@ export default async function ProfilePage() {
             </dd>
           </div>
         </dl>
+
+        {/* 이메일 변경은 표 아래 접어둔다. 표는 "지금 무엇인가" 를 보는
+            자리라, 바꾸는 칸을 그 안에 섞으면 읽는 것과 고치는 것이
+            한 덩어리가 된다. */}
+        <div className="mt-3 grid gap-3">
+          <EmailCard
+            action={requestEmailChangeAction}
+            currentEmail={user.email}
+            hasPassword={user.has_password}
+          />
+          <PasswordCard
+            action={changePasswordAction}
+            hasPassword={user.has_password}
+            email={user.email}
+          />
+        </div>
 
         {/* 로그아웃은 흰 버튼이다. 코랄은 이 화면에서 저장 버튼이 가진다 -
             둘 다 코랄이면 되돌릴 수 없는 쪽(로그아웃)이 주된 동작으로 보인다. */}

@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -705,3 +706,61 @@ class LeaderboardApiTest(TestCase):
             self.client.get(ALL_TIME_URL).json()["rows"][0]["avatar"],
             {"type": "preset", "key": "a2"},
         )
+
+
+class UploadedPhotoInBoardTest(TestCase):
+    """올린 사진이 순위표 줄에도 뜬다.
+
+    이 표는 사용자를 행마다 조회하지 않고 .values() 로 필요한 칸만 긁어
+    가짜 User 에 채운다(leaderboards._row). 그래서 avatar_display 가 보는
+    필드가 늘면 그 목록에도 더해야 하는데, 안 더해도 **화면은 안 깨진다** -
+    아바타로 조용히 떨어질 뿐이다. 사진 올린 사람 눈에만 자기 줄이 다른
+    그림으로 보이고, 그것을 알아채기까지 한참 걸린다.
+
+    실제로 그 상태로 한 번 내보낼 뻔해서 여기 못 박는다.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_user("사진맨")
+        self.user.avatar_photo = b"x"
+        self.user.avatar_photo_key = uuid.uuid4()
+        self.user.avatar_photo_at = timezone.now()
+        self.user.avatar = "photo"
+        self.user.save(
+            update_fields=[
+                "avatar_photo",
+                "avatar_photo_key",
+                "avatar_photo_at",
+                "avatar",
+            ]
+        )
+        finish_round(self.user, 90)
+
+    def _my_row(self, url: str) -> dict:
+        rows = self.client.get(url).json()["rows"]
+        found = [r for r in rows if r["display_name"] == "사진맨"]
+        self.assertEqual(len(found), 1, f"{url} 에 내 줄이 없다")
+        return found[0]
+
+    def test_weekly_row_shows_the_photo(self):
+        shown = self._my_row(WEEKLY_URL)["avatar"]
+
+        self.assertEqual(shown["type"], "photo")
+        self.assertIn(str(self.user.avatar_photo_key), shown["url"])
+
+    def test_all_time_row_shows_the_photo(self):
+        shown = self._my_row(ALL_TIME_URL)["avatar"]
+
+        self.assertEqual(shown["type"], "photo")
+
+    def test_streak_row_shows_the_photo(self):
+        """꾸준함은 질의가 따로라 .values() 목록도 따로다.
+
+        한쪽만 고치면 이 표에서만 아바타가 뜬다.
+        """
+        daily(self.user, calendar_kst.today(), study=50)
+
+        shown = self._my_row(STREAK_URL)["avatar"]
+
+        self.assertEqual(shown["type"], "photo")

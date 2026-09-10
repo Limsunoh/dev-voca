@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import io
 import re
 import secrets
 import unicodedata
@@ -27,9 +28,42 @@ AVATAR_PRESETS = ("a1", "a2", "a3", "a4", "a5", "a6")
 # 구글 계정 사진을 쓰겠다는 표시.
 AVATAR_GOOGLE = "google"
 
-AVATAR_CHOICES = [(AVATAR_GOOGLE, "구글 사진")] + [
-    (key, f"아바타 {key[1:]}") for key in AVATAR_PRESETS
-]
+# 직접 올린 사진을 쓰겠다는 표시. 사진 자체는 avatar_photo 컬럼에 있다.
+#
+# "무엇을 보여줄지" 를 여기 한 칸에 모아두는 이유: 순위표는 사용자를
+# 행마다 조회하지 않고 .values("user__avatar", ...) 로 필요한 칸만 긁어
+# 간다(apps/learning/leaderboards.py). 사진 유무를 별도 컬럼으로 두면
+# 그 목록에 그 칸을 더해야 하고, 안 더하면 순위표에서만 사진이 조용히
+# 안 뜬다 - 화면은 멀쩡해 보여서 한참 뒤에야 드러난다.
+AVATAR_PHOTO = "photo"
+
+AVATAR_CHOICES = [
+    (AVATAR_PHOTO, "올린 사진"),
+    (AVATAR_GOOGLE, "구글 사진"),
+] + [(key, f"아바타 {key[1:]}") for key in AVATAR_PRESETS]
+
+# 올린 사진을 줄여서 저장할 한 변의 길이. 화면에서 가장 큰 자리가
+# 프로필의 72px 이라 256 이면 3배수까지 선명하다.
+#
+# 원본을 그대로 넣지 않는 이유: 요즘 폰 사진 한 장이 5MB 다. 그대로
+# 넣으면 사용자 행 하나가 그만큼 커지고, User 를 읽는 모든 질의가
+# 그 무게를 진다.
+AVATAR_PHOTO_SIZE = 256
+
+# 받아줄 업로드 파일의 최대 크기. 상한이 없으면 큰 파일 하나로 메모리를
+# 밀어버릴 수 있다 - Pillow 로 열기 전에, 바이트를 세는 것만으로 막는다.
+#
+# 5MB 인 이유: 요즘 폰 사진 한 장이 대개 2~5MB 다. 더 낮추면 평범한
+# 사진이 거절돼 사용자가 이유를 모른 채 막힌다.
+AVATAR_PHOTO_MAX_BYTES = 5 * 1024 * 1024
+
+# 펼쳤을 때의 픽셀 수 상한. 바이트 상한과 따로 있어야 하는 이유는 아래
+# shrink_avatar_photo 에 적어뒀다 - 잘 압축되는 큰 그림이 바이트 검사를
+# 지나간다.
+#
+# 5천만으로 둔다. 요즘 폰이 5천만 화소 안쪽이라 평범한 사진은 다 통과하고,
+# 그 위는 프로필 사진으로 쓸 이유가 없다.
+AVATAR_PHOTO_MAX_PIXELS = 50_000_000
 
 # 자동으로 지어주는 이름의 앞부분. 뒤에 네 자리를 붙여 일곱 글자가 된다.
 GENERATED_NAME_PREFIX = "학습자"
@@ -140,6 +174,107 @@ def free_display_name(wanted: str | None) -> str:
     return ""
 
 
+class AvatarPhotoError(ValueError):
+    """올린 파일을 사진으로 못 쓸 때. 뷰가 안내 문구로 바꾼다."""
+
+
+def shrink_avatar_photo(raw: bytes) -> bytes:
+    """올린 사진을 줄여서 WebP 바이트로 바꾼다.
+
+    **확장자와 Content-Type 을 믿지 않는다.** 둘 다 올리는 쪽이 적어
+    보내는 값이라, 아무 파일이나 .jpg 로 이름 붙여 보낼 수 있다. Pillow 로
+    실제로 열어봐야 사진인지 알 수 있다.
+
+    WebP 로 통일하는 이유:
+
+    - 투명한 PNG 를 JPEG 로 바꾸면 투명한 부분이 **검게** 나온다. 배경을
+      흰색으로 깔아 피할 수도 있지만, 크림 바탕(--paper) 위에 흰 네모가
+      떠서 그것대로 눈에 띈다. WebP 는 투명도를 그대로 들고 간다.
+    - 형식을 원본에 따라 바꾸면(투명하면 PNG, 아니면 JPEG) 내려줄 때
+      Content-Type 도 갈라진다. 저장한 형식을 어딘가 또 적어둬야 하고,
+      그 칸과 실제 바이트가 어긋나면 그림이 안 뜬다. 한 형식이면 그럴
+      자리가 없다.
+    - 같은 화질에서 JPEG 보다 작다. DB 에 넣는 바이트라 크기가 곧 비용이다.
+
+    호환성은 문제되지 않는다. WebP 는 2020년부터 모든 주요 브라우저가
+    읽는다. 이 앱은 폰 브라우저와 최신 데스크톱을 본다.
+    """
+    # Pillow 를 함수 안에서 가져온다. 모델 모듈은 마이그레이션과
+    # manage.py 가 언제나 읽는데, 사진을 안 만지는 그 경로까지
+    # 이미지 라이브러리를 로드할 이유가 없다.
+    from PIL import Image, UnidentifiedImageError
+
+    if len(raw) > AVATAR_PHOTO_MAX_BYTES:
+        mb = AVATAR_PHOTO_MAX_BYTES // (1024 * 1024)
+        raise AvatarPhotoError(f"사진은 {mb}MB 까지 올릴 수 있습니다.")
+
+    if not raw:
+        raise AvatarPhotoError("사진 파일이 비어 있습니다.")
+
+    # verify() 를 따로 부르지 않는다. 아래 fit() 이 실제로 픽셀을 읽으므로
+    # "머리말만 멀쩡하고 내용이 잘린" 파일은 거기서 OSError 로 걸린다.
+    # verify() 를 넣으면 그 뒤 이미지를 못 써서(Pillow 가 그렇게 정했다)
+    # 같은 파일을 두 번 열어야 하는데, 얻는 것 없이 일만 두 배가 된다.
+    try:
+        with Image.open(io.BytesIO(raw)) as image:
+            # **픽셀 수를 여기서 본다.** 위의 바이트 상한으로는 못 막는
+            # 공격이 있다 - 같은 색으로 채운 큰 그림은 압축이 아주 잘 돼서,
+            # 12000x12000(1.4억 픽셀)짜리가 440KB 밖에 안 된다. 5MB 검사를
+            # 지나간 뒤 아래에서 실제로 펼치는 순간 0.5GB 를 쓴다.
+            #
+            # Pillow 에도 같은 방어가 있지만 믿을 수 없다. 기본 한계
+            # (8948만)를 넘으면 경고만 내고 그냥 통과시키고, 예외로 막는
+            # 것은 그 두 배를 넘을 때다. 즉 1배와 2배 사이가 뚫려 있다.
+            #
+            # Image.open 은 머리말만 읽으므로 이 시점에는 아직 안 펼쳤다.
+            # 여기서 끊어야 메모리를 안 쓴다.
+            if image.width * image.height > AVATAR_PHOTO_MAX_PIXELS:
+                raise AvatarPhotoError("사진이 너무 큽니다. 다른 사진을 골라주세요.")
+
+            # 폰 사진은 세로로 찍어도 가로 그림 + "돌려서 보라" 는 표시로
+            # 저장되는 경우가 많다(EXIF Orientation). 그대로 줄이면 표시가
+            # 사라져서 옆으로 누운 사진이 된다.
+            from PIL import ImageOps
+
+            image = ImageOps.exif_transpose(image) or image
+
+            # 정사각형으로 자른다. 화면이 아바타를 정사각으로 그리는데
+            # (Avatar.tsx 의 object-cover), 원본 비율 그대로 저장하면
+            # 브라우저가 자르는 자리와 서버가 아는 크기가 달라진다.
+            # 여기서 잘라두면 내려가는 바이트도 그만큼 줄어든다.
+            image = ImageOps.fit(
+                image,
+                (AVATAR_PHOTO_SIZE, AVATAR_PHOTO_SIZE),
+                method=Image.Resampling.LANCZOS,
+            )
+
+            # 팔레트나 흑백 이미지가 그대로 WebP 로 안 가는 경우가 있다.
+            # 투명도를 살린 채 RGBA 로 맞춘다.
+            if image.mode != "RGBA":
+                image = image.convert("RGBA")
+
+            out = io.BytesIO()
+            # quality 82 는 사진에서 눈에 띄는 열화 없이 크기가 확 준다.
+            # 256px 짜리라 대개 10~20KB 로 떨어진다.
+            image.save(out, format="WEBP", quality=82, method=4)
+            return out.getvalue()
+    except AvatarPhotoError:
+        raise
+    except (
+        UnidentifiedImageError,
+        OSError,
+        ValueError,
+        # Pillow 가 스스로 폭탄이라 판단하는 경우(기본 한계의 두 배 초과).
+        # Exception 직속이라 위의 셋에 안 걸린다 - 빼면 위의 픽셀 검사에
+        # 닿기도 전에 터져서 400 이 아니라 500 이 나간다.
+        Image.DecompressionBombError,
+    ) as exc:
+        # 사진이 아닌 파일, 깨진 파일, Pillow 가 거부하는 형식이 전부
+        # 여기로 온다. 원인을 나눠 알려줄 것이 없다 - 사용자가 할 수
+        # 있는 일은 어느 쪽이든 "다른 사진을 고른다" 하나다.
+        raise AvatarPhotoError("사진 파일을 읽을 수 없습니다.") from exc
+
+
 class UserManager(BaseUserManager):
     """이메일로 계정을 만드는 매니저.
 
@@ -226,6 +361,58 @@ class User(AbstractUser):
         "아바타", max_length=10, blank=True, choices=AVATAR_CHOICES
     )
 
+    # 직접 올린 사진. 줄여서 WebP 로 바꾼 바이트가 통째로 들어간다.
+    #
+    # 파일이 아니라 DB 에 두는 이유: 배포할 때마다 컨테이너 디스크가
+    # 초기화된다. 실제로 Railway 볼륨이 지워져 데이터가 날아간 적이 있다.
+    # 외부 스토리지를 붙이면 그건 그것대로 계정·요금·장애 지점이 하나 는다.
+    #
+    # 줄인 뒤라 한 장이 대개 10~20KB 다. 그래서 행이 무거워지는 걱정보다
+    # **읽히는 자리** 가 문제인데, 그건 avatar_photo 를 어느 질의에도
+    # 안 실어서 푼다 - UserSerializer 는 이 칸을 내보내지 않고, 사진은
+    # 별도 엔드포인트(PhotoView)가 이 칸만 골라 읽는다.
+    avatar_photo = models.BinaryField("올린 사진", null=True, blank=True, editable=False)
+
+    # 사진 주소에 쓰는 값. 사진을 올릴 때마다 새로 만든다.
+    #
+    # **pk 를 주소로 쓰지 않는 이유**: pk 는 연번이라 1번부터 눌러보면
+    # 사진 올린 계정을 전부 훑을 수 있다. 순위표도 이름과 그림을 같이
+    # 보여주지만 그쪽은 상위 몇 줄이고 페이지를 넘겨야 한다 - 같은 정보라도
+    # 전원을 한 번에 긁는 것과는 비용이 다르고, 얼굴 사진은 그 차이가
+    # 중요한 종류다.
+    #
+    # **바꿀 때마다 새로 만드는 이유**: 값을 고정하면 옛 주소를 아는 사람이
+    # 바뀐 사진도 계속 본다. 새 값이면 옛 주소는 그 자리에서 404 가 된다.
+    # 캐시가 깨지는 것은 덤이다 - 주소 자체가 달라지므로 ?v= 같은 꼬리표를
+    # 따로 붙일 필요가 없다.
+    #
+    # 사진이 없으면 None 이다. unique 를 걸지 않는 이유: 사진 없는 행이
+    # 여럿이면 NULL 이 여러 개가 되는데, 그 처리가 DB 엔진마다 다르다.
+    # 충돌 확률이 사실상 0 인 값이라 제약으로 지킬 것이 없다.
+    avatar_photo_key = models.UUIDField(
+        "사진 주소 값",
+        null=True,
+        blank=True,
+        editable=False,
+        # 사진을 내려주는 자리가 이 칸으로 행을 찾는다. 인덱스가 없으면
+        # 그림 요청마다 표를 통째로 훑는데, 순위표 한 화면이 스무 장을
+        # 동시에 부르므로 그게 한 화면에 스무 번이다.
+        #
+        # unique 는 안 건다. 사진 없는 계정이 대부분이라 이 칸이 거의 다
+        # NULL 이고, NULL 중복을 엔진마다 다르게 다룬다. 인덱스는 그것과
+        # 무관하게 찾는 비용만 줄인다.
+        db_index=True,
+    )
+
+    # 사진을 마지막으로 바꾼 시각. ETag 로 쓴다 - 같은 그림을 다시
+    # 내려받지 않게 한다.
+    #
+    # 캐시 깨기는 이 값이 아니라 위의 avatar_photo_key 가 한다. 주소가
+    # 통째로 바뀌기 때문이다.
+    #
+    # 사진을 지우면 None 으로 되돌린다.
+    avatar_photo_at = models.DateTimeField("사진 올린 시각", null=True, blank=True)
+
     # 가입일은 AbstractUser 의 date_joined 를 그대로 쓴다. 따로 만들면
     # 컬럼이 둘이 되고, Admin 은 이쪽을 Django 기본 기능은 저쪽을 보게 된다.
 
@@ -299,19 +486,61 @@ class User(AbstractUser):
         return self.display_name or GENERATED_NAME_PREFIX
 
     @property
+    def has_avatar_photo(self) -> bool:
+        """올린 사진이 있나.
+
+        avatar_photo 를 읽지 않고 주소 값만 본다. 바이트를 안 건드려야
+        순위표처럼 사용자 스무 명을 훑는 자리에서 그림 스무 장을
+        같이 끌고 오지 않는다.
+        """
+        return self.avatar_photo_key is not None
+
+    @property
+    def avatar_photo_url(self) -> str:
+        """올린 사진을 내려주는 주소.
+
+        바이트를 JSON 에 싣지 않고 주소만 내려주는 이유: /api/accounts/me/
+        는 화면을 그릴 때마다 불린다(머리말이 이름과 그림을 그린다).
+        base64 로 싣으면 그 응답이 매번 수십 KB 가 되고, 캐시도 못 한다 -
+        JSON 안에 들어간 그림은 브라우저 이미지 캐시를 못 탄다.
+
+        주소가 pk 가 아니라 avatar_photo_key 인 이유는 그 필드 주석에 있다.
+        꼬리표(?v=)를 안 붙이는 것도 거기 적었다 - 사진을 바꾸면 이 값이
+        새로 만들어져 주소가 통째로 달라진다.
+        """
+        return f"/api/accounts/photo/{self.avatar_photo_key}/"
+
+    @property
     def avatar_display(self) -> dict[str, str]:
         """화면이 그릴 것.
 
         {"type": "photo", "url": ...} 이거나 {"type": "preset", "key": "a3"}.
-        고른 값이 없으면 여기서 정한다 - 구글 사진이 있으면 그것, 없으면
-        계정마다 고정된 아바타 하나. 고정이라 새로고침할 때마다 그림이
-        바뀌지 않는다.
+        고른 값이 없으면 여기서 정한다 - 올린 사진이 있으면 그것, 다음이
+        구글 사진, 없으면 계정마다 고정된 아바타 하나. 고정이라 새로고침할
+        때마다 그림이 바뀌지 않는다.
+
+        올린 사진을 구글 사진보다 앞에 두는 이유: 직접 올린 쪽이 나중에
+        한 행동이고, 더 뚜렷한 의사표시다.
+
+        **순위표는 이 property 를 가짜 User 로 부른다**
+        (apps/learning/leaderboards.py 의 _row). .values() 로 긁은 칸만
+        채워 넣으므로, 여기서 보는 필드가 늘면 그쪽 목록에도 더해야 한다.
+        안 더하면 순위표 줄에서만 다른 그림이 뜬다 - 화면이 비지 않아서
+        한참 뒤에야 드러난다. 지금은 avatar_photo_key 가 그 목록에 있다.
         """
+        if self.avatar == AVATAR_PHOTO and self.has_avatar_photo:
+            return {"type": "photo", "url": self.avatar_photo_url}
+
         if self.avatar in AVATAR_PRESETS:
             return {"type": "preset", "key": self.avatar}
+
+        # 아무것도 안 고른 상태. 올린 사진이 있으면 그것이 기본이다.
+        # (avatar == AVATAR_PHOTO 인 경우는 위에서 이미 잡았다.)
+        if self.avatar == "" and self.has_avatar_photo:
+            return {"type": "photo", "url": self.avatar_photo_url}
 
         if self.google_picture and self.avatar in ("", AVATAR_GOOGLE):
             return {"type": "photo", "url": self.google_picture}
 
-        # 구글 사진을 고른 채로 사진이 없어진 경우도 여기로 온다.
+        # 구글 사진이나 올린 사진을 고른 채로 그것이 없어진 경우도 여기로 온다.
         return {"type": "preset", "key": AVATAR_PRESETS[(self.pk or 0) % len(AVATAR_PRESETS)]}
