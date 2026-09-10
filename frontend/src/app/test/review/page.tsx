@@ -30,16 +30,33 @@ export default async function ReviewPage() {
     const offline = error instanceof ApiError && error.status === 0;
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-8 text-center">
-        <p className="text-slate-200">복습을 불러오지 못했습니다.</p>
-        <p className="mt-1 text-sm text-slate-500">
+        <p
+          style={{
+            color: "var(--foreground)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
+          복습을 불러오지 못했습니다.
+        </p>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
           {offline
             ? "서버에 연결할 수 없습니다. 잠시 뒤 다시 시도해주세요."
             : "잠시 뒤 다시 시도해주세요."}
         </p>
         <div className="mt-6">
+          {/* 흰 알약. 실패해서 물러나는 자리라 코랄을 쓰지 않는다. */}
           <Link
             href={routes.home}
-            className="inline-flex min-h-11 items-center rounded-full border border-white/40 px-5 text-sm font-medium text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="dv-btn inline-flex items-center rounded-[var(--radius-pill)] px-5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            style={
+              {
+                minHeight: "var(--hit-floor)",
+                background: "var(--paper)",
+                color: "var(--foreground)",
+                fontWeight: "var(--weight-black)",
+                "--lift": "var(--lift-button-paper)",
+              } as React.CSSProperties
+            }
           >
             홈으로
           </Link>

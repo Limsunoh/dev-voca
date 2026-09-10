@@ -9,6 +9,11 @@ import type { RoundQuestion } from "@/lib/api/rounds";
  *
  * 결과 문구는 여기 두지 않는다. "정답/오답" 다음에 무엇을 덧붙이느냐가
  * 화면마다 다르다 - 일일공부는 점수, 복습은 "한 번 더 맞히면 끝" 이다.
+ *
+ * 보기 버튼의 생김새는 QuizBoard 가 아니라 여기에도 한 벌 있다. 두 곳의
+ * 상태가 다르기 때문이다 - 여기는 고르기 전(idle)만 그리고 채점 결과는
+ * 호출부가 자기 방식으로 알린다. 치수(56px · --radius-xl)와 두께만 같이
+ * 간다.
  */
 export function QuestionCard({
   question,
@@ -21,30 +26,80 @@ export function QuestionCard({
 }) {
   return (
     <>
-      <div className="rounded-2xl border border-white/12 bg-slate-950/40 px-5 py-6">
-        <p className="text-xs text-slate-500">{question.kind_label}</p>
-        <p className="mt-1 text-sm text-slate-400">{question.question}</p>
+      <div
+        className="px-5 py-6"
+        style={{
+          background: "var(--paper)",
+          borderRadius: "var(--radius-2xl)",
+          // 누르는 것이 아니라 읽는 카드다. :active 가 없으니 인라인
+          // boxShadow 로 둔다 - --lift 로 넘길 이유가 없다.
+          boxShadow: "var(--lift-card)",
+        }}
+      >
+        <p
+          style={{
+            fontSize: "var(--text-xs)",
+            fontWeight: "var(--weight-bold)",
+            letterSpacing: "var(--tracking-wide)",
+            // --text-dim 은 흰 종이 위에서도 3.85:1 이라 본문 대비 4.5:1 에
+            // 못 미친다. 라벨이라 작을수록 더 필요하다.
+            color: "var(--text-muted)",
+          }}
+        >
+          {question.kind_label}
+        </p>
+        <p
+          className="mt-1"
+          style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}
+        >
+          {question.question}
+        </p>
         <p
           className={[
-            "mt-3 text-xl font-semibold text-slate-100 sm:text-2xl",
+            "mt-3",
             // 단어·에러 메시지는 고정폭, 사람이 쓴 문장은 가변폭.
             question.kind === "situation" || question.kind === "blank"
               ? ""
               : "font-mono",
           ].join(" ")}
+          style={{
+            fontSize: "var(--text-xl)",
+            fontWeight: "var(--weight-black)",
+            lineHeight: "var(--leading-tight)",
+            // 고정폭 제목은 한 단계 더 좁힌다(가이드 type-mono).
+            letterSpacing:
+              question.kind === "situation" || question.kind === "blank"
+                ? "var(--tracking-tight)"
+                : "var(--tracking-tighter)",
+            color: "var(--foreground)",
+          }}
         >
           {question.prompt}
         </p>
       </div>
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2.5">
         {question.choices.map((choice) => (
           <li key={choice.id}>
             <button
               type="button"
               onClick={() => onPick(choice.id)}
               disabled={busy}
-              className="min-h-12 w-full rounded-xl border border-white/40 px-4 py-3 text-left text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+              // dv-card dv-card-press: 누르면 두께가 0 이 되고 그만큼
+              // 내려앉는다. :active 는 인라인 style 로 못 써서 공통 클래스가 맡는다.
+              className="dv-card dv-card-press w-full px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default"
+              style={
+                {
+                  // 보기는 56px(가이드 shape-hit). 터치로 연달아 누르는
+                  // 자리라 --hit-min(52px)보다 한 급 크다.
+                  minHeight: 56,
+                  background: "var(--paper)",
+                  color: "var(--foreground)",
+                  borderRadius: "var(--radius-xl)",
+                  fontWeight: "var(--weight-bold)",
+                  "--lift": "var(--lift-card)",
+                } as React.CSSProperties
+              }
             >
               {choice.text}
             </button>

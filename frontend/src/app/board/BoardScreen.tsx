@@ -23,9 +23,27 @@ export async function BoardScreen({ kind }: { kind: BoardKind }) {
     const offline = error instanceof ApiError && error.status === 0;
     return (
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
-        <div className="rise rounded-xl border border-white/10 bg-slate-950/40 px-5 py-10 text-center">
-          <p className="text-slate-200">순위표를 불러오지 못했습니다.</p>
-          <p className="mt-1 text-sm text-slate-500">
+        {/* 흰 종이 + 두께. 테두리를 쓰지 않는다 - 이 디자인은 경계를
+            아래 두께가 맡는다(가이드 shape-lift). */}
+        <div
+          className="rise px-5 py-10 text-center dv-card"
+          style={
+            {
+              background: "var(--paper)",
+              borderRadius: "var(--radius-2xl)",
+              "--lift": "var(--lift-card)",
+            } as React.CSSProperties
+          }
+        >
+          <p
+            style={{
+              color: "var(--foreground)",
+              fontWeight: "var(--weight-bold)",
+            }}
+          >
+            순위표를 불러오지 못했습니다.
+          </p>
+          <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
             {offline
               ? "서버에 연결할 수 없습니다. 잠시 뒤 다시 시도해주세요."
               : "잠시 뒤 다시 시도해주세요."}

@@ -238,11 +238,36 @@ function ChooseCard({
 }) {
   return (
     <div className="rise flex flex-1 flex-col justify-center">
-      <p className="text-sm font-medium text-focus">하루 한 번</p>
-      <h1 className="mt-2 text-2xl font-bold text-slate-100">
+      {/* 작은 라벨이라 --text-dim 을 써도 되는 자리다. 본문·설명에는
+          --text-muted 를 쓴다(--text-dim 은 라벨용). */}
+      <p
+        className="text-sm"
+        style={{
+          fontWeight: "var(--weight-bold)",
+          letterSpacing: "var(--tracking-wide)",
+          color: "var(--text-muted)",
+        }}
+      >
+        하루 한 번
+      </p>
+      <h1
+        className="mt-2"
+        style={{
+          fontSize: "var(--text-2xl)",
+          fontWeight: "var(--weight-black)",
+          letterSpacing: "var(--tracking-tight)",
+          color: "var(--foreground)",
+        }}
+      >
         오늘 얼마나 해볼까요
       </h1>
-      <p className="mt-2 text-sm leading-relaxed text-slate-400">
+      <p
+        className="mt-2 text-sm"
+        style={{
+          lineHeight: "var(--leading-relaxed)",
+          color: "var(--text-muted)",
+        }}
+      >
         {/* 무엇을 하는 시간인지 먼저 말한다. "문제를 푼다" 로만 안내하면
             학습 카드가 나왔을 때 잘못 들어온 화면으로 읽힌다. */}
         몇 개를 익히고 그것으로 문제를 풉니다.
@@ -255,14 +280,32 @@ function ChooseCard({
           한 번의 응답 사이클에만 뜨는데(다음 GET 에서는 판이 닫혀 결과로
           간다), 그 한 번이 "진행이 날아갔다" 고 읽는 순간이다. */}
       {resuming && !resuming.done && (
-        <p className="mt-5 rounded-xl border border-white/25 px-4 py-3 text-sm text-slate-300">
+        // 옅은 호박 띠. 막혔다는 것을 알리는 자리라 배지 문법을 쓴다
+        // (옅은 채움 + 진한 글자). 테두리로 두르지 않는다 - 크림은 경계를
+        // 테두리가 아니라 채움과 두께로 만든다.
+        <p
+          className="mt-5 px-4 py-3 text-sm"
+          style={{
+            background: "var(--amber-soft)",
+            borderRadius: "var(--radius-md)",
+            lineHeight: "var(--leading-relaxed)",
+            color: "var(--amber-deep)",
+          }}
+        >
           오늘 {resuming.answered}/{resuming.total}문제까지 풀었습니다. 지금은
           이어서 풀 문제를 낼 수 없습니다. 잠시 뒤 다시 시도해주세요.
         </p>
       )}
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-rose-300">
+        <p
+          role="alert"
+          className="mt-4 text-sm"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {error}
         </p>
       )}
@@ -276,18 +319,60 @@ function ChooseCard({
             // 하다 만 판이 있으면 길이를 다시 고를 수 없다. 눌러봐야
             // 서버가 "이미 시작했다" 로 막는다.
             disabled={busy || (resuming !== null && !resuming.done)}
-            className="flex min-h-14 items-center justify-between rounded-2xl border border-white/25 px-5 text-left transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/45 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+            // 흰 카드 셋을 나란히 둔다. 코랄로 채우지 않는 이유: 셋 다
+            // 같은 자격의 선택지라, 하나만 코랄로 두면 그것을 권하는
+            // 것이 되고 셋 다 코랄이면 코랄이 하나라는 규칙이 깨진다.
+            // 고르는 자리에서는 카드가 맞다.
+            className="dv-card dv-card-press flex items-center justify-between px-5 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+            style={
+              {
+                minHeight: 56,
+                background: "var(--paper)",
+                border: 0,
+                borderRadius: "var(--radius-2xl)",
+                "--lift": "var(--lift-card)",
+              } as React.CSSProperties
+            }
           >
-            <span className="font-semibold text-slate-100">{one.label}</span>
-            <span className="text-right text-sm text-slate-400">
+            <span
+              style={{
+                fontSize: "var(--text-md)",
+                fontWeight: "var(--weight-black)",
+                letterSpacing: "var(--tracking-tight)",
+                color: "var(--foreground)",
+              }}
+            >
+              {one.label}
+            </span>
+            <span
+              className="text-right text-sm"
+              style={{ color: "var(--text-muted)" }}
+            >
               {/* 몇 개를 배우는지 먼저 보여준다. 문제 수만 있으면 길이
                   선택이 "얼마나 오래 걸리나" 로만 읽히는데, 이 기능의
                   값은 그날 몇 단어를 익히느냐에 있다. */}
               {one.words > 0 && (
-                <span className="text-slate-300">{one.words}단어 · </span>
+                <span
+                  style={{
+                    color: "var(--text-body)",
+                    fontWeight: "var(--weight-bold)",
+                  }}
+                >
+                  {one.words}단어 ·{" "}
+                </span>
               )}
               {one.questions}문제
-              <span className="ml-2 text-focus">+{one.bonus}</span>
+              {/* 보너스는 얻는 것이라 초록이다. 코랄은 "지금 눌러야 할 것"
+                  이고 여기 셋은 다 같은 자격의 선택지다. */}
+              <span
+                className="ml-2"
+                style={{
+                  color: "var(--green-deep)",
+                  fontWeight: "var(--weight-black)",
+                }}
+              >
+                +{one.bonus}
+              </span>
             </span>
           </button>
         ))}
@@ -322,10 +407,24 @@ function PlayCard({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-sm tabular-nums text-slate-400">
+        <span
+          className="font-mono text-sm tabular-nums"
+          style={{
+            color: "var(--text-muted)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {answered} / {total}
         </span>
-        <span className="font-mono text-sm tabular-nums text-focus">
+        {/* 점수는 잉크로 둔다. 코랄은 이 화면에서 "이어서 익히기" 버튼이
+            갖고, 읽기만 하는 값에 강조색을 쓰면 그 뜻이 흐려진다. */}
+        <span
+          className="font-mono text-sm tabular-nums"
+          style={{
+            color: "var(--foreground)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {study?.score ?? 0}점
         </span>
       </div>
@@ -333,16 +432,26 @@ function PlayCard({
       {/* 남은 시간이 아니라 진행률이다. 제한 시간이 없는 공부라 급할
           이유가 없고, 얼마나 남았는지만 알면 된다. */}
       <div
-        className="h-1 overflow-hidden rounded-full bg-white/10"
+        className="h-1.5 overflow-hidden"
         role="progressbar"
         aria-label="진행"
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={answered}
+        style={{
+          background: "var(--sand-deep)",
+          borderRadius: "var(--radius-pill)",
+        }}
       >
+        {/* 채워진 부분은 초록. 코랄은 "지금 눌러야 할 것" 이고 이건 이미
+            지나온 것이라, 복습 화면·진행 점과 같게 둔다. */}
         <div
-          className="h-full rounded-full bg-focus/70 transition-[width] duration-300"
-          style={{ width: `${total ? (answered / total) * 100 : 0}%` }}
+          className="h-full transition-[width] duration-300"
+          style={{
+            width: `${total ? (answered / total) * 100 : 0}%`,
+            background: "var(--green)",
+            borderRadius: "var(--radius-pill)",
+          }}
         />
       </div>
 
@@ -357,7 +466,15 @@ function PlayCard({
       {/* 새로 나타나는 영역이라 읽어준다. */}
       <p aria-live="polite" className="min-h-6 text-sm">
         {result && (
-          <span className={result.correct ? "text-focus" : "text-rose-300"}>
+          // 정답은 초록, 오답은 진한 코랄. 오답에 --coral 을 그대로 쓰지
+          // 않는 이유는 --wrong-deep 이 그 자리를 위해 있어서다 - 크림
+          // 위에서 --coral 은 본문 대비에 못 미친다.
+          <span
+            style={{
+              color: result.correct ? "var(--correct)" : "var(--wrong-deep)",
+              fontWeight: "var(--weight-black)",
+            }}
+          >
             {result.correct ? "정답" : `오답 · ${result.answer_text}`}
           </span>
         )}
@@ -366,17 +483,38 @@ function PlayCard({
       {/* 다음 묶음이 기다릴 때만. 이 버튼이 없으면 아래 보기를 눌러
           답하게 되는데, 그 문제는 아직 안 배운 단어로 나온다. */}
       {onLearn && (
+        // 이 화면의 코랄 하나. 이 버튼이 떠 있는 동안 보기는 잠겨 있어서
+        // (위 QuestionCard 의 busy) 지금 누를 수 있는 것은 이것뿐이다.
         <button
           type="button"
           onClick={onLearn}
-          className="flex min-h-12 w-full items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="dv-btn flex w-full items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              border: 0,
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              letterSpacing: "var(--tracking-tight)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
         >
           이어서 익히기
         </button>
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-rose-300">
+        <p
+          role="alert"
+          className="text-sm"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {error}
         </p>
       )}
@@ -396,41 +534,84 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
 
   return (
     <div className="rise flex flex-1 flex-col justify-center text-center">
-      <p className="text-sm text-slate-400">
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
         {short ? "오늘은 여기까지" : "오늘 몫 완료"}
       </p>
-      <p className="pop mt-2 font-mono text-5xl font-bold tabular-nums text-focus">
+      {/* 화면에서 가장 큰 숫자. 잉크로 둔다 - 결과는 읽는 것이고, 이
+          화면의 코랄은 아래 "순위표에서 확인" 버튼이 갖는다. 복습 결과
+          화면이 같은 자리를 같은 방식으로 그린다. */}
+      <p
+        className="pop mt-2 font-mono text-5xl tabular-nums"
+        style={{
+          fontWeight: "var(--weight-bold)",
+          letterSpacing: "var(--tracking-tighter)",
+          color: "var(--foreground)",
+        }}
+      >
         {study?.score ?? 0}
       </p>
       {study && (
-        <p className="mt-3 text-sm text-slate-400">
+        <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
           {study.total}문제 중 {study.correct}개 정답
+          {/* 보너스는 얻은 것이라 초록. 길이 고르기의 "+5" 와 같은 색이라
+              고를 때 본 약속과 받은 결과가 이어진다. */}
           {!short && study.bonus > 0 && (
-            <span className="ml-1 text-focus">+{study.bonus} 보너스</span>
+            <span
+              className="ml-1"
+              style={{
+                color: "var(--green-deep)",
+                fontWeight: "var(--weight-black)",
+              }}
+            >
+              +{study.bonus} 보너스
+            </span>
           )}
         </p>
       )}
 
       {short && (
-        <p className="mt-3 text-sm text-slate-400">
+        <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
           낼 수 있는 문제가 떨어져 먼저 마쳤습니다.
         </p>
       )}
 
-      <p className="mt-6 text-sm text-slate-500">
+      <p className="mt-6 text-sm" style={{ color: "var(--text-muted)" }}>
         일일공부는 하루 한 번입니다. 내일 또 만나요.
       </p>
 
       <div className="mt-6 flex flex-col gap-2.5">
+        {/* 순위표가 주된 동작이라 코랄. 홈으로는 흰 알약으로 물러난다 -
+            둘 다 코랄이면 여기서 뭘 해야 할지가 사라진다. */}
         <Link
           href={routes.board()}
-          className="flex min-h-12 items-center justify-center rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="dv-btn flex items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              letterSpacing: "var(--tracking-tight)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
         >
           순위표에서 확인
         </Link>
         <Link
           href={routes.home}
-          className="flex min-h-12 items-center justify-center rounded-full border border-white/40 px-5 font-medium text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="dv-btn flex items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--paper)",
+              color: "var(--foreground)",
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button-paper)",
+            } as React.CSSProperties
+          }
         >
           홈으로
         </Link>

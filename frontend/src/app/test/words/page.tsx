@@ -51,7 +51,13 @@ export default async function TestWordsPage({ searchParams }: PageProps) {
         <ExitGuard to={routes.home} label="홈" />
         <Link
           href={routes.testRound}
-          className="min-h-11 rounded-lg px-2.5 py-2 text-sm text-slate-400 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="flex items-center px-2.5 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={{
+            minHeight: "var(--hit-floor)",
+            borderRadius: "var(--radius-md)",
+            color: "var(--text-muted)",
+            fontWeight: "var(--weight-bold)",
+          }}
         >
           한 판 풀기
         </Link>

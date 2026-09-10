@@ -80,7 +80,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
   // 그 길이가 그대로 박힌다. 백엔드도 자르지만 그건 SQL 인자 쪽이다.
   const shuffle = search
     ? undefined
-    : (first(params.shuffle)?.slice(0, 64) || newShuffleSeed());
+    : first(params.shuffle)?.slice(0, 64) || newShuffleSeed();
 
   // 두 요청을 동시에 띄운다. 순서대로 기다리면 두 번의 왕복이 그대로
   // 대기 시간이 된다.
@@ -131,7 +131,21 @@ export default async function VocabPage({ searchParams }: PageProps) {
             사용자가 조건을 바꿀 수단이 없어 막다른 화면이 된다. */}
         <CategoryFilter options={categories} basePath={routes.words} />
 
-        <p className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        {/* 경고 카드. 테두리를 쓰지 않는다 - 크림에서 경계는 채움과 두께가
+            맡는다(가이드 shape-lift). 옅은 앰버 채움이 흰 카드들 사이에서
+            충분히 눈에 띈다. */}
+        <p
+          className="dv-card mt-6 p-4"
+          style={
+            {
+              background: "var(--amber-soft)",
+              color: "var(--amber-deep)",
+              borderRadius: "var(--radius-2xl)",
+              fontWeight: "var(--weight-bold)",
+              "--lift": "var(--lift-card)",
+            } as React.CSSProperties
+          }
+        >
           {badRequest
             ? "검색 조건이 올바르지 않습니다. 위에서 분류를 다시 골라보세요."
             : `단어를 불러오지 못했습니다. ${error.message}`}
@@ -194,7 +208,12 @@ export default async function VocabPage({ searchParams }: PageProps) {
           options={difficulties}
           basePath={routes.words}
           selected={difficulty}
-          keep={{ search, category, is_exam: examOnly, exam_subject: examSubject }}
+          keep={{
+            search,
+            category,
+            is_exam: examOnly,
+            exam_subject: examSubject,
+          }}
         />
 
         <CategoryFilter
@@ -210,7 +229,14 @@ export default async function VocabPage({ searchParams }: PageProps) {
       {/* 24px 이던 것을 줄였다. 필터 상자가 테두리를 갖고 있어 그대로 두면
           사이가 벌어져 보인다. 접혔을 때는 상자가 없지만 그때는 위가 알약
           하나뿐이라 역시 16px 이 맞다. */}
-      <p className="mt-4 text-sm text-slate-500 dark:text-slate-300">
+      <p
+        className="mt-4"
+        style={{
+          fontSize: "var(--text-sm)",
+          color: "var(--text-muted)",
+          fontWeight: "var(--weight-bold)",
+        }}
+      >
         {search ? `"${search}" 검색 결과 ` : "전체 "}
         {data.count}개
       </p>
@@ -221,7 +247,18 @@ export default async function VocabPage({ searchParams }: PageProps) {
         // 끊는다. 안내 문구는 안쪽에서 다시 p 로 감싼다 - 그래야 문단으로
         // 읽히고, 두 줄로 접혔을 때 text-center 가 둘째 줄에도 걸린다
         // (익명 flex 아이템에는 클래스가 안 붙는다).
-        <div className="mt-8 flex flex-col items-center rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
+        // 빈 자리는 옅은 띠로 둔다. 흰 카드로 두면 목록에 카드가 한 장
+        // 있는 것처럼 보이는데, 내용이 없다는 것이 이 상자의 뜻이다.
+        // 띠는 그림자 없이 면으로만 구분한다(FilterPanel 이 쓰는 문법).
+        <div
+          className="mt-8 flex flex-col items-center p-6 text-center"
+          style={{
+            background: "var(--background-deep)",
+            borderRadius: "var(--radius-2xl)",
+            color: "var(--text-muted)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {/* 분류만 걸어 비었을 때 "등록된 단어가 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
           {search || category || difficulty || examOnly || examSubject ? (
@@ -233,7 +270,17 @@ export default async function VocabPage({ searchParams }: PageProps) {
                   링크라 서버 컴포넌트 그대로이고 접힘과 무관하게 보인다. */}
               <Link
                 href={routes.words}
-                className="mt-4 inline-flex min-h-11 items-center rounded-full border border-white/40 px-4 text-sm text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="dv-btn mt-4 inline-flex min-h-11 items-center rounded-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                style={
+                  {
+                    background: "var(--paper)",
+                    color: "var(--foreground)",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: "var(--weight-black)",
+                    // 쉬는 두께는 --lift 로. 인라인 box-shadow 는 :active 를 이긴다.
+                    "--lift": "var(--lift-button-paper)",
+                  } as React.CSSProperties
+                }
               >
                 조건 지우기
               </Link>

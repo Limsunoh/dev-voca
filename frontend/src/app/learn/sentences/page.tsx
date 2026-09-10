@@ -59,7 +59,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
   // 자세한 이유는 learn/words/page.tsx 참고.
   const shuffle = search
     ? undefined
-    : (first(params.shuffle)?.slice(0, 64) || newShuffleSeed());
+    : first(params.shuffle)?.slice(0, 64) || newShuffleSeed();
 
   // 세 요청을 동시에 띄운다. 순서대로 기다리면 세 번의 왕복이 그대로
   // 대기 시간이 된다.
@@ -109,7 +109,19 @@ export default async function SentencesPage({ searchParams }: PageProps) {
             사용자가 조건을 바꿀 수단이 없어 막다른 화면이 된다. */}
         <CategoryFilter options={categories} basePath={routes.sentences} />
 
-        <p className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        {/* 경고 카드. 테두리를 안 쓰는 이유는 learn/words/page.tsx 참고. */}
+        <p
+          className="dv-card mt-6 p-4"
+          style={
+            {
+              background: "var(--amber-soft)",
+              color: "var(--amber-deep)",
+              borderRadius: "var(--radius-2xl)",
+              fontWeight: "var(--weight-bold)",
+              "--lift": "var(--lift-card)",
+            } as React.CSSProperties
+          }
+        >
           {badRequest
             ? "검색 조건이 올바르지 않습니다. 위에서 분류를 다시 골라보세요."
             : `문장을 불러오지 못했습니다. ${error.message}`}
@@ -174,14 +186,30 @@ export default async function SentencesPage({ searchParams }: PageProps) {
       </FilterPanel>
 
       {/* 여백을 줄인 이유는 learn/words/page.tsx 쪽에 적어뒀다. */}
-      <p className="mt-4 text-sm text-slate-500 dark:text-slate-300">
+      <p
+        className="mt-4"
+        style={{
+          fontSize: "var(--text-sm)",
+          color: "var(--text-muted)",
+          fontWeight: "var(--weight-bold)",
+        }}
+      >
         {search ? `"${search}" 검색 결과 ` : "전체 "}
         {data.count}개
       </p>
 
       {data.results.length === 0 ? (
         // div 인 이유는 learn/words/page.tsx 쪽에 적어뒀다.
-        <div className="mt-8 flex flex-col items-center rounded-md border border-slate-200 p-6 text-center text-slate-500 dark:border-slate-800 dark:text-slate-300">
+        // 옅은 띠로 두는 이유는 learn/words/page.tsx 쪽에 적어뒀다.
+        <div
+          className="mt-8 flex flex-col items-center p-6 text-center"
+          style={{
+            background: "var(--background-deep)",
+            borderRadius: "var(--radius-2xl)",
+            color: "var(--text-muted)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {/* 조건을 걸어 비었을 때 "등록된 문장이 없다"고 하면 서비스 전체가
               비어 있다는 뜻으로 읽힌다. 조건을 좁힌 결과임을 알려준다. */}
           {search || category || kind || difficulty ? (
@@ -190,7 +218,16 @@ export default async function SentencesPage({ searchParams }: PageProps) {
               {/* 접힌 필터를 가리키지 않는다. 이유는 learn/words/page.tsx 참고. */}
               <Link
                 href={routes.sentences}
-                className="mt-4 inline-flex min-h-11 items-center rounded-full border border-white/40 px-4 text-sm text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="dv-btn mt-4 inline-flex min-h-11 items-center rounded-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                style={
+                  {
+                    background: "var(--paper)",
+                    color: "var(--foreground)",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: "var(--weight-black)",
+                    "--lift": "var(--lift-button-paper)",
+                  } as React.CSSProperties
+                }
               >
                 조건 지우기
               </Link>
@@ -224,7 +261,12 @@ export default async function SentencesPage({ searchParams }: PageProps) {
                         단어 카드도 분류를 보여주므로 두 목록이 어긋나지 않는다. */}
                     <CategoryChip label={sentence.category_label} />
                     {sentence.context && (
-                      <span className="text-sm text-slate-500 dark:text-slate-300">
+                      <span
+                        style={{
+                          fontSize: "var(--text-sm)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
                         {sentence.context}
                       </span>
                     )}

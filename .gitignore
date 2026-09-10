@@ -80,3 +80,6 @@ Thumbs.db
 
 # graphify 가 만드는 의존 관계 지도. 로컬 분석용이라 커밋하지 않는다.
 graphify-out/
+
+# claude.ai/design 번들 사본. 작업 중 참조용이라 커밋하지 않는다.
+.design-bundle/

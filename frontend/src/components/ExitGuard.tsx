@@ -167,13 +167,39 @@ export function ExitGuard({
       <button
         type="button"
         onClick={confirm ? open : leave}
-        // 테두리와 배경을 준다. 대비는 원래도 충분했지만(12.83:1) 위계가
-        // 없었다 - 옆의 "한 판 풀기" 링크와 같은 크기·같은 무게라, 화면의
-        // 유일한 출구가 그냥 링크 중 하나로 보였다. 크게 만들 필요는 없고
-        // 눌리는 것처럼 보이면 된다.
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-white/12 bg-white/5 px-3 text-[0.9375rem] font-medium text-slate-200 transition-[scale,color,background-color] duration-[120ms] ease-press hover:bg-white/10 hover:text-slate-50 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        // 흰 알약에 두께를 준다. 위계가 필요한 자리라서다 - 옆의 "순위표"
+        // 링크와 같은 무게로 두면 화면의 유일한 출구가 그냥 링크 중 하나로
+        // 보인다. 크게 만들 필요는 없고 눌리는 것처럼 보이면 된다.
+        //
+        // 코랄은 안 쓴다. 나가기는 물러나는 동작이고, 이 화면의 코랄
+        // 하나는 "시작"·"이어서 익히기" 같은 주된 동작이 갖는다.
+        //
+        // 상세의 되돌아가기(DetailBack)와 같은 모양이다 - 화살표를 옅은
+        // 띠에 앉힌 흰 알약. 둘 다 "여기서 빠져나가는 길" 이라 같아야 한다.
+        className="dv-card dv-card-press inline-flex min-h-11 items-center gap-2 rounded-full py-1 pr-4 pl-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        style={
+          {
+            background: "var(--paper)",
+            color: "var(--foreground)",
+            fontSize: "var(--text-sm)",
+            fontWeight: "var(--weight-black)",
+            // 쉬는 두께는 --lift 로. 인라인 box-shadow 는 :active 를 이겨서
+            // 눌러도 두께가 안 사라진다.
+            "--lift": "var(--lift-card)",
+          } as React.CSSProperties
+        }
       >
-        <span aria-hidden className="text-base leading-none">
+        {/* 화살표만 옅은 띠에 앉힌다. 알약 전체가 이미 흰 종이라 여기에
+            또 종이를 깔면 층이 둘이 된다. */}
+        <span
+          aria-hidden
+          className="grid h-7 w-7 place-items-center"
+          style={{
+            background: "var(--background-deep)",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
           ←
         </span>
         {label}
@@ -189,12 +215,47 @@ export function ExitGuard({
           // 라서 저절로 가운데 서는데, Tailwind 의 리셋이 모든 요소의 margin
           // 을 0 으로 만들어 그 기본값을 지운다. 그러면 inset: 0 만 남아
           // 화면 왼쪽 위에 붙는다(실측: top 0, left 0).
-          className="pop m-auto max-w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/12 bg-slate-900 p-6 text-slate-100 shadow-[0_24px_64px_-12px_rgb(0_0_0/0.9)] backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+          // 시트라 두께가 카드보다 두껍다(--lift-sheet, 8px). 화면 위에
+          // 떠 있는 것이라 카드 3px 로는 종이 한 장이 얹힌 것으로 보인다.
+          //
+          // 여기는 인라인 boxShadow 로 둔다. 대화상자는 누르는 것이 아니라
+          // 누를 것을 담는 그릇이고, :active 가 없어서 --lift 로 넘길 이유가
+          // 없다(QuestionCard 의 문제 카드와 같은 판단이다).
+          //
+          // backdrop 은 잉크(#191512) 72%. 검정 대신 잉크를 쓰는 이유는
+          // 크림 화면에 순검정이 한 번도 안 나오기 때문이다 - 순검정을
+          // 깔면 뒤가 어두워지는 게 아니라 다른 앱이 덮은 것처럼 보인다.
+          // blur 도 뺀다. 크림은 흐린 그림자·글래스를 쓰지 않는다.
+          className="pop m-auto max-w-[min(22rem,calc(100vw-2rem))] p-6 backdrop:bg-[rgb(25_21_18/0.72)]"
+          style={{
+            background: "var(--paper)",
+            color: "var(--foreground)",
+            borderRadius: "var(--radius-sheet)",
+            border: 0,
+            boxShadow: "var(--lift-sheet)",
+          }}
         >
-          <h2 id={titleId} className="text-lg font-bold">
+          <h2
+            id={titleId}
+            style={{
+              fontSize: "var(--text-lg)",
+              fontWeight: "var(--weight-black)",
+              letterSpacing: "var(--tracking-tight)",
+              color: "var(--foreground)",
+            }}
+          >
             지금 나가시겠습니까?
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-300">
+          {/* 본문이라 --text-muted. --text-dim 은 작은 라벨용이다.
+              (지금 두 토큰은 같은 값이지만 이름으로 의미를 가른다 -
+              globals.css 의 --text-dim 주석 참고) */}
+          <p
+            className="mt-2 text-sm"
+            style={{
+              lineHeight: "var(--leading-relaxed)",
+              color: "var(--text-muted)",
+            }}
+          >
             {/* 양수일 때만 숫자를 말한다. 틀려서 점수가 음수인 사람에게
                 "딴 -2점이 사라진다" 고 하면 거짓말이고, 0 이면 잃을 게
                 없다. 두 경우 모두 일반 문구가 맞다.
@@ -213,7 +274,22 @@ export function ExitGuard({
               바로 손을 떼게 만드는 것이 지금 할 수 있는 최선이다.
               (Esc 로도 닫힌다) */}
           {countdown && (
-            <p className="mt-2 text-sm font-medium text-amber-300">
+            // 옅은 호박 띠에 진한 호박 글자. 배지 문법(color-verdict:
+            // 옅은 채움 + 진한 글자)을 그대로 쓴다.
+            //
+            // --amber(#f2a93b) 를 글자색으로 쓰지 않는다. 크림 위에서
+            // 2.2:1 이라 안 읽힌다 - 다크에서 amber-300 이 잘 보였던 것은
+            // 어두운 바탕이었기 때문이고, 바탕이 뒤집혔으니 값도 뒤집어야
+            // 한다. --amber-deep 이 그 자리를 위해 있는 토큰이다.
+            <p
+              className="mt-3 px-3 py-2 text-sm"
+              style={{
+                background: "var(--amber-soft)",
+                borderRadius: "var(--radius-md)",
+                color: "var(--amber-deep)",
+                fontWeight: "var(--weight-bold)",
+              }}
+            >
               창이 떠 있는 동안에도 시간은 흐릅니다.
             </p>
           )}
@@ -221,17 +297,45 @@ export function ExitGuard({
           <div className="mt-6 flex gap-2">
             {/* 계속 풀기를 먼저 둔다. 실수로 연 사람이 대부분이라 손가락이
                 먼저 닿는 자리에 되돌아가는 쪽이 있어야 한다. */}
+            {/* 이 창의 코랄 하나를 "계속 풀기" 가 갖는다. 여기서 권하는
+                것이 그쪽이고, 코랄은 "지금 눌러야 할 것" 을 뜻한다.
+                실수로 연 사람이 대부분이라 되돌아가는 쪽이 주된 동작이다. */}
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
-              className="flex min-h-12 flex-1 items-center justify-center rounded-xl bg-white/10 px-4 text-sm font-semibold transition-[scale,background-color] duration-[120ms] ease-press hover:bg-white/15 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              className="dv-btn flex flex-1 items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={
+                {
+                  minHeight: "var(--hit-min)",
+                  background: "var(--coral)",
+                  color: "var(--text-on-color)",
+                  border: 0,
+                  borderRadius: "var(--radius-pill)",
+                  fontWeight: "var(--weight-black)",
+                  "--lift": "var(--lift-button)",
+                } as React.CSSProperties
+              }
             >
               계속 풀기
             </button>
+            {/* 나가기는 물러나는 동작이라 흰 알약이다. 글자만 코랄 진한
+                쪽으로 둬서 되돌릴 수 없는 동작임을 알린다 - 채우면 코랄이
+                둘이 되어 어느 쪽이 권하는 것인지 사라진다. */}
             <button
               type="button"
               onClick={leave}
-              className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-rose-400/40 px-4 text-sm font-semibold text-rose-200 transition-[scale,background-color] duration-[120ms] ease-press hover:bg-rose-400/10 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              className="dv-btn flex flex-1 items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={
+                {
+                  minHeight: "var(--hit-min)",
+                  background: "var(--paper)",
+                  color: "var(--coral-deep)",
+                  border: 0,
+                  borderRadius: "var(--radius-pill)",
+                  fontWeight: "var(--weight-black)",
+                  "--lift": "var(--lift-button-paper)",
+                } as React.CSSProperties
+              }
             >
               나가기
             </button>

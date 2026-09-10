@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Burst } from "@/components/Burst";
 import { ExitGuard } from "@/components/ExitGuard";
+import { QuestionCard } from "@/components/QuestionCard";
 import type {
   RoundAnswered,
   RoundQuestion,
@@ -269,9 +270,16 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
             대신 갈 곳을 여럿 둔다 - 여기는 고르는 자리다. */}
         <div className="mb-5 flex items-center justify-between gap-3">
           <ExitGuard to={routes.home} label="홈" />
+          {/* 맨몸 글자 링크로 둔다. 옆의 나가기가 흰 알약이라, 여기까지
+              알약이면 같은 무게의 버튼 둘이 나란히 서서 어느 것이 나가는
+              길인지 안 보인다. */}
           <Link
             href={routes.board()}
-            className="min-h-11 rounded-lg px-2.5 py-2 text-sm text-slate-400 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="inline-flex min-h-11 items-center rounded-full px-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            style={{
+              color: "var(--text-muted)",
+              fontWeight: "var(--weight-bold)",
+            }}
           >
             순위표
           </Link>
@@ -350,34 +358,91 @@ function StartCard({
   error: string;
 }) {
   return (
-    <div className="rise rounded-2xl border border-white/10 bg-slate-950/40 px-6 py-10 text-center">
+    // 흰 카드에 두께. 크림에는 영역별 배경이 없어서 맨몸으로 두면 시작
+    // 카드가 바탕에 녹는다. dv-card-press 는 안 붙인다 - 카드가 아니라
+    // 안의 "시작" 버튼이 눌리는 자리다.
+    <div
+      className="rise dv-card px-6 py-10 text-center"
+      style={
+        {
+          background: "var(--paper)",
+          borderRadius: "var(--radius-2xl)",
+          "--lift": "var(--lift-card)",
+        } as React.CSSProperties
+      }
+    >
       {/* 90 을 크게 둔다. 이 화면에서 가장 먼저 읽어야 할 것이 "얼마나
           걸리나" 이고, 제목은 그 다음이다. 크기 차이를 벌려야 훑는 눈이
-          순서대로 걸린다. */}
-      <p className="font-mono text-4xl font-bold text-amber-300 sm:text-5xl">
+          순서대로 걸린다.
+
+          잉크로 둔다. 다크에서는 호박이었는데 크림 위의 --amber 는 2.2:1
+          이라 큰 글자여도 흐리게 뜬다. 코랄로 바꾸지도 않는다 - 이 카드의
+          코랄 하나는 아래 "시작" 버튼이 갖고, 읽는 숫자와 누르는 버튼이
+          같은 색이면 어느 쪽이 동작인지 사라진다. */}
+      <p
+        className="font-mono text-4xl tabular-nums sm:text-5xl"
+        style={{
+          fontWeight: "var(--weight-bold)",
+          letterSpacing: "var(--tracking-tighter)",
+          color: "var(--foreground)",
+        }}
+      >
         90
-        <span className="ml-0.5 text-lg font-medium text-amber-300/70 sm:text-xl">
+        <span
+          className="ml-0.5 text-lg sm:text-xl"
+          style={{
+            fontWeight: "var(--weight-medium)",
+            color: "var(--text-muted)",
+          }}
+        >
           초
         </span>
       </p>
-      <h1 className="mt-3 text-xl font-bold text-slate-100 sm:text-2xl">
+      <h1
+        className="mt-3 text-xl sm:text-2xl"
+        style={{
+          fontWeight: "var(--weight-black)",
+          letterSpacing: "var(--tracking-tight)",
+          color: "var(--foreground)",
+        }}
+      >
         한 판 풀어봅니다
       </h1>
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
         맞히면 +1, 틀리면 -1. 모르겠으면 세 번까지 넘길 수 있습니다.
       </p>
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-rose-300">
+        <p
+          role="alert"
+          className="mt-4 text-sm"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {error}
         </p>
       )}
 
+      {/* 이 화면의 코랄 하나. 여기서 할 일은 판을 여는 것뿐이다. */}
       <button
         type="button"
         onClick={onStart}
         disabled={busy}
-        className="mt-6 inline-flex min-h-12 items-center rounded-xl bg-amber-300/15 px-8 text-base font-semibold text-amber-100 ring-1 ring-amber-300/40 transition hover:bg-amber-300/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+        className="dv-btn mt-6 inline-flex items-center px-8 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
+        style={
+          {
+            minHeight: "var(--hit-min)",
+            background: "var(--coral)",
+            color: "var(--text-on-color)",
+            border: 0,
+            borderRadius: "var(--radius-pill)",
+            fontWeight: "var(--weight-black)",
+            letterSpacing: "var(--tracking-tight)",
+            "--lift": "var(--lift-button)",
+          } as React.CSSProperties
+        }
       >
         {busy ? "여는 중..." : "시작"}
       </button>
@@ -420,18 +485,30 @@ function PlayCard({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
+        {/* 쉬는 동안은 잉크, 10초 아래로는 코랄.
+            평소를 코랄로 두면 경고할 색이 남지 않는다 - 이 화면에서 코랄은
+            "지금 급하다" 하나를 뜻한다. 색만으로 알리지도 않는다: 숫자가
+            줄고 아래 막대가 짧아지는 것이 먼저 있고 색은 그 위에 얹힌다. */}
         <span
-          className={[
-            "font-mono text-2xl font-bold tabular-nums transition-colors sm:text-3xl",
-            urgent ? "text-rose-300" : "text-slate-100",
-          ].join(" ")}
+          className="font-mono text-2xl tabular-nums transition-colors sm:text-3xl"
+          style={{
+            fontWeight: "var(--weight-black)",
+            letterSpacing: "var(--tracking-tighter)",
+            color: urgent ? "var(--coral)" : "var(--foreground)",
+          }}
           // 매 초 바뀌는 값이라 읽어주면 방해가 된다. 남은 시간은 아래
           // 진행 막대와 색으로도 드러난다.
           aria-hidden
         >
           {seconds}
         </span>
-        <span className="font-mono text-sm tabular-nums text-slate-400">
+        <span
+          className="font-mono text-sm tabular-nums"
+          style={{
+            color: "var(--text-muted)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {tally.score >= 0 ? `+${tally.score}` : tally.score}점 ·{" "}
           {tally.correct}/{tally.answered}
         </span>
@@ -439,7 +516,7 @@ function PlayCard({
 
       {/* 남은 시간 막대. 90초를 100% 로 잡는다. */}
       <div
-        className="h-1 overflow-hidden rounded-full bg-white/8"
+        className="h-1.5 overflow-hidden"
         role="progressbar"
         aria-label="남은 시간"
         aria-valuemin={0}
@@ -447,53 +524,55 @@ function PlayCard({
         // **경과분을 넣는다.** 남은 초를 그대로 주면 90 에서 0 으로
         // 줄어들어, 스크린리더가 진행이 되돌아간다고 읽는다.
         aria-valuenow={total - seconds}
+        style={{
+          background: "var(--sand-deep)",
+          borderRadius: "var(--radius-pill)",
+        }}
       >
+        {/* 여기는 복습·일일공부의 진행 막대와 **뜻이 반대다.** 그쪽은
+            채운 만큼이 지나온 것(초록)이고, 여기 채움은 **남은 시간**이라
+            줄어든다. 그래서 초록을 안 쓴다 - 같은 초록이 한쪽에서는
+            "해낸 것", 다른 쪽에서는 "남은 것" 이 되면 훑을 때 헷갈린다.
+            평소는 잉크, 10초 아래로는 위 숫자와 함께 코랄로 넘어간다. */}
         <div
-          className={[
-            "h-full rounded-full transition-[width] duration-300 ease-linear",
-            urgent ? "bg-rose-400/80" : "bg-amber-300/70",
-          ].join(" ")}
-          style={{ width: `${Math.min(100, (left / (total * 1000)) * 100)}%` }}
+          className="h-full transition-[width] duration-300 ease-linear"
+          style={{
+            width: `${Math.min(100, (left / (total * 1000)) * 100)}%`,
+            background: urgent ? "var(--coral)" : "var(--foreground)",
+            borderRadius: "var(--radius-pill)",
+          }}
         />
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-slate-950/40 px-5 py-6">
-        <p className="text-xs text-slate-500">{question.kind_label}</p>
-        <p className="mt-1 text-sm text-slate-400">{question.question}</p>
-        <p
-          className={[
-            "mt-3 text-xl font-semibold text-slate-100 sm:text-2xl",
-            // 단어·에러 메시지는 고정폭, 사람이 쓴 문장은 가변폭.
-            question.kind === "situation" || question.kind === "blank"
-              ? ""
-              : "font-mono",
-          ].join(" ")}
-        >
-          {question.prompt}
-        </p>
-      </div>
-
-      <ul className="flex flex-col gap-2">
-        {question.choices.map((choice) => (
-          <li key={choice.id}>
-            <button
-              type="button"
-              onClick={() => onPick(choice.id)}
-              disabled={busy}
-              className="min-h-12 w-full rounded-xl border border-white/12 bg-slate-950/35 px-4 py-3 text-left text-slate-100 transition hover:border-amber-300/40 hover:bg-amber-300/8 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
-            >
-              {choice.text}
-            </button>
-          </li>
-        ))}
-      </ul>
+      {/* 문제와 보기는 QuestionCard 가 그린다.
+          여기 한 벌을 따로 들고 있었는데(복습·일일공부는 이미 공용을 쓴다),
+          같은 것을 두 벌 두면 보기의 터치 높이나 발음기호 서체를 한쪽만
+          고치게 된다 - QuestionCard 주석이 경고하던 바로 그 자리다. 크림에서
+          두 벌의 보기 버튼이 실제로 갈라졌다(공용은 56px·--radius-xl 인데
+          여기는 48px·rounded-xl 이었다). 화면 셋이 같은 문제를 내므로 같은
+          모양이어야 한다. */}
+      <QuestionCard question={question} busy={busy} onPick={onPick} />
 
       <div className="flex items-center justify-between gap-3">
+        {/* 흰 알약으로 물러난다. 코랄은 보기를 고르는 쪽에 있어야 하고,
+            넘기기는 세 번뿐인 도피구다 - 눈에 띄게 두면 그걸 먼저 쓴다.
+            횟수를 다 쓰면 흐려지지만 사라지지는 않는다. 사라지면 버튼 줄이
+            통째로 움직여 옆의 채점 결과가 다른 자리로 뛴다. */}
         <button
           type="button"
           onClick={onSkip}
           disabled={busy || skipsLeft === 0}
-          className="min-h-11 rounded-lg px-3 text-sm text-slate-400 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
+          className="dv-btn inline-flex min-h-11 items-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
+          style={
+            {
+              background: "var(--paper)",
+              color: "var(--text-body)",
+              border: 0,
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-bold)",
+              "--lift": "var(--lift-card)",
+            } as React.CSSProperties
+          }
         >
           넘기기 {skipsLeft > 0 && `(${skipsLeft})`}
         </button>
@@ -501,14 +580,18 @@ function PlayCard({
         {/* 직전 채점 결과. 새로 나타나는 영역이라 읽어준다. */}
         <p aria-live="polite" className="text-sm">
           {result && !result.skipped && (
+            // 맞았지만 시간이 지난 것(0점)은 초록으로 두지 않는다. 점수가
+            // 안 붙은 것을 정답과 같은 색으로 칠하면 문구만 예외가 되고
+            // 색은 거짓말을 한다. 잉크로 물러난다.
             <span
-              className={
-                !result.correct
-                  ? "text-rose-300"
+              style={{
+                color: !result.correct
+                  ? "var(--wrong-deep)"
                   : result.in_time
-                    ? "text-teal-300"
-                    : "text-slate-300"
-              }
+                    ? "var(--correct)"
+                    : "var(--text-muted)",
+                fontWeight: "var(--weight-black)",
+              }}
             >
               {/* **시간 초과로 맞힌 것은 0점이다.** 그냥 "정답" 으로 두면
                   맞혔는데 점수가 안 오르는 이유를 알 방법이 없다. */}
@@ -523,7 +606,14 @@ function PlayCard({
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-rose-300">
+        <p
+          role="alert"
+          className="text-sm"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {error}
         </p>
       )}
@@ -555,15 +645,36 @@ function RoundResultCard({
   late: number;
 }) {
   return (
-    <div className="rise rounded-2xl border border-white/10 bg-slate-950/40 px-6 py-8 text-center">
-      <p className="text-sm text-slate-400">한 판 끝</p>
+    <div
+      className="rise dv-card px-6 py-8 text-center"
+      style={
+        {
+          background: "var(--paper)",
+          borderRadius: "var(--radius-2xl)",
+          "--lift": "var(--lift-card)",
+        } as React.CSSProperties
+      }
+    >
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        한 판 끝
+      </p>
 
       {summary ? (
         <>
-          <p className="pop mt-2 font-mono text-5xl font-bold tabular-nums text-amber-200">
+          {/* 이 화면에서 가장 큰 숫자. 잉크로 둔다 - 일일공부·복습 결과가
+              같은 자리를 같은 방식으로 그리고, 코랄은 아래 "순위표에서
+              확인" 이 갖는다. */}
+          <p
+            className="pop mt-2 font-mono text-5xl tabular-nums"
+            style={{
+              fontWeight: "var(--weight-bold)",
+              letterSpacing: "var(--tracking-tighter)",
+              color: "var(--foreground)",
+            }}
+          >
             {summary.score}
           </p>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
             {summary.answered}문제 중 {summary.correct}개 정답
             {summary.skipped > 0 && ` · ${summary.skipped}개 넘김`}
             {/* 시간 지나 맞힌 것은 0 점이다. 이 줄이 없으면 "2개 맞혔는데
@@ -576,19 +687,49 @@ function RoundResultCard({
           {/* 기록됐을 때만 순위 얘기를 한다. 게스트에게 "17위" 를 보여주면
               다음에 왔을 때 그 등수가 사라져 있다. */}
           {summary.recorded ? (
+            // 기록이 남은 사람에게는 순위표가 다음에 할 일이라 코랄.
+            // 아래 "한 판 더" 는 흰 알약으로 물러난다.
             <Link
               href={routes.board()}
-              className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-violet-300/15 px-5 text-sm font-medium text-violet-100 ring-1 ring-violet-300/35 transition hover:bg-violet-300/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              className="dv-btn mt-6 inline-flex items-center px-6 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={
+                {
+                  minHeight: "var(--hit-min)",
+                  background: "var(--coral)",
+                  color: "var(--text-on-color)",
+                  borderRadius: "var(--radius-pill)",
+                  fontWeight: "var(--weight-black)",
+                  "--lift": "var(--lift-button)",
+                } as React.CSSProperties
+              }
             >
               순위표에서 확인
             </Link>
           ) : (
             isGuest && (
-              <p className="mt-5 rounded-lg border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-400">
+              // 게스트 안내는 옅은 띠에 앉힌다. 이 카드 안의 또 다른
+              // 카드로 두지 않는다 - 흰 종이 위에 흰 종이면 두께만 겹치고
+              // 층이 안 생긴다.
+              <p
+                className="mt-5 px-4 py-3 text-sm"
+                style={{
+                  background: "var(--background-deep)",
+                  borderRadius: "var(--radius-md)",
+                  lineHeight: "var(--leading-relaxed)",
+                  color: "var(--text-muted)",
+                }}
+              >
                 로그인하면 다음 판부터 순위표에 올라갑니다.{" "}
+                {/* 게스트에게는 로그인이 이 화면의 코랄 하나다 - 위
+                    "순위표에서 확인" 이 안 그려지는 갈래라 겹치지 않는다.
+                    밑줄을 남긴다: 문장 안의 링크는 색만으로 알리지 않는다. */}
                 <Link
                   href={`/login?next=${routes.testRound}`}
-                  className="font-medium text-teal-300 underline underline-offset-2 hover:text-teal-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  className="underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  style={{
+                    color: "var(--coral-deep)",
+                    fontWeight: "var(--weight-black)",
+                  }}
                 >
                   로그인
                 </Link>
@@ -597,17 +738,31 @@ function RoundResultCard({
           )}
         </>
       ) : (
-        <p className="mt-3 text-slate-300">
+        <p className="mt-3" style={{ color: "var(--text-body)" }}>
           {error || "결과를 불러오지 못했습니다."}
         </p>
       )}
 
       <div className="mt-6">
+        {/* 흰 알약. 위의 "순위표에서 확인" 이 코랄이라 여기는 물러난다.
+            결과를 못 불러온 갈래에서는 이것이 화면의 유일한 버튼이 되지만
+            그대로 둔다 - 그때는 방금 실패한 판을 다시 여는 것이라, 코랄로
+            권할 동작이 아니다. */}
         <button
           type="button"
           onClick={onAgain}
           disabled={busy}
-          className="min-h-11 rounded-lg border border-white/12 px-5 text-sm font-medium text-slate-200 transition hover:border-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+          className="dv-btn inline-flex min-h-11 items-center px-5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
+          style={
+            {
+              background: "var(--paper)",
+              color: "var(--foreground)",
+              border: 0,
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button-paper)",
+            } as React.CSSProperties
+          }
         >
           {busy ? "여는 중..." : "한 판 더"}
         </button>
