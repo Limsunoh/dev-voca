@@ -134,6 +134,9 @@ docker compose down    # DB 중지
 - API 호출은 `lib/api/` 하위에 모듈화
 - 런타임 의존성은 `next`/`react`/`react-dom` 셋. 늘리려면 `.claude/skills/devvoca-design/SKILL.md` 의 기준을 먼저 통과시킨다
 
+**화면이 어떻게 이어지는지는** @docs/userflow.md 에 있다. 경로·탭바·로그인
+게이트와 화면별 구조(wireframe)를 담았다. 화면을 고치면 그 문서도 같이 고친다.
+
 **화면(UI) 작업을 시작하기 전에** `.claude/skills/devvoca-design/SKILL.md` 를 읽는다. 화면마다 성격이 달라 쓰는 도구가 다르고(홈은 랜딩, 목록·상세는 제품 화면), 발음기호 타이포처럼 이미 코드에 반영돼 있어 깨뜨리기 쉬운 제약이 있다. 팔레트·폰트 선정 → 작성 → 검사 → 검증 기록까지 4단계 절차가 그 문서에 있다.
 
 **공통**

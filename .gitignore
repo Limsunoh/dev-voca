@@ -80,3 +80,6 @@ Thumbs.db
 
 # graphify 가 만드는 의존 관계 지도. 로컬 분석용이라 커밋하지 않는다.
 graphify-out/
+
+# claude.ai/design 핸드오프 번들. 링크로 받으므로 저장소에 안 둔다.
+*.zip
