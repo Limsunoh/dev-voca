@@ -30,16 +30,36 @@ export default async function DailyPage() {
     const offline = error instanceof ApiError && error.status === 0;
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-8 text-center">
-        <p className="text-slate-200">일일공부를 불러오지 못했습니다.</p>
-        <p className="mt-1 text-sm text-slate-500">
+        <p
+          style={{
+            fontWeight: "var(--weight-black)",
+            letterSpacing: "var(--tracking-tight)",
+            color: "var(--foreground)",
+          }}
+        >
+          일일공부를 불러오지 못했습니다.
+        </p>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
           {offline
             ? "서버에 연결할 수 없습니다. 잠시 뒤 다시 시도해주세요."
             : "잠시 뒤 다시 시도해주세요."}
         </p>
         <div className="mt-6">
+          {/* 여기서 갈 곳은 홈뿐이라 이 화면의 코랄 하나다. 되돌아가는
+              동작이지만 다른 선택지가 없으면 그것이 주된 동작이다. */}
           <Link
             href={routes.home}
-            className="inline-flex min-h-11 items-center rounded-full border border-white/40 px-5 text-sm font-medium text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="dv-btn inline-flex items-center px-6 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            style={
+              {
+                minHeight: "var(--hit-min)",
+                background: "var(--coral)",
+                color: "var(--text-on-color)",
+                borderRadius: "var(--radius-pill)",
+                fontWeight: "var(--weight-black)",
+                "--lift": "var(--lift-button)",
+              } as React.CSSProperties
+            }
           >
             홈으로
           </Link>

@@ -90,9 +90,22 @@ export function TabBar() {
         data-tabbar
         // 아래에 고정한다. 목록이 길어도 이동 수단이 늘 손 닿는 곳에 있다.
         // 폰의 홈 인디케이터에 가리지 않도록 safe-area 만큼 더 띄운다.
-        // 배경은 토큰으로 둔다. 리터럴로 박으면 문제풀이·내정보가 각자
-        // 배경을 받을 때 탭바만 단어·문장 색으로 남고, 그 줄을 찾아야 한다.
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
+        //
+        // 반투명 + backdrop-blur 를 걷어냈다. 다크에서는 뒤의 그라디언트가
+        // 비쳐야 탭바가 화면에 붙어 보였지만, 크림에는 영역별 배경이 없어
+        // 비칠 것이 없다. 흐림만 남으면 스크롤할 때마다 폰이 화면 폭 전체를
+        // 다시 합성한다.
+        //
+        // 여기만 테두리(1px)를 남긴다. 크림의 두께는 전부 아래로 떨어지는데
+        // 탭바는 화면 맨 아래에 붙어 있어 그림자를 놓을 자리가 없다.
+        // 위로 그림자를 쏘면 이 시스템에서 유일하게 방향이 반대인 요소가
+        // 되므로, 머리카락 굵기 선 하나로 바닥과 갈라놓는다
+        // (번들 navigation/TabBar.jsx 도 이 자리만 테두리를 쓴다).
+        className="fixed inset-x-0 bottom-0 z-20 border-t pb-[env(safe-area-inset-bottom)]"
+        style={{
+          background: "var(--paper)",
+          borderColor: "var(--border-hairline)",
+        }}
       >
         {/* flex 로 두는 이유: 모드가 하나 열리면 tabs 가 저절로 늘어난다.
           grid-cols-N 을 박아두면 그때 여기도 같이 고쳐야 한다. */}
@@ -103,12 +116,19 @@ export function TabBar() {
             // 아이콘 라이브러리를 넣지 않으려고 막대 하나로 지금 위치를
             // 표시한다. 색만으로 구분하면 색각 이상이 있을 때 구분이 안 되므로
             // 진하기도 같이 바꾼다.
+            // 크림에서는 이 막대가 켜졌을 때만 보이는 코랄 막대다(34x6).
+            // 다크에서는 꺼진 탭도 40% 투명도로 남겼는데, 크림 바탕에서는
+            // 옅은 회색 막대 다섯 개가 탭바 위에 눈금처럼 늘어서서 무엇이
+            // 켜진 것인지 더 안 보였다. 꺼지면 자리만 남기고 색을 없앤다.
+            //
+            // 색만으로 구분하지 않는다는 규칙은 그대로다 - 켜진 탭은 글자도
+            // 코랄이고 aria-current 가 소리로 말한다. 막대는 훑을 때를 돕는
+            // 보조 수단이다.
             const marker = (
               <span
                 aria-hidden
-                className={`block h-0.5 w-5 rounded-full bg-current transition ${
-                  active ? "opacity-100" : "opacity-40"
-                }`}
+                className="block h-1.5 w-[34px] rounded-full"
+                style={{ background: active ? "var(--coral)" : "transparent" }}
               />
             );
 
@@ -119,8 +139,12 @@ export function TabBar() {
             // 수십~수백 번 눌린다. 그 빈도에서는 반응이 붙을수록 느리게
             // 느껴진다 - 색과 표시줄이 즉시 바뀌는 지금이 가장 빠르다.
             // (globals.css 의 "누름 피드백" 주석 참고)
+            // min-h 를 14(56px)로 둔다. 12(48px)면 "준비 중 / 말하기" 처럼
+            // 두 줄인 항목이 안 들어가 글자가 탭바 밖으로 잘린다 - 준비 중인
+            // 탭이 하나뿐이라 다른 항목만 보고는 못 알아챈다. 데스크톱에서
+            // 실측으로 확인했다.
             const shape =
-              "flex min-h-12 flex-col items-center justify-center gap-1.5 py-2 text-xs transition";
+              "flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-xs transition";
 
             if (!tab.ready) {
               return (
@@ -136,7 +160,10 @@ export function TabBar() {
                     한 줄에 두 덩이가 되어 탭이 5개인 좁은 폰(360px)에서 칸을
                     넘고, 마지막 탭이 화면 밖으로 조용히 밀린다. 위아래로 두면
                     다른 탭과 같은 두 줄이라 높이도 어긋나지 않는다. */}
-                  <span className={`${shape} cursor-default text-slate-400`}>
+                  <span
+                    className={`${shape} cursor-default`}
+                    style={{ color: "var(--text-muted)" }}
+                  >
                     <span aria-hidden className="text-[0.625rem] leading-none">
                       준비 중
                     </span>
@@ -152,11 +179,14 @@ export function TabBar() {
                 <Link
                   href={tabHref(tab, pathname)}
                   aria-current={active ? "page" : undefined}
-                  className={`${shape} focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
-                    active
-                      ? "text-focus"
-                      : "text-slate-300 hover:text-slate-100"
-                  }`}
+                  className={`${shape} focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus`}
+                  style={{
+                    // 글자는 --coral-deep(4.93:1). 위 막대는 background 라
+                    // 비텍스트 3:1 기준이고 --coral(3.15:1)로 통과한다 -
+                    // 같은 색을 쓰지 않는 이유가 그것이다.
+                    color: active ? "var(--coral-deep)" : "var(--text-muted)",
+                    fontWeight: "var(--weight-bold)",
+                  }}
                 >
                   {marker}
                   {tab.label}

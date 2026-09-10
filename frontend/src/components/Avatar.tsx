@@ -16,8 +16,7 @@ import { useState } from "react";
 
 /** 서버가 내려주는 모양. backend 의 User.avatar_display 와 짝. */
 export type AvatarDisplay =
-  | { type: "photo"; url: string }
-  | { type: "preset"; key: string };
+  { type: "photo"; url: string } | { type: "preset"; key: string };
 
 export const AVATAR_KEYS = ["a1", "a2", "a3", "a4", "a5", "a6"] as const;
 
@@ -32,42 +31,57 @@ const PRESETS: Record<
   { bg: string; fg: string; label: string; path: string }
 > = {
   a1: {
-    bg: "#1e293b",
-    fg: "#e2e8f0",
+    bg: "#2A4A7B",
+    fg: "#DCE8F7",
     label: "터미널",
     path: "M14 18l8 8-8 8M28 34h12",
   },
   a2: {
-    bg: "#0f766e",
-    fg: "#ccfbf1",
+    bg: "#17916B",
+    fg: "#DFF2EA",
     label: "중괄호",
     path: "M22 14c-4 0-4 4-4 6s0 6-4 6c4 0 4 4 4 6s0 6 4 6M42 14c4 0 4 4 4 6s0 6 4 6c-4 0-4 4-4 6s0 6-4 6",
   },
   a3: {
-    bg: "#7c2d12",
-    fg: "#fed7aa",
+    bg: "#C13E22",
+    fg: "#FFE0D6",
     label: "책",
     path: "M16 16h14v32H16zM34 16h14v32H34zM32 16v32",
   },
   a4: {
-    bg: "#4c1d95",
-    fg: "#ddd6fe",
+    bg: "#5844A8",
+    fg: "#E7E2F7",
     label: "별",
     path: "M32 14l5.5 11.5L50 27l-9 9 2 12.5L32 42l-11 6.5 2-12.5-9-9 12.5-1.5z",
   },
   a5: {
-    bg: "#155e75",
-    fg: "#cffafe",
+    bg: "#F2A93B",
+    fg: "#3A2A0A",
     label: "물음표",
     path: "M24 24c0-5 4-8 8-8s8 3 8 8c0 5-8 6-8 12M32 44v2",
   },
   a6: {
-    bg: "#831843",
-    fg: "#fbcfe8",
+    bg: "#191512",
+    fg: "#FFF6E9",
     label: "하트",
     path: "M32 46S16 36 16 26a8 8 0 0116-4 8 8 0 0116 4c0 10-16 20-16 20z",
   },
 };
+
+/**
+ * 아바타 모서리. 원이 아니라 라운드 사각이다(디자인 가이드 shape-radius).
+ *
+ * --radius-lg(16px)를 그대로 못 쓴다. 이 컴포넌트는 24px 부터 72px 까지
+ * 쓰이는데(프로필 72 · 순위표 42 · 카드 옆 24), 고정 16px 이면 작은 것은
+ * 거의 원이고 큰 것은 거의 사각이라 화면마다 다른 모양이 된다. 비율로
+ * 두면 어느 크기에서나 같은 둥글기로 보인다.
+ *
+ * 0.38 은 번들 원본(identity/Avatar.jsx)이 정한 값이다. 40px 에서
+ * 15px 이라 --radius-lg 와 사실상 같고, 그게 이 비율의 기준점이다.
+ */
+function cornerFor(size: number): number {
+  return Math.round(size * 0.38);
+}
 
 /** 알 수 없는 키가 와도 화면이 비지 않게 첫 번째로 떨어진다. */
 function presetOf(key: string) {
@@ -108,7 +122,8 @@ export function Avatar({ shown, size = 40, className = "" }: Props) {
         // referrerPolicy: 구글이 우리 주소를 받지 않게 한다. 안 주면
         // 사진 요청이 거절되는 경우도 있어 no-referrer 로 둔다.
         referrerPolicy="no-referrer"
-        className={`shrink-0 rounded-full object-cover ${className}`}
+        className={`shrink-0 object-cover ${className}`}
+        style={{ borderRadius: cornerFor(size) }}
       />
     );
   }
@@ -141,7 +156,8 @@ export function AvatarMark({
       height={size}
       viewBox="0 0 64 64"
       aria-hidden="true"
-      className={`shrink-0 rounded-full ${className}`}
+      className={`shrink-0 ${className}`}
+      style={{ borderRadius: cornerFor(size) }}
     >
       <rect width="64" height="64" fill={preset.bg} />
       <path

@@ -36,8 +36,17 @@ export default function TestError({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-bold text-slate-100">문제가 생겼습니다</h1>
-      <p className="mt-2 text-slate-300">
+      <h1
+        style={{
+          fontSize: "var(--text-2xl)",
+          fontWeight: "var(--weight-black)",
+          letterSpacing: "var(--tracking-tight)",
+          color: "var(--foreground)",
+        }}
+      >
+        문제가 생겼습니다
+      </h1>
+      <p className="mt-2" style={{ color: "var(--text-body)" }}>
         문제풀기를 여는 중 오류가 발생했습니다.
       </p>
 
@@ -47,15 +56,38 @@ export default function TestError({
         <button
           type="button"
           onClick={() => unstable_retry()}
-          className="min-h-12 flex-1 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          // 화면의 주요 동작 하나. 코랄은 한 화면에 하나만 둔다 - 옆의
+          // "홈으로" 가 흰 버튼인 이유다.
+          className="dv-btn flex-1 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
         >
           다시 시도
         </button>
-        {/* 테두리가 유일한 "여기가 버튼" 신호라 white/40 아래로 내리지
-            않는다. WCAG 1.4.11 이 컨트롤 경계에 3:1 을 요구한다. */}
+        {/* 크림 바탕 위 흰 종이 + 두께. 테두리가 아니라 아래 그림자가
+            "여기가 버튼" 을 말한다(가이드 shape-lift). */}
         <Link
           href={routes.home}
-          className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/40 px-5 font-semibold text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="dv-btn flex flex-1 items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--paper)",
+              color: "var(--foreground)",
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              textDecoration: "none",
+              "--lift": "var(--lift-button-paper)",
+            } as React.CSSProperties
+          }
         >
           홈으로
         </Link>

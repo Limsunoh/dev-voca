@@ -16,15 +16,21 @@ import "./globals.css";
 // 한글 글리프는 subsets 에 없어도 함께 자체 호스팅되며, 브라우저가
 // unicode-range 를 보고 필요한 구간만 내려받는다. 한글 구간을 전부 preload
 // 하면 첫 화면에 쓰지도 않을 파일을 수백 개 당기게 되므로 latin 만 둔다.
+// weight 를 명시한다. 안 적으면 가변 축이 있는 글꼴만 전 구간을 받고,
+// Noto Sans KR 처럼 정적 웨이트로 배포되는 글꼴은 400 하나만 온다. 크림
+// 디자인은 제목이 전부 900 이라 그것이 없으면 브라우저가 400 을 굵게
+// 흉내내고(가짜 볼드), 한글에서 획이 뭉개진다.
 const notoSansKr = Noto_Sans_KR({
   variable: "--font-noto-kr",
   subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
   display: "swap",
 });
 
 const jetBrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
   display: "swap",
 });
 
@@ -34,14 +40,14 @@ export const metadata: Metadata = {
 };
 
 // themeColor: 모바일 브라우저가 주소창을 화면 색에 맞춰 칠하게 한다. 없으면
-// 어두운 화면 위에 흰 주소창이 남아 앱처럼 보이지 않는다.
+// 크림 화면 위에 회색 주소창이 남아 앱처럼 보이지 않는다.
 //
-// colorScheme: globals.css 에도 color-scheme: dark 가 있지만 그건 스타일시트가
+// colorScheme: globals.css 에도 color-scheme: light 가 있지만 그건 스타일시트가
 // 파싱된 뒤에야 적용된다. 여기 두면 head 의 meta 로 먼저 나가서 첫 페인트의
-// 흰 번쩍임이 없어진다.
+// 색 번쩍임이 없어진다.
 export const viewport: Viewport = {
-  themeColor: "#0b1017",
-  colorScheme: "dark",
+  themeColor: "#fff6e9",
+  colorScheme: "light",
   // 이게 없으면 iOS 가 safe-area env() 를 전부 0 으로 준다. 아래 탭바가
   // safe-area 만큼 띄우도록 짜여 있는데 그 방어가 통째로 무효가 되어,
   // 아이폰 홈 인디케이터가 탭 라벨 위에 겹친다.
@@ -56,8 +62,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      // dark 는 고정이다. globals.css 의 @custom-variant 설명 참고.
-      className={`dark ${notoSansKr.variable} ${jetBrainsMono.variable} h-full antialiased`}
+      className={`${notoSansKr.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
       {/* 탭바가 가리는 만큼의 여백은 여기가 아니라 TabBar 자신이 만든다.
           여기에 두면 탭바가 없는 화면(문제풀이·로그인)에도 5rem 이 남아,

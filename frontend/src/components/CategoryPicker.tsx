@@ -80,16 +80,29 @@ export function CategoryPicker({
         // 무엇이 펼쳐지는지 연결한다. aria-expanded 만 있으면 "열렸다" 는
         // 알지만 무엇이 열렸는지는 모른다.
         aria-controls="category-picker-menu"
-        className="flex min-h-11 items-center gap-2 rounded-full border border-white/40 px-4 text-sm text-slate-200 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        // dv-btn: 누르면 두께가 0 이 되고 그만큼 내려앉는다. :active 는
+        // 인라인 style 로 못 써서 globals.css 의 공통 클래스가 맡는다.
+        className="dv-btn flex items-center gap-2 rounded-full px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        style={
+          {
+            minHeight: "var(--hit-floor)",
+            background: "var(--paper)",
+            color: "var(--foreground)",
+            fontWeight: "var(--weight-bold)",
+            "--lift": "var(--lift-card)",
+          } as React.CSSProperties
+        }
       >
-        <span className="text-slate-400">분류</span>
-        <span className="font-medium">{label}</span>
+        {/* --text-dim 은 흰 종이 위 3.85:1 로 본문 대비에 못 미친다. */}
+        <span style={{ color: "var(--text-muted)" }}>분류</span>
+        <span>{label}</span>
         {/* 화살표가 열림 상태를 말한다. 글자만으로는 눌러야 뭐가 되는지 모른다. */}
         <span
           aria-hidden
           className={`text-xs transition-transform duration-[120ms] ease-press ${
             open ? "rotate-180" : ""
           }`}
+          style={{ color: "var(--text-dim)" }}
         >
           ▼
         </span>
@@ -105,9 +118,22 @@ export function CategoryPicker({
         <nav
           id="category-picker-menu"
           aria-label="분류 고르기"
-          className="absolute top-full left-0 z-20 mt-2 max-h-72 w-64 overflow-y-auto rounded-xl border border-white/12 bg-slate-950/95 p-1.5 shadow-[0_12px_32px_-8px_rgb(0_0_0/0.8)] backdrop-blur-sm"
+          // 흐린 그림자·글래스를 쓰지 않는다(가이드 shape-lift). 떠 있는
+          // 판이라 두께는 카드보다 한 급 두꺼운 --lift-sheet 를 쓴다 -
+          // 아래 보기 버튼(--lift-card)과 같은 두께면 어느 쪽이 위인지
+          // 안 보인다. 눌리는 판이 아니라 정적이라 인라인 boxShadow 로 둔다.
+          className="absolute top-full left-0 z-20 mt-2 max-h-72 w-64 overflow-y-auto p-1.5"
+          style={{
+            background: "var(--paper)",
+            borderRadius: "var(--radius-xl)",
+            boxShadow: "var(--lift-sheet)",
+          }}
         >
-          <PickerItem href={href()} active={!selected} onNavigate={() => setOpen(false)}>
+          <PickerItem
+            href={href()}
+            active={!selected}
+            onNavigate={() => setOpen(false)}
+          >
             전체
           </PickerItem>
           {options.map((option) => (
@@ -145,13 +171,19 @@ function PickerItem({
       // "page" 인 이유: 이 링크를 누르면 그 분류 화면으로 가고, 지금 그
       // 화면에 있다는 뜻이다. ContentTabs 도 같은 값을 쓴다.
       aria-current={active ? "page" : undefined}
-      className={`flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 text-sm transition-[background-color] duration-[120ms] ease-press focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
-        active
-          ? "bg-white/10 font-medium text-slate-50"
-          : "text-slate-300 hover:bg-white/5"
-      }`}
+      className="flex items-center justify-between gap-2 px-3 text-sm transition-[background-color] duration-[120ms] ease-press focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+      style={{
+        minHeight: "var(--hit-floor)",
+        borderRadius: "var(--radius-md)",
+        // 고른 것은 옅은 코랄 채움 + 코랄 글자. 회색 위 회색으로 두면
+        // 종이 위에서 대비가 거의 안 남는다.
+        background: active ? "var(--coral-soft)" : "transparent",
+        color: active ? "var(--coral-deep)" : "var(--text-body)",
+        fontWeight: active ? "var(--weight-black)" : "var(--weight-medium)",
+      }}
     >
       {children}
+      {/* 색만으로 고른 것을 표시하지 않는다. 색각 이상이 있으면 구분이 안 된다. */}
       {active && <span aria-hidden>✓</span>}
     </Link>
   );

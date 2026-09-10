@@ -366,7 +366,7 @@ export function QuizBoard({ category, content = "words" }: Props) {
 
   if (loading) {
     return (
-      <p className="mt-10 text-center text-slate-400">
+      <p className="mt-10 text-center" style={{ color: "var(--text-muted)" }}>
         문제를 가져오는 중입니다.
       </p>
     );
@@ -375,7 +375,18 @@ export function QuizBoard({ category, content = "words" }: Props) {
   if (error && !question) {
     return (
       <div className="mt-10">
-        <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4 text-amber-100">
+        {/* 안내는 앰버 채움에 진한 앰버 글자. 채움을 진하게 하면 이 카드가
+            화면에서 가장 강한 것이 되어, 정작 눌러야 할 아래 버튼보다
+            먼저 읽힌다(가이드 color-difficulty 와 같은 원칙). */}
+        <p
+          className="p-4"
+          style={{
+            background: "var(--amber-soft)",
+            color: "var(--amber-deep)",
+            borderRadius: "var(--radius-xl)",
+            fontWeight: "var(--weight-medium)",
+          }}
+        >
           {error}
         </p>
         <button
@@ -394,7 +405,18 @@ export function QuizBoard({ category, content = "words" }: Props) {
             setReaction({ fire: 0, correct: false });
             void load();
           }}
-          className="mt-4 min-h-12 rounded-full bg-focus px-5 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          // 이 화면의 유일한 동작이라 코랄을 준다.
+          className="dv-btn mt-4 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
         >
           처음부터 다시
         </button>
@@ -421,10 +443,17 @@ export function QuizBoard({ category, content = "words" }: Props) {
       <Reaction fire={reaction.fire} correct={reaction.correct} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* 분류 칩(CategoryChip)의 비링크 모양과 같은 문법. 같은 화면에
-            필터 칩이 이미 여러 줄 서 있어서, 여기까지 다른 회색을 쓰면
-            같은 알약이 세 종류가 된다. */}
-        <span className="rounded-full bg-white/8 px-3 py-1 text-sm text-slate-300">
+        {/* 분류 칩(MetaBadge 의 CategoryChip)의 비링크 모양과 같은 문법.
+            같은 화면에 분류 고르개가 이미 서 있어서, 여기까지 다른 회색을
+            쓰면 같은 알약이 세 종류가 된다. */}
+        <span
+          className="inline-flex items-center rounded-full px-3 py-1.5 text-xs whitespace-nowrap"
+          style={{
+            background: "var(--sand)",
+            color: "var(--text-muted)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {question.kind_label}
         </span>
         {score.solved > 0 && (
@@ -438,7 +467,15 @@ export function QuizBoard({ category, content = "words" }: Props) {
             {combo >= 2 && (
               <span
                 key={combo}
-                className="pop inline-flex items-center gap-1 rounded-full bg-focus/15 px-2.5 py-1 text-sm font-semibold text-focus"
+                // 연속은 초록이다. 코랄로 두면 "지금 여기"·오답과 같은 색이
+                // 되어, 잘 가고 있다는 신호가 경고처럼 보인다(가이드
+                // color-accent).
+                className="pop inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
+                style={{
+                  background: "var(--green-soft)",
+                  color: "var(--green-deep)",
+                  fontWeight: "var(--weight-black)",
+                }}
               >
                 <span aria-hidden>연속</span>
                 {combo}
@@ -446,14 +483,34 @@ export function QuizBoard({ category, content = "words" }: Props) {
             )}
             {/* 숫자가 바뀔 때 자리가 밀리지 않게 고정폭 숫자를 쓴다.
                 9 에서 10 이 되면 글자가 옆으로 밀려 눈에 거슬린다. */}
-            <span className="text-sm text-slate-400 tabular-nums">
+            <span
+              className="text-sm tabular-nums"
+              // 맨 바탕 위라 라벨용이 아니라 --text-muted.
+              style={{ color: "var(--text-muted)" }}
+            >
               {score.solved}문제 중 {score.correct}개
             </span>
           </div>
         )}
       </div>
 
-      <h2 className="mt-4 text-sm font-medium text-focus">
+      {/* 무엇을 고르라는 것인지. 지문보다 확실히 작고 흐리다 - 여기서
+          눈이 멈추면 안 되고, 바로 아래 지문으로 넘어가야 한다. */}
+      <h2
+        className="mt-5"
+        style={{
+          fontSize: "var(--text-xs)",
+          fontWeight: "var(--weight-black)",
+          letterSpacing: "var(--tracking-wide)",
+          // 본문이라 --text-muted. --text-dim 은 작은 라벨용이다.
+          //
+          // 한때 "카드 안이면 --text-dim 도 4.2:1 이라 괜찮다" 고 적혀
+          // 있었는데 그 숫자가 실측이 아니었다. 대비 값은 여기 적지 않고
+          // globals.css 의 토큰 주석 한 곳에만 둔다 - 값이 움직일 때
+          // 호출부마다 거짓말이 되기 때문이다.
+          color: "var(--text-muted)",
+        }}
+      >
         {question.question}
       </h2>
 
@@ -483,7 +540,9 @@ export function QuizBoard({ category, content = "words" }: Props) {
         // 768px 막대가 되어, 게임 선택지가 아니라 설문 문항처럼 읽힌다.
         // 두 칸이면 시선 이동도 짧다. 폰에서는 한 칸이 맞다 - 두 칸으로
         // 쪼개면 긴 뜻풀이가 줄바꿈되어 높이가 들쭉날쭉해진다.
-        className={`mt-6 grid gap-2 sm:grid-cols-2 ${
+        // 간격을 두께만큼 넓힌다. 카드가 아래로 3px 를 내밀어서, gap-2(8px)
+        // 로 두면 위 보기의 두께가 아래 보기 윗선에 거의 붙는다.
+        className={`mt-5 grid gap-2.5 sm:grid-cols-2 ${
           result && !result.correct
             ? shake % 2 === 0
               ? "shake"
@@ -510,7 +569,13 @@ export function QuizBoard({ category, content = "words" }: Props) {
       {error && question && (
         <p
           role="alert"
-          className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100"
+          className="mt-4 p-3 text-sm"
+          style={{
+            background: "var(--amber-soft)",
+            color: "var(--amber-deep)",
+            borderRadius: "var(--radius-md)",
+            fontWeight: "var(--weight-medium)",
+          }}
         >
           {error}
         </p>
@@ -519,16 +584,29 @@ export function QuizBoard({ category, content = "words" }: Props) {
       {/* aria-live 를 바깥에 두고 항상 렌더한다. 리전 자체가 내용과 함께
           새로 생기면 화면 낭독기가 대부분 그 등장을 알리지 않는다 - 리전은
           미리 있어야 이후 변화를 감시한다. 안쪽만 조건부로 바꾼다. */}
-      <div aria-live="polite">
-        {result && <Explanation result={result} />}
-      </div>
+      <div aria-live="polite">{result && <Explanation result={result} />}</div>
 
       {picked !== null && (
         <button
           ref={nextButtonRef}
           type="button"
           onClick={() => void load()}
-          className="mt-6 min-h-12 w-full rounded-full bg-focus px-4 font-semibold text-focus-on transition-[scale] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          // 채점이 끝난 뒤 이 화면의 유일한 다음 동작이라 코랄이다.
+          // 한 화면에 코랄 버튼은 하나만 둔다 - 보기 넷은 종이라 겹치지 않는다.
+          className="dv-btn mt-6 w-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              borderRadius: "var(--radius-pill)",
+              // fontSize 를 여기 적지 않는다. globals.css 가 코랄 버튼
+              // 글자를 19px 로 올리는데(대비 때문), 인라인으로 크기를
+              // 걸면 그 규칙이 덮여서 16px 로 남는다.
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
         >
           다음 문제
         </button>
@@ -553,64 +631,129 @@ function choiceState(
   return id === picked ? "picked" : "idle";
 }
 
+/**
+ * 문제 지문.
+ *
+ * 크림에서 지문이 **카드 안으로 들어왔다.** 다크였을 때는 배경 그라디언트가
+ * 영역을 갈랐지만 그것을 걷어냈고(globals.css 의 "영역별 배경" 절), 이제
+ * 층을 만드는 것은 카드의 두께 하나다. 지문이 맨 바탕에 놓이면 아래 보기
+ * 넷만 종이로 떠 있어서, 화면에서 가장 중요한 것이 유일하게 평평해진다.
+ *
+ * 가운데 정렬도 카드를 쓰기 때문이다. 왼쪽 정렬이면 카드 오른쪽이 늘
+ * 비어 지문이 짧은 문제에서 카드가 반만 찬 것처럼 보인다.
+ */
 function Prompt({ kind, text }: { kind: string; text: string }) {
-  // 단어를 보여주는 문제는 크고 고정폭으로, 설명은 읽기 좋게 본문체로.
-  if (kind === "description") {
-    return (
-      <p className="mt-3 whitespace-pre-line text-lg leading-relaxed text-slate-200">
-        {text}
-      </p>
-    );
-  }
-
-  // 문장 지문은 고정폭으로, 크기도 한 급 낮춘다.
+  // 유형마다 서체·크기가 다르다. 카드는 하나로 두고 안쪽 글자만 가른다 -
+  // 카드까지 유형별로 두면 유형이 늘 때마다 같은 두께를 다시 적게 된다.
   //
-  // 에러 메시지와 실무 표현이라 코드에 가깝다 - 같은 문자열을 아래 해설이
-  // 이미 고정폭으로 그리고 있어서, 지문만 본문체면 한 화면에서 같은 문장이
-  // 두 서체로 나온다. 단어 목록·상세가 쓰는 것과 같은 구분이다.
+  // 설명 문제: 여러 줄 한글이라 본문체로 읽기 좋게. 크기를 키우면 폰에서
+  // 다섯 줄이 되어 보기가 첫 화면에서 밀린다.
   //
-  // 크기를 3xl 로 두지 않는 이유: 지문이 한 줄짜리 문장이라 단어 하나보다
-  // 훨씬 길다. "IndexError: list ____ out of range" 가 390px 에서 세 줄로
-  // 감기고, 그러면 보기 넷이 첫 화면에서 밀린다.
+  // 문장(빈칸·상황): 에러 메시지와 실무 표현이라 코드에 가깝다. 아래
+  // 해설이 같은 문자열을 이미 고정폭으로 그려서, 지문만 본문체면 한
+  // 화면에서 같은 문장이 두 서체로 나온다. 크기를 --text-3xl 로 두지
+  // 않는 이유는 지문이 한 줄짜리 문장이라 단어 하나보다 훨씬 길어서다 -
+  // "IndexError: list ____ out of range" 가 390px 에서 세 줄로 감기고,
+  // 그러면 보기 넷이 첫 화면에서 밀린다.
+  //
+  // 그 밖(뜻 고르기·단어 고르기): 이 화면에서 가장 먼저 읽어야 할 것이라
+  // --text-3xl(28px). 고정폭 제목은 tracking 을 한 단계 더 좁힌다
+  // (가이드 type-mono).
   //
   // lang 은 한글 폰트가 라틴·기호를 잘못 렌더하는 것을 막는다.
-  if (kind === "blank" || kind === "situation") {
-    return (
-      <p
-        lang="en"
-        className="mt-3 font-mono text-xl leading-snug font-bold text-slate-50"
-      >
-        {text}
-      </p>
-    );
-  }
-
-  // 홈의 "오늘의 단어" 와 같은 급으로 둔다. 이 화면에서 가장 먼저 읽어야
-  // 할 것이 문제이므로, 필터 칩 줄보다 확실히 커야 눈이 여기서 멈춘다.
-  //
-  // 줄간격을 kind 로 가른다. meaning 문제의 지문은 영어 단어 하나라 감기지
-  // 않아서 홈처럼 leading-none 으로 바짝 붙여도 되지만, term 문제의 지문은
-  // 한글 뜻이라 폰에서 두 줄로 감긴다("네트워크에서 위치를 나타내는 주소
-  // 체계" 가 390px 에서 두 줄). 거기에 leading-none 을 주면 줄 높이가 글자
-  // 크기와 같아져 받침과 다음 줄 윗선이 맞닿는다.
-  //
-  // tracking 도 한 자리에서 정한다. 기본값에 tracking-tight 를 두고 삼항에서
-  // tracking-tighter 를 덧붙이면 같은 속성이 두 번 올라가고, 어느 쪽이 이기는지
-  // 클래스 순서가 아니라 Tailwind 의 생성 순서가 정한다.
-  // 줄간격은 양쪽 다 leading-tight 다. 영어 용어도 안전하지 않다 -
-  // "eventual consistency" 가 390px 에서 330px 를 먹어 한 줄에 겨우 들어가고,
-  // 이보다 조금만 길면 감긴다. 한 줄일 때는 leading-none 과 보이는 차이가
-  // 없으니 감길 때만 벌어지는 쪽으로 통일한다.
-  const shape =
-    kind === "meaning"
-      ? "font-mono leading-tight tracking-tighter"
-      : "leading-tight tracking-tight";
+  const body: {
+    lang?: string;
+    className: string;
+    style: React.CSSProperties;
+  } =
+    kind === "description"
+      ? {
+          className: "whitespace-pre-line",
+          style: {
+            fontSize: "var(--text-md)",
+            fontWeight: "var(--weight-medium)",
+            lineHeight: "var(--leading-relaxed)",
+            color: "var(--text-body)",
+          },
+        }
+      : kind === "blank" || kind === "situation"
+        ? {
+            lang: "en",
+            className: "font-mono",
+            style: {
+              fontSize: "var(--text-xl)",
+              fontWeight: "var(--weight-bold)",
+              lineHeight: "var(--leading-snug)",
+              letterSpacing: "var(--tracking-tighter)",
+              color: "var(--foreground)",
+            },
+          }
+        : {
+            // 줄간격을 --leading-none 으로 바짝 붙이지 않는다. term 문제의
+            // 지문은 한글 뜻이라 폰에서 두 줄로 감기고("네트워크에서 위치를
+            // 나타내는 주소 체계" 가 390px 에서 두 줄), 그때 줄 높이가 글자
+            // 크기와 같으면 받침과 다음 줄 윗선이 맞닿는다. 영어 용어도
+            // 안전하지 않다 - "eventual consistency" 가 390px 에서 한 줄에
+            // 겨우 들어간다.
+            className: kind === "meaning" ? "font-mono" : "",
+            style: {
+              fontSize: "var(--text-3xl)",
+              fontWeight: "var(--weight-black)",
+              lineHeight: "var(--leading-tight)",
+              letterSpacing:
+                kind === "meaning"
+                  ? "var(--tracking-tighter)"
+                  : "var(--tracking-tight)",
+              color: "var(--foreground)",
+            },
+          };
 
   return (
-    <p className={`mt-3 text-3xl font-bold text-slate-50 ${shape}`}>{text}</p>
+    <div
+      className="mt-3 px-5 py-6 text-center"
+      style={{
+        background: "var(--paper)",
+        borderRadius: "var(--radius-2xl)",
+        // 읽는 카드라 눌리지 않는다. :active 가 없으니 인라인 boxShadow 로
+        // 둬도 --lift 규칙과 충돌하지 않는다.
+        boxShadow: "var(--lift-card)",
+      }}
+    >
+      <p lang={body.lang} className={body.className} style={body.style}>
+        {text}
+      </p>
+    </div>
   );
 }
 
+/**
+ * 오답 보기의 두께. inset 테두리와 아래 3px 를 한 값으로 묶는다.
+ *
+ * 쉬는 두께와 hover 두께가 **같아야 해서** 상수로 뺐다. globals.css 의
+ * .dv-card-press:hover 는 disabled 와 무관하게 걸려서, --lift-hover 를
+ * 안 주면 채점이 끝난 뒤 마우스를 올리는 순간 코랄 테두리가 기본 회색
+ * 두께로 덮인다. 두 자리에 같은 문자열을 적어두면 한쪽만 고쳐진다.
+ */
+const WRONG_LIFT =
+  "0 0 0 2px var(--wrong) inset, 0 3px 0 rgb(193 62 34 / 0.25)";
+
+/**
+ * 보기 하나.
+ *
+ * 상태 넷의 생김새가 이 화면에서 가장 중요한 정보다.
+ *
+ *   idle     흰 종이 + 두께
+ *   picked   같은 종이에 잉크 테두리(안쪽 2px). 채점을 기다리는 짧은 구간
+ *   correct  초록 채움 + 초록 두께
+ *   wrong    **채움이 아니라 코랄 테두리**
+ *
+ * 마지막 줄이 이 시스템의 규칙이다(가이드 color-accent). 코랄이 "지금
+ * 여기"(주요 버튼)와 "틀림" 을 겸하기 때문에, 오답까지 코랄로 채우면
+ * 같은 화면의 코랄 버튼과 구분이 안 된다. 정답만 채우고 오답은 테두리로
+ * 둔다.
+ *
+ * 색만으로 가르지도 않는다 - "정답"·"오답" 글자가 항상 같이 간다.
+ */
 function ChoiceButton({
   text,
   mono,
@@ -627,94 +770,108 @@ function ChoiceButton({
   // 색만으로 정답·오답을 구분하지 않는다. 색각 이상이 있으면 안 보인다.
   const mark = { correct: "정답", wrong: "오답", picked: "", idle: "" }[state];
 
-  // 아직 결과를 모르는 상태(picked·idle)는 중립으로 둔다.
+  // 아직 결과를 모르는 상태(picked·idle)는 중립으로 둔다. 삼항이 아니라
+  // 맵인 이유: 삼항이면 correct 가 아닌 모든 상태가 오답 색이 되어, 나중에
+  // picked 에 "채점 중" 같은 문구를 넣는 순간 결과를 모르는 상태가 빨개진다.
   const markTone = {
-    correct: "text-emerald-200",
-    wrong: "text-rose-200",
-    picked: "text-slate-300",
-    idle: "text-slate-300",
+    correct: "var(--text-on-color)",
+    wrong: "var(--wrong-deep)",
+    picked: "var(--text-dim)",
+    idle: "var(--text-dim)",
   }[state];
 
-  // 표면은 learn 의 카드와 같은 문법으로 둔다(반투명 + white/N 테두리).
-  // 색을 리터럴로 채우면 뒤에 깔린 surface-quiz 배경이 통째로 가려져서,
-  // 문제풀이 화면만 다른 앱처럼 보인다.
+  // 표면·글자·두께를 한 자리에서 정한다.
   //
-  // 고르기 전 테두리가 유일한 "여기가 버튼" 신호다. slate-700 은 어두운
-  // 배경에서 1.8:1 이라 버튼 넷이 그냥 텍스트 넉 줄로 보인다.
-  // WCAG 1.4.11 은 컨트롤 경계에 3:1 을 요구한다 - SearchInput 이 같은
-  // 이유로 이미 white/40 을 쓰고 있다.
-  const style = {
-    // 누르면 배경이 밝아진다. 축소만으로는 이 버튼에서 거의 안 보인다 -
-    // 높이가 50px 뿐이라 0.96 이어도 위아래로 1px 밖에 안 움직인다(카드는
-    // 133px 이라 같은 값에서 2.7px 움직여 눈에 띈다). 납작한 요소는 크기
-    // 대신 색이 신호를 맡아야 한다.
-    // hover·active 를 enabled: 로 감싼다. 채점이 끝나면 고르지 않은 보기도
-    // idle 로 돌아오는데, 그때는 disabled 라 누를 수 없다. 그런데 hover 는
-    // disabled 와 무관하게 걸려서, 마우스를 올리면 테두리가 밝아져 아직
-    // 누를 수 있는 것처럼 보인다(실측: 알파 0.4 -> 0.6).
-    idle: "border-white/40 bg-slate-950/45 enabled:hover:border-white/60 enabled:active:border-white/70 enabled:active:bg-slate-800/70",
-    // 고른 직후. 채점을 기다리는 짧은 순간이라 강조색으로 "이걸 골랐다" 만
-    // 말하고, 맞았는지는 아직 말하지 않는다.
+  // **boxShadow 를 인라인으로 적지 않는다.** 인라인 선언은 클래스를 항상
+  // 이겨서 globals.css 의 :active(두께 0)가 무시되고, 그러면 transform 만
+  // 걸려 버튼이 두께를 단 채 내려가 바닥을 뚫은 모양이 된다. 두께는 --lift
+  // 변수로 넘긴다.
+  //
+  // picked·wrong 의 테두리는 inset 그림자다. border 로 두면 그 1~2px 만큼
+  // 안쪽 폭이 줄어 상태가 바뀔 때 글자가 밀린다. inset 은 자리를 안 먹는다.
+  //
+  // --lift-hover 를 판정 상태에도 같이 준다. 이유는 WRONG_LIFT 주석 참고.
+  const tone: Record<ChoiceState, React.CSSProperties> = {
+    idle: {
+      background: "var(--paper)",
+      color: "var(--foreground)",
+      "--lift": "var(--lift-card)",
+    } as React.CSSProperties,
+    // 고른 직후. 채점을 기다리는 짧은 순간이라 "이걸 골랐다" 만 말하고
+    // 맞았는지는 아직 말하지 않는다. 그래서 판정색(초록·코랄)이 아니라
+    // 잉크다 - 여기서 코랄을 쓰면 응답이 오기 전에 틀린 것처럼 보인다.
     //
-    // 배경을 누름 상태와 같은 밝기로 유지한다. 기본 배경으로 돌려놓으면
-    // 손을 뗀 순간 밝기가 원래대로 내려가서, 서버 응답을 기다리는 바로 그
-    // 구간에 "눌렀다" 는 신호가 꺼진다. 그 구간이 이 화면에서 피드백이
-    // 가장 필요한 자리다(느린 응답을 흉내내 재현했다).
-    picked: "border-focus bg-slate-800/70",
-    // 정답·오답은 채도를 낮춘 톤으로 둔다. emerald-950 같은 원색을 깔면
-    // 청록 팔레트와 따로 놀고, 배경 그라디언트도 덮어버린다.
-    // MetaBadge 의 난이도 배지가 쓰는 -400/N 문법과 같은 계열이다.
-    //
-    // 알파가 /75 인 이유: 채움(-400/10)은 배경 대비 1.1:1 이라 사실상 안
-    // 보이므로, 상태를 전하는 그래픽 신호가 테두리 하나뿐이다. /60 으로
-    // 두면 rose 가 .surface-quiz 위쪽 밝은 구간에서 2.9:1 이라 WCAG
-    // 1.4.11 의 3:1 에 못 미친다. 둘을 같이 올려야 정답이 오답보다
-    // 흐려 보이지 않는다.
-    correct: "border-emerald-400/75 bg-emerald-400/10",
-    wrong: "border-rose-400/75 bg-rose-400/10",
-  }[state];
+    // 두께를 0 으로 둬서 눌린 채로 머문다. 서버 왕복을 기다리는 그 구간이
+    // 이 화면에서 피드백이 가장 필요한 자리인데, 손을 뗀 순간 두께가
+    // 돌아오면 "눌렀다" 는 신호가 꺼진다.
+    picked: {
+      background: "var(--paper)",
+      color: "var(--foreground)",
+      "--lift": "0 0 0 2px var(--foreground) inset",
+      "--lift-hover": "0 0 0 2px var(--foreground) inset",
+      transform: "translateY(var(--press-y-card))",
+    } as React.CSSProperties,
+    // 채움을 --correct 가 아니라 --correct-deep 으로 둔다. --correct
+    // (#17916b) 위의 흰 글자는 3.96:1 이라, 16px 굵은 글씨(WCAG 의 대형
+    // 글자 기준 18.66px 에 못 미친다)에 필요한 4.5:1 을 못 넘긴다.
+    // --correct-deep 은 6.32:1 이고, 두께가 이미 --lift-button-green
+    // (--green-deep)이라 채움과 두께가 같은 계열로 붙는다.
+    correct: {
+      background: "var(--correct-deep)",
+      color: "var(--text-on-color)",
+      "--lift": "var(--lift-button-green)",
+      "--lift-hover": "var(--lift-button-green)",
+    } as React.CSSProperties,
+    // 채움이 아니라 테두리. 위 주석 참고.
+    wrong: {
+      background: "var(--paper)",
+      color: "var(--wrong-deep)",
+      // 두께를 --wrong-deep 의 옅은 알파로 둔다. --wrong-soft(옅은 장미)는
+      // 크림 바탕과 거의 같은 밝기라 3px 가 안 보이고, --wrong-deep 을
+      // 그대로 쓰면 정답(초록 채움)보다 오답이 더 진해진다.
+      "--lift": WRONG_LIFT,
+      "--lift-hover": WRONG_LIFT,
+    } as React.CSSProperties,
+  };
 
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      // 누르면 살짝 들어간다. 채점은 서버 왕복이라 이게 없으면 손가락을 뗀
-      // 뒤 응답이 올 때까지 아무 반응이 없다 - 눌리긴 한 건지 알 수 없다.
-      //
-      // 0.96 은 globals.css 의 "누름 피드백" 절이 정한 값이다. 보기 넷이
-      // 붙어 있어 흔들려 보일까 봐 0.98 로 뒀었는데, 그 정도로는 눌러도
-      // 보이지 않아 있으나 마나였다.
-      //
-      // 채점 뒤에는 disabled 라 브라우저가 :active 를 주지 않는다. 따로 끌
-      // 필요가 없다.
-      //
-      // 목록에 transform 이 아니라 scale 을 적는다. Tailwind v4 의
-      // active:scale-* 는 transform 이 아니라 별개의 scale 속성을 쓴다.
-      // transform 만 적어두면 전환 대상에 안 잡혀서 크기가 툭 바뀐다.
-      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-[scale,border-color,background-color] duration-[120ms] ease-press active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default ${style}`}
+      // dv-card dv-card-press: 누르면 두께가 0 이 되고 그만큼(3px) 내려앉는다.
+      // 크림에서 누름이 축소에서 내려앉음으로 바뀌었다(globals.css 의
+      // "누름 피드백" 절). :active 는 인라인 style 로 못 써서 클래스가 맡고,
+      // 채점 뒤에는 disabled 라 브라우저가 :active 를 주지 않는다.
+      className="dv-card dv-card-press flex w-full items-center gap-3 px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default"
+      style={{
+        // 보기는 56px(가이드 shape-hit). 주요 버튼(52px)보다 한 급 크다 -
+        // 연달아 네 개를 겨냥하는 자리라 실수가 제일 잦다.
+        minHeight: 56,
+        borderRadius: "var(--radius-xl)",
+        fontSize: "var(--text-base)",
+        fontWeight:
+          state === "correct" ? "var(--weight-black)" : "var(--weight-bold)",
+        ...tone[state],
+      }}
     >
       {/* min-w-0 이 있어야 flex 항목이 내용보다 작아진다. 글자를 끊는 쪽은
           globals.css 의 base 규칙(body 상속)이 맡는다. 둘 중 하나만 있으면
           보기 문구가 길 때 버튼이 화면 밖으로 밀린다. */}
-      <span className={`min-w-0 text-slate-200 ${mono ? "font-mono" : ""}`}>
+      <span className={`min-w-0 flex-1 ${mono ? "font-mono" : ""}`}>
         {text}
       </span>
       {mark && (
-        // 정답·오답 글자도 테두리와 같은 톤으로 둔다. 회색으로 두면 방금
-        // 무슨 일이 일어났는지 눈이 먼저 읽는 신호가 테두리 하나뿐이다.
+        // 정답·오답 글자도 테두리·채움과 같은 톤으로 둔다. 회색으로 두면
+        // 방금 무슨 일이 일어났는지 눈이 먼저 읽는 신호가 하나뿐이다.
         //
-        // 삼항이 아니라 맵인 이유: 삼항으로 두면 correct 가 아닌 모든 상태가
-        // 오답 색이 된다. 지금은 mark 가 빈 문자열이라 이 span 이 안 그려져
-        // 드러나지 않지만, 나중에 picked 에 "채점 중" 같은 문구를 넣는 순간
-        // 아직 결과를 모르는 상태가 빨갛게 뜬다.
-        //
-        // 색 전환을 여기 두는 이유도 같은 미래 때문이다. 지금은 이 span 이
-        // 채점된 뒤에야 처음 생겨서 전환할 이전 값이 없지만, picked 에 문구가
-        // 붙으면 계속 살아 있게 되어 색만 툭 바뀐다. 버튼 쪽에 걸어봐야
-        // 자식 글자색에는 닿지 않는다.
+        // 색 전환을 여기 두는 이유: 지금은 이 span 이 채점된 뒤에야 처음
+        // 생겨 전환할 이전 값이 없지만, picked 에 문구가 붙으면 계속 살아
+        // 있게 되어 색만 툭 바뀐다. 버튼 쪽에 걸어봐야 자식 글자색에는
+        // 닿지 않는다.
         <span
-          className={`shrink-0 text-xs font-semibold transition-[color] duration-[120ms] ease-press ${markTone}`}
+          className="shrink-0 text-xs transition-[color] duration-[120ms] ease-press"
+          style={{ color: markTone, fontWeight: "var(--weight-black)" }}
         >
           {mark}
         </span>
@@ -747,14 +904,31 @@ function Explanation({ result }: { result: GradeResult }) {
       // 높이는 애니메이트하지 않는다. 해설이 붙은 뒤 버튼 위치를 재서
       // 스크롤할 자리를 정하는데(위 useEffect), 그때 높이가 아직 변하는
       // 중이면 목표가 어긋난다. 자리는 즉시 잡고 그 안에서 떠오르기만 한다.
-      className="rise mt-6 rounded-lg border border-white/12 bg-slate-950/45 p-4"
+      className="rise mt-6 p-5"
+      style={{
+        background: "var(--paper)",
+        borderRadius: "var(--radius-2xl)",
+        // 읽는 카드라 눌리지 않는다. 인라인 boxShadow 여도 :active 와
+        // 충돌하지 않는다.
+        boxShadow: "var(--lift-card)",
+      }}
     >
       {/* 맞았는지 틀렸는지가 이 카드에서 가장 먼저 읽혀야 한다. 회색으로
           두면 보기 버튼의 테두리 색이 유일한 신호가 된다. */}
+      {/* 판정은 옅은 채움 + 진한 글자의 알약으로 둔다. 글자만 색을 입히면
+          흰 종이 위에서 이 줄이 본문과 같은 무게로 읽힌다.
+
+          오답 쪽을 코랄로 채우지 않는 것은 보기 버튼과 같은 이유다 -
+          코랄 채움은 "누르는 것" 의 색이다(가이드 color-accent). */}
       <p
-        className={`text-sm font-semibold ${
-          result.correct ? "text-emerald-200" : "text-rose-200"
-        }`}
+        className="inline-flex items-center rounded-full px-3 py-1.5 text-xs"
+        style={{
+          background: result.correct
+            ? "var(--correct-soft)"
+            : "var(--wrong-soft)",
+          color: result.correct ? "var(--correct-deep)" : "var(--wrong-deep)",
+          fontWeight: "var(--weight-black)",
+        }}
       >
         {result.correct ? "맞았습니다" : "정답은 이것입니다"}
       </p>
@@ -770,35 +944,79 @@ function WordAnswer({ word }: { word: NonNullable<GradeResult["word"]> }) {
   return (
     <>
       <div className="mt-2 flex flex-wrap items-baseline gap-2">
-        <h3 className="font-mono text-xl font-bold text-slate-50">
+        <h3
+          className="font-mono"
+          style={{
+            fontSize: "var(--text-xl)",
+            fontWeight: "var(--weight-black)",
+            letterSpacing: "var(--tracking-tighter)",
+            color: "var(--foreground)",
+          }}
+        >
           {word.term}
         </h3>
         {word.pronunciation && (
           // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
           // 깨지거나 폭이 어긋나는 경우가 있다. lang 은 한글 폰트가 IPA 를
           // 잘못 렌더하는 것을 막는다.
-          <span lang="en-US" className="text-slate-300">
+          <span lang="en-US" style={{ color: "var(--text-muted)" }}>
             {word.pronunciation}
           </span>
         )}
         {word.reading && (
-          <Reading text={word.reading} className="text-slate-400" />
+          <Reading text={word.reading} style={{ color: "var(--text-muted)" }} />
         )}
       </div>
 
-      <p className="mt-1 text-slate-100">{word.meaning}</p>
+      <p
+        className="mt-1"
+        style={{
+          fontSize: "var(--text-md)",
+          fontWeight: "var(--weight-medium)",
+          color: "var(--text-body)",
+        }}
+      >
+        {word.meaning}
+      </p>
 
       {word.description && (
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-300">
+        <p
+          className="mt-3 whitespace-pre-line text-sm"
+          style={{
+            lineHeight: "var(--leading-relaxed)",
+            color: "var(--text-muted)",
+          }}
+        >
           {word.description}
         </p>
       )}
 
       {word.example && (
-        <div className="mt-3 border-l-2 border-white/15 pl-3">
-          <p className="font-mono text-sm text-slate-200">{word.example}</p>
+        /* 예문은 반전 카드다(--surface-card-dark). 흰 종이 위 흰 종이로
+           두면 층이 안 생기고, 왼쪽 세로선 하나로 가르는 것은 테두리를
+           안 쓰는 이 시스템의 문법이 아니다(가이드 shape-lift). */
+        <div
+          className="mt-4 px-4 py-3"
+          style={{
+            background: "var(--surface-card-dark)",
+            borderRadius: "var(--radius-xl)",
+          }}
+        >
+          <p
+            lang="en"
+            className="font-mono text-sm"
+            style={{ color: "var(--paper)" }}
+          >
+            {word.example}
+          </p>
           {word.example_translation && (
-            <p className="mt-1 text-sm text-slate-400">
+            // 반전 카드 위 보조 글자는 --text-on-dark 다. 상세 화면의
+            // 예문 번역과 같은 자리라 같은 토큰을 쓴다 - 흰색 알파로
+            // 각자 내리면 반전 카드 색을 바꿀 때 한쪽만 따라온다.
+            <p
+              className="mt-1.5 text-sm"
+              style={{ color: "var(--text-on-dark)" }}
+            >
               {word.example_translation}
             </p>
           )}
@@ -822,24 +1040,48 @@ function SentenceAnswer({
 }) {
   return (
     <>
-      <h3 className="mt-2 text-xl font-bold text-slate-50">
+      <h3
+        className="mt-3"
+        style={{
+          fontSize: "var(--text-xl)",
+          fontWeight: "var(--weight-black)",
+          letterSpacing: "var(--tracking-tight)",
+          color: "var(--foreground)",
+        }}
+      >
         {sentence.context}
       </h3>
 
       {/* 문장 본문은 고정폭이다. 에러 메시지와 실무 표현이라 코드에 가깝다.
           단어 목록·상세가 쓰는 것과 같은 구분이다. */}
-      <p lang="en" className="mt-3 font-mono text-sm text-slate-200">
+      <p
+        lang="en"
+        className="mt-3 font-mono text-sm"
+        style={{ color: "var(--text-body)" }}
+      >
         {sentence.text}
       </p>
       {sentence.reading && (
-        <Reading text={sentence.reading} className="mt-1 block text-slate-400" />
+        <Reading
+          text={sentence.reading}
+          className="mt-1 block"
+          style={{ color: "var(--text-muted)" }}
+        />
       )}
       {sentence.translation && (
-        <p className="mt-1 text-sm text-slate-400">{sentence.translation}</p>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+          {sentence.translation}
+        </p>
       )}
 
       {sentence.description && (
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-300">
+        <p
+          className="mt-3 whitespace-pre-line text-sm"
+          style={{
+            lineHeight: "var(--leading-relaxed)",
+            color: "var(--text-muted)",
+          }}
+        >
           {sentence.description}
         </p>
       )}

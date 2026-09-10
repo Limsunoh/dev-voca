@@ -53,14 +53,33 @@ export function FilterPanel({
         // (learn/words/[id]/page.tsx)가 쓰는 것과 같은 방식이다. 칩들이
         // 쓰는 after 히트영역은 옆에 이웃이 있어 알약을 못 키울 때 쓰는
         // 우회책인데, 이 summary 는 한 줄을 혼자 쓰므로 그냥 키우면 된다.
-        className="flex w-fit min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-white/40 px-3.5 text-sm text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&::-webkit-details-marker]:hidden"
+        //
+        // 필터 칩과 같은 흰 알약 + 두께다. 이 summary 는 바로 아래에 그 칩들을
+        // 여는 것이라, 다른 문법으로 두면 둘이 관계없는 것처럼 보인다.
+        className="dv-card dv-card-press flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-full px-3.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus [&::-webkit-details-marker]:hidden"
+        style={
+          {
+            background: "var(--paper)",
+            color: "var(--foreground)",
+            // 쉬는 두께는 --lift 로. 인라인 box-shadow 는 :active 를 이긴다.
+            "--lift": "var(--lift-card)",
+            fontWeight: "var(--weight-bold)",
+          } as React.CSSProperties
+        }
       >
         필터
         {/* 접혀 있어도 조건이 걸렸다는 걸 알려주는 유일한 신호다. 0 일 때는
             아예 안 그린다 - "필터 0" 은 아무 조건도 없다는 뜻인데 배지가
             붙어 있으면 뭔가 걸린 것처럼 보인다. */}
         {activeCount > 0 && (
-          <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-focus px-1.5 text-[0.6875rem] font-bold text-focus-on">
+          <span
+            className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[length:var(--text-11)]"
+            style={{
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              fontWeight: "var(--weight-black)",
+            }}
+          >
             {activeCount}
             {/* 숫자만 두면 음성으로는 "필터 2" 가 무엇의 2 인지 알 수 없다.
                 페이지 번호로도 들린다. 화면에서는 알약 안의 강조색 배지라
@@ -73,7 +92,8 @@ export function FilterPanel({
             aria-hidden 인 이유: summary 자체가 이미 "확장/축소" 로 읽힌다. */}
         <span
           aria-hidden
-          className="text-[0.625rem] text-slate-400 transition-transform duration-150 group-open:rotate-180"
+          className="text-[0.625rem] transition-transform duration-150 group-open:rotate-180"
+          style={{ color: "var(--text-faint)" }}
         >
           ▼
         </span>
@@ -89,7 +109,17 @@ export function FilterPanel({
           실패하면 조용히 빈 배열이 된다(lib/api/client.ts 의 fetchChoices).
           즉 백엔드 부분 장애에서 첫 자식이 사라져 표시가 엉뚱한 줄에 붙는다.
           :first-child 는 DOM 기준이라 그때도 살아남은 첫 줄을 맞춘다. */}
-      <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 [&>*:first-child]:mt-0">
+      {/* 펼친 칩들을 옅은 띠 위에 앉힌다. 흰 종이로 두면 그 위의 흰 칩이
+          안 보이고, 두께를 주면 칩마다 있는 두께와 겹쳐 층이 둘이 된다.
+          띠(--background-deep)는 그림자 없이 면으로만 구분하는 자리다
+          (번들 core/Card.jsx 의 tone="sand" 와 같은 문법). */}
+      <div
+        className="mt-3 p-3 [&>*:first-child]:mt-0"
+        style={{
+          background: "var(--background-deep)",
+          borderRadius: "var(--radius-2xl)",
+        }}
+      >
         {children}
       </div>
     </details>

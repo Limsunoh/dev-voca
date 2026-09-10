@@ -86,11 +86,16 @@ export function Reaction({ fire, correct }: Props) {
  * 이유는 둘이다 - 작게 그리면 뭉개져서 표정이 안 보이고, 특정 인물처럼
  * 보이면 그 사람을 아는 사용자에게 다른 뜻이 된다.
  *
- * 색은 판정에 맞춘다. 맞히면 emerald, 틀리면 rose - 보기 버튼의 정답·오답
- * 테두리와 같은 색이라 무엇 때문에 온 사람인지가 색으로 먼저 온다.
+ * 색은 판정에 맞춘다. 보기 버튼의 정답·오답과 **같은 토큰**을 써야
+ * 무엇 때문에 온 사람인지가 색으로 먼저 온다.
+ *
+ * 리터럴을 박지 않는다. 다크 시절 emerald-300 · rose-300 이 남아 있었는데,
+ * 크림 바탕에서 1.42:1 · 1.77:1 이라 선이 거의 안 보였다. 비텍스트 그래픽
+ * 기준 3:1 에도 못 미치는 값이라 "색으로 먼저 온다" 는 전제 자체가 안 섰다.
+ * 토큰으로 이어두면 판정 색을 바꿀 때 여기가 따로 남지 않는다.
  */
 function Figure({ correct }: { correct: boolean }) {
-  const stroke = correct ? "#6ee7b7" : "#fda4af";
+  const stroke = correct ? "var(--correct-deep)" : "var(--wrong-deep)";
 
   return (
     <svg
@@ -102,9 +107,10 @@ function Figure({ correct }: { correct: boolean }) {
       strokeWidth="4"
       strokeLinecap="round"
       strokeLinejoin="round"
-      // 어두운 배경에서 가는 선이 묻힌다. 검은 그림자를 깔아 띄운다 -
-      // 배경이 어떤 카드 위든 실루엣이 읽힌다.
-      style={{ filter: "drop-shadow(0 2px 6px rgb(0 0 0 / 0.6))" }}
+      // 그림자를 걸지 않는다. 다크였을 때는 가는 선이 어두운 배경에
+      // 묻혀서 검은 그림자로 띄웠는데, 크림 위에서는 획(--correct-deep
+      // 5.9:1)이 이미 충분히 진하고 흐린 그림자가 후광으로 보인다.
+      // 이 시스템은 "흐린 그림자·광채·글래스를 쓰지 않는다"(globals.css).
     >
       {/* 머리 */}
       <circle cx="36" cy="16" r="11" />

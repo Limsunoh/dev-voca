@@ -46,9 +46,7 @@ export function ExamScopeFilter({ basePath, active, keep }: Props) {
         active={active}
         // 켜고 끄는 것이라 무엇이 되는지 말해준다. 보이는 글자만으로는
         // 지금 켜진 것인지 누르면 켜지는 것인지 소리로 구분되지 않는다.
-        ariaLabel={
-          active ? "정처기 범위만 보기 해제" : "정처기 범위만 보기"
-        }
+        ariaLabel={active ? "정처기 범위만 보기 해제" : "정처기 범위만 보기"}
       >
         정처기 범위만
       </FilterChip>

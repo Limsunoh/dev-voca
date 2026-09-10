@@ -24,7 +24,9 @@ export default async function LoginPage({ searchParams }: PageProps) {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-16">
-      <AuthForm mode="login" action={loginAction}
+      <AuthForm
+        mode="login"
+        action={loginAction}
         next={next}
         googleFailed={googleFailed}
       />

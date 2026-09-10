@@ -1,5 +1,4 @@
 import { EnterVeil } from "@/components/EnterVeil";
-import { SurfaceLayer } from "@/components/SurfaceLayer";
 
 /**
  * 문제풀이 영역의 배경과 진입 연출.
@@ -26,7 +25,6 @@ export default function TestLayout({
 }) {
   return (
     <>
-      <SurfaceLayer variant="surface-quiz" />
       <EnterVeil />
       {children}
     </>

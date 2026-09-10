@@ -34,8 +34,24 @@ export function Pagination({
     return qs ? `${basePath}?${qs}` : basePath;
   }
 
+  // 흰 알약 + 두께. 목록 맨 아래에 홀로 놓이는 버튼이라 코랄을 쓰지 않는다 -
+  // 한 화면에 코랄은 하나뿐이고, 그 자리는 검색 버튼이 갖는다.
+  //
+  // 최소 높이 44px(--hit-floor). 다크에서는 py-1.5(30px)라 터치 대상에
+  // 못 미쳤는데, 목록 맨 아래에서 엄지로 누르는 자리라 이번에 맞춘다.
   const linkClass =
-    "rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-500 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500";
+    "dv-btn inline-flex items-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
+
+  const linkStyle = {
+    background: "var(--paper)",
+    color: "var(--foreground)",
+    borderRadius: "var(--radius-pill)",
+    // 쉬는 두께는 --lift 로 넘긴다. box-shadow 를 인라인으로 적으면
+    // globals.css 의 :active 가 두께를 0 으로 만드는 것을 이겨버린다.
+    "--lift": "var(--lift-button-paper)",
+    minHeight: "var(--hit-floor)",
+    fontWeight: "var(--weight-black)",
+  } as React.CSSProperties;
 
   return (
     <nav
@@ -43,19 +59,32 @@ export function Pagination({
       className="mt-8 flex items-center justify-between"
     >
       {hasPrevious ? (
-        <Link href={hrefFor(currentPage - 1)} className={linkClass}>
+        <Link
+          href={hrefFor(currentPage - 1)}
+          className={linkClass}
+          style={linkStyle}
+        >
           이전
         </Link>
       ) : (
         <span />
       )}
 
-      <span className="text-sm text-slate-500 dark:text-slate-400">
+      {/* tabular-nums: 페이지를 넘길 때 숫자 폭이 달라지면 가운데 글자가
+          좌우로 흔들린다(1 과 4 의 폭이 다르다). */}
+      <span
+        className="text-sm tabular-nums"
+        style={{ color: "var(--text-muted)", fontWeight: "var(--weight-bold)" }}
+      >
         {currentPage} 페이지
       </span>
 
       {hasNext ? (
-        <Link href={hrefFor(currentPage + 1)} className={linkClass}>
+        <Link
+          href={hrefFor(currentPage + 1)}
+          className={linkClass}
+          style={linkStyle}
+        >
           다음
         </Link>
       ) : (

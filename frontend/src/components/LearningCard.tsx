@@ -65,77 +65,120 @@ export function LearningCard({
   return (
     <Link
       href={href}
-      // 카드를 불투명하게 채우면 뒤의 배경 그라디언트가 통째로 가려진다.
-      // 반투명으로 두면 배경이 비쳐서 목록 전체가 한 화면으로 읽힌다.
-      // backdrop-blur 는 일부러 쓰지 않는다 - 목록에 카드가 스무 개씩
-      // 깔리는데 카드마다 백드롭 필터를 걸면 폰에서 스크롤이 끊긴다.
+      // 흰 종이 + 아래 3px 두께. 크림 리디자인의 핵심이라 카드가 이 시스템의
+      // 기준점이다(디자인 가이드 shape-lift).
       //
-      // 누르면 살짝 들어간다. 이게 없으면 폰에서 이 카드는 완전히 무반응이다 -
-      // hover 는 터치에 없어서 탭한 순간부터 다음 화면이 뜰 때까지 손가락
-      // 아래에서 아무 일도 일어나지 않는다. 웹 문서는 그렇게 동작하지만
-      // 앱은 그렇지 않다.
+      // 반투명을 버렸다. 다크에서는 뒤의 그라디언트가 비쳐야 목록이 한 화면으로
+      // 읽혔지만, 크림에는 영역별 배경 자체가 없다(가이드 color-base:
+      // "그라디언트·영역별 배경 없음. 카드의 두께가 화면을 만든다").
+      // 여기서 반투명을 유지하면 크림 위에 크림이라 카드 경계가 사라진다.
       //
-      // 0.96 은 globals.css 의 "누름 피드백" 절이 정한 값이다. 처음에 이웃
-      // 카드와 벌어질까 봐 0.985 로 뒀는데, 재보니 좌우 2.6px 위아래 1px 이라
-      // 눌러도 안 보였다. 값을 낮출 생각이 들면 먼저 몇 px 움직이는지 잰다.
+      // 테두리도 버렸다. 두께가 경계를 맡으므로 테두리를 같이 두면 신호가
+      // 둘이 되고, 눌러서 두께가 0 이 될 때 테두리만 남아 카드가 납작해진
+      // 게 아니라 색이 바랜 것처럼 보인다.
       //
-      // transition 을 속성으로 좁힌다. 맨 transition 은 all 이라 카드 스무
-      // 장에 걸리면 폰에서 낭비다(위에서 backdrop-blur 를 뺀 것과 같은 이유).
+      // 누르면 두께만큼(3px) 내려앉는다. 이게 없으면 폰에서 이 카드는 완전히
+      // 무반응이다 - hover 는 터치에 없어서 탭한 순간부터 다음 화면이 뜰
+      // 때까지 손가락 아래에서 아무 일도 일어나지 않는다.
       //
-      // 목록에 transform 이 아니라 scale 을 적는다. Tailwind v4 의
-      // active:scale-* 는 transform 이 아니라 별개의 scale 속성을 쓴다.
-      // transform 만 적어두면 전환 대상에 안 잡혀서 크기가 툭 바뀐다
-      // (실측으로 확인했다 - scale 은 0.985 로 바뀌는데 transitionProperty
-      // 에는 없었다).
-      className={`group block rounded-lg border border-slate-200 bg-white transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/12 dark:bg-slate-950/45 dark:hover:border-white/25 ${
-        compact ? "px-4 py-3" : "p-4"
+      // **scale 을 쓰지 않는다.** 다크에서는 0.96 으로 줄였는데, 크림은
+      // 누름이 "내려앉음" 이다(가이드 motion-press). 두 개를 겹치면 카드가
+      // 작아지면서 가라앉아 물러나 보인다.
+      //
+      // 쉬는 두께를 box-shadow 가 아니라 --lift 변수로 준다. 인라인 style 의
+      // 선언은 클래스 규칙을 이기므로(같은 !important 급이 아니면 인라인이
+      // 항상 우선), box-shadow 를 여기 직접 적으면 globals.css 의
+      // .dv-card-press:active 가 그리는 --lift-none 이 무시된다. 그러면
+      // transform 만 걸려서 카드가 두께를 그대로 단 채 3px 내려가 바닥을
+      // 뚫고 들어간 것처럼 보인다. 변수로 넘기면 클래스가 그 변수를 덮어쓸
+      // 수 있어 눌림이 제대로 그려진다.
+      className={`dv-card dv-card-press block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+        compact ? "px-4 py-3.5" : "px-4.5 pt-4.5 pb-4"
       }`}
+      style={
+        {
+          background: "var(--paper)",
+          borderRadius: "var(--radius-2xl)",
+          "--lift": "var(--lift-card)",
+        } as React.CSSProperties
+      }
     >
-      <div className="flex items-start justify-between gap-3">
+      {/* compact 는 한 줄짜리라 제목과 뜻이 세로로 딱 붙는다. 기준선을 위로
+          맞추면 오른쪽 배지가 제목 위로 떠 보인다. */}
+      <div
+        className={`flex justify-between gap-3 ${
+          compact ? "items-center" : "items-start"
+        }`}
+      >
         {/* min-w-0 이 없으면 flex 항목이 내용보다 작아지지 못한다. 제목에
             줄바꿀 곳이 없는 긴 문자열(에러 메시지 안의 URL 같은 것)이 오면
             카드가 화면 밖으로 밀려 나가 페이지에 가로 스크롤이 생긴다.
             데스크톱에서는 여백이 넉넉해 드러나지 않고 폰에서만 보인다.
             글자를 끊는 쪽은 globals.css 의 base 규칙이 맡는다. */}
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+        <div className="min-w-0">
           <h2
-            className={`font-semibold text-slate-900 group-hover:underline dark:text-slate-50 ${
-              compact ? "text-sm" : "text-xl"
-            } ${monoTitle ? "font-mono" : ""}`}
+            className={compact ? "text-[0.9375rem]" : "text-xl"}
+            style={{
+              // 고정폭 제목은 자간을 더 조인다. JetBrains Mono 는 글자마다
+              // 폭이 같아 기본 자간으로 두면 단어가 흩어져 보인다.
+              fontFamily: monoTitle ? "var(--font-mono)" : "var(--font-sans)",
+              fontWeight: monoTitle
+                ? "var(--weight-bold)"
+                : "var(--weight-black)",
+              letterSpacing: monoTitle
+                ? "var(--tracking-tighter)"
+                : "var(--tracking-tight)",
+              color: "var(--foreground)",
+              lineHeight: "var(--leading-tight)",
+            }}
           >
             {title}
           </h2>
-          {aside && (
-            // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
-            // 깨지거나 폭이 어긋나는 경우가 있다.
-            <span
-              lang="en-US"
-              className="text-base text-slate-500 dark:text-slate-300"
+
+          {/* 발음 줄. compact 에서는 통째로 뺀다 - 홈에 여러 장이 들어가는
+              자리라 제목과 뜻만 있으면 된다. */}
+          {!compact && (aside || reading) && (
+            <div
+              className="mt-1.5 flex flex-wrap gap-x-2.5 text-sm"
+              style={{ color: "var(--text-muted)" }}
             >
-              {aside}
-            </span>
+              {/* 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
+                  깨지거나 폭이 어긋난다(디자인 가이드 type-ipa). 이 줄이
+                  --font-sans 상속만 받고 아무 글꼴도 안 적는 것이 그래서다. */}
+              {aside && <span lang="en-US">{aside}</span>}
+              {reading && (
+                <Reading
+                  text={reading}
+                  style={{ color: "var(--text-muted)" }}
+                />
+              )}
+            </div>
           )}
-          {reading && (
-            <Reading
-              text={reading}
-              className="text-base text-slate-500 dark:text-slate-400"
-            />
-          )}
+
+          {/* compact 에서는 한 줄로 자른다. 두 줄이 되면 카드 높이가 제각각이라
+              목록이 고르지 않게 보인다. 뜻 전체는 눌러서 상세로 가면 있다. */}
+          <p
+            className={compact ? "mt-0.5 truncate text-xs" : "mt-2.5 text-base"}
+            style={{
+              color: compact ? "var(--text-muted)" : "var(--text-body)",
+              // 뜻은 카드에서 제목 다음으로 읽히는 줄이라 굵게 세운다.
+              // compact 은 곁들이는 자리라 평범한 굵기로 물러난다.
+              fontWeight: compact
+                ? "var(--weight-regular)"
+                : "var(--weight-bold)",
+            }}
+          >
+            {subtitle}
+          </p>
         </div>
         {badge}
       </div>
 
-      {/* compact 에서는 한 줄로 자른다. 두 줄이 되면 카드 높이가 제각각이라
-          목록이 고르지 않게 보인다. 뜻 전체는 눌러서 상세로 가면 있다. */}
-      <p
-        className={`text-slate-700 dark:text-slate-200 ${
-          compact ? "mt-0.5 truncate text-xs" : "mt-1.5 text-lg"
-        }`}
-      >
-        {subtitle}
-      </p>
-
-      {tag && <div className="mt-3">{tag}</div>}
+      {/* 칩이 여럿 올 수 있다(분류 + 정처기). 줄바꿈과 간격을 여기서 준다 -
+          호출부가 조각(<>...</>)으로 넘기면 칩 사이가 붙어버린다. */}
+      {!compact && tag && (
+        <div className="mt-3 flex flex-wrap gap-1.5">{tag}</div>
+      )}
     </Link>
   );
 }

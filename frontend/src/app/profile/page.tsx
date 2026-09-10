@@ -35,7 +35,13 @@ export default async function ProfilePage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+      <h1
+        className="text-[length:var(--text-2xl)] tracking-[var(--tracking-tight)]"
+        style={{
+          color: "var(--foreground)",
+          fontWeight: "var(--weight-black)",
+        }}
+      >
         내 프로필
       </h1>
 
@@ -52,13 +58,18 @@ export default async function ProfilePage() {
         />
       </section>
 
-      {/* dark: 쌍을 안 쓴다. 이 앱은 어두운 화면 하나로 가고(globals.css
-          첫머리), 파일에 남은 라이트 전용 클래스는 걷어낼 잔재다. */}
-      <section
-        className="mt-10 border-t border-white/15 pt-6"
-        aria-labelledby="records"
-      >
-        <h2 id="records" className="text-sm font-medium text-slate-300">
+      {/* 구획선(border-t)을 쓰지 않는다. 이 디자인은 영역을 선이 아니라
+          카드의 두께로 가른다 - 크림 바탕에 가로선을 그으면 그것만 다른
+          시대의 화면처럼 보인다. 절 제목은 카드 위에 작은 라벨로 둔다. */}
+      <section className="mt-8" aria-labelledby="records">
+        <h2
+          id="records"
+          className="text-xs tracking-[var(--tracking-wide)]"
+          style={{
+            color: "var(--text-dim)",
+            fontWeight: "var(--weight-black)",
+          }}
+        >
           학습 기록
         </h2>
         <div className="mt-3">
@@ -66,36 +77,59 @@ export default async function ProfilePage() {
         </div>
       </section>
 
-      <section
-        className="mt-10 border-t border-slate-200 pt-6 dark:border-white/15"
-        aria-labelledby="account"
-      >
+      <section className="mt-8" aria-labelledby="account">
         <h2
           id="account"
-          className="text-sm font-medium text-slate-700 dark:text-slate-300"
+          className="text-xs tracking-[var(--tracking-wide)]"
+          style={{
+            color: "var(--text-dim)",
+            fontWeight: "var(--weight-black)",
+          }}
         >
           계정
         </h2>
 
-        <dl className="mt-3 grid gap-2 text-sm">
+        <dl
+          className="mt-3 grid gap-2 p-5 text-sm"
+          style={{
+            background: "var(--paper)",
+            borderRadius: "var(--radius-2xl)",
+            boxShadow: "var(--lift-card)",
+          }}
+        >
           <div className="flex justify-between gap-4">
-            <dt className="text-slate-500 dark:text-slate-400">이메일</dt>
+            <dt style={{ color: "var(--text-muted)" }}>이메일</dt>
             {/* 이메일은 로그인 키라 바꿀 수 없다. 바꾸려면 본인 확인이
                 먼저인데 그 절차가 아직 없다. */}
             {/* min-w-0 이 없으면 truncate 가 아예 발동하지 않는다. flex 항목의
                 min-width 는 auto = min-content 인데, truncate 가 건
                 white-space: nowrap 때문에 min-content 가 이메일 전체 폭이
                 되어 칸이 줄지 않고 행이 그대로 넘친다. */}
-            <dd className="min-w-0 truncate font-mono text-slate-700 dark:text-slate-300">
+            <dd
+              className="min-w-0 truncate font-mono"
+              style={{ color: "var(--text-body)" }}
+            >
               {user.email}
             </dd>
           </div>
         </dl>
 
+        {/* 로그아웃은 흰 버튼이다. 코랄은 이 화면에서 저장 버튼이 가진다 -
+            둘 다 코랄이면 되돌릴 수 없는 쪽(로그아웃)이 주된 동작으로 보인다. */}
         <form action={logoutAction} className="mt-4">
           <button
             type="submit"
-            className="w-full rounded-md border border-slate-300 px-4 py-2.5 text-slate-700 transition-[scale,border-color] duration-[120ms] ease-press hover:border-slate-400 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:w-auto sm:px-6 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
+            className="dv-btn w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:w-auto sm:px-8"
+            style={
+              {
+                minHeight: "var(--hit-min)",
+                background: "var(--paper)",
+                color: "var(--foreground)",
+                border: 0,
+                "--lift": "var(--lift-button-paper)",
+                fontWeight: "var(--weight-bold)",
+              } as React.CSSProperties
+            }
           >
             로그아웃
           </button>

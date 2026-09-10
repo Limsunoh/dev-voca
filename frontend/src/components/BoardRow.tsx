@@ -13,16 +13,20 @@ import { BOARD_LABELS } from "@/lib/api/leaderboards";
  */
 
 /**
- * 1~3위 표시. 숫자 색과 테두리를 함께 바꾼다.
+ * 1~3위 표시. 등수 숫자의 색과 크기를 함께 바꾼다.
  *
- * **광채(zero-offset colored shadow)를 쓰지 않는다.** 어두운 배경에
- * 색 있는 후광을 두르는 것은 AI 가 만든 화면의 전형이고, 여기서는
- * 이미 색과 테두리로 상위 셋이 갈린다 - 광채는 덧칠이다.
+ * 크림에서 링(ring)을 버렸다. 다크에서는 색 있는 테두리로 상위 셋을 갈랐지만
+ * 이 시스템은 경계를 테두리가 아니라 아래 두께가 맡는다(가이드 shape-lift).
+ * 줄마다 색 링을 두르면 두께가 만든 층 위에 다른 층이 하나 더 생긴다.
+ *
+ * 대신 숫자를 한 단계 키운다(--text-md vs --text-sm). 번들 원본
+ * (identity/BoardRow.jsx)이 17px / 14px 로 가른 것과 같은 방식이고, 색을
+ * 못 보는 사람에게도 상위 셋이 크기로 남는다.
  */
-const MEDALS: Record<number, { ring: string; text: string }> = {
-  1: { ring: "ring-amber-300/55", text: "text-amber-300" },
-  2: { ring: "ring-slate-300/50", text: "text-slate-200" },
-  3: { ring: "ring-orange-300/45", text: "text-orange-200" },
+const MEDALS: Record<number, string> = {
+  1: "var(--medal-1)",
+  2: "var(--medal-2)",
+  3: "var(--medal-3)",
 };
 
 type Props = {
@@ -36,7 +40,7 @@ type Props = {
    * 나열해두면 TOP_SIZE 가 바뀔 때 조용히 어긋난다.
    */
   index?: number;
-  /** 하단 고정 줄로 쓸 때. 순서 애니메이션을 끄고 테두리를 다르게 준다. */
+  /** 하단 고정 줄로 쓸 때. 순서 애니메이션을 끈다. */
   pinned?: boolean;
 };
 
@@ -44,27 +48,42 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
   const medal = MEDALS[row.rank];
   const unit = BOARD_LABELS[kind].unit;
 
+  // 내 줄은 옅은 코랄로 채운다(번들 identity/BoardRow.jsx). 스무 줄이 전부
+  // 흰 종이라 채움 하나만 달라도 눈이 바로 찾는다.
+  //
+  // 두께도 코랄 계열로 같이 바꾼다. 흰 줄과 같은 잉크 두께를 두면 채움만
+  // 뜨고 판은 그대로라 색을 덧칠한 것처럼 보인다.
+  const mine = row.is_me;
+
   return (
     <li
-      className={[
-        "rise flex items-center gap-3 rounded-xl border px-3 py-2.5 sm:gap-4 sm:px-4 sm:py-3",
-        // 내 줄은 청록으로 띄운다. 배경이 자수정이라 보색에 가까워
-        // 스무 줄 사이에서 눈이 바로 찾는다.
-        row.is_me
-          ? "border-teal-300/45 bg-teal-300/10"
-          : "border-white/10 bg-slate-950/35",
-        pinned ? "border-teal-300/55 bg-teal-300/12" : "",
-        medal ? `ring-1 ${medal.ring}` : "",
-      ].join(" ")}
-      // 스무 줄이 동시에 뜨면 화면이 한 번 번쩍인다. 40ms 씩 밀어 위에서
-      // 아래로 흐르게 한다. 마지막 줄이 0.8초라 기다린다는 느낌은 없다.
-      style={pinned ? undefined : { animationDelay: `${index * 40}ms` }}
+      // rise 는 고정 줄에도 건다. 지연만 빼서 목록과 함께 한 번에 올라온다 -
+      // 목록 끝에 40ms 씩 이어 붙이면 스무 줄 뒤에 혼자 늦게 뜬다.
+      className="rise flex items-center gap-3 px-3.5 py-3 dv-card sm:gap-4 sm:px-4"
+      style={
+        {
+          background: mine ? "var(--coral-soft)" : "var(--paper)",
+          borderRadius: "var(--radius-xl)",
+          // 누를 수 없는 줄이라 dv-card-press 를 안 건다. 그래도 두께는
+          // --lift 로 넘긴다 - .dv-card 가 box-shadow: var(--lift) 를
+          // 그리므로 변수를 안 주면 그림자가 통째로 사라진다.
+          "--lift": mine ? "0 3px 0 rgb(193 62 34 / 0.25)" : "var(--lift-card)",
+          // 스무 줄이 동시에 뜨면 화면이 한 번 번쩍인다. 40ms 씩 밀어 위에서
+          // 아래로 흐르게 한다. 마지막 줄이 0.8초라 기다린다는 느낌은 없다.
+          animationDelay: pinned ? undefined : `${index * 40}ms`,
+        } as React.CSSProperties
+      }
     >
       <span
-        className={[
-          "w-7 shrink-0 text-center font-mono text-sm tabular-nums sm:w-9 sm:text-base",
-          medal ? `font-bold ${medal.text}` : "text-slate-400",
-        ].join(" ")}
+        className="w-7 shrink-0 text-center tabular-nums sm:w-9"
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontWeight: "var(--weight-bold)",
+          // 상위 셋은 한 단계 크다. 색만으로 가르지 않는다.
+          fontSize: medal ? "var(--text-md)" : "var(--text-sm)",
+          color: medal ?? "var(--text-muted)",
+          letterSpacing: "var(--tracking-tighter)",
+        }}
       >
         {row.rank}
       </span>
@@ -72,18 +91,48 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
       <Avatar shown={row.avatar} size={34} className="shrink-0" />
 
       {/* min-w-0 이 없으면 긴 이름이 줄을 화면 밖으로 밀어낸다. */}
-      <span className="min-w-0 flex-1 truncate text-sm text-slate-100 sm:text-base">
+      <span
+        className="min-w-0 flex-1 truncate text-sm sm:text-base"
+        style={{
+          color: "var(--foreground)",
+          fontWeight: "var(--weight-bold)",
+        }}
+      >
         {row.display_name}
-        {row.is_me && (
-          <span className="ml-1.5 text-xs font-medium text-teal-300">나</span>
+        {mine && (
+          <span
+            className="ml-1.5 text-xs"
+            style={{
+              color: "var(--coral-deep)",
+              fontWeight: "var(--weight-black)",
+            }}
+          >
+            나
+          </span>
         )}
       </span>
 
       <span className="shrink-0 text-right">
-        <span className="block font-mono text-sm font-semibold tabular-nums text-slate-100 sm:text-base">
+        {/* tabular-nums: 점수가 920 에서 1,040 으로 갈 때 자릿수가 바뀌는데,
+            폭이 흔들리면 오른쪽 끝이 줄마다 다른 자리에서 끝난다. */}
+        <span
+          className="block text-sm tabular-nums sm:text-base"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontWeight: "var(--weight-bold)",
+            color: "var(--foreground)",
+            letterSpacing: "var(--tracking-tighter)",
+          }}
+        >
           {row.score.toLocaleString()}
         </span>
-        <span className="block text-[11px] text-slate-400 sm:text-xs">
+        <span
+          className="block text-[length:var(--text-11)] sm:text-xs"
+          style={{
+            color: "var(--text-dim)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {row.entries}
           {unit}
         </span>

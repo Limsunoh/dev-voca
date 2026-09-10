@@ -17,6 +17,10 @@ import { routes } from "@/lib/routes";
  * 클라이언트 컴포넌트인 이유: 제출 중 버튼을 잠그고 에러를 그 자리에
  * 보여주려면 상태가 필요하다. 다만 실제 제출은 Server Action 이 받으므로
  * 토큰은 브라우저를 거치지 않는다.
+ *
+ * 색·그림자·모서리는 CSS 변수로 쓴다. 크림 토큰이 Tailwind 유틸로 전부
+ * 나가 있지 않고, 나가 있는 것만 골라 쓰면 같은 파일 안에서 색을 두 가지
+ * 방식으로 적게 된다. 레이아웃만 Tailwind 로 둔다.
  */
 
 type Props = {
@@ -47,6 +51,28 @@ const COPY = {
   },
 } as const;
 
+/**
+ * 알림 상자(구글 실패·폼 에러).
+ *
+ * 테두리가 아니라 옅은 채움으로 구분한다. 이 디자인은 경계를 테두리가
+ * 아니라 채움과 두께로 만든다 - 크림 바탕에 1px 선을 그으면 그것만
+ * 다른 시대의 화면처럼 보인다.
+ */
+function Notice({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      role="alert"
+      className="rounded-[var(--radius-xl)] p-3 text-sm"
+      style={{
+        background: "var(--amber-soft)",
+        color: "var(--amber-deep)",
+      }}
+    >
+      {children}
+    </p>
+  );
+}
+
 export function AuthForm({ mode, action, next, googleFailed }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(action, {});
   const copy = COPY[mode];
@@ -57,35 +83,57 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-sm">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+      <h1
+        className="text-[length:var(--text-2xl)] tracking-[var(--tracking-tight)]"
+        style={{
+          color: "var(--foreground)",
+          fontWeight: "var(--weight-black)",
+        }}
+      >
         {copy.title}
       </h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+      <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
         로그인하면 푼 문제와 틀린 단어가 기기를 옮겨도 이어집니다.
       </p>
 
       {googleFailed && (
-        <p
-          role="alert"
-          className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-        >
-          구글 로그인을 마치지 못했습니다. 다시 시도해주세요.
-        </p>
+        <div className="mt-6">
+          <Notice>구글 로그인을 마치지 못했습니다. 다시 시도해주세요.</Notice>
+        </div>
       )}
 
-      {/* 링크지만 버튼처럼 보인다. 누르면 구글 동의 화면으로 간다. */}
+      {/* 링크지만 버튼처럼 보인다. 누르면 구글 동의 화면으로 간다.
+          코랄이 아니라 흰 버튼인 이유: 한 화면에 코랄은 하나뿐이고,
+          그 자리는 아래 제출 버튼이 가진다. */}
       <a
         href={googleHref}
-        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-md border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition-[scale,background-color] duration-[120ms] ease-press hover:bg-slate-50 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+        className="dv-btn mt-6 flex w-full items-center justify-center gap-2.5 rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        style={
+          {
+            minHeight: "var(--hit-min)",
+            background: "var(--paper)",
+            color: "var(--foreground)",
+            "--lift": "var(--lift-button-paper)",
+            fontWeight: "var(--weight-bold)",
+          } as React.CSSProperties
+        }
       >
         <GoogleMark />
         구글로 계속하기
       </a>
 
       <div className="mt-6 flex items-center gap-3">
-        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-        <span className="text-xs text-slate-500 dark:text-slate-400">또는</span>
-        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+        <span
+          className="h-px flex-1"
+          style={{ background: "var(--sand-deep)" }}
+        />
+        <span className="text-xs" style={{ color: "var(--text-dim)" }}>
+          또는
+        </span>
+        <span
+          className="h-px flex-1"
+          style={{ background: "var(--sand-deep)" }}
+        />
       </div>
 
       <form action={formAction} className="mt-6 grid gap-4">
@@ -124,23 +172,23 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
           }
         />
 
-        {state.error && (
-          <p
-            role="alert"
-            className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-          >
-            {state.error}
-          </p>
-        )}
+        {state.error && <Notice>{state.error}</Notice>}
 
         <SubmitButton label={copy.submit} pendingLabel={copy.pending} />
       </form>
 
-      <p className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
+      <p
+        className="mt-6 text-center text-sm"
+        style={{ color: "var(--text-muted)" }}
+      >
         {copy.switchText}{" "}
         <Link
           href={copy.switchHref}
-          className="font-medium text-slate-900 underline underline-offset-4 dark:text-slate-100"
+          className="underline underline-offset-4"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
         >
           {copy.switchLabel}
         </Link>
@@ -153,7 +201,10 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
       <p className="mt-4 text-center text-sm">
         <Link
           href={routes.home}
-          className="text-slate-400 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          // 링크는 --text-faint(크림 위 2.51:1)로 두지 않는다. 누를 수
+          // 있는 것이 배경에 묻히면 있는 줄도 모른다.
+          style={{ color: "var(--text-muted)" }}
         >
           로그인 없이 둘러보기
         </Link>
@@ -165,8 +216,7 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
 /**
  * 구글 로고.
  *
- * 구글 브랜드 규정상 색과 모양을 바꾸지 않는다. 다크 모드에서도
- * 그대로 둔다.
+ * 구글 브랜드 규정상 색과 모양을 바꾸지 않는다.
  */
 function GoogleMark() {
   return (
@@ -214,12 +264,18 @@ function Field({
     <div>
       <label
         htmlFor={name}
-        className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+        className="block text-sm"
+        style={{ color: "var(--text-body)", fontWeight: "var(--weight-bold)" }}
       >
         {label}
         {!required && (
-          // 실제로 쓰이는 값은 dark: 쪽이다(globals.css 참고). 아래 hint 도 같다.
-          <span className="ml-1 font-normal text-slate-500 dark:text-slate-400">
+          <span
+            className="ml-1"
+            style={{
+              color: "var(--text-muted)",
+              fontWeight: "var(--weight-regular)",
+            }}
+          >
             (선택)
           </span>
         )}
@@ -232,12 +288,25 @@ function Field({
         required={required}
         maxLength={maxLength}
         aria-describedby={hintId}
-        // SearchInput·ProfileForm 과 같은 값이다. 앱의 입력칸은 이 셋뿐이라
-        // 한 곳만 고치면 나머지가 낮은 대비·작은 터치 대상으로 남는다.
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-white/40 dark:bg-slate-900/55 dark:text-slate-100"
+        // 흰 바탕이 아니라 --surface-field 다. 크림(#FFF6E9) 위에 흰
+        // 입력칸을 놓으면 경계가 거의 안 보인다. 여기에 카드 두께까지
+        // 얹어서 "눌러서 쓰는 칸" 임을 두 겹으로 알린다.
+        // ProfileForm 과 같은 값이다.
+        className="mt-1 w-full rounded-[var(--radius-xl)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        style={{
+          minHeight: "var(--hit-floor)",
+          background: "var(--surface-field)",
+          color: "var(--foreground)",
+          border: 0,
+          boxShadow: "var(--lift-card)",
+        }}
       />
       {hint && (
-        <p id={hintId} className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <p
+          id={hintId}
+          className="mt-1.5 text-xs"
+          style={{ color: "var(--text-dim)" }}
+        >
           {hint}
         </p>
       )}
@@ -264,7 +333,19 @@ function SubmitButton({
     <button
       type="submit"
       disabled={pending}
-      className="mt-2 w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white transition-[scale,background-color] duration-[120ms] ease-press hover:bg-slate-700 active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+      // 이 화면의 유일한 코랄. 주된 동작이 무엇인지 색 하나로 정한다.
+      className="dv-btn mt-2 w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+      style={
+        {
+          minHeight: "var(--hit-min)",
+          background: "var(--coral)",
+          color: "var(--text-on-color)",
+          border: 0,
+          "--lift": "var(--lift-button)",
+          fontWeight: "var(--weight-black)",
+          letterSpacing: "var(--tracking-tight)",
+        } as React.CSSProperties
+      }
     >
       {pending ? pendingLabel : label}
     </button>

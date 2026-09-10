@@ -187,22 +187,40 @@ function IdleCard({
   if (due.due === 0) {
     return (
       <div className="rise flex flex-1 flex-col justify-center text-center">
-        <p className="text-lg font-semibold text-slate-100">
+        <p
+          className="text-lg"
+          style={{
+            color: "var(--foreground)",
+            fontWeight: "var(--weight-black)",
+            letterSpacing: "var(--tracking-tight)",
+          }}
+        >
           다시 볼 것이 없습니다
         </p>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
           문제를 풀다 틀리면 여기 모입니다. 맞힌 것도 일주일이 지나면 다시
           나옵니다.
         </p>
         {/* 여기서 연속으로 맞혀야 빠진다는 것을 적는다. 문제풀이에서
             맞힌 것은 정답을 안 보고 맞힌 것이라 세지 않는데, 그걸 모르면
             "분명히 맞혔는데 왜 그대로지" 가 된다. */}
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
           다시 보기에서 연속으로 맞혀야 빠집니다.
         </p>
+        {/* 볼 것이 없는 화면이라 여기서 할 일은 문제를 푸는 것 하나다.
+            이 화면의 유일한 코랄 버튼. */}
         <Link
           href={routes.testRound}
-          className="mx-auto mt-6 inline-flex min-h-12 items-center rounded-xl border border-white/40 px-5 text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="dv-btn mx-auto mt-6 inline-flex items-center rounded-[var(--radius-pill)] px-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
         >
           문제 풀러 가기
         </Link>
@@ -214,37 +232,62 @@ function IdleCard({
   // 적혀 있지만 실제 값은 JSON 이라 컴파일러가 못 막는다. 필드가 빠지면
   // "연속 번 맞히면" 처럼 구멍이 뚫리고, 0 이나 음수가 오면 "연속 -1번"
   // 을 사용자에게 읽힌다. 셀 수 없으면 숫자를 뺀 문장으로 물러난다.
-  const capped = counted(due.round_size) && due.due > due.round_size
-    ? due.round_size
-    : null;
+  const capped =
+    counted(due.round_size) && due.due > due.round_size ? due.round_size : null;
   const streak = counted(due.graduate_streak) ? due.graduate_streak : null;
 
   return (
     <div className="rise flex flex-1 flex-col justify-center gap-6 text-center">
       <div>
-        <p className="text-sm text-slate-400">다시 볼 것</p>
-        <p className="pop mt-1 font-mono text-5xl font-bold tabular-nums text-focus">
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          다시 볼 것
+        </p>
+        {/* 화면에서 가장 큰 숫자. tabular-nums 를 두는 이유는 pop 으로
+            튀어오를 때 자릿수에 따라 가운데가 흔들리지 않게 하기 위해서다. */}
+        <p
+          className="pop mt-1 text-5xl tabular-nums"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontWeight: "var(--weight-bold)",
+            letterSpacing: "var(--tracking-tighter)",
+            color: "var(--foreground)",
+          }}
+        >
           {due.due}
         </p>
       </div>
 
-      <p className="text-sm text-slate-400">
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
         {capped
           ? `이번 판에서 ${capped}개를 봅니다. 점수는 붙지 않고 시간도 재지 않습니다.`
           : "점수는 붙지 않고 시간도 재지 않습니다."}
       </p>
 
       <div>
+        {/* 이 화면의 주된 동작이라 코랄. 한 화면에 코랄 버튼은 하나다. */}
         <button
           type="button"
           onClick={onStart}
           disabled={busy}
-          className="min-h-12 w-full rounded-xl bg-slate-100 px-5 font-semibold text-slate-900 transition-[scale] duration-[120ms] ease-press active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:px-10"
+          className="dv-btn w-full rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50 sm:w-auto sm:px-10"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              border: 0,
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
         >
           {busy ? "여는 중" : "시작"}
         </button>
-        {/* "여기서" 는 위 빈 화면 문구와 같은 이유로 붙인다. */}
-        <p className="mt-3 text-xs text-slate-500">
+        {/* "여기서" 는 위 빈 화면 문구와 같은 이유로 붙인다.
+            라벨이 아니라 설명 문장이라 --text-muted 를 쓴다. 12px 이라
+            라벨용 토큰을 쓰면 이 화면에서 제일 알아야 할
+            규칙이 제일 흐리게 나온다. */}
+        <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
           {streak
             ? `여기서 연속 ${streak}번 맞히면 목록에서 빠집니다.`
             : "여기서 연속으로 맞히면 목록에서 빠집니다."}
@@ -252,7 +295,14 @@ function IdleCard({
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-rose-300">
+        <p
+          role="alert"
+          className="text-sm"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {error}
         </p>
       )}
@@ -284,25 +334,51 @@ function PlayCard({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-sm tabular-nums text-slate-400">
+        {/* tabular-nums: 9/20 에서 10/20 으로 갈 때 폭이 바뀌면 왼쪽 끝이
+            고정인 채로 글자만 밀려 한 번 더 읽게 된다. */}
+        <span
+          className="text-sm tabular-nums"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontWeight: "var(--weight-bold)",
+            color: "var(--text-muted)",
+            letterSpacing: "var(--tracking-tighter)",
+          }}
+        >
           {answered} / {total}
         </span>
-        <span className="text-sm text-slate-500">점수 없음</span>
+        <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+          점수 없음
+        </span>
       </div>
 
       {/* 남은 시간이 아니라 진행률이다. 제한 시간이 없는 공부라 급할
-          이유가 없고, 얼마나 남았는지만 알면 된다. */}
+          이유가 없고, 얼마나 남았는지만 알면 된다.
+
+          막대는 7px 로 키웠다. 크림 바탕에서 1px 짜리 선은 두께 있는 카드
+          옆에서 그어놓은 줄로 보인다 - 홈의 진행 점(ProgressDots)이 같은
+          높이라 두 화면의 진행 표시가 같은 굵기로 선다. */}
       <div
-        className="h-1 overflow-hidden rounded-full bg-white/10"
+        className="h-[7px] overflow-hidden"
         role="progressbar"
         aria-label="진행"
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={answered}
+        style={{
+          background: "var(--sand-deep)",
+          borderRadius: "var(--radius-pill)",
+        }}
       >
+        {/* 채워진 부분은 초록. 코랄은 "지금 눌러야 할 것" 이고 이건 이미
+            지나온 것이라, 진행 점에서 done 을 초록으로 둔 것과 같다. */}
         <div
-          className="h-full rounded-full bg-focus/70 transition-[width] duration-300"
-          style={{ width: `${total ? (answered / total) * 100 : 0}%` }}
+          className="h-full transition-[width] duration-300"
+          style={{
+            width: `${total ? (answered / total) * 100 : 0}%`,
+            background: "var(--green)",
+            borderRadius: "var(--radius-pill)",
+          }}
         />
       </div>
 
@@ -316,7 +392,14 @@ function PlayCard({
       </p>
 
       {error && (
-        <p role="alert" className="text-sm text-rose-300">
+        <p
+          role="alert"
+          className="text-sm"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {error}
         </p>
       )}
@@ -343,7 +426,16 @@ function ResultLine({
   graduateStreak: number;
 }) {
   if (!result.correct) {
-    return <span className="text-rose-300">오답 · {result.answer_text}</span>;
+    return (
+      <span
+        style={{
+          color: "var(--wrong-deep)",
+          fontWeight: "var(--weight-bold)",
+        }}
+      >
+        오답 · {result.answer_text}
+      </span>
+    );
   }
 
   // IdleCard 와 같은 판정을 쓴다. 뺄셈 결과를 그대로 믿으면 서버가
@@ -352,9 +444,22 @@ function ResultLine({
   const known = counted(left);
 
   return (
-    <span className="text-focus">
+    // 정답은 초록. 오답 코랄과 색으로 갈린다 - 여기는 글자 한 줄이라
+    // 형태로 가를 자리가 없고, 문구("정답"/"오답")가 색과 같이 간다.
+    <span
+      style={{
+        color: "var(--correct-deep)",
+        fontWeight: "var(--weight-black)",
+      }}
+    >
       정답
-      <span className="ml-2 text-slate-400">
+      <span
+        className="ml-2"
+        style={{
+          color: "var(--text-muted)",
+          fontWeight: "var(--weight-regular)",
+        }}
+      >
         {result.graduated
           ? "다 외웠습니다"
           : !known
@@ -387,30 +492,61 @@ function DoneCard({
   return (
     <div className="rise flex flex-1 flex-col justify-center gap-6 text-center">
       <div>
-        <p className="text-sm text-slate-400">이번 판</p>
-        <p className="pop mt-1 font-mono text-5xl font-bold tabular-nums text-focus">
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          이번 판
+        </p>
+        <p
+          className="pop mt-1 text-5xl tabular-nums"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontWeight: "var(--weight-bold)",
+            letterSpacing: "var(--tracking-tighter)",
+            color: "var(--foreground)",
+          }}
+        >
           {correct} / {answered}
         </p>
       </div>
 
-      <p className="text-sm text-slate-400">
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
         {graduated > 0
           ? `${graduated}개를 다 외워 목록에서 뺐습니다.`
           : "연속으로 맞히면 목록에서 빠집니다."}
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+        {/* "이어서 더" 가 주된 동작이라 코랄. 홈으로는 흰 알약으로 물러난다 -
+            둘 다 코랄이면 여기서 뭘 해야 할지가 사라진다. */}
         <button
           type="button"
           onClick={onAgain}
           disabled={busy}
-          className="min-h-12 rounded-xl bg-slate-100 px-5 font-semibold text-slate-900 transition-[scale] duration-[120ms] ease-press active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:px-10"
+          className="dv-btn rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50 sm:px-10"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              border: 0,
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
         >
           {busy ? "여는 중" : "이어서 더"}
         </button>
         <Link
           href={routes.home}
-          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/40 px-5 text-slate-100 transition-[scale,border-color] duration-[120ms] ease-press hover:border-white/60 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="dv-btn inline-flex items-center justify-center rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:px-10"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--paper)",
+              color: "var(--foreground)",
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button-paper)",
+            } as React.CSSProperties
+          }
         >
           홈으로
         </Link>
@@ -421,7 +557,14 @@ function DoneCard({
           그게 이 기능의 정상적인 끝이라 자주 만난다. 여기 안 그리면
           버튼만 깜빡이고 아무 일도 안 일어난 것처럼 보인다. */}
       {error && (
-        <p role="alert" className="text-sm text-rose-300">
+        <p
+          role="alert"
+          className="text-sm"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
           {error}
         </p>
       )}

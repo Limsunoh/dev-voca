@@ -18,9 +18,18 @@
 export function Reading({
   text,
   className = "",
+  style,
 }: {
   text: string;
   className?: string;
+  /**
+   * 색 같은 것을 토큰으로 직접 줄 때. className 과 같이 쓸 수 있다.
+   *
+   * 크림 토큰은 CSS 변수라 Tailwind 클래스로 옮기면 임의값 문법
+   * (text-[var(--text-dim)])이 되어 오히려 길다. 부르는 쪽이 짧은 쪽을
+   * 고르게 둘 다 받는다.
+   */
+  style?: React.CSSProperties;
 }) {
   if (!text) return null;
 
@@ -32,10 +41,14 @@ export function Reading({
   const parts = text.split("**");
 
   return (
-    <span className={className}>
+    <span className={className} style={style}>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <strong key={i} className="font-semibold">
+          // 크림에서 굵기를 900 으로 올린다. 카드가 흰 종이라 배경 대비가
+          // 다크였을 때보다 낮고, semibold(600)로는 흐린 글씨 안에서 강세가
+          // 안 보인다. 크림 토큰이 제목 900 · 라벨 700 로 한 단계씩 올린 것과
+          // 같은 이유다.
+          <strong key={i} style={{ fontWeight: "var(--weight-black)" }}>
             {part}
           </strong>
         ) : (

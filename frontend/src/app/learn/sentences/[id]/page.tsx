@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 
 import {
+  DetailAction,
   DetailBack,
   DetailCard,
   DetailHero,
-  DetailMeaning,
   DetailShell,
 } from "@/components/DetailLayout";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
@@ -46,30 +46,29 @@ export default async function SentenceDetailPage({ params }: PageProps) {
 
   return (
     <DetailShell>
-      <DetailBack href={routes.sentences} label="문장으로" />
+      <DetailBack href={routes.sentences} label="문장" />
 
       <DetailHero
         title={sentence.text}
         reading={sentence.reading || undefined}
+        meaning={sentence.translation}
         mono={isError}
         meta={
           <>
             <CategoryChip label={sentence.kind_label} />
-            <DifficultyBadge
-              level={sentence.difficulty}
-              label={sentence.difficulty_label}
-            />
             {sentence.category_label && (
               <CategoryChip
                 label={sentence.category_label}
                 href={`${routes.sentences}?category=${encodeURIComponent(sentence.category)}`}
               />
             )}
+            <DifficultyBadge
+              level={sentence.difficulty}
+              label={sentence.difficulty_label}
+            />
           </>
         }
       />
-
-      <DetailMeaning>{sentence.translation}</DetailMeaning>
 
       {sentence.context && (
         <DetailCard label="어디서 나오나" delay="[animation-delay:280ms]">
@@ -77,13 +76,22 @@ export default async function SentenceDetailPage({ params }: PageProps) {
         </DetailCard>
       )}
 
+      {/* 설명이 이 화면의 강조점이다. 단어 상세는 예문이 그 자리를 갖지만
+          문장에는 예문이 없다 - 문장 자체가 이미 예문이라 히어로가 그것을
+          맡고, 여기서 더 알려주는 것은 설명뿐이다. */}
       {sentence.description && (
-        <DetailCard label="설명" delay="[animation-delay:360ms]" raised>
+        <DetailCard label="설명" delay="[animation-delay:360ms]" tone="dark">
           <p className="whitespace-pre-line text-pretty">
             {sentence.description}
           </p>
         </DetailCard>
       )}
+
+      {/* 문장 낱개 문제로 보낸다. testWords 로 보내면 문장을 보다 단어
+          문제가 나와 흐름을 잃는다(routes.ts 의 tabHref 와 같은 판단). */}
+      <DetailAction href={routes.testSentences}>
+        이 문장으로 문제 풀기
+      </DetailAction>
     </DetailShell>
   );
 }
