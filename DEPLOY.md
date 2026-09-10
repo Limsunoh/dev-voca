@@ -168,9 +168,18 @@ CREATE SCHEMA public;
 ```
 railway ssh --service web "python backend/manage.py seed_words"
 railway ssh --service web "python backend/manage.py seed_sentences"
+railway ssh --service web "python backend/manage.py seed_phrases"
 railway ssh --service web
 # 붙은 뒤 셸에서: python backend/manage.py createsuperuser
 ```
+
+**`seed_phrases` 를 빠뜨리면 일상영어 탭이 반만 돈다.** 개발 용어 갈래는
+`seed_words` 로 채워져 정상인데 일상 표현 갈래만 "지금 낼 것이 없습니다" 가
+뜬다. 화면이 안 깨지므로 배포 확인에서 그냥 지나치기 쉽고, 처음 들어온
+사람은 탭 이름이 "일상영어" 인데 일상 표현이 없으니 고장으로 읽는다.
+
+`seed_phrases` 는 여러 번 돌려도 안전하다. `--reset` 을 주면 소스와 맞추는데,
+그때 **씨드가 넣은 행만** 손대고 Admin 에서 사람이 넣은 표현은 남긴다.
 
 ### 방법 2: 데이터를 살린다
 
