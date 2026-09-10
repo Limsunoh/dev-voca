@@ -182,7 +182,11 @@ export const tabs: Tab[] = [
     segment: mode.slug,
     ready: mode.ready,
   })),
-  { key: "profile", label: "나", segment: "profile", ready: true },
+  // "나" 가 아니라 "내정보" 인 이유: 나머지 탭이 전부 명사(홈·단어·문장)라
+  // 대명사 하나만 결이 어긋난다. 그리고 이 화면에 이메일·비밀번호 변경이
+  // 들어오면서 학습 기록만 있는 자리가 아니게 됐다. "내 기록" 으로 좁히면
+  // 계정 설정이 들어간 뒤 이름을 다시 바꿔야 한다.
+  { key: "profile", label: "내정보", segment: "profile", ready: true },
 ];
 
 /**

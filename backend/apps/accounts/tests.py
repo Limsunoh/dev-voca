@@ -4,21 +4,37 @@
 실패했을 때 그 응답만으로 가입 여부를 알아낼 수 없는가.
 """
 
+import io
+import os
 import unicodedata
+import uuid
+from datetime import timedelta
 from importlib import import_module
 from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import DatabaseError, connection, migrations
 from django.db.migrations.loader import MigrationLoader
 from django.test import TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 from .google import GoogleAuthError, fetch_google_user
-from .models import DISPLAY_NAME_MAX, free_display_name, name_taken
+from .mail import MailNotConfigured
+from .models import (
+    AVATAR_PHOTO,
+    AVATAR_PHOTO_MAX_BYTES,
+    AVATAR_PHOTO_SIZE,
+    DISPLAY_NAME_MAX,
+    AvatarPhotoError,
+    free_display_name,
+    name_taken,
+    shrink_avatar_photo,
+)
 from .throttles import EmailRateThrottle, GoogleRateThrottle
 
 # 마이그레이션 모듈은 이름이 숫자로 시작해 평범한 import 가 안 된다.
@@ -37,6 +53,9 @@ LOGIN_URL = "/api/accounts/login/"
 LOGOUT_URL = "/api/accounts/logout/"
 ME_URL = "/api/accounts/me/"
 GOOGLE_URL = "/api/accounts/google/"
+EMAIL_CHANGE_URL = "/api/accounts/email-change/"
+EMAIL_CHANGE_CONFIRM_URL = "/api/accounts/email-change/confirm/"
+PHOTO_URL = "/api/accounts/photo/"
 
 # 구글이 코드를 발급할 때 쓴 주소. 확인 요청에 같이 보내야 한다.
 REDIRECT_URI = "http://localhost:3000/api/auth/google/callback"
@@ -66,9 +85,29 @@ class SignUpTest(TestCase):
         self.assertTrue(user.check_password(PASSWORD))
 
     def test_password_never_appears_in_response(self):
-        res = self.signup()
+        """비밀번호 값도, 그 해시도 응답에 실리면 안 된다.
 
-        self.assertNotIn("password", res.content.decode())
+        예전에는 본문에 "password" 라는 글자가 있는지만 봤다. 그 방식은
+        has_password(비밀번호를 쓸 수 있는 계정인가) 같은 **값이 아닌**
+        필드가 생기자 곧바로 걸렸다 - 새는 것이 없는데도 빨개진다.
+
+        반대로 느슨하기도 했다. 응답이 해시를 pw 나 secret 같은 다른
+        이름으로 실어 보내면 그 검사는 통과한다. 막으려는 것은 이름이
+        아니라 값이므로, 평문과 해시를 직접 찾는다.
+        """
+        res = self.signup()
+        body = res.content.decode()
+
+        self.assertNotIn(PASSWORD, body)
+
+        # 해시도 빠져나가면 안 된다. 오프라인에서 깨볼 수 있고, 같은
+        # 비밀번호를 쓰는 다른 계정까지 위험해진다.
+        stored = User.objects.get(email="a@example.com").password
+        self.assertNotIn(stored, body)
+
+        # 해시 앞부분(알고리즘 이름)만 새도 안 된다. 통째로 비교하면
+        # 잘려 실린 경우를 놓친다.
+        self.assertNotIn(stored[:20], body)
 
     def test_rejects_duplicate_email(self):
         self.signup()
@@ -1179,3 +1218,878 @@ class DisplayNameRulesTest(TestCase):
         )
 
         self.assertTrue(name_taken("Kelvin"))
+
+
+class EmailChangeTest(TestCase):
+    """이메일 변경. 확인 링크를 눌러야 바뀐다.
+
+    여기서 봐야 할 것은 "바꿀 수 있는가" 가 아니라 **"바꿀 수 없어야 할 때
+    막히는가"** 다. 이메일은 로그인 키라, 뚫리면 계정이 통째로 넘어간다.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email="old@example.com", password=PASSWORD, display_name="주인"
+        )
+        self.token = Token.objects.create(user=self.user)
+
+    def request_change(self, **body):
+        payload = {
+            "new_email": "new@example.com",
+            "current_password": PASSWORD,
+            **body,
+        }
+        return self.client.post(
+            EMAIL_CHANGE_URL,
+            payload,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+    def confirm(self, token):
+        return self.client.post(
+            EMAIL_CHANGE_CONFIRM_URL,
+            {"token": token},
+            content_type="application/json",
+        )
+
+    def issued_token(self):
+        """신청을 한 번 하고 메일에 실린 토큰을 꺼낸다."""
+        with mock.patch("apps.accounts.views.send_account_mail") as sent:
+            self.request_change()
+        body = sent.call_args.kwargs["body"]
+        # 링크의 마지막 조각이 토큰이다.
+        return body.split("/profile/email/")[1].split()[0]
+
+    def test_신청만으로는_주소가_안_바뀐다(self):
+        """확인 전에 바뀌면 링크를 두는 의미가 없다."""
+        with mock.patch("apps.accounts.views.send_account_mail"):
+            res = self.request_change()
+
+        self.assertEqual(res.status_code, 202)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "old@example.com")
+
+    def test_확인_메일은_새_주소로_간다(self):
+        """옛 주소로 가면 새 주소의 주인임을 증명하지 못한다."""
+        with mock.patch("apps.accounts.views.send_account_mail") as sent:
+            self.request_change()
+
+        self.assertEqual(sent.call_args.kwargs["to"], "new@example.com")
+
+    def test_링크를_누르면_바뀐다(self):
+        res = self.confirm(self.issued_token())
+
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "new@example.com")
+
+    def test_비밀번호가_틀리면_메일이_안_나간다(self):
+        """자리를 비운 사이 남이 제 주소로 변경을 걸어두는 것을 막는다.
+
+        링크는 새 주소의 주인임만 증명한다. 화면 앞의 사람이 계정 주인인지는
+        비밀번호가 증명한다.
+        """
+        with mock.patch("apps.accounts.views.send_account_mail") as sent:
+            res = self.request_change(current_password="틀린비밀번호")
+
+        self.assertEqual(res.status_code, 400)
+        sent.assert_not_called()
+
+    def test_로그인_없이는_신청할_수_없다(self):
+        res = self.client.post(
+            EMAIL_CHANGE_URL,
+            {"new_email": "x@example.com", "current_password": PASSWORD},
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 401)
+
+    def test_이미_가입된_주소로는_못_바꾼다(self):
+        User.objects.create_user(
+            email="taken@example.com", password=PASSWORD, display_name="선점"
+        )
+        with mock.patch("apps.accounts.views.send_account_mail") as sent:
+            res = self.request_change(new_email="taken@example.com")
+
+        self.assertEqual(res.status_code, 400)
+        sent.assert_not_called()
+
+    def test_신청_뒤_남이_그_주소로_가입하면_거절된다(self):
+        """토큰이 유효해도 쓰는 시점에 다시 봐야 한다.
+
+        안 보면 save 가 IntegrityError 로 500 이 난다.
+        """
+        token = self.issued_token()
+        User.objects.create_user(
+            email="new@example.com", password=PASSWORD, display_name="새치기"
+        )
+
+        res = self.confirm(token)
+
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "old@example.com")
+
+    def test_묵혀둔_링크로_주소를_되돌릴_수_없다(self):
+        """a→b 링크를 받아두고 a→c 로 바꾼 뒤 b 링크를 누르는 경우.
+
+        막지 않으면 사용자가 바꾼 적 없는 주소로 계정이 옮겨간다. 그것도
+        나중에야 안다.
+        """
+        stale = self.issued_token()
+
+        # 그 사이 다른 주소로 바꾼다.
+        self.user.email = "other@example.com"
+        self.user.save(update_fields=["email"])
+
+        res = self.confirm(stale)
+
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "other@example.com")
+
+    def test_같은_링크를_두_번_쓸_수_없다(self):
+        token = self.issued_token()
+        self.assertEqual(self.confirm(token).status_code, 200)
+
+        # 두 번째는 옛 주소가 안 맞아 걸린다.
+        self.assertEqual(self.confirm(token).status_code, 400)
+
+    def test_손댄_토큰은_거절된다(self):
+        token = self.issued_token()
+
+        self.assertEqual(self.confirm(token + "x").status_code, 400)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "old@example.com")
+
+    def test_만료된_링크는_거절된다(self):
+        token = self.issued_token()
+
+        # 수명을 0 으로 두면 방금 만든 토큰도 만료로 읽힌다.
+        with mock.patch("apps.accounts.email_change.TOKEN_MAX_AGE", 0):
+            res = self.confirm(token)
+
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "old@example.com")
+
+    def test_바꾸면_다른_기기의_토큰이_끊긴다(self):
+        """이메일이 바뀌는 것은 계정 주인이 바뀔 수 있는 사건이다."""
+        other_device = Token.objects.create(
+            user=User.objects.create_user(
+                email="zzz@example.com", password=PASSWORD, display_name="남"
+            )
+        )
+        old_key = self.token.key
+
+        res = self.confirm(self.issued_token())
+
+        self.assertEqual(res.status_code, 200)
+        # 옛 토큰은 사라진다.
+        self.assertFalse(Token.objects.filter(key=old_key).exists())
+        # 새 토큰을 받아 링크를 누른 기기는 이어서 쓴다.
+        self.assertTrue(res.json()["token"])
+        # 남의 토큰까지 지우면 안 된다.
+        self.assertTrue(Token.objects.filter(key=other_device.key).exists())
+
+    def test_지금_쓰는_주소로는_못_바꾼다(self):
+        with mock.patch("apps.accounts.views.send_account_mail") as sent:
+            res = self.request_change(new_email="old@example.com")
+
+        self.assertEqual(res.status_code, 400)
+        sent.assert_not_called()
+
+    def test_구글_전용_계정은_비밀번호를_먼저_설정하라고_안내한다(self):
+        """비밀번호가 없는 계정에 "비밀번호가 틀렸다" 고만 하면 안 된다.
+
+        사용자는 만든 적 없는 비밀번호를 계속 찾게 된다.
+        """
+        google_user = User.objects.create_user(
+            email="g@example.com", password=None, display_name="구글"
+        )
+        google_token = Token.objects.create(user=google_user)
+
+        res = self.client.post(
+            EMAIL_CHANGE_URL,
+            {"new_email": "gnew@example.com", "current_password": "무엇이든"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {google_token.key}",
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("비밀번호", str(res.json()))
+
+    def test_메일이_안_나가면_실패로_알린다(self):
+        """조용히 성공으로 넘기면 사용자는 오지 않을 메일을 기다린다."""
+        with mock.patch(
+            "apps.accounts.views.send_account_mail",
+            side_effect=MailNotConfigured("설정 없음"),
+        ):
+            res = self.request_change()
+
+        self.assertEqual(res.status_code, 503)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "old@example.com")
+
+    def test_정지된_계정은_링크로_되살아나지_않는다(self):
+        """확인 경로가 새 토큰을 발급하므로 여기서 막아야 한다.
+
+        정지 직전에 신청해둔 링크가 24시간 살아 있다. 그것을 누르면
+        이메일이 바뀌고 새 토큰이 나가, 관리자가 끊은 계정이 되살아난다.
+        기존 토큰을 지우는 것으로는 못 막는다 - 이 경로가 새로 내준다.
+        """
+        token = self.issued_token()
+
+        self.user.is_active = False
+        self.user.save(update_fields=["is_active"])
+
+        res = self.confirm(token)
+
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "old@example.com")
+        self.assertNotIn("token", res.json())
+
+    def test_저장이_부딪혀도_500_이_아니다(self):
+        """검사와 저장 사이에 남이 그 주소를 가져간 경우.
+
+        위쪽 exists() 검사를 통과한 뒤 save() 에서 부딪히는 창이다. 그
+        자리를 savepoint 로 감싸지 않으면, 잡아서 400 을 돌려주려 해도
+        바깥 atomic 이 깨져 500 이 된다.
+
+        검사를 건너뛰게 만들어 그 창을 강제로 연다.
+        """
+        token = self.issued_token()
+        User.objects.create_user(
+            email="new@example.com", password=PASSWORD, display_name="새치기"
+        )
+
+        # exists() 검사만 통과시키고 save() 는 실제 DB 제약에 부딪히게 둔다.
+        with mock.patch.object(
+            User.objects, "filter", side_effect=lambda *a, **k: _NeverExists()
+        ):
+            res = self.confirm(token)
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("이미 가입된", str(res.json()))
+
+
+class _NeverExists:
+    """exists() 가 항상 False 인 가짜 queryset.
+
+    "검사는 통과했는데 저장에서 부딪히는" 창을 만들기 위한 것이다.
+    exclude 도 자기 자신을 돌려줘 체이닝을 받아낸다.
+    """
+
+    def exists(self):
+        return False
+
+    def exclude(self, *args, **kwargs):
+        return self
+
+    def delete(self):
+        return (0, {})
+
+
+class EmailChangeThrottleScopeTest(TestCase):
+    """신청과 확인이 서로 다른 통을 쓰는지.
+
+    합쳐두면 아무나 확인 엔드포인트에 쓰레기를 던져 통을 태우는 것만으로
+    **모두의 이메일 변경 신청**을 막을 수 있다. 확인 쪽은 로그인이 없어
+    통 하나를 전원이 나눠 쓰기 때문이다.
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    def test_신청과_확인이_다른_통을_쓴다(self):
+        from .throttles import EmailChangeConfirmThrottle, EmailChangeThrottle
+
+        self.assertNotEqual(
+            EmailChangeThrottle.scope, EmailChangeConfirmThrottle.scope
+        )
+
+    def test_확인_쪽_통이_더_넉넉하다(self):
+        """좁게 잡으면 그 통이 전원을 막는 스위치가 된다.
+
+        **운영 값을 읽는다.** settings 는 테스트로 돌 때 두 통을 다
+        2000/min 으로 올리므로(다른 통들과 같은 방식), 실행 중 값을 보면
+        둘이 같아 아무것도 검증하지 못한다. sys.argv 를 잠시 비워 settings
+        모듈을 운영 조건으로 다시 읽는다.
+        """
+        import importlib
+        import sys
+
+        real_argv = sys.argv
+        sys.argv = ["gunicorn"]
+        try:
+            prod = importlib.reload(
+                importlib.import_module("config.settings")
+            ).REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
+        finally:
+            sys.argv = real_argv
+            # 다른 테스트가 실행 중 값을 보므로 되돌려 놓는다.
+            importlib.reload(importlib.import_module("config.settings"))
+
+        def per_min(scope):
+            return int(prod[scope].partition("/")[0])
+
+        self.assertGreater(
+            per_min("email_change_confirm"), per_min("email_change")
+        )
+
+    def test_익명_신청은_세지_않는다(self):
+        """401 로 끝날 요청이 통을 채우면 그것이 전원을 막는다."""
+        from rest_framework.test import APIRequestFactory
+
+        from .throttles import EmailChangeThrottle
+
+        request = APIRequestFactory().post(EMAIL_CHANGE_URL)
+        request.user = None
+
+        self.assertIsNone(EmailChangeThrottle().get_cache_key(request, None))
+def _png(size=(600, 400), mode="RGB", color=(200, 80, 40)):
+    """테스트용 이미지 바이트. 실제 Pillow 가 만든 진짜 파일이다."""
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new(mode, size, color).save(out, format="PNG")
+    return out.getvalue()
+
+
+def _big_png():
+    """상한을 넘는 **진짜 사진**.
+
+    사진이 아닌 바이트를 늘려 쓰면 안 된다. 그건 상한을 지워도 "사진
+    파일을 읽을 수 없습니다" 로 거절되므로, 테스트는 통과하는데 정작
+    상한은 검사되지 않는다. 실제로 그렇게 짰다가 상한 두 곳을 모두
+    지워도 117개가 다 초록이었다.
+
+    잡음으로 채우는 이유: PNG 는 무손실 압축이라 단색으로 만들면 아무리
+    크게 잡아도 몇 KB 로 줄어든다. 잡음은 압축이 안 먹어서 픽셀 수만큼
+    커진다.
+    """
+    from PIL import Image
+
+    side = 1600
+    image = Image.frombytes("RGB", (side, side), os.urandom(side * side * 3))
+    out = io.BytesIO()
+    image.save(out, format="PNG")
+    assert len(out.getvalue()) > AVATAR_PHOTO_MAX_BYTES
+    return out.getvalue()
+
+
+def _upload(data, name="photo.png", content_type="image/png"):
+    return SimpleUploadedFile(name, data, content_type=content_type)
+
+
+class AvatarPhotoShrinkTest(TestCase):
+    """줄이는 함수 자체. 뷰를 거치지 않고 본다."""
+
+    def test_shrinks_to_square_webp(self):
+        out = shrink_avatar_photo(_png(size=(1200, 800)))
+
+        from PIL import Image
+
+        with Image.open(io.BytesIO(out)) as image:
+            self.assertEqual(image.format, "WEBP")
+            self.assertEqual(image.size, (AVATAR_PHOTO_SIZE, AVATAR_PHOTO_SIZE))
+
+    def test_result_is_much_smaller(self):
+        """원본을 그대로 넣지 않는다는 것을 값으로 확인한다.
+
+        크기를 안 줄이면 행 하나가 폰 사진만큼 커진다. 그것을 막는 것이
+        이 함수의 존재 이유라 여기서 못 박는다.
+        """
+        raw = _png(size=(2000, 2000))
+        out = shrink_avatar_photo(raw)
+
+        self.assertLess(len(out), len(raw))
+        # 256px WebP 는 넉넉히 잡아도 이 아래다.
+        self.assertLess(len(out), 100 * 1024)
+
+    def test_keeps_transparency(self):
+        """투명한 PNG 의 투명한 부분이 검게 안 변한다.
+
+        JPEG 로 저장했으면 여기가 깨진다. 형식을 WebP 로 정한 이유가
+        이것이라, 형식을 바꾸려는 사람이 이 테스트를 만나게 둔다.
+        """
+        from PIL import Image
+
+        source = io.BytesIO()
+        Image.new("RGBA", (400, 400), (255, 0, 0, 0)).save(source, format="PNG")
+
+        out = shrink_avatar_photo(source.getvalue())
+
+        with Image.open(io.BytesIO(out)) as image:
+            self.assertEqual(image.mode, "RGBA")
+            # 가운데 점이 투명한 채로 남아 있어야 한다.
+            self.assertEqual(image.convert("RGBA").getpixel((128, 128))[3], 0)
+
+    def test_rejects_non_image(self):
+        """확장자만 사진인 파일을 막는다.
+
+        Content-Type 이나 이름을 믿으면 아무 파일이나 통과한다.
+        """
+        with self.assertRaises(AvatarPhotoError):
+            shrink_avatar_photo(b"this is not a picture, just bytes" * 100)
+
+    def test_rejects_truncated_image(self):
+        """머리말만 멀쩡하고 내용이 잘린 파일도 막는다."""
+        raw = _png()
+        with self.assertRaises(AvatarPhotoError):
+            shrink_avatar_photo(raw[: len(raw) // 3])
+
+    def test_rejects_empty(self):
+        with self.assertRaises(AvatarPhotoError):
+            shrink_avatar_photo(b"")
+
+    def test_rejects_oversized(self):
+        """상한을 넘으면 Pillow 로 열기 전에 막는다.
+
+        열 수 있는 진짜 사진으로 본다. 사진이 아닌 바이트로 보면 상한이
+        없어도 "읽을 수 없다" 로 거절돼, 상한을 지워도 테스트가 통과한다.
+        """
+        with self.assertRaises(AvatarPhotoError) as caught:
+            shrink_avatar_photo(_big_png())
+
+        self.assertIn("MB", str(caught.exception))
+
+
+class AvatarPhotoUploadTest(TestCase):
+    """올리기·지우기 API."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="p@example.com", password=PASSWORD, display_name="사진사"
+        )
+        self.token = Token.objects.create(user=self.user)
+
+    def auth(self):
+        return {"HTTP_AUTHORIZATION": f"Token {self.token.key}"}
+
+    def test_upload_saves_and_selects_photo(self):
+        res = self.client.post(PHOTO_URL, {"photo": _upload(_png())}, **self.auth())
+
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.avatar_photo)
+        self.assertEqual(self.user.avatar, AVATAR_PHOTO)
+        self.assertIsNotNone(self.user.avatar_photo_at)
+        self.assertIsNotNone(self.user.avatar_photo_key)
+        # 무엇을 그릴지도 사진으로 바뀌어 있어야 한다. 이것이 안 바뀌면
+        # 사진은 올라갔는데 화면은 그대로다.
+        self.assertEqual(res.json()["avatar_display"]["type"], "photo")
+
+    def test_upload_requires_login(self):
+        res = self.client.post(PHOTO_URL, {"photo": _upload(_png())})
+
+        self.assertEqual(res.status_code, 401)
+
+    def test_upload_rejects_non_image(self):
+        evil = _upload(b"not an image at all", name="evil.jpg", content_type="image/jpeg")
+
+        res = self.client.post(PHOTO_URL, {"photo": evil}, **self.auth())
+
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.avatar_photo)
+
+    def test_upload_rejects_oversized(self):
+        """상한을 넘는 파일은 안내와 함께 거절된다.
+
+        여기도 진짜 사진이어야 한다(_big_png 주석 참고).
+        """
+        res = self.client.post(
+            PHOTO_URL, {"photo": _upload(_big_png(), name="big.png")}, **self.auth()
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("MB", str(res.json()))
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.avatar_photo)
+
+    def test_upload_stores_shrunk_bytes(self):
+        """DB 에 들어간 것이 원본이 아니라 줄인 것인지 본다."""
+        raw = _png(size=(1600, 1600))
+
+        self.client.post(PHOTO_URL, {"photo": _upload(raw)}, **self.auth())
+
+        self.user.refresh_from_db()
+        self.assertLess(len(bytes(self.user.avatar_photo)), len(raw))
+
+    def test_delete_reverts_to_avatar(self):
+        """지우면 사진도 선택도 사라진다.
+
+        선택을 안 비우면 avatar 가 photo 인 채로 남아, 사용자가 예전에
+        골라둔 아바타가 아니라 계정 고정 아바타가 나온다.
+        """
+        self.client.post(PHOTO_URL, {"photo": _upload(_png())}, **self.auth())
+
+        res = self.client.delete(PHOTO_URL, **self.auth())
+
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.avatar_photo)
+        self.assertIsNone(self.user.avatar_photo_at)
+        self.assertIsNone(self.user.avatar_photo_key)
+        self.assertEqual(self.user.avatar, "")
+        self.assertEqual(res.json()["avatar_display"]["type"], "preset")
+
+    def test_delete_keeps_chosen_preset(self):
+        """아바타를 골라둔 사람이 사진을 지워도 그 아바타는 남는다."""
+        self.client.post(PHOTO_URL, {"photo": _upload(_png())}, **self.auth())
+        self.user.refresh_from_db()
+        self.user.avatar = "a4"
+        self.user.save(update_fields=["avatar"])
+
+        self.client.delete(PHOTO_URL, **self.auth())
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.avatar, "a4")
+
+    def test_delete_requires_login(self):
+        res = self.client.delete(PHOTO_URL)
+
+        self.assertEqual(res.status_code, 401)
+
+    def test_can_switch_back_to_preset_with_photo_kept(self):
+        """사진을 남긴 채 아바타로 바꿨다가 다시 사진으로 돌아올 수 있다.
+
+        한 번 올리면 못 돌아가는 상태를 막는 것이 요구사항이다.
+        """
+        self.client.post(PHOTO_URL, {"photo": _upload(_png())}, **self.auth())
+
+        self.client.patch(
+            ME_URL, {"avatar": "a2"}, content_type="application/json", **self.auth()
+        )
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.avatar_photo)
+
+        res = self.client.patch(
+            ME_URL,
+            {"avatar": AVATAR_PHOTO},
+            content_type="application/json",
+            **self.auth(),
+        )
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["avatar_display"]["type"], "photo")
+
+    def test_cannot_select_photo_without_one(self):
+        """사진이 없는데 올린 사진을 고르면 막힌다."""
+        res = self.client.patch(
+            ME_URL,
+            {"avatar": AVATAR_PHOTO},
+            content_type="application/json",
+            **self.auth(),
+        )
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_me_does_not_carry_photo_bytes(self):
+        """/me/ 응답에 그림 바이트가 실리지 않는다.
+
+        이 응답은 화면을 그릴 때마다 불린다. base64 로 실으면 매번 수십
+        KB 가 오간다. 주소만 나가는지 본다.
+        """
+        self.client.post(PHOTO_URL, {"photo": _upload(_png())}, **self.auth())
+
+        res = self.client.get(ME_URL, **self.auth())
+
+        body = res.json()
+        self.assertNotIn("avatar_photo", body)
+        self.assertNotIn("avatar_photo_key", body)
+        self.assertTrue(body["uploaded_photo"].startswith("/api/accounts/photo/"))
+        # 응답 전체가 작아야 한다. 그림이 섞이면 이 선을 훌쩍 넘는다.
+        self.assertLess(len(res.content), 2000)
+
+
+class AvatarPhotoFileTest(TestCase):
+    """그림을 내려주는 엔드포인트."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="f@example.com", password=PASSWORD, display_name="주인"
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.client.post(
+            PHOTO_URL,
+            {"photo": _upload(_png())},
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.user.refresh_from_db()
+        self.url = f"/api/accounts/photo/{self.user.avatar_photo_key}/"
+
+    def test_serves_webp_without_login(self):
+        """로그인 없이 열린다. 순위표가 남의 아바타를 그린다."""
+        res = self.client.get(self.url)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "image/webp")
+        self.assertTrue(res.content.startswith(b"RIFF"))
+
+    def test_address_is_not_the_user_id(self):
+        """주소에 pk 가 안 들어간다.
+
+        pk 면 1번부터 눌러보는 것만으로 사진 올린 계정을 전부 훑을 수
+        있다. 그것을 막으려고 UUID 로 둔 것이라, 주소 형태가 도로
+        연번이 되면 방어가 사라진다.
+        """
+        self.assertNotIn(f"/{self.user.pk}/", self.user.avatar_photo_url)
+        self.assertIn(str(self.user.avatar_photo_key), self.user.avatar_photo_url)
+
+    def test_user_id_in_the_address_does_not_work(self):
+        """pk 를 넣어 부르면 안 열린다."""
+        res = self.client.get(f"/api/accounts/photo/{self.user.pk}/")
+
+        self.assertEqual(res.status_code, 404)
+
+    def test_old_address_dies_when_photo_changes(self):
+        """사진을 바꾸면 옛 주소가 죽는다.
+
+        값을 고정하면 옛 주소를 아는 사람이 바뀐 사진도 계속 본다.
+        """
+        old_url = self.url
+
+        self.client.post(
+            PHOTO_URL,
+            {"photo": _upload(_png(color=(10, 200, 90)))},
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        self.user.refresh_from_db()
+        self.assertNotEqual(
+            f"/api/accounts/photo/{self.user.avatar_photo_key}/", old_url
+        )
+        self.assertEqual(self.client.get(old_url).status_code, 404)
+
+    def test_repeats_are_not_resent(self):
+        """같은 그림을 두 번 내려보내지 않는다."""
+        first = self.client.get(self.url)
+
+        again = self.client.get(self.url, HTTP_IF_NONE_MATCH=first["ETag"])
+
+        self.assertEqual(again.status_code, 304)
+        self.assertEqual(again.content, b"")
+
+    def test_etag_follows_the_timestamp(self):
+        """ETag 가 올린 시각을 따라간다.
+
+        사진을 바꾸면 주소 자체가 달라지므로(avatar_photo_key) 캐시는
+        그쪽에서 이미 깨진다. 여기서 보는 것은 **같은 주소**에서 내용이
+        달라지는 경우다 - 값이 안 따라오면 304 를 잘못 내보낸다.
+        """
+        first = self.client.get(self.url)["ETag"]
+
+        # 시각이 초 단위라 같은 초에 두 번 올리면 값이 같다. 직접 옮긴다.
+        self.user.avatar_photo_at = self.user.avatar_photo_at + timedelta(seconds=5)
+        self.user.save(update_fields=["avatar_photo_at"])
+
+        self.assertNotEqual(self.client.get(self.url)["ETag"], first)
+
+    def test_unknown_key_is_404(self):
+        res = self.client.get(f"/api/accounts/photo/{uuid.uuid4()}/")
+
+        self.assertEqual(res.status_code, 404)
+
+    def test_malformed_key_is_404(self):
+        """UUID 가 아닌 값은 경로에서 걸러진다."""
+        res = self.client.get("/api/accounts/photo/999999/")
+
+        self.assertEqual(res.status_code, 404)
+
+    def test_key_is_gone_after_delete(self):
+        """지우면 주소 값도 사라져 그 주소가 죽는다."""
+        old_url = self.url
+
+        self.client.delete(PHOTO_URL, HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.avatar_photo_key)
+        self.assertEqual(self.client.get(old_url).status_code, 404)
+
+    def test_inactive_user_photo_is_hidden(self):
+        """탈퇴한 계정의 사진은 주소로도 안 열린다.
+
+        순위표에서는 사라졌는데 주소로는 계속 열리면 지운 것이 아니다.
+        """
+        self.user.is_active = False
+        self.user.save(update_fields=["is_active"])
+
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+
+    def test_dead_token_still_gets_the_image(self):
+        """쿠키에 죽은 토큰이 있어도 그림은 온다.
+
+        인증을 켜두면 여기서 401 이 나고, 화면은 그림만 안 뜬다.
+        """
+        res = self.client.get(self.url, HTTP_AUTHORIZATION="Token dead-token-9999")
+
+        self.assertEqual(res.status_code, 200)
+
+
+class AvatarDisplayPhotoTest(TestCase):
+    """무엇을 그릴지 정하는 규칙에 사진이 끼어든 뒤."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="d@example.com", password=PASSWORD, display_name="규칙"
+        )
+
+    def _give_photo(self):
+        self.user.avatar_photo = b"x"
+        self.user.avatar_photo_key = uuid.uuid4()
+        self.user.avatar_photo_at = timezone.now()
+        self.user.save(
+            update_fields=["avatar_photo", "avatar_photo_key", "avatar_photo_at"]
+        )
+
+    def test_photo_wins_over_google_when_nothing_chosen(self):
+        """아무것도 안 골랐으면 올린 사진이 구글 사진보다 앞선다."""
+        self.user.google_picture = "https://example.com/g.png"
+        self.user.save(update_fields=["google_picture"])
+        self._give_photo()
+
+        shown = self.user.avatar_display
+
+        self.assertEqual(shown["type"], "photo")
+        self.assertIn("/api/accounts/photo/", shown["url"])
+
+    def test_chosen_preset_wins_over_photo(self):
+        """아바타를 골라뒀으면 사진이 있어도 그 아바타가 나온다."""
+        self._give_photo()
+        self.user.avatar = "a5"
+        self.user.save(update_fields=["avatar"])
+
+        self.assertEqual(self.user.avatar_display, {"type": "preset", "key": "a5"})
+
+    def test_falls_back_when_photo_is_gone(self):
+        """사진을 고른 채 사진이 없어져도 화면이 비지 않는다."""
+        self.user.avatar = AVATAR_PHOTO
+        self.user.save(update_fields=["avatar"])
+
+        self.assertEqual(self.user.avatar_display["type"], "preset")
+
+    def test_url_changes_when_photo_changes(self):
+        """사진을 바꾸면 주소도 바뀐다. 안 바뀌면 옛 그림이 남는다."""
+        self._give_photo()
+        first = self.user.avatar_display["url"]
+
+        self._give_photo()
+
+        self.assertNotEqual(self.user.avatar_display["url"], first)
+
+
+class AuthQueryWeightTest(TestCase):
+    """인증이 사진 바이트를 끌고 오지 않는지.
+
+    models.py 의 avatar_photo 주석이 "어느 질의에도 안 실어서 푼다" 고
+    적어뒀는데, 그 불변식이 실제로 서는지 보는 자리다.
+
+    **응답 크기로는 못 잡는다.** 이미 있는 test_me_does_not_carry_photo_bytes
+    는 JSON 이 작은지만 보는데, 직렬화에서 빠져도 DB 에서 앱까지는 이미
+    실려온 뒤다. 그래서 질의문 자체를 본다.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="weight@example.com", password=PASSWORD, display_name="무게"
+        )
+        self.token = Token.objects.create(user=self.user)
+
+    def test_인증_질의가_사진_칸을_안_읽는다(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx:
+            res = self.client.get(
+                ME_URL, HTTP_AUTHORIZATION=f"Token {self.token.key}"
+            )
+        self.assertEqual(res.status_code, 200)
+
+        auth_queries = [
+            q["sql"] for q in ctx.captured_queries if "authtoken_token" in q["sql"]
+        ]
+        self.assertTrue(auth_queries, "토큰 조회 질의를 못 찾았다")
+
+        # **부분일치로 보면 안 된다.** avatar_photo_key 와 avatar_photo_at
+        # 은 읽어도 되는 칸인데 이름이 avatar_photo 로 시작해서 함께 걸린다.
+        # 따옴표까지 붙여 그 칸 하나만 본다.
+        for sql in auth_queries:
+            self.assertNotIn(
+                '"avatar_photo"',
+                sql,
+                "인증 질의가 사진 바이트를 읽는다. 로그인한 사람의 모든 "
+                "요청이 그 무게를 진다.",
+            )
+
+    def test_사진이_있어도_마찬가지다(self):
+        """빈 칸이라 안 읽히는 것처럼 보이는 경우를 배제한다."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self.user.avatar_photo = b"x" * 5000
+        self.user.save(update_fields=["avatar_photo"])
+
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+        for q in ctx.captured_queries:
+            if "authtoken_token" in q["sql"]:
+                self.assertNotIn('"avatar_photo"', q["sql"])
+
+
+class AvatarPhotoBombTest(TestCase):
+    """압축이 잘 되는 큰 그림을 막는지.
+
+    바이트 상한만으로는 안 막힌다. 같은 색으로 채운 12000x12000 은 픽셀이
+    1.4억인데 PNG 로 440KB 밖에 안 돼서 5MB 검사를 지나간다. 그대로 펼치면
+    0.5GB 를 쓴다.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="bomb@example.com", password=PASSWORD, display_name="폭탄"
+        )
+        self.token = Token.objects.create(user=self.user)
+
+    def _png(self, w, h):
+        import io as _io
+
+        from PIL import Image
+
+        buf = _io.BytesIO()
+        Image.new("RGB", (w, h), (10, 20, 30)).save(buf, "PNG")
+        return buf.getvalue()
+
+    def _upload(self, data):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return self.client.post(
+            "/api/accounts/photo/",
+            {"photo": SimpleUploadedFile("x.png", data, content_type="image/png")},
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+    def test_픽셀이_많으면_거절한다(self):
+        """Pillow 가 경고만 내고 통과시키는 구간(한계의 1~2배)."""
+        data = self._png(12000, 12000)
+
+        # 바이트 상한은 통과하는 크기라야 이 테스트가 의미가 있다.
+        self.assertLess(len(data), AVATAR_PHOTO_MAX_BYTES)
+
+        res = self._upload(data)
+
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.avatar_photo_key)
+
+    def test_평범한_사진은_통과한다(self):
+        """상한이 실제 사진까지 막으면 안 된다."""
+        res = self._upload(self._png(1200, 900))
+
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.avatar_photo_key)

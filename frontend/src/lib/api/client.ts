@@ -14,8 +14,13 @@
  * 모듈 최상위에서 읽으면 빌드 시점 값이 그대로 굳어, 배포 플랫폼이 런타임에
  * 넣어주는 값을 못 받는다. 그러면 프로덕션에서 조용히 127.0.0.1 을 치고
  * "서버에 연결할 수 없습니다"만 뜬다.
+ *
+ * export 인 이유: 파일 업로드(lib/api/accounts.ts)는 multipart 경계를
+ * fetch 가 지어야 해서 아래 request() 를 못 쓴다. 그쪽에서 주소만
+ * 다시 읽으면 위의 규칙(요청 시점에 읽기, 프로덕션에서는 없으면
+ * 던지기)이 두 곳으로 갈라진다.
  */
-function apiBase(): string {
+export function apiBase(): string {
   const url = process.env.API_URL;
   if (url) return url;
 

@@ -227,6 +227,10 @@ def _row(rank: int, item: dict, *, me_pk: int | None) -> Row:
         display_name=item.get("user__display_name") or "",
         avatar=item.get("user__avatar") or "",
         google_picture=item.get("user__google_picture") or "",
+        # 올린 사진의 주소 값. 없으면 None 이고 avatar_display 가 아바타로
+        # 떨어진다. 위 .values() 목록에서 이 칸을 빼면 사진 올린 사람이
+        # 순위표에서만 다른 그림으로 뜬다 - 화면이 비지 않아서 안 드러난다.
+        avatar_photo_key=item.get("user__avatar_photo_key"),
     )
 
     return Row(
@@ -277,7 +281,11 @@ def _best_by_user(rounds: QuerySet) -> QuerySet:
     """
     return (
         rounds.values(
-            "user", "user__display_name", "user__avatar", "user__google_picture"
+            "user",
+            "user__display_name",
+            "user__avatar",
+            "user__google_picture",
+            "user__avatar_photo_key",
         )
         .annotate(
             score=Max("score"),
@@ -310,7 +318,13 @@ def _streak_by_user(days: QuerySet, *, only_scored: bool = True) -> QuerySet:
     """
     rows = (
         days.annotate(_day_total=_DAY_TOTAL)
-        .values("user", "user__display_name", "user__avatar", "user__google_picture")
+        .values(
+            "user",
+            "user__display_name",
+            "user__avatar",
+            "user__google_picture",
+            "user__avatar_photo_key",
+        )
         .annotate(
             score=Sum("_day_total"),
             # 동점이면 활동한 날이 많은 쪽이 위. 같은 점수를 더 여러 날에

@@ -100,6 +100,56 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
 
 
+# 확인 링크가 가리킬 곳. 백엔드가 아니라 **화면(Next)** 주소다.
+#
+# 요청 헤더(Host)에서 뽑지 않는다. 그 값은 보내는 쪽이 지어낼 수 있어서,
+# 남의 주소가 박힌 확인 링크를 우리 이름으로 발송하는 통로가 된다. 받는
+# 사람은 devvoca 가 보낸 메일이라 믿고 누른다.
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
+
+# 메일 발송.
+#
+# 이메일 변경이 본인 확인을 메일로 하기 때문에 필요하다. 없으면 그 기능만
+# 못 쓰는 것이 아니라, 확인 링크가 안 가는데 화면은 "보냈습니다" 라고
+# 말하는 상태가 된다 - 사용자는 스팸함만 뒤지게 된다.
+#
+# 서비스를 코드에 박지 않고 환경변수로 갈아끼우게 둔다. 지금은 Gmail SMTP
+# 지만 하루 500통 제한이 있어, 사용자가 늘면 전용 서비스로 옮겨야 한다.
+# 그때 고칠 곳이 .env 하나가 되도록 한다.
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+
+# Gmail 은 계정 비밀번호가 아니라 앱 비밀번호를 받는다. 2단계 인증을 켠 뒤
+# 발급하는 16자리다. 계정 비밀번호를 넣으면 인증이 거절된다.
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+
+# 받는 사람에게 보이는 주소. 보내는 계정과 다르면 Gmail 이 거절하거나
+# 스팸으로 분류하므로 기본값을 보내는 계정으로 둔다.
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+
+# 메일이 실제로 나가는지 여부.
+#
+# 계정이 설정돼 있으면 SMTP 로 보내고, 없으면 콘솔에 찍는다. 개발할 때
+# 앱 비밀번호 없이도 확인 링크를 볼 수 있어야 하기 때문이다.
+#
+# **여기서 기동을 막지 않는다.** SECRET_KEY 처럼 없으면 죽게 만들고 싶지만,
+# CI 는 운영과 같은 조건(DEBUG=False)으로 `manage.py check` 와
+# `makemigrations --check` 를 돌린다. 기동에서 막으면 메일과 무관한 그
+# 두 단계가 먼저 깨져, 앱 비밀번호를 CI 비밀값에 넣어야만 초록이 된다.
+# 테스트에 쓰지도 않는 실제 발송 계정을 CI 에 두는 것은 맞바꿀 것이 아니다.
+#
+# 대신 **보내는 자리에서 막는다**(apps/accounts/mail.py). 운영에서 계정이
+# 비어 있으면 메일을 보내려는 순간 오류가 나고, 화면은 "메일을 보낼 수 없다"
+# 고 정확히 말한다. 조용히 콘솔로 떨어져 사용자가 스팸함을 뒤지는 상황만
+# 막으면 되고, 그것은 발송 시점에 막는 것으로 충분하다.
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -303,7 +353,10 @@ REST_FRAMEWORK = {
     # 세션도 남겨두는 이유: Admin 화면과 DRF 의 브라우저 화면이 세션으로
     # 동작한다. 빼면 브라우저에서 API 를 눌러볼 수 없다.
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        # 기본 TokenAuthentication 이 아니다. 그건 사용자 행을 통째로 읽어
+        # 프로필 사진 바이트까지 딸려오는데, 그러면 로그인한 사람의 모든
+        # 요청이 그 무게를 진다. 이유는 그 클래스 주석에 적어뒀다.
+        "apps.accounts.authentication.SlimTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     # 속도 제한은 여기 두지 않는다. 이 구조에서는 오히려 해가 된다.
@@ -337,6 +390,23 @@ REST_FRAMEWORK = {
         # 그래서 실제 사용량보다 훨씬 넉넉하게 잡는다 - 여기서 재는 것은
         # 개인의 시도 횟수가 아니라 우리 서버가 구글을 두드리는 총량이다.
         "auth_google": "2000/min" if sys.argv[1:2] == ["test"] else "120/min",
+        # 이메일 변경 신청. 확인 메일이 나가는 자리라 낮게 잡는다 - 반복해서
+        # 신청하면 우리 이름으로 남의 메일함을 채우는 통로가 된다. 계정별로
+        # 세고, 주소를 바꾸는 일은 계정당 아주 가끔이라 좁아서 불편할 일이 없다.
+        "email_change": "2000/min" if sys.argv[1:2] == ["test"] else "5/min",
+        # 확인 링크를 쓰는 쪽은 로그인이 없어 통 하나를 모두가 나눠 쓴다.
+        # 좁게 잡으면 아무나 그 통을 태워 전원을 막는 스위치가 되므로 넉넉히
+        # 잡는다(이유는 apps.accounts.throttles 에 적어뒀다). 서명을 맞히는
+        # 것은 이 정도 횟수로 될 일이 아니라 무차별 시도는 그대로 막힌다.
+        "email_change_confirm": "2000/min" if sys.argv[1:2] == ["test"] else "120/min",
+        # 비밀번호 변경. 현재 비밀번호를 대조하는 자리라 반복해서 찔러볼 수
+        # 있다. 로그인 통(auth_email)과 따로 두는 이유는 세는 단위가 달라서다 -
+        # 저쪽은 이메일, 여기는 이미 로그인한 계정이다.
+        "password_change": "2000/min" if sys.argv[1:2] == ["test"] else "5/min",
+        # 사진 올리기. 요청 하나가 5MB 를 받아 Pillow 로 열고 줄이는,
+        # 이 앱에서 제일 비싼 자리다. 사람이 프로필 사진을 고르는 일은
+        # 몇 번 안 되므로 스무 번이면 넉넉하다.
+        "avatar_photo": "2000/min" if sys.argv[1:2] == ["test"] else "20/min",
         # 판은 로그인한 사람을 계정별로 가른다(apps.learning.throttles 참고).
         # 90초짜리 판이라 열고 닫기는 한 사람당 분당 하나꼴이면 충분하다.
         "round_start": "2000/min" if sys.argv[1:2] == ["test"] else "60/min",
