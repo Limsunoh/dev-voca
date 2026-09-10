@@ -13,7 +13,7 @@ from rest_framework.permissions import (
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import LearningItem, Sentence, Word
+from .models import DailyPhrase, LearningItem, Sentence, Word
 from .quiz import (
     TARGET_SENTENCE,
     TARGET_WORD,
@@ -31,7 +31,19 @@ from .serializers import (
     SentenceListSerializer,
     WordDetailSerializer,
     WordListSerializer,
+    visible_reading,
 )
+from .talk import (
+    KIND_DEV,
+    KIND_PHRASE,
+    KIND_WORD,
+    clean_heard,
+    is_speakable,
+    sign,
+    unsign,
+)
+from .talk import grade as grade_heard
+from .throttles import TalkGradeThrottle, TalkQuestionThrottle
 
 
 def can_review(user) -> bool:
@@ -599,3 +611,156 @@ class SentenceViewSet(LearningItemViewSet):
                 **body,
             }
         )
+
+
+class TalkViewSet(viewsets.ViewSet):
+    """소리내어 읽기(일상영어).
+
+    **음성이 서버로 오지 않는다.** 브라우저가 음성을 텍스트로 바꿔 그
+    텍스트만 보낸다. 저장소·비용·생체정보 문제가 없고, Claude API 를
+    부르지 않으므로 사용자 경로 AI 금지와도 부딪히지 않는다.
+
+    무엇을 재고 무엇을 못 재는지는 talk.py 머리에 적어뒀다. 요약하면
+    **발음이 아니라 철자를 잰다** - 인식기가 그 단어로 알아들었는지를
+    본다. 사용자가 그 한계를 알고 안고 가기로 결정했다.
+
+    ModelViewSet 이 아니라 ViewSet 인 이유: 목록·상세·쓰기가 없다.
+    읽을 것을 하나 받고 채점하는 두 동작뿐이라 라우터가 만드는 CRUD 가
+    전부 죽은 경로가 된다.
+
+    로그인 없이 쓸 수 있다. 점수·순위표에 안 들어가므로 막을 이유가 없고,
+    발음 연습은 게스트가 먼저 해보고 판단할 성질이다.
+    """
+
+    permission_classes = [AllowAny]
+
+    @action(detail=False, throttle_classes=[TalkQuestionThrottle])
+    def question(self, request: Request) -> Response:
+        """읽을 것 하나를 낸다.
+
+        ?kind=dev       개발 용어에서 낸다. 없으면 일상 표현
+        ?exclude=1,2,3  방금 낸 것을 다시 내지 않는다
+
+        **약어·숫자·기호는 출제하지 않는다.** 소리로 채점할 수 없어서다
+        (talk.is_speakable). 개발 용어 566개 중 361개만 나온다.
+
+        그 필터를 SQL 로 옮기지 않고 파이썬에서 도는 이유: 판정이 "낱말로
+        쪼개 각 낱말이 전부 대문자인지" 라 SQL 로 옮기면 정규식 세 개가
+        되고, 그것이 DB 엔진마다 다르게 동작한다. 566행은 통째로 읽어도
+        싸다.
+        """
+        if request.query_params.get("kind") == KIND_DEV:
+            kind, model, field = KIND_WORD, Word, "term"
+        else:
+            kind, model, field = KIND_PHRASE, DailyPhrase, "text"
+
+        exclude = _parse_ids(request.query_params.get("exclude", ""))
+        pool = model.objects.visible().exclude(pk__in=exclude)
+
+        # 소리로 채점할 수 있는 것만 남긴다. values_list 로 두 칸만 읽어
+        # 필터한 뒤 pk 로 다시 꺼낸다 - 전 항목을 객체로 만들 이유가 없다.
+        speakable = [
+            pk
+            for pk, text in pool.values_list("pk", field)
+            if is_speakable(text)
+        ]
+        if not speakable:
+            # 다 봤거나 exclude 가 풀을 비웠다. 화면이 "다 봤습니다" 를
+            # 그리고 다른 갈래로 가는 길을 둔다.
+            return Response(
+                {"detail": "읽을 것을 다 봤습니다. 잠시 뒤 다시 시작해보세요."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        item = model.objects.get(pk=random.choice(speakable))
+        text = getattr(item, field)
+
+        return Response(
+            {
+                # 정답을 토큰에 담아 서명한다. 화면이 미리 알 수 없고
+                # 서버도 세션을 저장하지 않는다.
+                "token": sign(item.pk, kind),
+                # 방금 낸 것을 화면이 기억했다가 exclude 로 되돌려주기
+                # 위해서다. 없으면 화면이 뺄 값을 몰라 같은 것이 계속
+                # 나온다 - 표현이 60개뿐이라 열 번에 절반은 겹친다.
+                #
+                # 정답이 새지 않는다. 이 값으로 목록 API 를 조회하면
+                # 뜻은 볼 수 있지만, 애초에 화면이 뜻을 함께 받고 있고
+                # 점수가 안 남는 연습이라 얻을 것이 없다.
+                "id": item.pk,
+                # 무엇을 읽는 것인가. 화면이 배지로 그린다.
+                "kind": kind,
+                # 낱말이든 표현이든 같은 칸이다. 화면이 길이만 감당하면
+                # 된다(최장 6낱말).
+                "term": text,
+                "pronunciation": item.pronunciation,
+                # **검수된 발음만 내보낸다.** 시리얼라이저를 안 쓰는 자리라
+                # 게이트를 손으로 태워야 한다 - item.reading 을 그대로 쓰면
+                # AI 가 채운 미검수 표기가 나가고, 이 화면은 그것을 본보기로
+                # 제시하며 따라 읽으라고 시킨다.
+                "reading": visible_reading(item),
+                "meaning": item.meaning,
+            }
+        )
+
+    @action(detail=False, methods=["post"], throttle_classes=[TalkGradeThrottle])
+    def grade(self, request: Request) -> Response:
+        """읽은 것이 맞았는지 알려준다.
+
+        POST 인 이유는 quiz 쪽과 같다 - 토큰을 URL 에 실으면 브라우저
+        기록과 서버 로그에 남는다.
+
+        **빈 목록은 정상이다.** 아무 소리도 안 났거나 인식이 실패한
+        경우이고, 그것도 결과("안 들렸다")가 있어야 화면이 그린다.
+        400 으로 막으면 그 상태를 표현할 방법이 없다.
+
+        서버는 "소리는 났는데 인식이 실패한 것" 과 "아무 소리도 안 난 것"
+        을 구분할 수 없다 - 텍스트만 오기 때문이다. 그 구분은 화면이
+        인식기 에러 코드로 한다.
+        """
+        if not isinstance(request.data, dict):
+            return Response(
+                {"detail": "요청 형식이 올바르지 않습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        token = request.data.get("token")
+        if not isinstance(token, str):
+            return Response(
+                {"detail": "문제 정보가 올바르지 않습니다. 새로 받아주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        heard = clean_heard(request.data.get("heard"))
+        if heard is None:
+            # 길이 초과나 형식 오류. **자르지 않고 막는다** - 잘라서
+            # 채점하면 사용자는 왜 틀렸는지 모른다.
+            return Response(
+                {"detail": "인식 결과가 올바르지 않습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        unsigned = unsign(token)
+        if unsigned is None:
+            return Response(
+                {"detail": "문제 정보가 올바르지 않습니다. 새로 받아주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        item_id, kind = unsigned
+        # 토큰에 담은 종류로 표를 고른다. 이것이 없으면 id 가 같은 엉뚱한
+        # 행을 정답이라고 띄운다 - 단어·문장 채점에서 실제로 났던 구멍이다.
+        model, field = (
+            (Word, "term") if kind == KIND_WORD else (DailyPhrase, "text")
+        )
+
+        # visible() 로 다시 거른다. 토큰을 받은 뒤 검수가 취소되면 그
+        # 항목은 더 이상 내보낼 것이 아니다.
+        item = model.objects.visible().filter(pk=item_id).first()
+        if item is None:
+            return Response(
+                {"detail": "문제 정보가 올바르지 않습니다. 새로 받아주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(grade_heard(heard, getattr(item, field)))

@@ -297,3 +297,126 @@ class Sentence(LearningItem):
         # 문장은 길어서 통째로 찍으면 Admin 목록이 읽기 어려워진다.
         head = self.text if len(self.text) <= 40 else f"{self.text[:40]}..."
         return f"[{self.get_kind_display()}] {head}"
+
+
+class PhraseScene(models.TextChoices):
+    """일상 표현을 쓰는 상황.
+
+    LearningItem.Category 를 안 쓰는 이유: 그쪽 여덟 개가 전부 개발 분류
+    (git·api·devops...)다. 거기에 "식당" 을 더하면 단어장 필터에도 그 항목이
+    생기는데, 개발 단어를 보는 화면에 쓸 일이 없는 선택지가 늘어난다.
+
+    모델 안에 중첩하지 않는 이유는 SentenceKind 와 같다 - Meta 의
+    CheckConstraint 가 참조할 수 없다.
+
+    **처음부터 다 만들지 않는다.** 60개에 실제로 쓰는 것만 두고, 표현이
+    늘어 담을 곳이 없을 때 더한다. 미리 만들어두면 비어 있는 분류가
+    화면 필터에 뜬다.
+    """
+
+    GREETING = "greeting", "인사·소개"
+    SHOPPING = "shopping", "쇼핑·주문"
+    ASKING = "asking", "묻기·길찾기"
+    TROUBLE = "trouble", "곤란할 때"
+    SMALLTALK = "smalltalk", "가벼운 대화"
+
+
+class DailyPhrase(LearningItem):
+    """일상 영어 표현 하나. 소리내어 말하는 연습에 쓴다.
+
+    **Word 에 섞지 않고 표를 따로 두는 이유는 취향이 아니라 못 하기
+    때문이다.** Word.term 이 unique=True 인데, 일상 영어의 기초 낱말이
+    이미 개발 용어로 등록돼 있다 - 흔히 쓰는 32개를 세어보니 16개가
+    충돌했다(commit·branch·cache·merge·push·pull·deploy·key·index·view·
+    state·queue·stack·thread·port·token). 일상 영어 "commit(약속하다)" 을
+    넣을 자리가 없다.
+
+    unique 를 푸는 쪽도 검토했다. 안 되는 이유: 씨드 명령 넷과
+    mark_exam_scope·generate_words 가 filter(term=...)·get_or_create(term=...)
+    로 term 을 키처럼 쓴다. 제약을 풀면 그것들이 에러 없이 엉뚱한 행을
+    집는다 - 오동작이라 한참 뒤에야 드러난다.
+
+    두 번째 이유는 보기(오답) 풀이다. quiz.py 의 _pick_distractors 가 같은
+    분류에서 먼저 뽑고 모자라면 **전체 풀에서** 채운다. 한 표에 두 종류가
+    있으면 개발 용어 문제에 일상 표현 오답이 섞여 답이 뻔해진다.
+
+    **낱말 하나가 아니라 표현이다.** "화장실이 어디예요" 를 못 말하는 것이
+    일상 영어에서 막히는 지점이고, restroom 을 낱개로 외우는 것은 단어장이
+    이미 하는 일이다. 그래서 text 에 여러 낱말이 들어온다.
+
+    **정처기 필드(is_exam·exam_subject)는 이 표에서 안 쓴다.** LearningItem
+    에서 물려받는 것이라 칸은 생기지만 항상 비어 있다. 상속의 대가로
+    받아들였다 - 그 두 칸 때문에 추상을 하나 더 만들 이유는 안 된다.
+    아래 CheckConstraint 가 값이 들어오는 것을 막는다.
+    """
+
+    # 낱말이 아니라 표현이라 term 이 아니라 text 다. Sentence 와 같은 이름을
+    # 쓰는 이유는 둘 다 여러 낱말이기 때문이고, 그래서 채점도 낱말 단위다.
+    #
+    # unique=True 를 그대로 둔다. 같은 표현을 두 번 넣을 이유가 없고,
+    # Word 와 다른 표라 개발 용어와는 안 부딪힌다.
+    text = models.CharField("영어 표현", max_length=120, unique=True)
+
+    # 상황. Category 를 안 쓰는 이유는 PhraseScene 주석에 있다.
+    #
+    # blank 를 허용하는 것은 Word.category 와 같은 이유다 - 아직 상황을
+    # 못 정한 표현을 Admin 에서 받을 수 있어야 한다.
+    scene = models.CharField(
+        "상황", max_length=20, blank=True, choices=PhraseScene.choices
+    )
+
+    # IPA. **전체를 슬래시로 한 번만** 감싸고 안쪽은 낱말마다 공백으로
+    # 끊는다. 개발 용어 361개가 전부 이 모양이라 두 갈래가 같아지고,
+    # 화면이 갈래를 안 보고 같은 코드로 그린다.
+    #
+    # 낱말 경계가 필요한 이유: 화면이 wrong_at 으로 받은 자리를 강조하려면
+    # text·pronunciation·reading 셋의 낱말 수가 같아야 한다.
+    #
+    # Word 와 달리 비워두지 않는다. 발음 연습이 이 표의 존재 이유이고,
+    # 화면이 본보기를 IPA·한글발음으로 그린다(합성 음성이 없는 기계가
+    # 있어서 "들어보기" 를 주된 장치로 못 쓴다). 비면 그 갈래에서 본보기가
+    # 사라지므로 아래 제약으로 막는다.
+    pronunciation = models.CharField("발음기호", max_length=200)
+
+    # 한글만 읽어도 통하게 적은 발음. 규칙은 Word.reading 과 같고, 강세를
+    # ** 로 감싼다(Reading 컴포넌트가 그것으로 굵게 그린다).
+    #
+    # **강세는 낱말 안에서 닫는다.** 공백을 걸치면(`**쏘r s**`) 공백으로
+    # 세는 낱말 수가 어긋나 화면이 강조를 포기한다 - 개발 용어의
+    # source map 이 실제로 그 상태다.
+    reading = models.CharField("한글 발음", max_length=200)
+
+    meaning = models.CharField("한글 뜻", max_length=200)
+
+    class Meta:
+        verbose_name = "일상 표현"
+        verbose_name_plural = "일상 표현"
+        ordering = ["text"]
+        indexes = [
+            # 출제가 항상 검수된 것만 보므로 Word 와 같은 모양으로 둔다.
+            models.Index(fields=["is_reviewed", "text"]),
+        ]
+        constraints = [
+            # choices 를 DB 에서도 막는다. 이유는 Word 쪽 주석과 같다 -
+            # update_or_create·bulk_create 는 full_clean 을 안 타서
+            # 목록에 없는 값이 그냥 저장되고, 화면에서 조용히 깨진다.
+            models.CheckConstraint(
+                condition=models.Q(scene__in=[*PhraseScene.values, ""]),
+                name="%(app_label)s_%(class)s_scene_valid",
+            ),
+            # 발음이 비면 화면에 본보기가 없다. blank=False 는 폼에서만
+            # 걸리므로 여기서도 막는다.
+            models.CheckConstraint(
+                condition=~models.Q(pronunciation="") & ~models.Q(reading=""),
+                name="%(app_label)s_%(class)s_needs_pronunciation",
+            ),
+            # 이 표는 정처기와 무관하다. 값이 들어오면 Admin 에서 정처기
+            # 범위처럼 보이는데 화면 어디에도 안 나온다.
+            models.CheckConstraint(
+                condition=models.Q(is_exam=False) & models.Q(exam_subject=""),
+                name="%(app_label)s_%(class)s_not_exam",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.text

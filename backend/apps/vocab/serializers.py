@@ -3,6 +3,33 @@ from rest_framework import serializers
 from .models import LearningItem, Sentence, Word
 
 
+def visible_reading(instance, field_name: str = "reading") -> str:
+    """검수된 한글 발음만 돌려준다. 아니면 빈 문자열.
+
+    **이 규칙이 사는 유일한 자리다.** 아래 ReviewedReadingField 도 이것을
+    부르고, 시리얼라이저를 안 쓰는 곳(apps.vocab.views 의 TalkViewSet 처럼
+    응답 dict 를 손으로 만드는 자리)도 이것을 부른다.
+
+    함수로 뺀 이유: 예전에는 규칙이 필드 클래스 안에만 있어서, 시리얼라이저를
+    거치지 않는 응답이 생기면 그 자리만 게이트를 통째로 빠져나갔다. 실제로
+    말하기 API 가 그렇게 새어 있었다 - 검수된 단어에 AI 가 채운 미검수 발음이
+    붙어 있으면 그것을 본보기로 제시하며 따라 읽으라고 시킨다.
+
+    reading_reviewed 가 없는 모델(DailyPhrase 처럼 사람이 손으로 쓴 것)은
+    검수된 것으로 본다. 없는 칸을 False 로 읽으면 발음이 통째로 사라진다.
+    """
+    if not getattr(instance, "reading_reviewed", True):
+        return ""
+
+    # 칸 이름에는 기본값을 두지 않는다. 오타가 나면 그 자리에서 터져야
+    # 한다 - 기본값을 주면 빈 문자열이 돌아가는데, 그것은 "미검수라 가렸다"
+    # 와 화면에서 구분이 안 된다. 발음이 조용히 사라지고 아무도 모른다.
+    #
+    # reading_reviewed 쪽 기본값 True 는 다르다. 그 칸이 없는 모델
+    # (DailyPhrase)이 실제로 있고, 없으면 검수된 것으로 보는 것이 맞다.
+    return getattr(instance, field_name) or ""
+
+
 class ReviewedReadingField(serializers.CharField):
     """검수된 한글 발음만 내보낸다. 아니면 빈 문자열.
 
@@ -29,7 +56,9 @@ class ReviewedReadingField(serializers.CharField):
         super().__init__(**kwargs)
 
     def to_representation(self, instance) -> str:
-        return getattr(instance, self.field_name) if instance.reading_reviewed else ""
+        # 규칙은 visible_reading 한 곳에 있다. 여기서 다시 쓰면 두 곳이
+        # 갈린다.
+        return visible_reading(instance, self.field_name)
 
 
 class UnreviewOnContentChangeMixin:
