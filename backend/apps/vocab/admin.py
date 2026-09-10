@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Sentence, Word
+from .models import DailyPhrase, Sentence, Word
 
 
 @admin.register(Word)
@@ -151,3 +151,77 @@ class SentenceAdmin(admin.ModelAdmin):
         self.message_user(request, f"{updated}개 문장의 발음을 검수 완료로 표시했습니다.")
 
     actions = ["mark_reviewed", "mark_reading_reviewed"]
+
+
+@admin.register(DailyPhrase)
+class DailyPhraseAdmin(admin.ModelAdmin):
+    """일상 표현 검수 화면.
+
+    소리내어 읽기(일상영어)에만 쓰는 표다. 단어장·문제풀기에는 안 나온다.
+    """
+
+    list_display = (
+        "text",
+        "pronunciation",
+        "reading",
+        "meaning",
+        "scene",
+        "difficulty",
+        "is_reviewed",
+    )
+    list_filter = ("is_reviewed", "scene", "difficulty")
+    search_fields = ("text", "meaning")
+    list_editable = ("is_reviewed",)
+    readonly_fields = ("created_at", "updated_at")
+
+    # **fieldsets 가 명시적이라 여기 없는 필드는 폼에 아예 안 나온다.**
+    # WordAdmin 쪽 주석과 같은 함정이다 - 칸을 만들어놓고 이 목록에서
+    # 빠뜨리면 관리자가 그 값을 고칠 방법이 없다.
+    #
+    # **일부러 뺀 것 셋**: category·is_exam·exam_subject 다. LearningItem
+    # 에서 물려받았지만 이 표에서는 안 쓰고, DB 제약이 값이 들어오는 것을
+    # 막는다(not_exam). 폼에 두면 관리자가 채울 수 있는 것처럼 보이는데
+    # 저장하면 거절당한다 - 그게 더 나쁘다.
+    #
+    # 상황(scene)이 category 를 대신한다. 이유는 PhraseScene 주석에 있다.
+    fieldsets = (
+        (None, {"fields": ("text", "meaning")}),
+        (
+            "발음",
+            {
+                "fields": ("pronunciation", "reading"),
+                "description": (
+                    "**낱말 수를 셋 다 맞춰야 한다.** 표현·발음기호·한글발음의 "
+                    "낱말 수가 같아야 화면이 틀린 낱말만 짚어줄 수 있고, "
+                    "하나라도 어긋나면 그 표현은 강조 없이 통째로 그려진다. "
+                    "발음기호는 바깥만 슬래시로 한 번 감싸고(/wɛr ɪz ðə/) "
+                    "안쪽은 낱말마다 공백으로 끊는다. 한글발음의 강세는 "
+                    "**이렇게** 감싸되 낱말 안에서 닫을 것 - 공백을 걸치면 "
+                    "낱말 수가 어긋난다. 두 칸을 비우면 DB 가 거절한다."
+                ),
+            },
+        ),
+        (
+            "분류",
+            {
+                "fields": ("scene", "difficulty", "source"),
+                "description": (
+                    "난이도는 낱말 수가 아니라 **발음이 어려운 정도**로 준다. "
+                    "thank you 는 세 낱말이어도 쉬움이고 comfortable 은 한 "
+                    "낱말이어도 어려움이다."
+                ),
+            },
+        ),
+        (
+            "검수",
+            {
+                "fields": ("is_reviewed", "created_at", "updated_at"),
+                "description": (
+                    "검수 전에는 출제되지 않는다. 그리고 약어·숫자·기호가 "
+                    "들어간 표현은 검수해도 출제되지 않는다 - 소리로 채점할 "
+                    "수 없어서 걸러진다(apps/vocab/talk.py 의 is_speakable). "
+                    "넣었는데 안 나오면 그것을 먼저 확인할 것."
+                ),
+            },
+        ),
+    )

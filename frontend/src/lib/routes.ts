@@ -3,7 +3,7 @@
  *
  * 경로는 /{모드}/{콘텐츠} 두 축으로 짠다.
  *
- *   모드   learn(익히기) · test(문제풀기) · talk(말하기) · game(놀이)
+ *   모드   learn(익히기) · test(문제풀기) · talk(일상영어) · game(놀이)
  *   콘텐츠 words · sentences · errors · articles
  *
  * 같은 콘텐츠를 모드마다 다른 이름으로 부르면(/learn/vocab 인데 /test/words)
@@ -31,6 +31,18 @@ export function contentPath(mode: string, content: string): string {
  */
 export type BoardKind = "weekly" | "all_time" | "streak";
 
+/**
+ * 소리내어 읽기의 갈래.
+ *
+ * daily 는 일상 표현("How was your weekend"), dev 는 개발 용어(cache).
+ * 둘은 성격도 난이도도 달라서 한 판에 섞지 않는다 - deploy 다음에
+ * 일상 인사가 나오면 머리를 다시 맞춰야 한다.
+ *
+ * string 으로 두지 않는 이유는 BoardKind 와 같다. 오타가 타입 검사를
+ * 통과해 엉뚱한 쿼리로 나간다.
+ */
+export type TalkKind = "daily" | "dev";
+
 export const routes = {
   home: "/",
   words: "/learn/words",
@@ -57,6 +69,18 @@ export const routes = {
   testDaily: "/test/daily",
   /** 틀린 것 다시 풀기. 점수가 없고 로그인이 필요하다. */
   testReview: "/test/review",
+  /**
+   * 소리내어 읽기. 갈래(일상 표현/개발 용어)는 쿼리로 가른다.
+   *
+   * 콘텐츠 축(/talk/words)을 안 쓰는 이유: contents 는 모드와 무관한
+   * 전역 목록이라 거기에 갈래를 더하면 익히기·문제풀기에도 같은 탭이
+   * 생긴다. 그쪽에는 그 콘텐츠가 없어서 눌리는 순간 빈 화면이다.
+   * 이 모드 안에서만 도는 축이라 여기서 푼다.
+   *
+   * 기본값(쿼리 없음)이 일상 표현이다. 탭 이름이 그것이라 처음 들어온
+   * 사람이 보는 것과 이름이 맞아야 한다.
+   */
+  talk: (kind?: TalkKind) => (kind === "dev" ? "/talk?kind=dev" : "/talk"),
   /**
    * 순위표. 종류를 안 주면 이번 주.
    *
@@ -126,8 +150,8 @@ export type LearningMode = {
 /**
  * 모드 목록. 아래 탭바가 이걸로 만들어진다.
  *
- * 아직 안 만든 모드(talk)도 목록에 있다. 만들고 나서 ready 를 true 로
- * 바꾸면 그대로 눌리는 탭이 된다.
+ * ready 가 false 인 모드는 눌리지 않고 "준비 중" 으로 보인다. 지금은
+ * 셋 다 열려 있고, 다음 모드(놀이 등)를 만들 때 다시 쓴다.
  *
  * 경로를 여기 박아두지 않는 이유: 모드를 바꿀 때 보고 있던 콘텐츠를
  * 유지해야 한다. 문장을 보다 "문제풀기" 를 눌렀는데 단어 문제가 나오면
@@ -136,7 +160,7 @@ export type LearningMode = {
 export const learningModes: LearningMode[] = [
   { slug: "learn", label: "익히기", ready: true },
   { slug: "test", label: "문제풀기", ready: true },
-  { slug: "talk", label: "말하기", ready: false },
+  { slug: "talk", label: "일상영어", ready: true },
 ];
 
 /**
