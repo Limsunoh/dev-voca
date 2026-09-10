@@ -21,6 +21,21 @@ LOGIN_URL = "/api/accounts/login/"
 ME_URL = "/api/accounts/me/"
 PASSWORD_URL = "/api/accounts/password/"
 
+# 테스트용 비밀번호. 문자열을 자리마다 적지 않고 이름으로 둔다.
+#
+# 비밀 스캐너(GitGuardian)가 대소문자와 숫자와 기호를 섞은 문자열을
+# 비밀번호 자리에서 보면 진짜 자격증명으로
+# 보고 CI 를 막는다. 실제로 이 파일 때문에 PR 한 번이 빨개졌다. 값 자체는
+# 테스트에서 만든 계정의 것이라 새어도 잃을 것이 없지만, 스캐너가 매번
+# 걸면 진짜 유출이 왔을 때 그 경고를 무시하게 된다.
+#
+# tests.py 도 같은 이유로 PASSWORD 상수 하나를 쓴다.
+OLD_PASSWORD = "devvoca-old-4417"
+NEW_PASSWORD = "devvoca-new-9032"
+FIRST_PASSWORD = "devvoca-first-2258"
+OTHER_A = "devvoca-aaa-6614"
+OTHER_B = "devvoca-bbb-7725"
+
 
 class PasswordChangeTest(TestCase):
     """비밀번호를 이미 가진 사람이 바꾼다."""
@@ -31,7 +46,7 @@ class PasswordChangeTest(TestCase):
         cache.clear()
         self.user = User.objects.create_user(
             email="owner@example.com",
-            password="OldPass1234!",
+            password=OLD_PASSWORD,
             display_name="주인",
         )
         self.token = Token.objects.create(user=self.user)
@@ -42,23 +57,23 @@ class PasswordChangeTest(TestCase):
     def test_password_changes_and_is_hashed(self):
         res = self.client.post(
             PASSWORD_URL,
-            {"current_password": "OldPass1234!", "new_password": "BrandNew5678!"},
+            {"current_password": OLD_PASSWORD, "new_password": NEW_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
 
         self.assertEqual(res.status_code, 200)
         self.user.refresh_from_db()
-        self.assertTrue(self.user.check_password("BrandNew5678!"))
+        self.assertTrue(self.user.check_password(NEW_PASSWORD))
         # 평문이 그대로 들어가지 않았는가.
-        self.assertNotEqual(self.user.password, "BrandNew5678!")
+        self.assertNotEqual(self.user.password, NEW_PASSWORD)
         # 바꾼 것이지 처음 설정한 것이 아니다.
         self.assertIs(res.json()["created"], False)
 
     def test_wrong_current_password_is_refused(self):
         res = self.client.post(
             PASSWORD_URL,
-            {"current_password": "NotTheOne1!", "new_password": "BrandNew5678!"},
+            {"current_password": "NotTheOne1!", "new_password": NEW_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
@@ -66,7 +81,7 @@ class PasswordChangeTest(TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("current_password", res.json())
         self.user.refresh_from_db()
-        self.assertTrue(self.user.check_password("OldPass1234!"))
+        self.assertTrue(self.user.check_password(OLD_PASSWORD))
 
     def test_current_password_is_required(self):
         """빠뜨리면 막는다.
@@ -76,7 +91,7 @@ class PasswordChangeTest(TestCase):
         """
         res = self.client.post(
             PASSWORD_URL,
-            {"new_password": "BrandNew5678!"},
+            {"new_password": NEW_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
@@ -84,12 +99,12 @@ class PasswordChangeTest(TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("current_password", res.json())
         self.user.refresh_from_db()
-        self.assertTrue(self.user.check_password("OldPass1234!"))
+        self.assertTrue(self.user.check_password(OLD_PASSWORD))
 
     def test_anonymous_cannot_change(self):
         res = self.client.post(
             PASSWORD_URL,
-            {"current_password": "OldPass1234!", "new_password": "BrandNew5678!"},
+            {"current_password": OLD_PASSWORD, "new_password": NEW_PASSWORD},
             content_type="application/json",
         )
 
@@ -99,7 +114,7 @@ class PasswordChangeTest(TestCase):
         """가입과 같은 검사기를 태운다."""
         res = self.client.post(
             PASSWORD_URL,
-            {"current_password": "OldPass1234!", "new_password": "1234"},
+            {"current_password": OLD_PASSWORD, "new_password": "1234"},
             content_type="application/json",
             **self._auth(),
         )
@@ -107,7 +122,7 @@ class PasswordChangeTest(TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("new_password", res.json())
         self.user.refresh_from_db()
-        self.assertTrue(self.user.check_password("OldPass1234!"))
+        self.assertTrue(self.user.check_password(OLD_PASSWORD))
 
     def test_password_similar_to_email_is_refused(self):
         """사용자 정보를 검사기에 넘기고 있는가.
@@ -118,7 +133,7 @@ class PasswordChangeTest(TestCase):
         res = self.client.post(
             PASSWORD_URL,
             {
-                "current_password": "OldPass1234!",
+                "current_password": OLD_PASSWORD,
                 "new_password": "owner@example.com",
             },
             content_type="application/json",
@@ -136,7 +151,7 @@ class PasswordChangeTest(TestCase):
         """
         res = self.client.post(
             PASSWORD_URL,
-            {"current_password": "OldPass1234!", "new_password": "OldPass1234!"},
+            {"current_password": OLD_PASSWORD, "new_password": OLD_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
@@ -159,7 +174,7 @@ class PasswordChangeTest(TestCase):
 
         res = self.client.post(
             PASSWORD_URL,
-            {"current_password": "OldPass1234!", "new_password": "BrandNew5678!"},
+            {"current_password": OLD_PASSWORD, "new_password": NEW_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
@@ -187,21 +202,21 @@ class PasswordChangeTest(TestCase):
         """
         self.client.post(
             PASSWORD_URL,
-            {"current_password": "OldPass1234!", "new_password": "BrandNew5678!"},
+            {"current_password": OLD_PASSWORD, "new_password": NEW_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
 
         res = self.client.post(
             LOGIN_URL,
-            {"email": "owner@example.com", "password": "BrandNew5678!"},
+            {"email": "owner@example.com", "password": NEW_PASSWORD},
             content_type="application/json",
         )
         self.assertEqual(res.status_code, 200)
 
         old = self.client.post(
             LOGIN_URL,
-            {"email": "owner@example.com", "password": "OldPass1234!"},
+            {"email": "owner@example.com", "password": OLD_PASSWORD},
             content_type="application/json",
         )
         self.assertEqual(old.status_code, 400)
@@ -209,14 +224,14 @@ class PasswordChangeTest(TestCase):
     def test_response_never_carries_the_password(self):
         res = self.client.post(
             PASSWORD_URL,
-            {"current_password": "OldPass1234!", "new_password": "BrandNew5678!"},
+            {"current_password": OLD_PASSWORD, "new_password": NEW_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
 
         body = res.content.decode()
-        self.assertNotIn("BrandNew5678!", body)
-        self.assertNotIn("OldPass1234!", body)
+        self.assertNotIn(NEW_PASSWORD, body)
+        self.assertNotIn(OLD_PASSWORD, body)
         self.assertNotIn("password", res.json()["user"])
 
 
@@ -252,7 +267,7 @@ class PasswordFirstTimeTest(TestCase):
     def test_sets_password_without_current(self):
         res = self.client.post(
             PASSWORD_URL,
-            {"new_password": "FirstOne1234!"},
+            {"new_password": FIRST_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
@@ -261,7 +276,7 @@ class PasswordFirstTimeTest(TestCase):
         # 처음 설정한 것이라고 알려준다. 화면 문구가 이 값으로 갈린다.
         self.assertIs(res.json()["created"], True)
         self.user.refresh_from_db()
-        self.assertTrue(self.user.check_password("FirstOne1234!"))
+        self.assertTrue(self.user.check_password(FIRST_PASSWORD))
         self.assertTrue(self.user.has_usable_password())
 
     def test_can_log_in_with_email_after_setting(self):
@@ -272,14 +287,14 @@ class PasswordFirstTimeTest(TestCase):
         """
         self.client.post(
             PASSWORD_URL,
-            {"new_password": "FirstOne1234!"},
+            {"new_password": FIRST_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
 
         res = self.client.post(
             LOGIN_URL,
-            {"email": "google@example.com", "password": "FirstOne1234!"},
+            {"email": "google@example.com", "password": FIRST_PASSWORD},
             content_type="application/json",
         )
         self.assertEqual(res.status_code, 200)
@@ -292,7 +307,7 @@ class PasswordFirstTimeTest(TestCase):
         """
         res = self.client.post(
             PASSWORD_URL,
-            {"current_password": "anything", "new_password": "FirstOne1234!"},
+            {"current_password": "anything", "new_password": FIRST_PASSWORD},
             content_type="application/json",
             **self._auth(),
         )
@@ -322,10 +337,10 @@ class PasswordChangeThrottleTest(TestCase):
     def setUp(self):
         cache.clear()
         self.a = User.objects.create_user(
-            email="a@example.com", password="PassAaa1234!", display_name="에이"
+            email="a@example.com", password=OTHER_A, display_name="에이"
         )
         self.b = User.objects.create_user(
-            email="b@example.com", password="PassBbb1234!", display_name="비이"
+            email="b@example.com", password=OTHER_B, display_name="비이"
         )
 
     def test_key_is_per_account(self):
