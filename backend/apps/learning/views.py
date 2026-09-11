@@ -71,6 +71,10 @@ class RoundStartView(APIView):
                 "question": question,
                 "round_seconds": session.ROUND_SECONDS,
                 "max_skips": session.MAX_SKIPS,
+                # 화면이 채점 뒤 이만큼 멈춘다. 서버가 마감을 미루는 양과
+                # 같은 값이어야 한다 - 화면에 숫자를 따로 적어두면 한쪽만
+                # 바뀌었을 때 차이가 문제마다 쌓인다.
+                "reaction_pause_ms": session.REACTION_PAUSE_MS,
             },
             status=status.HTTP_201_CREATED,
         )

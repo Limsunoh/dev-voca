@@ -55,6 +55,14 @@ export type RoundStarted = {
   question: RoundQuestion;
   round_seconds: number;
   max_skips: number;
+  /**
+   * 채점 연출 한 번에 화면이 멈추는 시간(ms).
+   *
+   * 서버가 답 하나마다 이만큼 마감을 미룬다. 화면도 같은 값으로 멈춰야
+   * 한다 - 여기에 숫자를 따로 적어두면 한쪽만 바뀌었을 때 차이가 문제마다
+   * 쌓인다.
+   */
+  reaction_pause_ms: number;
 };
 
 export type RoundAnswered = {

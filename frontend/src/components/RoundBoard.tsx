@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Burst } from "@/components/Burst";
+import { Reaction } from "@/components/Reaction";
 import { ExitGuard } from "@/components/ExitGuard";
 import { QuestionCard } from "@/components/QuestionCard";
 import type {
@@ -67,10 +68,24 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
   });
   /** 방금 판정. 정답일 때 조각이 터진다. 카운터인 이유는 Burst 주석 참고. */
   const [burst, setBurst] = useState(0);
+  /**
+   * 걸어오는 사람. 맞히든 틀리든 오므로 burst 를 못 쓴다.
+   *
+   * 횟수와 판정을 같이 들고 있는 이유는 QuizBoard 와 같다 - 판정만 두면
+   * 연속으로 같은 결과가 나왔을 때 두 번째부터 다시 안 뛴다.
+   */
+  const [reaction, setReaction] = useState({ fire: 0, correct: false });
 
   // 마감 시각(ms). 남은 시간을 매 초 다시 계산하는 근거다. setInterval 로
   // 1씩 빼면 탭이 백그라운드로 갔을 때 타이머가 멈춰 시간이 남아 보인다.
   const deadlineRef = useRef(0);
+  /**
+   * 채점 뒤 멈추는 시간(ms). 서버가 판을 열 때 내려준다.
+   *
+   * 여기에 숫자를 적어두지 않는 이유: 서버가 마감을 미루는 양과 달라지면
+   * 그 차이가 문제마다 쌓인다. 스무 문제면 눈에 띄게 어긋난다.
+   */
+  const pauseRef = useRef(0);
   // 판이 끝났는데 타이머가 한 번 더 도는 것을 막는다.
   const closingRef = useRef(false);
 
@@ -127,6 +142,11 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     if (phase !== "playing") return;
 
     const tick = () => {
+      // **답이 오가는 동안은 숫자를 건드리지 않는다.** 채점이 끝나면
+      // 연출 시간만큼 마감이 뒤로 밀리는데, 그 사이 다시 그리면 남은
+      // 시간이 61 에서 62 로 **올라간다**. 90초 판에 "91" 이 뜨기도 한다.
+      if (busyRef.current) return;
+
       const remain = Math.max(0, deadlineRef.current - Date.now());
       setLeft(remain);
       // **답이 오가는 중이면 미룬다.** 지금 닫으면 서버가 방금 태운
@@ -164,6 +184,9 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
 
       closingRef.current = false;
       deadlineRef.current = Date.now() + started.round_seconds * 1000;
+      // 서버가 정한 값을 그대로 쓴다. 없으면 0 이라 예전처럼 안 멈춘다 -
+      // 서버가 옛 버전이어도 판이 깨지지 않는다.
+      pauseRef.current = started.reaction_pause_ms ?? 0;
       setSeconds(started.round_seconds);
       tokenRef.current = started.token;
       setQuestion(started.question);
@@ -172,6 +195,10 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       // 축포 카운터도 되돌린다. 판마다 0 에서 시작해야 다른 리셋들과
       // 규율이 맞는다.
       setBurst(0);
+      // 걸어오는 사람도 같이 되돌린다. 안 되돌리면 "한 판 더" 를 눌렀을 때
+      // fire 가 지난 판의 숫자로 남아, 첫 문제를 풀기도 전에 사람이 걸어와
+      // 지난 판의 마지막 판정을 한 번 더 보여준다.
+      setReaction({ fire: 0, correct: false });
       setResult(null);
       setSummary(null);
       setPhase("playing");
@@ -226,6 +253,21 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         setBurst((n) => n + 1);
       }
 
+      // 걸어오는 사람은 맞든 틀리든 온다. 넘긴 것만 뺀다 - 넘기기는 판정이
+      // 아니라 "모르겠다" 라서 칭찬할 것도 나무랄 것도 없고, 넘길 때까지
+      // 기다리게 하면 넘기는 의미가 없다.
+      //
+      // **서버도 넘긴 것은 보상하지 않는다**(session._deadline_ms). 여기서만
+      // 빼면 화면은 안 멈추는데 마감은 밀려 판이 길어진다.
+      const pausing = !answered.result.skipped;
+      if (pausing) {
+        setReaction((r) => ({ fire: r.fire + 1, correct: answered.result.correct }));
+        // 서버가 미룬 만큼 이쪽 시계도 미룬다. 서버 시각을 그대로 받지
+        // 않는 이유는 판을 열 때와 같다 - 두 기계의 시계가 어긋나면
+        // 남은 시간이 튄다. 양쪽이 같은 값을 더하면 어긋날 일이 없다.
+        deadlineRef.current += pauseRef.current;
+      }
+
       if (answered.finished || !answered.question) {
         await finish(answered.token);
         return;
@@ -236,6 +278,26 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       if (Date.now() >= deadlineRef.current) {
         await finish(answered.token);
         return;
+      }
+
+      // 연출이 끝난 뒤에 다음 문제를 낸다. 바로 내면 걸어오는 사람 위로
+      // 새 문제가 덮여서, 맞았는지 틀렸는지 볼 틈이 없다.
+      //
+      // 이 사이 busyRef 를 쥐고 있어(finally 에서만 푼다) 보기 버튼이
+      // 안 먹는다. 연출 중에 답이 나가면 그 답의 시계가 이미 흐른 뒤다.
+      if (pausing && pauseRef.current > 0) {
+        await new Promise((r) => setTimeout(r, pauseRef.current));
+        // 기다리는 사이 판을 나갔을 수 있다.
+        if (!aliveRef.current) return;
+
+        // **마감을 다시 본다.** 기다리기 전에 봤어도 그 사이 지났을 수
+        // 있다. 안 보면 타이머가 0 인 채로 다음 문제가 떠서, 누르면
+        // 닫으려는 요청과 답이 같은 토큰으로 겹쳐 나가 판이 통째로
+        // 기록되지 않는다.
+        if (Date.now() >= deadlineRef.current) {
+          await finish(answered.token);
+          return;
+        }
       }
 
       setQuestion(answered.question);
@@ -313,6 +375,14 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     <>
       {/* 푸는 동안에만 둔다. 시작 카드와 결과 카드에는 판정이 없다. */}
       <Burst fire={burst} />
+
+      {/* 화면 아래쪽에서 걸어와 반응하고 간다. Burst 와 같은 이유로 여기
+          둔다 - 문제 위치와 무관하게 화면 기준으로 서야 한다.
+
+          판 모드에서는 이 연출 동안 다음 문제를 안 낸다. 그 시간은 서버가
+          마감에서 빼주므로(session.REACTION_PAUSE_MS) 90초를 손해 보지
+          않는다. 대신 한 판의 실제 길이가 그만큼 늘어난다. */}
+      <Reaction fire={reaction.fire} correct={reaction.correct} />
 
       {/* 판이 도는 중이다. 나가는 길은 이것 하나뿐이고, 여기서만 묻는다.
           지금 나가면 서버가 판을 안 닫아서 점수가 안 남는다. */}
