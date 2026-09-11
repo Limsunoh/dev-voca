@@ -517,11 +517,99 @@ class RoundEndTest(TestCase):
     def test_no_new_question_after_the_deadline(self):
         token, question = session.start()
 
-        later = timezone.now() + timedelta(seconds=session.ROUND_SECONDS + 1)
+        # 연출 보상(답 하나당 REACTION_PAUSE_MS)을 넘겨서 잡는다. 90초에
+        # 1초만 더하면 보상분과 아슬아슬해서, 보상 값을 올리는 순간 이
+        # 테스트가 "마감이 안 지났다" 로 뒤집힌다.
+        later = timezone.now() + timedelta(seconds=session.ROUND_SECONDS + 30)
         with mock.patch.object(timezone, "now", return_value=later):
             _, _, nxt = session.answer(token, question["choices"][0]["id"])
 
         self.assertIsNone(nxt)
+
+    def test_the_reaction_pause_buys_time_back(self):
+        """채점 연출을 보는 동안은 판 시간이 흐르지 않는다.
+
+        화면은 답을 낸 뒤 REACTION_PAUSE_MS 동안 다음 문제를 안 낸다.
+        그 시간을 안 돌려주면 연출이 곧 손해가 된다 - 많이 푼 사람일수록
+        더 잃는다.
+
+        90초와 (90초 + 보상) 사이를 고른다. 보상이 없으면 마감이 지나
+        다음 문제가 없고, 있으면 나온다.
+        """
+        token, question = session.start()
+
+        pause = session.REACTION_PAUSE_MS / 1000
+        between = timezone.now() + timedelta(seconds=session.ROUND_SECONDS + pause / 2)
+        with mock.patch.object(timezone, "now", return_value=between):
+            _, _, nxt = session.answer(token, question["choices"][0]["id"])
+
+        self.assertIsNotNone(
+            nxt,
+            "답 하나를 냈으면 연출 시간만큼 마감이 밀려야 한다. "
+            "session._deadline_ms 를 보라.",
+        )
+
+    def test_the_pause_does_not_eat_the_per_question_limit(self):
+        """연출 시간이 문제당 제한 시간을 깎으면 안 된다.
+
+        판 마감만 미루고 문제 시계를 그대로 두면, 사용자가 문제를 보기도
+        전에 800ms 가 흘러 있다. 3초짜리 문제의 창이 2.2초로 줄고 제때
+        맞힌 답이 "시간 초과" 로 0점이 된다.
+        """
+        token, question = session.start()
+        token, _, second = session.answer(token, question["choices"][0]["id"])
+        self.assertIsNotNone(second)
+
+        pause = session.REACTION_PAUSE_MS
+        limit = second["time_limit_ms"]
+
+        # 화면에 뜬 뒤(=연출이 끝난 뒤) 제한 시간 직전에 답한다.
+        at = timezone.now() + timedelta(milliseconds=pause + limit - 100)
+        with mock.patch.object(timezone, "now", return_value=at):
+            _, result, _ = session.answer(token, second["choices"][0]["id"])
+
+        self.assertTrue(
+            result.in_time,
+            "연출이 끝난 시각부터 제한 시간을 세야 한다. "
+            "session._issue 의 shown_after_ms 를 보라.",
+        )
+
+    def test_skipping_does_not_buy_time(self):
+        """넘긴 것에는 연출이 없으므로 시간도 안 준다.
+
+        넘기기는 곧바로 다음 문제로 간다. 화면이 안 멈추는데 시간을 주면
+        넘길수록 판이 길어진다.
+        """
+        token, question = session.start()
+
+        pause = session.REACTION_PAUSE_MS / 1000
+        between = timezone.now() + timedelta(seconds=session.ROUND_SECONDS + pause / 2)
+        with mock.patch.object(timezone, "now", return_value=between):
+            _, _, nxt = session.answer(token, None, skip=True)
+
+        self.assertIsNone(nxt, "넘긴 것은 보상 대상이 아니다")
+
+    def test_the_pause_is_per_answer_not_a_flat_bonus(self):
+        """보상이 답한 수에 비례하는지.
+
+        한 번만 더해주면 많이 푼 사람이 여전히 손해다. 두 문제를 풀면
+        두 번 구경했으므로 두 배를 돌려받아야 한다.
+        """
+        token, question = session.start()
+
+        # 첫 답은 제때 낸다. 보상이 하나 쌓인다.
+        token, _, question = session.answer(token, question["choices"][0]["id"])
+        self.assertIsNotNone(question)
+
+        # 보상이 하나뿐이면 마감이 지난 시점, 둘이면 아직 안 지난 시점.
+        pause = session.REACTION_PAUSE_MS / 1000
+        between = timezone.now() + timedelta(
+            seconds=session.ROUND_SECONDS + pause * 1.5
+        )
+        with mock.patch.object(timezone, "now", return_value=between):
+            _, _, nxt = session.answer(token, question["choices"][0]["id"])
+
+        self.assertIsNotNone(nxt, "보상은 답한 수만큼 쌓여야 한다")
 
     def test_the_last_answer_still_counts(self):
         """마감 직전에 받은 문제를 마감 직후에 답한 경우.

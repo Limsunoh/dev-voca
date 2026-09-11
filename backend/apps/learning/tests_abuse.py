@@ -406,7 +406,7 @@ class RoundFlowAbuseTest(TestCase):
     def test_answering_after_the_round_ended_is_refused(self):
         """끝난 판에 답을 더 보내면 400. 500 이 아니다."""
         token, question = session.start()
-        later = timezone.now() + timedelta(seconds=session.ROUND_SECONDS + 1)
+        later = timezone.now() + timedelta(seconds=session.ROUND_SECONDS + 30)
         with frozen(later):
             token, _, nxt = session.answer(token, question["choices"][0]["id"])
         self.assertIsNone(nxt)

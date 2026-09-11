@@ -55,6 +55,26 @@ logger = logging.getLogger(__name__)
 # 한 판의 길이. 모두 같아야 점수를 나란히 놓을 수 있어 고정한다.
 ROUND_SECONDS = 90
 
+# 채점 연출(걸어오는 사람) 한 번에 멈춰 있는 시간. 답 하나마다 이만큼
+# 마감을 미룬다.
+#
+# **미루지 않으면 연출이 곧 손해다.** 화면은 그 동안 다음 문제를 안 내는데
+# 시계만 흐르면, 스무 문제를 푼 사람은 16초를 구경하는 데 쓰고 그만큼 덜
+# 푼다. 빨리 푸는 사람일수록 더 많이 잃는다.
+#
+# 미루는 양을 서버가 정하는 것이 중요하다. 클라이언트가 "이만큼 멈췄다" 고
+# 말하게 두면 그 값을 부풀려 판을 늘릴 수 있다. 답 하나당 고정값이라
+# 부풀릴 여지가 없다.
+#
+# 화면의 걸어오는 동작이 600ms 다(globals.css 의 .rx-praise). 200ms 를
+# 더 두는 이유는 도착한 자세를 볼 틈이다 - 딱 600 이면 닿는 순간 다음
+# 문제로 바뀌어 뭘 봤는지 모른다.
+#
+# **화면도 이 값을 써야 한다.** 서버가 미루는 양과 화면이 멈추는 시간이
+# 다르면 차이만큼 매 문제 쌓인다. 그래서 판을 열 때 이 값을 함께 내려주고
+# (views.RoundStartView) 화면은 받은 값으로 멈춘다.
+REACTION_PAUSE_MS = 800
+
 # 판당 넘길 수 있는 횟수. 무제한이면 모르는 것을 전부 넘겨서 아무도
 # 마이너스가 안 된다. 이 셋이 다 떨어지면 답을 골라야 다음으로 간다.
 MAX_SKIPS = 3
@@ -189,7 +209,13 @@ def answer(
     # 마감이 지났으면 새 문제를 안 낸다. 이미 받은 문제의 답은 위에서
     # 세었다 - 마감 직전에 받은 문제를 마감 직후에 답했다고 버리면
     # 사용자 입장에서 억울하다.
-    question = None if _ms(now) >= _deadline_ms(state) else _issue(state, now)
+    # 넘긴 것은 연출이 없어 곧바로 다음 문제가 뜬다. 채점한 것만 늦는다.
+    shown_after = 0 if result.skipped else REACTION_PAUSE_MS
+    question = (
+        None
+        if _ms(now) >= _deadline_ms(state)
+        else _issue(state, now, shown_after)
+    )
 
     # 여기서부터는 실패할 것이 없다. 순번을 가져가고 반드시 새 토큰을 낸다.
     _take_step(state)
@@ -262,7 +288,31 @@ def _dt(ms: int) -> datetime:
 
 
 def _deadline_ms(state: dict) -> int:
-    return int(state["s"]) + ROUND_SECONDS * 1000
+    """이 판이 끝나는 시각(ms).
+
+    90초에 더해 **답한 수만큼 연출 시간을 돌려준다.** 답 하나마다 화면이
+    REACTION_PAUSE_MS 동안 다음 문제를 안 내므로, 그 시간은 푸는 데 쓴
+    시간이 아니다.
+
+    세는 값이 state["a"] 인 이유: 답을 기록한 뒤에 이 함수가 불리므로
+    (answer 안에서 append 가 먼저다) 방금 답한 것까지 들어간다. 즉 지금
+    보게 될 연출의 몫이 이미 반영된다. state["n"] 은 그 뒤에 오르므로
+    한 박자 늦는다.
+
+    **넘긴 것은 안 센다.** 넘기기는 연출 없이 곧바로 다음 문제로 가므로
+    멈춘 시간이 없다. 세면 안 멈춘 시간까지 돌려주는 셈이고, 넘기기를
+    반복해 판을 늘릴 수 있다(넘기기는 세 번뿐이라 크지는 않지만, 화면이
+    멈추지 않는데 시간을 주는 것 자체가 틀렸다).
+
+    판을 열었을 때는 a 가 비어 있어 정확히 90초다.
+    """
+    # **모양을 먼저 거른다.** 답 한 줄의 칸 수를 바꾸는 배포가 나가면, 그
+    # 직전에 시작한 판이 옛 모양의 줄을 들고 토큰 수명만큼 돌아온다. 칸을
+    # 바로 집으면 그때 IndexError 로 500 이 나고 그 판의 남은 요청이 전부
+    # 죽는다. _sound_answers 가 그 거름망이고, 이 파일의 다른 집계도 전부
+    # 그것을 지난다.
+    graded = sum(1 for row in _sound_answers(state["a"]) if not row[4])
+    return int(state["s"]) + ROUND_SECONDS * 1000 + graded * REACTION_PAUSE_MS
 
 
 def _check_replay(state: dict) -> None:
@@ -338,8 +388,17 @@ def _load(token: str) -> dict:
     return state
 
 
-def _issue(state: dict, now: datetime) -> dict | None:
-    """다음 문제를 만들어 판 상태에 심는다. 못 만들면 None."""
+def _issue(state: dict, now: datetime, shown_after_ms: int = 0) -> dict | None:
+    """다음 문제를 만들어 판 상태에 심는다. 못 만들면 None.
+
+    shown_after_ms 는 **화면이 이 문제를 실제로 보여주기까지 걸리는 시간**
+    이다. 채점 연출이 끝나야 다음 문제가 뜨므로(RoundBoard) 그만큼 늦다.
+
+    그 값을 문제 시계(`t`)에 더하지 않으면 **사용자가 문제를 보기도 전에
+    제한 시간이 깎인다.** 3초짜리 문제에서 800ms 면 창이 2.2초로 줄고,
+    제때 맞힌 답이 "시간 초과" 로 0점이 된다. 판 마감만 미루고 이쪽을
+    안 미루면 연출을 넣은 것이 곧 점수 손해다.
+    """
     question = _make(state)
     if question is None:
         return None
@@ -354,7 +413,8 @@ def _issue(state: dict, now: datetime) -> dict | None:
         "tt": question.answer_type,
         # 이 문제를 낸 시각. 서버 시계다 - 클라이언트가 잰 값을 받으면
         # 0 을 보내 항상 제한 시간 안이 된다.
-        "t": _ms(now),
+        # 화면에 뜨는 시각이다. 만든 시각이 아니다 - 위 docstring 참고.
+        "t": _ms(now) + shown_after_ms,
         "l": question.time_limit_ms,
     }
 
