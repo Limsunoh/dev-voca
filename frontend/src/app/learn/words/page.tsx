@@ -119,7 +119,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
     const badRequest = error.status === 400;
 
     return (
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main className="mx-auto w-full max-w-3xl px-4 py-10">
         <LearnHeader
           mode="learn"
           content="words"
@@ -155,7 +155,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="mx-auto w-full max-w-3xl px-4 py-10">
       <LearnHeader
         mode="learn"
         content="words"

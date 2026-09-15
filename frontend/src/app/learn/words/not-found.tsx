@@ -5,7 +5,7 @@ import { routes } from "@/lib/routes";
 // notFound() 가 호출되면 이 화면이 나온다. 없으면 Next 기본 영문 404 가 뜬다.
 export default function VocabNotFound() {
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="mx-auto w-full max-w-3xl px-4 py-10">
       <h1
         style={{
           fontSize: "var(--text-2xl)",
