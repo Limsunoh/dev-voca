@@ -12,7 +12,9 @@ import type {
 } from "@/lib/api/review";
 import { routes } from "@/lib/routes";
 
+import { Burst } from "./Burst";
 import { QuestionCard } from "./QuestionCard";
+import { Reaction } from "./Reaction";
 
 /**
  * 틀린 것 다시 풀기. 화면 셋을 phase 로 오간다.
@@ -46,6 +48,20 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
   const [graduated, setGraduated] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  /**
+   * 맞혔을 때만 걸어오는 사람.
+   *
+   * **틀렸을 때는 안 부른다.** 다른 화면에서는 머리를 콩 때리고 가는데,
+   * 여기는 이미 틀린 것만 모아 다시 보는 자리다. 그 자리에서 또 틀렸다고
+   * 때리면 이 앱이 줄이려는 것(영어와 에러에 대한 공포)을 오히려 키우고,
+   * 사용자는 복습 자체를 피하게 된다.
+   *
+   * 그래서 correct 는 항상 true 다. 값을 남겨두는 것은 Reaction 의 계약이
+   * 그렇기 때문이고, 여기서 false 가 들어갈 일은 없다.
+   */
+  const [reaction, setReaction] = useState({ fire: 0, correct: true });
+  /** 맞혔을 때 터지는 조각. */
+  const [burst, setBurst] = useState(0);
 
   const tokenRef = useRef("");
   const busyRef = useRef(false);
@@ -75,6 +91,10 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
       setCorrect(0);
       setGraduated(0);
       setResult(null);
+      // 지난 판의 연출을 끈다. 안 끄면 새 판 첫 화면에 지난 판 마지막
+      // 연출이 그대로 떠 있다(fire 가 0 이 아니라서 그려진다).
+      setReaction({ fire: 0, correct: true });
+      setBurst(0);
       setPhase("playing");
     } catch (err) {
       if (!aliveRef.current) return;
@@ -107,6 +127,19 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
       if (got.result.correct) setCorrect((n) => n + 1);
       if (got.result.graduated) setGraduated((n) => n + 1);
 
+      // 맞혔을 때만 연출한다. 틀렸을 때 아무것도 안 오는 것이 이 화면의
+      // 판단이다(위 reaction 주석).
+      //
+      // **연출을 기다렸다가 다음 문제를 내지 않는다.** 판 모드가 멈추는
+      // 이유는 거기서 화면을 어둡게 깔아(dim) 1초 동안 새 문제가 안 보이고,
+      // 판정이 보기 버튼 색으로만 남아 다음 문제가 뜨면 사라지기 때문이다.
+      // 이 화면은 어둡게 안 깔고, 결과 줄이 문제 카드와 별개 요소라 다음
+      // 문제가 떠도 그대로 남는다.
+      if (got.result.correct) {
+        setReaction((r) => ({ fire: r.fire + 1, correct: true }));
+        setBurst((n) => n + 1);
+      }
+
       if (got.finished || !got.question) {
         // busyRef 를 쥔 채 화면을 넘긴다. finally 에서 풀리지만 그때는
         // 이미 phase 가 done 이라 보기 버튼이 없다. 마지막 답 직후의
@@ -124,35 +157,54 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
     }
   };
 
-  if (phase === "done") {
-    return (
-      <DoneCard
-        answered={answered}
-        correct={correct}
-        graduated={graduated}
-        onAgain={start}
-        busy={busy}
-        error={error}
-      />
-    );
-  }
+  /* 채점 연출 둘. **어느 가지에도 넣지 않는다.** 이유는 DailyStudyBoard 의
+     같은 자리 주석에 있다 - 마지막 한 문제가 잘리는 것과, 가지를 오갈 때
+     지난 판정이 다시 재생되는 것 둘 다 막는다. */
+  const overlays = (
+    <>
+      <Burst fire={burst} />
+      <Reaction fire={reaction.fire} correct={reaction.correct} dim={false} />
+    </>
+  );
 
-  if (phase === "playing" && question) {
-    return (
-      <PlayCard
-        question={question}
-        result={result}
-        graduateStreak={due.graduate_streak}
-        answered={answered}
-        total={total}
-        busy={busy}
-        error={error}
-        onPick={send}
-      />
-    );
-  }
+  const body = (() => {
+    if (phase === "done") {
+      return (
+        <DoneCard
+          answered={answered}
+          correct={correct}
+          graduated={graduated}
+          onAgain={start}
+          busy={busy}
+          error={error}
+        />
+      );
+    }
 
-  return <IdleCard due={due} busy={busy} error={error} onStart={start} />;
+    if (phase === "playing" && question) {
+      return (
+        <PlayCard
+          question={question}
+          result={result}
+          graduateStreak={due.graduate_streak}
+          answered={answered}
+          total={total}
+          busy={busy}
+          error={error}
+          onPick={send}
+        />
+      );
+    }
+
+    return <IdleCard due={due} busy={busy} error={error} onStart={start} />;
+  })();
+
+  return (
+    <>
+      {overlays}
+      {body}
+    </>
+  );
 }
 
 /**

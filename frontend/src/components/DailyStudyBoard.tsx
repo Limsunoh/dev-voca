@@ -14,7 +14,9 @@ import type {
 import type { RoundQuestion, RoundResult } from "@/lib/api/rounds";
 import { routes } from "@/lib/routes";
 
+import { Burst } from "./Burst";
 import { QuestionCard } from "./QuestionCard";
+import { Reaction } from "./Reaction";
 import { StudyCards } from "./StudyCards";
 
 /**
@@ -76,6 +78,17 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
   const [study, setStudy] = useState<StudyProgress | null>(status.today);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  /**
+   * 채점 뒤 걸어오는 사람. 맞히든 틀리든 온다.
+   *
+   * 횟수와 판정을 한 덩이로 묶은 이유는 QuizBoard 와 같다 - 판정만 두면
+   * 연속으로 같은 결과가 나왔을 때 값이 안 바뀌어 다시 안 뛰고, 횟수만
+   * 두면 쓰다듬는지 콩 때리는지 모른다. 따로 두면 둘이 어긋나 지난 연출이
+   * 새 색으로 뜰 여지가 생긴다.
+   */
+  const [reaction, setReaction] = useState({ fire: 0, correct: false });
+  /** 맞혔을 때 터지는 조각. 카운터인 이유는 위와 같다. */
+  const [burst, setBurst] = useState(0);
 
   const tokenRef = useRef("");
   const busyRef = useRef(false);
@@ -108,6 +121,10 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
       setQuestion(started.question);
       setStudy(started.study);
       setResult(null);
+      // 지난 판의 연출을 끈다. 안 끄면 새 판 첫 화면에 지난 판 마지막
+      // 판정이 그대로 떠 있다(fire 가 0 이 아니라서 그려진다).
+      setReaction({ fire: 0, correct: false });
+      setBurst(0);
       // 학습이 먼저다. 카드가 없는 판(콘텐츠가 적어 묶음을 못 만든 경우)은
       // 곧바로 문제로 간다.
       setCards(started.learning);
@@ -139,6 +156,22 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
       setResult(answered.result);
       setStudy(answered.study);
 
+      // 사람은 맞히든 틀리든 온다. 쓰다듬기냐 콩이냐만 갈린다.
+      //
+      // **복습은 오답에 아무도 안 보낸다**(ReviewBoard 의 같은 자리). 여기는
+      // 보내는 이유: 이 화면은 오늘 처음 보는 것이 섞인 판이라 틀리는 것이
+      // 정상이고, 틀렸다는 사실 자체가 새 정보다. 복습은 이미 틀린 것만
+      // 모아둔 자리라 같은 말을 두 번 하는 셈이 된다.
+      //
+      // **연출을 기다렸다가 다음 문제를 내지 않는다.** 판 모드는 1초
+      // 멈추는데, 그건 거기서 화면을 어둡게 깔고(dim) 판정이 보기 버튼
+      // 색으로만 남아 다음 문제가 뜨면 사라지기 때문이다(RoundBoard 의 그
+      // 자리 주석). 이 화면은 어둡게 안 깔고, 결과 줄이 문제 카드와 **별개
+      // 요소**라 다음 문제가 떠도 그대로 남는다. 멈출 이유가 없는데 멈추면
+      // "답하면 곧바로 다음 문제" 라는 지금 동작만 바뀐다.
+      setReaction((r) => ({ fire: r.fire + 1, correct: answered.result.correct }));
+      if (answered.result.correct) setBurst((n) => n + 1);
+
       if (answered.finished || !answered.question) {
         // busyRef 를 쥔 채 화면을 넘긴다. finally 에서 풀리지만 그때는
         // 이미 phase 가 done 이라 보기 버튼이 없다. 마지막 답 직후의
@@ -162,61 +195,95 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
     }
   };
 
-  if (phase === "done") {
-    return <DoneCard study={study} />;
-  }
+  /* 채점 연출 둘. **어느 가지에도 넣지 않는다.**
 
-  if (phase === "learning" && cards.length > 0) {
-    return (
-      <StudyCards
-        // 묶음이 바뀌면 카드 번호를 처음으로 되돌린다. 안 주면 다음
-        // 묶음이 마지막 카드부터 시작한다.
-        key={study?.chunk_index ?? 0}
-        cards={cards}
-        chunkIndex={study?.chunk_index ?? 0}
-        chunkCount={study?.chunk_count ?? 0}
-        onDone={() => {
-          // 문제는 이미 받아둔 상태다. 카드를 비우고 넘어가기만 한다 -
-          // 여기서 서버를 부르면 왕복이 늘고, 그 요청은 점수와 무관해
-          // 되돌리기를 막을 이유도 없다.
-          setCards([]);
-          setResult(null);
-          setPhase("playing");
-        }}
-      />
-    );
-  }
+     아래는 phase 마다 다른 트리를 돌려준다. 연출을 그중 한 가지 안에 두면
+     두 가지가 깨진다.
 
-  // 학습할 카드가 없으면 문제로 간다. 후보가 모자라 묶음을 못 뽑으면
-  // 서버가 빈 목록을 주는데, phase 만 보고 분기하면 그 판이 아래 길이
-  // 고르기로 떨어진다 - 판이 도는 중에 "길이를 고르세요" 가 뜨면
-  // 사용자는 진행이 날아간 줄 안다.
-  if (phase !== "choosing" && question) {
+     하나. 마지막 답에서는 연출을 켜는 것과 phase 를 done 으로 바꾸는 것이
+     같이 반영되므로, playing 가지에만 두면 그 한 문제는 마운트되기도 전에
+     잘린다.
+
+     둘. 가지가 바뀌며 언마운트됐다가 돌아오면 reaction.fire 가 상태에 남아
+     있어 key 가 새로 붙고, **답도 안 한 사람에게 지난 판정이 처음부터 다시
+     재생된다.** 문제풀기에서 실제로 그랬다("다음 문제" 가 loading 가지를
+     거친다). 여기서는 "이어서 익히기" 가 같은 길이다.
+
+     가지마다 끼워 넣는 방식으로는 못 막는다 - 가지는 계속 늘어나고 하나만
+     빠뜨려도 같은 일이 난다. 출구를 하나로 두고 그 바깥에 세운다. 둘 다
+     fixed 라 자리를 안 차지하고, fire 가 0 이면 아무것도 안 그린다. */
+  const overlays = (
+    <>
+      <Burst fire={burst} />
+      {/* 화면 가운데 무대로 걸어와 반응하고 간다. 맞히든 틀리든 온다. */}
+      <Reaction fire={reaction.fire} correct={reaction.correct} dim={false} />
+    </>
+  );
+
+  const body = (() => {
+    if (phase === "done") {
+      return <DoneCard study={study} />;
+    }
+
+    if (phase === "learning" && cards.length > 0) {
+      return (
+        <StudyCards
+          // 묶음이 바뀌면 카드 번호를 처음으로 되돌린다. 안 주면 다음
+          // 묶음이 마지막 카드부터 시작한다.
+          key={study?.chunk_index ?? 0}
+          cards={cards}
+          chunkIndex={study?.chunk_index ?? 0}
+          chunkCount={study?.chunk_count ?? 0}
+          onDone={() => {
+            // 문제는 이미 받아둔 상태다. 카드를 비우고 넘어가기만 한다 -
+            // 여기서 서버를 부르면 왕복이 늘고, 그 요청은 점수와 무관해
+            // 되돌리기를 막을 이유도 없다.
+            setCards([]);
+            setResult(null);
+            setPhase("playing");
+          }}
+        />
+      );
+    }
+
+    // 학습할 카드가 없으면 문제로 간다. 후보가 모자라 묶음을 못 뽑으면
+    // 서버가 빈 목록을 주는데, phase 만 보고 분기하면 그 판이 아래 길이
+    // 고르기로 떨어진다 - 판이 도는 중에 "길이를 고르세요" 가 뜨면
+    // 사용자는 진행이 날아간 줄 안다.
+    if (phase !== "choosing" && question) {
+      return (
+        <PlayCard
+          question={question}
+          result={result}
+          study={study}
+          busy={busy}
+          error={error}
+          onPick={send}
+          // 다음 묶음이 시작되면 결과 줄 아래에 "이어서 익히기" 가 뜬다.
+          // 자동으로 넘기지 않는 이유: 이 화면은 채점 결과를 다음 문제
+          // 위에 인라인으로 띄우는데, 곧바로 학습으로 가면 방금 맞았는지
+          // 틀렸는지를 못 보고 화면이 튄다.
+          onLearn={cards.length > 0 ? () => setPhase("learning") : undefined}
+        />
+      );
+    }
+
     return (
-      <PlayCard
-        question={question}
-        result={result}
-        study={study}
+      <ChooseCard
+        lengths={status.lengths}
+        resuming={status.today}
         busy={busy}
         error={error}
-        onPick={send}
-        // 다음 묶음이 시작되면 결과 줄 아래에 "이어서 익히기" 가 뜬다.
-        // 자동으로 넘기지 않는 이유: 이 화면은 채점 결과를 다음 문제
-        // 위에 인라인으로 띄우는데, 곧바로 학습으로 가면 방금 맞았는지
-        // 틀렸는지를 못 보고 화면이 튄다.
-        onLearn={cards.length > 0 ? () => setPhase("learning") : undefined}
+        onStart={start}
       />
     );
-  }
+  })();
 
   return (
-    <ChooseCard
-      lengths={status.lengths}
-      resuming={status.today}
-      busy={busy}
-      error={error}
-      onStart={start}
-    />
+    <>
+      {overlays}
+      {body}
+    </>
   );
 }
 

@@ -225,6 +225,9 @@
      여기 두면 CSS 에서 var() 로 쓸 수 있다. */
   --duration-press: 90ms;
   --duration-enter: 360ms;
+  /* 연출 길이. 서버의 REACTION_PAUSE_MS 와 짝이다 - 아래 .vx 블록 머리말
+     참고. 여기 한 곳에만 둔다. 아래에 또 :root 를 두면 이 줄을 고친
+     사람에게 아무 일도 안 일어난다(캐스케이드에서 뒤가 이긴다). */
   --duration-verdict: 1000ms;
 
   /* ---- 포커스 링 ----
@@ -668,200 +671,521 @@
 }
 
 /* ---------------------------------------------------------------------------
-   채점 뒤 걸어오는 사람 (Reaction.tsx)
+   판정 연출 · 스포트라이트 (Reaction.tsx · ReactionCharacters.tsx)
 
-   폭죽과 흔들림만 있을 때는 판정이 색과 글자로만 왔다. 사람이 걸어와
-   반응하고 가면 한 판을 오래 풀어도 매번 무언가 일어나는 느낌이 남는다.
+   **디자인 원본에서 옮긴 것이다**(tokens/motion.css 의 .vx-*). 크림 디자인을
+   적용할 때 이 자리에 졸라맨을 손으로 그려 넣었던 것을 되돌렸다.
 
-   **0.6초로 못 박은 이유**: 사용자는 채점 직후 바로 "다음 문제" 를 누른다.
-   1초를 주면 걸어오는 모습은 잘 보이지만 연속으로 풀 때 기다리는 화면이
-   된다. 다음 문제로 넘어가면 컴포넌트가 언마운트되어 중간에라도 끊긴다.
+   화면이 어두워지고 원형 무대가 열린다. 부장님이 왼쪽에서 걸어와 학생 머리를
+   쓰다듬거나(정답) 콩 때린다(오답).
 
-   화면 아래에서 올라오지 않고 **옆에서 걸어온다.** 아래에서 솟으면 알림
-   토스트로 읽히고, 옆에서 오면 "누가 왔다" 가 된다.
+   **닿는 순간이 66% 다.** 그때 무대 바닥이 초록/코랄로 바뀌고 링이 퍼진다.
+   그 전에는 결과를 모른다 - 어둡게 깔기(vx-dim)가 장식이 아니라 판정을
+   감추는 장치인 이유다. 빼면 스포트라이트의 색 전환이 안 보여 연출이
+   성립하지 않는다.
 
-   translate 로만 움직인다. left/right 를 애니메이트하면 매 프레임 레이아웃을
-   다시 계산해서 폰에서 끊긴다.
+   **1000ms 로 못 박은 이유**: 키프레임이 전부 백분율이고 이 길이에 맞춰
+   조율돼 있다. 600ms 로 줄이면 접촉이 396ms 에 오고 걸음 하나가 48ms 가 되어
+   걷는 것이 아니라 미끄러지는 것으로 보인다.
+
+   **이 값을 바꾸면 서버도 바꿔야 한다.** 판 모드는 연출 시간을 마감에서
+   빼주는데(apps/learning/session.py 의 REACTION_PAUSE_MS), 그 값이 더 작으면
+   연출이 끝나기 전에 다음 문제가 떠서 판정 글자 구간(74~92%)이 잘린다.
+
+   캐릭터 내부 파트는 원본 이름(.boss .stu .arm .legA .legB .char)을 그대로
+   쓴다. 흔한 이름이지만 전부 `.vx` 안으로 한정해서, 이 연출 밖의 요소와는
+   겹치지 않는다.
 --------------------------------------------------------------------------- */
 
-/* 맞혔을 때 - 왼쪽에서 걸어와 따봉을 들고 멈췄다가 되돌아간다. */
-@keyframes walk-in-praise {
+/* 어둠. 12% 에 덮고 78% 에 걷힌다. */
+@keyframes vx-dim {
   0% {
     opacity: 0;
-    transform: translate3d(-160px, 0, 0);
   }
-  /* 25% 에 도착한다. 나머지는 서 있는 시간이라, 여기서 너무 늦게 도착하면
-     따봉을 든 모습이 안 보이고 지나가기만 한다. */
-  25% {
+  12%,
+  78% {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-  70% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
   100% {
     opacity: 0;
-    transform: translate3d(-120px, 0, 0);
   }
 }
 
-/* 틀렸을 때 - 오른쪽에서 와서 한 대 치고 반대로 빠진다.
+/* 원형 무대. 바탕색으로 열리고 66% 에 판정색으로 바뀐다.
+   이 색 전환이 판정을 알리는 주된 신호다. */
+/* **opacity 를 정지점마다 적는다.** 어떤 속성이 일부 키프레임에만 있으면
+   브라우저가 암묵적인 0% 프레임을 요소의 현재값으로 만들고 **그 둘 사이만**
+   보간한다. 중간 정지점은 그 속성에 대해 끼어들지 못한다.
 
-   때리는 순간(35%)에 살짝 앞으로 밀었다가 되돌린다. 그 2프레임이 없으면
-   팔만 움직이고 몸은 가만히 있어서 툭 건드린 것으로 보인다. */
-@keyframes walk-in-smack {
+   100% 에만 opacity 0 이 있었을 때 실제로 이랬다 - 1 에서 0 으로 한 번에
+   내려가는데 --ease-press 가 초반에 급해서 120ms 에 0.49, 300ms 에 0.14 다.
+   결과가 둘이었다. 하나는 **닿는 순간(66%)의 초록·코랄 전환이 opacity
+   0.012 로 일어나 안 보이는 것**이고, 하나는 반대로 **초반 300ms 동안
+   크림 원반이 보기 버튼을 덮는 것**이다. 이 층은 pointer-events: none 이라
+   덮인 채로 눌린다. */
+@keyframes vx-spot {
   0% {
+    transform: scale(0);
     opacity: 0;
-    transform: translate3d(160px, 0, 0);
+    background: var(--background);
   }
-  30% {
+  12%,
+  66% {
+    transform: scale(1);
     opacity: 1;
-    transform: translate3d(10px, 0, 0);
+    background: var(--background);
   }
-  35% {
-    transform: translate3d(-6px, 0, 0);
-  }
-  45% {
-    transform: translate3d(6px, 0, 0);
-  }
-  70% {
+  70%,
+  78% {
+    transform: scale(1.06);
     opacity: 1;
-    transform: translate3d(6px, 0, 0);
+    background: var(--vx-color);
   }
   100% {
+    transform: scale(1.2);
     opacity: 0;
-    transform: translate3d(150px, 0, 0);
+    background: var(--vx-color);
   }
 }
 
-/* 이 블록만 @utility 가 아니다. 위의 pop·shake·rise·burst-piece 는 전부
-   @utility 인데, 여기는 `.rx-praise .rx-arm-act` 같은 자손 셀렉터가 필요해
-   그 문법을 못 쓴다(@utility 는 단일 클래스만 만든다).
-
-   대신 이름에 rx- 를 붙였다. 평문 클래스는 어떤 캐스케이드 레이어에도
-   안 들어가서 Tailwind 유틸리티보다 우선순위가 높다 - leg-left 처럼
-   흔한 이름으로 두면 다른 SVG 를 하나만 더 그려도 조용히 겹친다. */
-.rx-praise,
-.rx-smack {
-  animation-duration: 600ms;
-  animation-fill-mode: both;
-  /* 걷다가 멈추는 것이라 감속이 필요하다. 등속이면 미끄러져 온 것으로 보인다. */
-  animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-.rx-praise {
-  animation-name: walk-in-praise;
-}
-
-.rx-smack {
-  animation-name: walk-in-smack;
-}
-
-/* 다리 - 걷는 동안만 번갈아 흔든다.
-
-   transform-box/transform-origin 을 같이 준다. SVG 안에서 회전 기준점은
-   기본이 뷰포트 원점이라, 안 주면 다리가 제자리에서 도는 게 아니라 화면
-   왼쪽 위를 중심으로 크게 돈다. */
-@keyframes step-a {
+/* 닿는 순간 퍼지는 링. 충격을 바깥으로 옮긴다. */
+@keyframes vx-ring {
   0%,
+  66% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  68% {
+    opacity: 0.9;
+  }
+  90%,
   100% {
-    transform: rotate(14deg);
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* 부장님이 걸어오는 길. 다섯 걸음이고 걸음마다 몸이 6px 들썩인다.
+   62~70% 의 rotate 는 때린 뒤 반동이다. */
+@keyframes vx-walk {
+  0%,
+  10% {
+    transform: translate(-190px, 0);
+  }
+  18% {
+    transform: translate(-150px, -6px);
+  }
+  26% {
+    transform: translate(-110px, 0);
+  }
+  34% {
+    transform: translate(-70px, -6px);
+  }
+  42% {
+    transform: translate(-35px, 0);
   }
   50% {
-    transform: rotate(-14deg);
+    transform: translate(-8px, -4px);
+  }
+  56% {
+    transform: translate(0, 0);
+  }
+  62% {
+    transform: translate(-5px, 0) rotate(-4deg);
+  }
+  70% {
+    transform: translate(3px, 0) rotate(3deg);
+  }
+  78%,
+  100% {
+    transform: none;
   }
 }
 
-@keyframes step-b {
+/* 두 다리가 번갈아. 걸음 구간(10~56%)만 움직이고 그 뒤는 선다. */
+@keyframes vx-step-a {
   0%,
+  10%,
+  26%,
+  42%,
+  56%,
   100% {
-    transform: rotate(-14deg);
+    transform: rotate(22deg);
   }
+  18%,
+  34%,
   50% {
-    transform: rotate(14deg);
+    transform: rotate(-22deg);
   }
 }
 
-.rx-leg-a,
-.rx-leg-b,
-.rx-arm-idle {
-  transform-box: fill-box;
-  transform-origin: top center;
-  animation-duration: 260ms;
-  /* 3회만 반복한다. 도착한 뒤에도 계속 걸으면 제자리걸음이 된다. */
-  animation-iteration-count: 3;
-  animation-timing-function: ease-in-out;
-}
-
-.rx-leg-a {
-  animation-name: step-a;
-}
-
-.rx-leg-b,
-.rx-arm-idle {
-  animation-name: step-b;
-}
-
-/* 오른팔 - 도착한 뒤 동작을 한다.
-
-   따봉은 들어올리고, 손바닥은 앞으로 뻗었다 돌아온다. 걷는 동안에는
-   가만히 있다가 25% 지점(도착)부터 움직이도록 delay 를 준다. */
-@keyframes raise-thumb {
-  0% {
-    transform: rotate(20deg) scale(0.9);
+@keyframes vx-step-b {
+  0%,
+  10%,
+  26%,
+  42%,
+  56%,
+  100% {
+    transform: rotate(-22deg);
   }
-  60% {
-    transform: rotate(-12deg) scale(1.1);
+  18%,
+  34%,
+  50% {
+    transform: rotate(22deg);
+  }
+}
+
+/* 쓰다듬기. 걸어올 때 팔이 흔들리고(0~50%), 들어올려(56%) 머리에 얹은 뒤
+   세 번 토닥인다(70·76·82%). */
+@keyframes vx-pat {
+  0%,
+  18%,
+  34%,
+  50% {
+    transform: rotate(18deg);
+  }
+  10%,
+  26%,
+  42% {
+    transform: rotate(-18deg);
+  }
+  56% {
+    transform: rotate(30deg);
+  }
+  64% {
+    transform: rotate(-136deg);
+  }
+  70% {
+    transform: rotate(-124deg);
+  }
+  76% {
+    transform: rotate(-140deg);
+  }
+  82%,
+  100% {
+    transform: rotate(-130deg);
+  }
+}
+
+/* 콩. 쓰다듬기와 같은 걸음이지만 더 크게 들어(42deg) 한 번에 내린다.
+   -215deg 로 지나쳤다가 -140deg 로 돌아오는 것이 때린 뒤 반동이다. */
+@keyframes vx-bonk {
+  0%,
+  18%,
+  34%,
+  50% {
+    transform: rotate(18deg);
+  }
+  10%,
+  26%,
+  42% {
+    transform: rotate(-18deg);
+  }
+  56% {
+    transform: rotate(42deg);
+  }
+  64% {
+    transform: rotate(-215deg);
+  }
+  69%,
+  100% {
+    transform: rotate(-140deg);
+  }
+}
+
+/* 학생이 기뻐 뛴다. 눌렸다가(62%) 솟고(70%) 착지한다(76%). */
+@keyframes vx-happy {
+  0%,
+  52% {
+    transform: none;
+  }
+  62% {
+    transform: scale(1.02, 0.95);
+  }
+  70% {
+    transform: translateY(-16px) scale(0.96, 1.06);
+  }
+  76% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+  82%,
+  100% {
+    transform: none;
+  }
+}
+
+/* 학생이 맞고 납작해진다. 좌우로 흔들리며 돌아온다. */
+@keyframes vx-ouch {
+  0%,
+  52% {
+    transform: none;
+  }
+  62% {
+    transform: scale(1.02, 0.95);
+  }
+  68% {
+    transform: scaleY(0.8) scaleX(1.08) rotate(-4deg);
+  }
+  73% {
+    transform: scaleY(1.03) rotate(4deg);
+  }
+  78% {
+    transform: scaleY(0.98) rotate(-2deg);
+  }
+  84%,
+  100% {
+    transform: none;
+  }
+}
+
+/* 표정 교체. 닿는 순간에 딱 바뀌어야 해서 step-end 로 계단처럼 넘긴다.
+   그 전에 바뀌면 결과가 미리 새고, 뒤에 바뀌면 반응이 늦어 보인다. */
+@keyframes vx-face-off {
+  0%,
+  66% {
+    opacity: 1;
+  }
+  67%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes vx-face-on {
+  0%,
+  66% {
+    opacity: 0;
+  }
+  67%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* 판정 글자. 어둠이 깔린 동안 보기 버튼과 해설이 안 읽히므로 그 사이를
+   메우고, 어둠이 걷히기 전에 사라진다 - 남으면 그때부터 중복이다. */
+@keyframes vx-text {
+  0%,
+  66% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.9);
+  }
+  74%,
+  92% {
+    opacity: 1;
+    transform: none;
   }
   100% {
-    transform: rotate(-6deg) scale(1);
+    opacity: 0;
+    transform: translateY(-6px);
   }
 }
 
-@keyframes swing-hand {
-  0% {
-    transform: rotate(-30deg);
-  }
-  /* 때리는 순간. 몸이 앞으로 밀리는 35% 와 맞춰야 한 동작으로 보인다. */
-  40% {
-    transform: rotate(25deg);
-  }
-  100% {
-    transform: rotate(10deg);
-  }
-}
+.vx {
+  position: fixed;
+  inset: 0;
+  /* **탭바가 있는 화면에서는 그만큼 위로 올린다.**
+     무대와 캐릭터가 `top: 50%` 기준이라, 아래를 잘라내면 가운데가 함께
+     올라가 탭바를 피한다.
 
-.rx-arm-act {
-  transform-box: fill-box;
-  transform-origin: top left;
-  animation-duration: 300ms;
-  animation-delay: 150ms;
+     높이는 TabBar 가 `--tabbar-height` 로 내보낸다. 탭바가 없는 화면에서는
+     그 변수가 없어 기본값 0 으로 떨어지므로 조건 셀렉터가 필요 없다.
+
+     **언제 실제로 걸리나.** 무대가 화면 중앙 기준이라 세로로 긴 화면에서는
+     원래 안 닿는다 - 390x844 에서 무대 아래끝 543, 탭바 위끝 787 로 244px
+     남는다. 실측한 임계는 이렇다.
+
+         보정 없음   화면 높이 414px 아래부터 무대가 탭바를 밟는다
+         보정 있음   357px 아래부터
+
+     가로로 눕힌 폰이 390px 이라 딱 그 사이에 들어간다. 보정이 없으면 거기서
+     무대 아래 호가 12px 물린다(발은 안 닿는다).
+
+     판정 글자를 근거로 삼지 말 것. 그 글자는 dim 이 켜진 화면에만 그려지고
+     그 화면들은 탭바가 없다 - 이 규칙이 걸리는 상황과 배타적이다.
+
+     JS 로 재지 않는 이유: 높이를 재려면 effect 와 상태가 필요한데 그때는
+     이미 애니메이션이 돌고 있어 한 프레임 늦게 자리가 바뀐다. */
+  bottom: var(--tabbar-height, 0px);
+  /* 필수다. 이 층이 보기 버튼 위를 덮는데, 없으면 연출이 도는 1초 동안
+     답을 못 고른다. */
+  pointer-events: none;
+  /* 무대(300px svg)가 화면 밖으로 나갈 일은 없지만, 층 자체가 화면을 꽉
+     채우므로 안에서 뭐가 삐져나와도 가로 스크롤이 안 생기게 자른다.
+     부장님의 출발점 -190px 은 화면이 아니라 svg 좌표계 기준이고, 그쪽은
+     svg 가 자기 뷰포트를 이미 자른다 - 무대 왼쪽 경계에서 잘린 채 걸어
+     들어와 26% 쯤에 온전히 보인다. */
+  overflow: hidden;
+  /* 본문 위·나가기 장막(z-50) 아래. 탭바는 위 bottom 이 비켜 가므로 덮지 않는다. */
+  z-index: 40;
+  /* **끝나면 층 전체를 지운다.** 이것이 없으면 사람이 화면에 박혀 다음
+     문제를 푸는 내내 서 있다 - 원본 키프레임의 마지막이 vx-walk 의
+     `transform: none`, 즉 "무대 한가운데 서 있는 상태" 라서 그렇다.
+     어둠과 무대와 링만 끝을 opacity 0 으로 두고 사람은 안 지운다.
+
+     원본이 이 규칙 없이도 되는 것은 그쪽 화면이 1초 뒤 결과 시트를
+     띄워 덮기 때문이고, 우리 네 화면에는 그런 것이 없다.
+
+     타이머로 언마운트하지 않는 이유: 바로 아래 reduced-motion 주석과
+     같은 판단이다. 상태와 정리가 늘어나는 것보다 안 보이는 층 하나가
+     남는 쪽이 싸다 - Burst 와 옛 Reaction 도 같은 계약이었다.
+
+     단축(animation: ...)을 안 쓰는 이유는 rise 유틸과 같다. 나중에 .vx 에
+     애니메이션을 하나 더 얹는 사람이 단축으로 적으면 이 줄이 통째로
+     지워지고, 그러면 캐릭터가 박히는 그 버그가 그대로 돌아온다. 빌드는
+     통과하고 화면만 달라진다. */
+  animation-name: vx-out;
+  animation-duration: var(--duration-verdict);
+  animation-timing-function: linear;
   animation-fill-mode: both;
-  animation-timing-function: cubic-bezier(0.3, 1.4, 0.5, 1);
 }
 
-.rx-praise .rx-arm-act {
-  animation-name: raise-thumb;
+/* 마지막 10% 에 걷힌다. 판정 글자(92~100%)와 어둠(78~100%)이 이미 그
+   구간에서 빠지므로 같이 사라지는 것으로 보인다. */
+@keyframes vx-out {
+  0%,
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
-.rx-smack .rx-arm-act {
-  animation-name: swing-hand;
+.vx-dim {
+  position: absolute;
+  inset: 0;
+  background: rgb(25 21 18 / 0.72);
+  animation: vx-dim var(--duration-verdict) linear both;
+}
+
+.vx-spot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 300px;
+  height: 300px;
+  margin: -150px;
+  border-radius: 50%;
+  animation: vx-spot var(--duration-verdict) var(--ease-press) both;
+}
+
+.vx-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 300px;
+  height: 300px;
+  margin: -150px;
+  border-radius: 50%;
+  border: 6px solid var(--vx-color);
+  animation: vx-ring var(--duration-verdict) cubic-bezier(0.1, 0.8, 0.2, 1) both;
+}
+
+.vx svg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 300px;
+  height: 300px;
+  margin: -150px;
+}
+
+/* 회전 기준점을 관절에 둔다. 실제로 동작을 바꾸는 것은 `transform-origin: 0 0`
+   이다 - 기본값 `50% 50%` 로 두면 다리가 엉덩이가 아니라 뷰박스 한가운데를
+   축으로 돈다. `transform-box: view-box` 는 SVG 요소의 초깃값과 같아서 지금은
+   아무 일도 안 하지만, 누가 `fill-box` 로 바꾸면 기준이 통째로 어긋나므로
+   의도를 못 박아 둔다.
+
+   .boss 가 여기 있어야 하는 이유: vx-walk 가 62~70% 에 rotate 를 준다.
+   기준점이 뷰박스 가운데면 발에서 150 유닛 떨어진 점을 축으로 돌아, 제자리
+   기울기가 아니라 대각선으로 26px 튀었다 돌아오는 동작이 된다. */
+.vx .boss,
+.vx .legA,
+.vx .legB,
+.vx .arm,
+.vx .stu {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.vx .boss {
+  animation: vx-walk var(--duration-verdict) var(--ease-walk) both;
+}
+
+.vx .legA {
+  animation: vx-step-a var(--duration-verdict) ease-in-out both;
+}
+
+.vx .legB {
+  animation: vx-step-b var(--duration-verdict) ease-in-out both;
+}
+
+/* 팔과 학생 반응은 정답 여부로 갈린다. Reaction.tsx 가 --vx-arm·--vx-stu 로
+   키프레임 이름을 넘긴다. */
+.vx .arm {
+  animation: var(--vx-arm) var(--duration-verdict) var(--ease-pat) both;
+}
+
+.vx .stu {
+  animation: var(--vx-stu) var(--duration-verdict) var(--ease-bounce) both;
+}
+
+/* 표정은 셋을 다 그려두고 여기서 하나만 켠다.
+   ReactionCharacters 의 data-x 이름과 짝이라 한쪽만 바꾸면 표정이 안 뜬다. */
+.vx .char [data-x] {
+  display: inline;
+}
+
+.vx .char [data-x="neutral"],
+.vx .char [data-x="idle"] {
+  animation: vx-face-off var(--duration-verdict) step-end both;
+}
+
+.vx .char [data-x="smile"],
+.vx .char [data-x="happy"],
+.vx .char [data-x="stern"],
+.vx .char [data-x="ouch"] {
+  animation: vx-face-on var(--duration-verdict) step-end both;
+}
+
+/* 쓰지 않는 쪽 표정은 아예 지운다. 이것이 없으면 정답일 때 굳은 표정과
+   웃는 표정이 겹쳐 뜬다. */
+.vx-ok .char [data-x="stern"],
+.vx-ok .char [data-x="ouch"],
+.vx-no .char [data-x="smile"],
+.vx-no .char [data-x="happy"] {
+  display: none;
+}
+
+.vx-verdict {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  /* 무대(300px, margin -150px) 아래에 둔다. 150 + 28 이라 무대 테두리와
+     겹치지 않는다. */
+  margin: 178px 0 0;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  /* 어둠 위에 얹히므로 흰색이다. 무대 색과 무관하게 읽혀야 한다. */
+  color: #fff;
+  animation: vx-text var(--duration-verdict) var(--ease-bounce) both;
 }
 
 /* 움직임을 줄인 사용자에게는 아예 안 그린다.
+   전역 reduced-motion 규칙(위쪽)이 duration 을 0.01ms 로 만드는데, 그것에
+   맡기면 animation-fill-mode: both 때문에 **마지막 프레임에 고정된다.**
+   vx-spot 의 끝은 opacity 0 이라 우연히 안 보이지만, vx-walk·vx-pat 의 끝은
+   "서 있는 상태" 라 부장님과 학생이 화면 가운데에 박힌다 - ExitGuard 가
+   exit-veil 에서 이미 같은 대가를 치렀다.
 
-   전역 reduced-motion 규칙(animation-duration 0.01ms)에 맡기면 fill-mode:
-   both 때문에 마지막 프레임에 고정되는데, 지금은 그 프레임이 opacity 0 이라
-   우연히 안 보인다. 키프레임 끝을 "서 있는 상태" 로 바꾸는 순간 스틱피겨가
-   화면에 영구히 박힌다 - ExitGuard 가 exit-veil 에서 이미 같은 대가를
-   치렀다(그때는 화면이 덮인 채로 굳었다).
-
-   정지 이미지로 남기지 않는 이유: 판정은 이미 aria-live 텍스트와 보기 버튼
-   색으로 두 번 전달된다. 멈춘 사람은 정보를 더하지 않고 고장으로 읽힌다. */
+   정지 이미지로 남기지 않는 이유: 판정은 이미 보기 버튼 색과 해설로 두 번
+   전달된다. 멈춘 캐릭터는 정보를 더하지 않고 고장으로 읽힌다. */
 @media (prefers-reduced-motion: reduce) {
-  .rx-praise,
-  .rx-smack {
+  .vx {
     display: none;
   }
 }

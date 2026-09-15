@@ -111,6 +111,10 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     aliveRef.current = true;
     return () => {
       aliveRef.current = false;
+      // 판을 떠나면 연출 길이를 원래대로 돌려놓는다. 이 화면만 서버 값을
+      // 따라가므로(아래 start 참고), 안 지우면 그 값이 문서 뿌리에 남아
+      // 일일학습·복습·문제풀기의 연출 길이까지 따라 바뀐다.
+      document.documentElement.style.removeProperty("--duration-verdict");
     };
   }, []);
 
@@ -187,6 +191,24 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       // 서버가 정한 값을 그대로 쓴다. 없으면 0 이라 예전처럼 안 멈춘다 -
       // 서버가 옛 버전이어도 판이 깨지지 않는다.
       pauseRef.current = started.reaction_pause_ms ?? 0;
+      // 연출 길이도 같은 값으로 맞춘다. 서버가 이만큼 멈추는데 CSS 가 다른
+      // 길이로 돌면, 짧은 쪽은 빈 화면을 기다리고 긴 쪽은 연출이 잘린 채
+      // 다음 문제가 뜬다. 서버 값을 받는 화면은 여기뿐이라 다른 화면은
+      // globals.css 의 기본값이 계속 답이다.
+      // 0 일 때도 반드시 반영한다. 서버가 0 을 주면(옛 서버이거나 연출을
+      // 끈 경우) 안 멈추는데, 그냥 두면 직전 판에서 넣어둔 값이 남아
+      // 연출이 다음 문제 위에 겹친다.
+      if (pauseRef.current > 0) {
+        document.documentElement.style.setProperty(
+          "--duration-verdict",
+          `${pauseRef.current}ms`,
+        );
+      } else {
+        // 서버가 안 멈추면 연출도 안 돈다. removeProperty 로 두면 CSS 가
+        // 기본 1000ms 로 도는데, 빨리 푸는 동안 어둠이 key 교체로 계속
+        // 새로 시작해 화면이 어두운 채로 남는다.
+        document.documentElement.style.setProperty("--duration-verdict", "0ms");
+      }
       setSeconds(started.round_seconds);
       tokenRef.current = started.token;
       setQuestion(started.question);
@@ -268,20 +290,15 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         deadlineRef.current += pauseRef.current;
       }
 
-      if (answered.finished || !answered.question) {
-        await finish(answered.token);
-        return;
-      }
-
-      // 답하는 사이 마감이 지났으면 여기서 닫는다. 타이머는 진행 중이라
-      // 넘겼고, 그 사이 토큰이 새로 왔으므로 이제 거절되지 않는다.
-      if (Date.now() >= deadlineRef.current) {
-        await finish(answered.token);
-        return;
-      }
-
-      // 연출이 끝난 뒤에 다음 문제를 낸다. 바로 내면 걸어오는 사람 위로
-      // 새 문제가 덮여서, 맞았는지 틀렸는지 볼 틈이 없다.
+      // 연출이 끝날 때까지 기다린다. **판을 닫는 길보다 위에 둔다.**
+      // 아래로 내려두면 마지막 문제만 finish() 왕복(로컬에서 30ms) 직후
+      // 결과 카드가 떠서, 맞았는지 틀렸는지를 결과 카드 위에서 보게 된다.
+      // 연출 층은 화면이 바뀌어도 그대로 붙어 있으니(맨 아래 overlays)
+      // 사라지지는 않지만, 판정을 먼저 보고 결과로 넘어가는 순서가 맞다.
+      //
+      // 다음 문제를 바로 안 내는 이유: 이 화면은 어둡게 깔아(dim) 연출
+      // 동안 문제가 가려지고, 판정은 보기 버튼 색으로만 남는다. 바로 내면
+      // 어둠이 걷혔을 때 이미 다음 문제라 맞았는지 틀렸는지 볼 틈이 없다.
       //
       // 이 사이 busyRef 를 쥐고 있어(finally 에서만 푼다) 보기 버튼이
       // 안 먹는다. 연출 중에 답이 나가면 그 답의 시계가 이미 흐른 뒤다.
@@ -289,15 +306,21 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         await new Promise((r) => setTimeout(r, pauseRef.current));
         // 기다리는 사이 판을 나갔을 수 있다.
         if (!aliveRef.current) return;
+      }
 
-        // **마감을 다시 본다.** 기다리기 전에 봤어도 그 사이 지났을 수
-        // 있다. 안 보면 타이머가 0 인 채로 다음 문제가 떠서, 누르면
-        // 닫으려는 요청과 답이 같은 토큰으로 겹쳐 나가 판이 통째로
-        // 기록되지 않는다.
-        if (Date.now() >= deadlineRef.current) {
-          await finish(answered.token);
-          return;
-        }
+      if (answered.finished || !answered.question) {
+        await finish(answered.token);
+        return;
+      }
+
+      // **마감을 다시 본다.** 답하는 사이에도, 연출을 기다리는 사이에도
+      // 지날 수 있다. 안 보면 타이머가 0 인 채로 다음 문제가 떠서, 누르면
+      // 닫으려는 요청과 답이 같은 토큰으로 겹쳐 나가 판이 통째로
+      // 기록되지 않는다. 타이머는 진행 중이라 넘겼고, 그 사이 토큰이 새로
+      // 왔으므로 이제 거절되지 않는다.
+      if (Date.now() >= deadlineRef.current) {
+        await finish(answered.token);
+        return;
       }
 
       setQuestion(answered.question);
@@ -322,96 +345,114 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     }
   };
 
-  if (phase === "idle") {
-    return (
-      // 세로 가운데. 시작 카드 하나뿐이라 위에 붙이면 아래가 통째로 빈다.
-      // 판이 시작되면(아래 playing) 위에 붙는다 - 그때는 타이머가 화면
-      // 맨 위에 있어야 한다.
-      <div className="flex flex-1 flex-col justify-center">
-        {/* 아직 판이 안 열렸다. 점수로 잃을 게 없으니 묻지 않고 나간다.
-            대신 갈 곳을 여럿 둔다 - 여기는 고르는 자리다. */}
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <ExitGuard to={routes.home} label="홈" />
-          {/* 맨몸 글자 링크로 둔다. 옆의 나가기가 흰 알약이라, 여기까지
-              알약이면 같은 무게의 버튼 둘이 나란히 서서 어느 것이 나가는
-              길인지 안 보인다. */}
-          <Link
-            href={routes.board()}
-            className="inline-flex min-h-11 items-center rounded-full px-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            style={{
-              color: "var(--text-muted)",
-              fontWeight: "var(--weight-bold)",
-            }}
-          >
-            순위표
-          </Link>
-        </div>
-        <StartCard onStart={start} busy={busy} error={error} />
-      </div>
-    );
-  }
+  /* 채점 연출 둘. **어느 가지에도 넣지 않는다.**
 
-  if (phase === "done") {
-    return (
-      // 결과 카드도 하나뿐이라 가운데가 맞다.
-      <div className="flex flex-1 flex-col justify-center">
-        {/* 판이 끝났다. 점수는 이미 서버에 올라갔으니 경고할 것이 없다. */}
-        <div className="mb-5 flex items-center gap-3">
-          <ExitGuard to={routes.profile} label="내 기록" />
+     아래는 phase 마다 다른 트리를 돌려준다. 연출을 그중 한 가지 안에 두면
+     가지가 바뀔 때 React 가 언마운트했다가 돌아올 때 다시 마운트하는데,
+     reaction.fire 가 상태에 남아 있으므로 key 가 새로 붙어 **답도 안 한
+     사람에게 지난 판정이 다시 재생된다.** 문제풀기에서 실제로 그랬다 -
+     "다음 문제" 가 loading 가지를 거치면서 연출이 한 번 더 돌았다.
+
+     가지마다 끼워 넣는 방식으로는 못 막는다. 출구를 하나로 두고 그 바깥에
+     세운다. 둘 다 fixed 라 자리를 안 차지하고 fire 가 0 이면 안 그린다. */
+  const overlays = (
+    <>
+      <Burst fire={burst} />
+      {/* 이 연출 동안 다음 문제를 안 낸다. 그 시간은 서버가 마감에서
+          빼주므로(session.REACTION_PAUSE_MS) 90초를 손해 보지 않는다.
+          대신 한 판의 실제 길이가 그만큼 늘어난다. */}
+      <Reaction fire={reaction.fire} correct={reaction.correct} dim />
+    </>
+  );
+
+  const body = (() => {
+    if (phase === "idle") {
+      return (
+        // 세로 가운데. 시작 카드 하나뿐이라 위에 붙이면 아래가 통째로 빈다.
+        // 판이 시작되면(아래 playing) 위에 붙는다 - 그때는 타이머가 화면
+        // 맨 위에 있어야 한다.
+        <div className="flex flex-1 flex-col justify-center">
+          {/* 아직 판이 안 열렸다. 점수로 잃을 게 없으니 묻지 않고 나간다.
+              대신 갈 곳을 여럿 둔다 - 여기는 고르는 자리다. */}
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <ExitGuard to={routes.home} label="홈" />
+            {/* 맨몸 글자 링크로 둔다. 옆의 나가기가 흰 알약이라, 여기까지
+                알약이면 같은 무게의 버튼 둘이 나란히 서서 어느 것이 나가는
+                길인지 안 보인다. */}
+            <Link
+              href={routes.board()}
+              className="inline-flex min-h-11 items-center rounded-full px-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={{
+                color: "var(--text-muted)",
+                fontWeight: "var(--weight-bold)",
+              }}
+            >
+              순위표
+            </Link>
+          </div>
+          <StartCard onStart={start} busy={busy} error={error} />
         </div>
-        <RoundResultCard
-          summary={summary}
-          error={error}
-          isGuest={isGuest}
-          onAgain={start}
+      );
+    }
+
+    if (phase === "done") {
+      return (
+        // 결과 카드도 하나뿐이라 가운데가 맞다.
+        <div className="flex flex-1 flex-col justify-center">
+          {/* 판이 끝났다. 점수는 이미 서버에 올라갔으니 경고할 것이 없다. */}
+          <div className="mb-5 flex items-center gap-3">
+            <ExitGuard to={routes.profile} label="내 기록" />
+          </div>
+          <RoundResultCard
+            summary={summary}
+            error={error}
+            isGuest={isGuest}
+            onAgain={start}
+            busy={busy}
+            late={tally.late}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {/* 판이 도는 중이다. 나가는 길은 이것 하나뿐이고, 여기서만 묻는다.
+            지금 나가면 서버가 판을 안 닫아서 점수가 안 남는다. */}
+        <div className="mb-4 flex items-center gap-3">
+          {/* 라벨이 "그만두기" 인 이유: 확인창 안의 확정 버튼이 "나가기" 라
+              같은 이름이 한 화면에 둘이면 낭독기가 같은 말을 두 번 읽고,
+              무엇을 눌러야 진짜 나가는지 헷갈린다. 여는 쪽과 확정하는 쪽의
+              이름을 다르게 둔다. */}
+          <ExitGuard
+            to={routes.home}
+            label="그만두기"
+            confirm
+            score={tally.score}
+            countdown
+          />
+        </div>
+
+        <PlayCard
+          question={question}
+          result={result}
+          left={left}
+          total={seconds}
+          skipsLeft={skipsLeft}
+          tally={tally}
           busy={busy}
-          late={tally.late}
+          error={error}
+          onPick={(id) => send(id)}
+          onSkip={() => send(null, true)}
         />
-      </div>
+      </>
     );
-  }
+  })();
 
   return (
     <>
-      {/* 푸는 동안에만 둔다. 시작 카드와 결과 카드에는 판정이 없다. */}
-      <Burst fire={burst} />
-
-      {/* 화면 아래쪽에서 걸어와 반응하고 간다. Burst 와 같은 이유로 여기
-          둔다 - 문제 위치와 무관하게 화면 기준으로 서야 한다.
-
-          판 모드에서는 이 연출 동안 다음 문제를 안 낸다. 그 시간은 서버가
-          마감에서 빼주므로(session.REACTION_PAUSE_MS) 90초를 손해 보지
-          않는다. 대신 한 판의 실제 길이가 그만큼 늘어난다. */}
-      <Reaction fire={reaction.fire} correct={reaction.correct} />
-
-      {/* 판이 도는 중이다. 나가는 길은 이것 하나뿐이고, 여기서만 묻는다.
-          지금 나가면 서버가 판을 안 닫아서 점수가 안 남는다. */}
-      <div className="mb-4 flex items-center gap-3">
-        {/* 라벨이 "그만두기" 인 이유: 확인창 안의 확정 버튼이 "나가기" 라
-            같은 이름이 한 화면에 둘이면 낭독기가 같은 말을 두 번 읽고,
-            무엇을 눌러야 진짜 나가는지 헷갈린다. 여는 쪽과 확정하는 쪽의
-            이름을 다르게 둔다. */}
-        <ExitGuard
-          to={routes.home}
-          label="그만두기"
-          confirm
-          score={tally.score}
-          countdown
-        />
-      </div>
-
-      <PlayCard
-        question={question}
-        result={result}
-        left={left}
-        total={seconds}
-        skipsLeft={skipsLeft}
-        tally={tally}
-        busy={busy}
-        error={error}
-        onPick={(id) => send(id)}
-        onSkip={() => send(null, true)}
-      />
+      {overlays}
+      {body}
     </>
   );
 }
