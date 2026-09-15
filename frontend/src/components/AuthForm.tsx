@@ -32,6 +32,20 @@ type Props = {
   googleFailed?: boolean;
 };
 
+/**
+ * 비밀번호 최소 길이.
+ *
+ * 백엔드 `MinimumLengthValidator` 기본값(8)과 같아야 한다. 여기가 더 크면
+ * 쓸 수 있는 비밀번호를 막고, 더 작으면 브라우저를 통과한 것이 서버에서
+ * 거절돼 왕복만 늘어난다.
+ *
+ * **안내 문구가 이 숫자를 한글로 적는다**("여덟 자 이상"). 이 값을 바꾸면
+ * 아래 hint 도 같이 고쳐야 한다 - 문구를 숫자로 만들어 묶을 수도 있지만,
+ * 그러면 "8자 이상" 이 되어 지금 문장이 바뀐다. 이번 범위가 아니라 그대로
+ * 두고 여기 적어둔다.
+ */
+const PASSWORD_MIN = 8;
+
 const COPY = {
   login: {
     title: "로그인",
@@ -139,12 +153,27 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
       <form action={formAction} className="mt-6 grid gap-4">
         {next && <input type="hidden" name="next" value={next} />}
 
+        {/* 이메일 칸에 maxLength 를 걸지 않는 이유:
+
+            백엔드가 254자에서 거절하니 미리 막고 싶지만, maxLength 는 넘는
+            값을 **말없이 잘라낸다**. 붙여넣기로 재현하면 261자가 254자로
+            잘려 `...aaa@exam` 이 되는데 브라우저는 그것을 유효하다고 보고
+            그대로 보낸다. 사용자는 멀쩡해 보이는 주소를 앞에 두고 "유효한
+            이메일 주소를 입력하세요" 를 받는다 - 무엇이 틀렸는지 알 방법이
+            없고, 잘린 것이 우연히 유효한 주소가 되면 의도한 적 없는 주소로
+            가입 시도가 나간다.
+
+            안 걸면 서버가 글자 수를 말해주고 친 값은 그대로 남는다.
+            **아래 이름 칸의 maxLength 와 비밀번호의 minLength 는 다르다** -
+            이름은 서버가 알아서 지어주는 선택 칸이라 잘려도 피해가 작고,
+            minLength 는 막기만 하고 고치지 않아 무엇을 할지 알 수 있다. */}
         <Field
           label="이메일"
           name="email"
           type="email"
           autoComplete="email"
           required
+          defaultValue={state.values?.email}
         />
 
         {mode === "signup" && (
@@ -155,16 +184,22 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
             autoComplete="nickname"
             // 백엔드 DISPLAY_NAME_MAX 와 같아야 한다. 프로필 화면도 같은 값.
             maxLength={12}
+            defaultValue={state.values?.display_name}
             hint="순위표에 뜰 이름입니다. 비워두면 알아서 지어드립니다."
           />
         )}
 
+        {/* 비밀번호는 되살리지 않는다(actions.ts 의 FormState 주석). 가입에만
+            최소 길이를 건다 - 로그인은 규칙이 바뀌기 전에 만든 옛 비밀번호도
+            받아야 하는데, 여기 minLength 를 걸면 그 사람이 자기 계정에
+            못 들어간다. 막을 곳은 만드는 자리지 들어오는 자리가 아니다. */}
         <Field
           label="비밀번호"
           name="password"
           type="password"
           autoComplete={mode === "login" ? "current-password" : "new-password"}
           required
+          minLength={mode === "signup" ? PASSWORD_MIN : undefined}
           hint={
             mode === "signup"
               ? "여덟 자 이상, 이메일과 너무 비슷하지 않게."
@@ -172,7 +207,18 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
           }
         />
 
-        {state.error && <Notice>{state.error}</Notice>}
+        {/* 알림 자리를 **항상 렌더한다.** 리전이 내용과 함께 새로 생기면
+            화면 낭독기가 대부분 그 등장을 안 알린다 - 리전은 미리 있어야
+            이후 변화를 감시한다(QuizBoard·TalkBoard 가 같은 이유로 그렇게
+            한다). 안쪽만 조건부로 바꾼다.
+
+            이번 변경으로 이게 더 중요해졌다. 전에는 실패하면 칸이 전부
+            비어서 눈으로도 무언가 일어난 것을 알았는데, 이제 폼이 그대로
+            남는다. 알림이 안 읽히면 화면을 못 보는 사용자에게는 **아무
+            일도 안 일어난 것과 같다.** */}
+        <div aria-live="polite">
+          {state.error && <Notice>{state.error}</Notice>}
+        </div>
 
         <SubmitButton label={copy.submit} pendingLabel={copy.pending} />
       </form>
@@ -248,6 +294,8 @@ function Field({
   autoComplete,
   required,
   maxLength,
+  minLength,
+  defaultValue,
   hint,
 }: {
   label: string;
@@ -256,6 +304,19 @@ function Field({
   autoComplete: string;
   required?: boolean;
   maxLength?: number;
+  minLength?: number;
+  /**
+   * 실패하고 돌아왔을 때 되살릴 값.
+   *
+   * 제어 입력(value+onChange)이 아니라 defaultValue 로 충분하다. Server
+   * Action 이 끝나면 React 가 폼을 초기화하는데, **그 초기화가 되돌리는
+   * 자리가 defaultValue** 라서 새 값이 그대로 남는다. 두 번 연속 실패해도
+   * 남는 것까지 확인했다.
+   *
+   * 제어 입력으로 만들면 칸마다 상태와 onChange 가 붙는데, 되살리는 것
+   * 말고는 쓸 데가 없다.
+   */
+  defaultValue?: string;
   hint?: string;
 }) {
   const hintId = hint ? `${name}-hint` : undefined;
@@ -287,6 +348,8 @@ function Field({
         autoComplete={autoComplete}
         required={required}
         maxLength={maxLength}
+        minLength={minLength}
+        defaultValue={defaultValue}
         aria-describedby={hintId}
         // 흰 바탕이 아니라 --surface-field 다. 크림(#FFF6E9) 위에 흰
         // 입력칸을 놓으면 경계가 거의 안 보인다. 여기에 카드 두께까지

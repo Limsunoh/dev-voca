@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test --test-reporter=spec \"src/**/*.test.{ts,mts}\""
+    "test": "tsx --test --experimental-test-module-mocks --test-reporter=spec \"src/**/*.test.{ts,mts}\""
   },
   "dependencies": {
     "next": "16.2.12",
