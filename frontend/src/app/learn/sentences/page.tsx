@@ -97,7 +97,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
     const badRequest = error.status === 400;
 
     return (
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main className="mx-auto w-full max-w-3xl px-4 py-10">
         <LearnHeader
           mode="learn"
           content="sentences"
@@ -131,7 +131,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="mx-auto w-full max-w-3xl px-4 py-10">
       <LearnHeader
         mode="learn"
         content="sentences"

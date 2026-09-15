@@ -29,7 +29,7 @@ export default async function TestWordsPage({ searchParams }: PageProps) {
   const categories = await getCategories();
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pt-4 pb-10">
+    <main className="mx-auto w-full max-w-3xl px-4 pt-4 pb-10">
       {/* 머리말을 한 줄로 줄인다. 전에는 탭·제목·설명·칩 여덟 개가 화면
           위 절반을 먹어서, 정작 풀어야 할 문제가 반쯤 잘리고 보기는 둘만
           보였다. 여기는 읽는 화면이 아니라 푸는 화면이다.

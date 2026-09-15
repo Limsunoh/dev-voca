@@ -40,7 +40,7 @@ export default async function TestSentencesPage({ searchParams }: PageProps) {
   const categories = await getSentenceCategories();
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pt-4 pb-10">
+    <main className="mx-auto w-full max-w-3xl px-4 pt-4 pb-10">
       {/* 화면에는 안 보이지만 남겨둔다. 이유는 test/words 쪽에 적어뒀다. */}
       <h1 className="sr-only">문장 문제풀기</h1>
 
