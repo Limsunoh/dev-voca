@@ -1,5 +1,6 @@
 "use client";
 
+import { DifficultyBadge } from "@/components/MetaBadge";
 import { Reading } from "@/components/Reading";
 import { alignParts } from "@/lib/talk-parts";
 import type { TalkPrompt as Prompt } from "@/lib/api/talk";
@@ -49,6 +50,23 @@ export function TalkPromptCard({
         boxShadow: "var(--lift-card)",
       }}
     >
+      {/* 난이도. 일상 표현은 발음, 개발 용어는 개념이 어려운 정도다(TalkLevelTabs 머리말).
+
+          위에 두는 이유: 읽기 전에 알아야 마음의 준비가 된다. 아래에 두면
+          다 읽고 나서 "아 이게 어려운 거였구나" 가 된다.
+
+          처음에는 여기서 알약을 손으로 그렸다. 크림 배경에 크림 채움이라
+          카드 위에서 사실상 안 보였고, 사용자가 "난이도는 아직 안 보인다"
+          고 알려 왔다. 단어장·목록이 쓰는 DifficultyBadge 가 이미 있었고
+          거기에는 난이도별 색(초록·앰버·장미)이 들어 있다. 같은 정보를
+          화면마다 다르게 그리지 않는다. */}
+      <p>
+        <DifficultyBadge
+          level={prompt.difficulty}
+          label={prompt.difficulty_label}
+        />
+      </p>
+
       {/* 읽을 글자. 이 화면에서 가장 큰 것이어야 한다 - 사용자가 보는 것이
           이것 하나다. 고정폭인 이유는 단어·에러 메시지에 고정폭을 쓰는
           이 저장소의 관례를 따른 것이다(LearningCard 의 monoTitle). */}
@@ -119,10 +137,25 @@ export function TalkPromptCard({
 
       {/* 뜻. 무엇을 읽는지 모른 채 소리만 흉내내면 남는 것이 없다.
 
-          발음보다 작고 흐리게 둔다 - 이 화면에서 주인공은 읽을 글자이고,
-          뜻은 "그게 무슨 말인지" 를 확인하는 곁다리다. */}
+          **발음 표기보다 크게 둔다.** 전에는 곁다리로 보고 제일 작게(text-xs)
+          제일 흐리게(--text-dim) 뒀는데, 화면에서 보면 IPA 와 한글 발음이
+          뜻보다 커서 **제일 필요한 것이 제일 안 보였다.** 사용자가 그것을
+          먼저 지적했다.
+
+          읽을 글자 다음으로 큰 자리를 준다. 순서는 이렇다.
+
+              읽을 글자   --text-2xl  무엇을 소리내나
+              뜻          --text-xl   무슨 말인가
+              한글 발음   text-sm     어떻게 소리내나
+              발음기호    text-sm     (아는 사람에게만)
+
+          --text-xl 은 이 저장소가 토큰 주석에 "21px 뜻" 이라고 적어둔
+          값이다. 숫자를 새로 고르지 않고 그것을 쓴다. */}
       {prompt.meaning && (
-        <p className="text-xs" style={{ color: "var(--text-dim)" }}>
+        <p
+          className="text-[length:var(--text-xl)] break-words"
+          style={{ color: "var(--text-body)" }}
+        >
           {prompt.meaning}
         </p>
       )}

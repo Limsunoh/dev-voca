@@ -21,6 +21,8 @@ import { getToken } from "@/lib/session";
 type Body = {
   action?: "start" | "grade";
   kind?: string;
+  /** 고른 난이도. 없으면 전부에서 낸다. */
+  level?: unknown;
   /** 최근에 낸 것. 같은 것이 연달아 나오지 않게 뺀다. */
   exclude?: unknown;
   token?: string;
@@ -69,8 +71,14 @@ export async function POST(request: Request) {
             (x): x is number => typeof x === "number" && Number.isInteger(x),
           )
         : [];
+      // 아는 값만 통과시킨다. 서버도 한 번 더 보지만, 여기서 거르면
+      // 주소를 고친 값이 쿼리에 실려 나가지 않는다.
+      const level =
+        typeof body.level === "number" && [1, 2, 3].includes(body.level)
+          ? body.level
+          : undefined;
       return NextResponse.json(
-        await fetchTalkQuestion(kind, { exclude, token: auth }),
+        await fetchTalkQuestion(kind, { exclude, token: auth, level }),
       );
     }
 

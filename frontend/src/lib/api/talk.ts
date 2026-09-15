@@ -53,8 +53,8 @@ export type TalkPrompt = {
   /**
    * 방금 낸 것의 번호. 다음에 부를 때 exclude 로 돌려준다.
    *
-   * 없으면 같은 것이 계속 나온다 - 표현이 60개뿐이라 열 번 누르면
-   * 절반쯤은 겹친다.
+   * 없으면 같은 것이 계속 나온다. 난이도를 고르면 뽑는 통이 그 난이도
+   * 하나로 좁아져서 더 자주 겹친다.
    */
   id: number;
   /** 서버가 부르는 이름. 화면은 배지에만 쓴다. */
@@ -86,10 +86,20 @@ export type TalkPrompt = {
   /**
    * 한글 뜻.
    *
-   * 무엇을 읽는지 모른 채 소리만 흉내내면 남는 것이 없다. 읽을 것 아래에
-   * 작게 둔다.
+   * 무엇을 읽는지 모른 채 소리만 흉내내면 남는 것이 없다. 그래서 작게
+   * 두지 않는다 - 처음에는 발음기호보다 작고 흐리게 뒀는데, 화면에서
+   * 제일 안 보이는 것이 제일 필요한 것이 되어 있었다.
    */
   meaning: string;
+  /**
+   * 얼마나 어려운가. 1 쉬움 · 2 보통 · 3 어려움.
+   *
+   * **갈래마다 기준이 다르다.** 일상 표현은 발음이 어려운 정도, 개발 용어는
+   * 개념이 어려운 정도다(TalkLevelTabs 머리말).
+   */
+  difficulty: number;
+  /** 난이도 이름. 서버가 만든 것을 그대로 쓴다 - 화면에서 다시 만들면 어긋난다. */
+  difficulty_label: string;
 };
 
 /** 채점 결과가 무엇 때문인가. */
@@ -152,12 +162,14 @@ export function isDevKind(kind: ServerKind): boolean {
  */
 export function fetchTalkQuestion(
   kind: TalkKind,
-  options: { exclude?: number[]; token?: string } = {},
+  options: { exclude?: number[]; token?: string; level?: number } = {},
 ): Promise<TalkPrompt> {
   const query = buildQuery({
     // 일상 표현이 기본이라 그때는 아예 안 보낸다.
     kind: kind === "dev" ? "dev" : undefined,
     exclude: options.exclude?.length ? options.exclude.join(",") : undefined,
+    // 난이도를 안 고르면 안 보낸다. 서버가 없으면 전부에서 낸다.
+    level: options.level ? String(options.level) : undefined,
   });
   return request(`${BASE}question/${query}`, { token: options.token });
 }

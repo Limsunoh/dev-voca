@@ -7,6 +7,7 @@ import { MicGate } from "@/components/MicGate";
 import { TalkFeedback } from "@/components/TalkFeedback";
 import { TalkPromptCard } from "@/components/TalkPrompt";
 import type { TalkKind, TalkPrompt, TalkResult } from "@/lib/api/talk";
+import type { TalkLevel } from "@/lib/routes";
 import {
   listenOnce,
   readMicState,
@@ -46,12 +47,29 @@ const STAGE_LABEL: Record<ListenStage, string> = {
   speech: "듣고 있어요",
 };
 
-// 최근에 낸 것을 몇 개까지 기억할까. 표현이 60개라 12면 다섯 판에 한 번쯤
-// 겹치는 정도이고, 이보다 크게 잡으면 풀이 좁아져 404 가 빨라진다.
+/**
+ * 최근에 낸 것을 몇 개까지 기억할까.
+ *
+ * 크게 잡을수록 안 겹치지만 풀이 그만큼 좁아져 "다 봤습니다" 가 빨라진다.
+ * **기준은 전체 개수가 아니라 가장 작은 통이다** - 난이도를 고르면 그
+ * 난이도 안에서만 뽑는데, 지금 제일 작은 것이 일상 표현 어려움 23개다.
+ * 12 면 거기서도 후보가 11개 남는다.
+ *
+ * 난이도 필터가 생기기 전에는 근거가 "표현이 60개" 였다. 그 숫자로 정한
+ * 값이 통이 쪼개지면서 뜻이 달라졌고, 값은 그대로 둬도 되지만 근거는
+ * 다시 써야 했다.
+ */
 const RECENT_KEEP = 12;
 
 
-export function TalkBoard({ kind }: { kind: TalkKind }) {
+export function TalkBoard({
+  kind,
+  level,
+}: {
+  kind: TalkKind;
+  /** 고른 난이도. 0 이면 전부에서 낸다. */
+  level: TalkLevel;
+}) {
   const [mic, setMic] = useState<MicState | null>(null);
   const [phase, setPhase] = useState<Phase>("gate");
   const [prompt, setPrompt] = useState<TalkPrompt | null>(null);
@@ -104,9 +122,11 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
         body: JSON.stringify({
           action: "start",
           kind,
+          // 0 은 안 보낸다. 서버가 없으면 전부에서 낸다.
+          ...(level ? { level } : {}),
           // 방금 낸 것들을 빼달라고 한다. 안 보내면 무작위로 다시 뽑아서
-          // 같은 것이 연달아 나온다 - 표현이 60개뿐이라 열 번 누르면
-          // 절반쯤은 겹친다. 문제풀기가 같은 방식을 쓴다(QuizBoard).
+          // 같은 것이 연달아 나온다. 난이도를 고르면 뽑는 통이 더 좁아져
+          // 체감이 커진다. 문제풀기가 같은 방식을 쓴다(QuizBoard).
           exclude: recentRef.current,
         }),
       });
@@ -114,9 +134,13 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
       if (!res.ok) {
         // 404 는 "낼 것이 없다" 는 뜻이다(다 봤거나 아직 데이터가 없다).
         // 실패로 다루면 사용자가 다시 눌러보게 되는데 결과가 같다.
+        // 404 일 때 서버가 준 문구를 그대로 쓴다. 난이도를 골라서 빈
+        // 것인지 통째로 빈 것인지를 서버만 알고, 사용자가 할 일이 다르다
+        // (난이도를 바꾼다 / 나중에 온다).
         setError(
           res.status === 404
-            ? "지금 낼 것이 없습니다. 다른 갈래를 보거나 나중에 다시 와주세요."
+            ? (data?.detail ??
+              "지금 낼 것이 없습니다. 다른 갈래를 보거나 나중에 다시 와주세요.")
             : (data?.detail ?? "불러오지 못했습니다."),
         );
         return;
@@ -132,11 +156,12 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
     } finally {
       setBusy(false);
     }
-  }, [kind]);
+  }, [kind, level]);
 
-  // 갈래가 바뀌어도 여기서 다시 받지 않는다. 페이지가 key={kind} 로 이
-  // 컴포넌트를 통째로 새로 만들기 때문이다(app/talk/page.tsx) - 상태가
-  // 처음부터 다시 시작하므로 옛 단어가 남을 자리가 없다.
+  // 갈래나 난이도가 바뀌어도 여기서 다시 받지 않는다. 페이지가
+  // key={`${kind}-${level}`} 로 이 컴포넌트를 통째로 새로 만들기 때문이다
+  // (app/talk/page.tsx) - 상태가 처음부터 다시 시작하므로 옛 단어가 남을
+  // 자리가 없고, 이미 낸 것을 빼는 목록도 같이 비워진다.
 
   async function allow() {
     setBusy(true);

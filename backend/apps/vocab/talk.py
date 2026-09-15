@@ -105,7 +105,22 @@ def normalize(said: str) -> str:
     # 나머지 기호는 공백으로. 하이픈이 여기 걸린다 - blue-green 을
     # "blue green" 으로 읽는 것이 정상이고 인식기도 그렇게 준다.
     stripped = re.sub(r"[^a-z0-9\s]", " ", lowered)
+    # **숫자는 낱말로 바꾼다.** 크롬 인식기는 수를 숫자로 적는 일이 흔해서
+    # "table for two please" 를 제대로 읽어도 "table for 2 please" 가 오고,
+    # 그대로 비교하면 two 자리가 틀린 것으로 짚인다. 출제되는 것에는 숫자가
+    # 없으므로(is_speakable) 정답 쪽은 이 줄에 안 걸린다.
+    stripped = re.sub(
+        r"\b\d+\b", lambda m: _NUMBER_WORDS.get(m.group(), m.group()), stripped
+    )
     return re.sub(r"\s+", " ", stripped).strip()
+
+
+# 인식기가 숫자로 적는 수. 표현에 나오는 것(one·two)보다 넉넉히 둔다 - 표현이
+# 늘 때 여기를 잊어도 흔한 수는 이미 들어 있게.
+_NUMBER_WORDS = {
+    "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four", "5": "five",
+    "6": "six", "7": "seven", "8": "eight", "9": "nine", "10": "ten",
+}
 
 
 def _flat(said: str) -> str:
@@ -198,14 +213,16 @@ _MANUAL_EXCLUDE: frozenset[str] = frozenset()
 #
 # 아래 규칙이 "낱말이 여러 개면 1글자 대문자도 약어" 로 보는데, 그것은
 # `big O`("빅 오")·`I/O`("아이 오") 를 잡으려고 넣은 조건이다. 그런데
-# 일상 표현의 **대명사 I** 가 같은 모양이라 함께 걸린다 - "I am lost",
-# "I would like to order" 처럼 60개 중 10개가 여기 걸렸다.
+# 일상 표현의 **대명사 I** 가 같은 모양이라 함께 걸린다 - "can I get a refill",
+# "I need help" 처럼 따로 선 I 가 있는 것이 207개 중 38개다. 줄임말
+# (I'm·I'd)은 한 낱말로 붙어 여기 안 걸린다. 표현이 늘수록 이 예외의
+# 무게가 커진다.
 #
 # I 는 철자를 읽는 것이 아니라 낱말 "아이" 로 읽으므로 인식 결과가
 # 흔들리지 않는다.
 #
 # **관사 A 는 넣지 않는다.** 같은 성질이라 처음에는 함께 넣었는데, 지금
-# 표현 60개 중 홀로 선 A 가 있는 것이 하나도 없다. 반면 넣으면 `plan A`·
+# 표현 207개 중 홀로 선 A 가 있는 것이 하나도 없다. 반면 넣으면 `plan A`·
 # `grade A`·`A record` 가 통과하는데, 그것들은 `plan B`·`big O` 와 같은
 # 부류라 제외되어야 한다. 쓰지도 않으면서 구멍만 여는 셈이다.
 #
