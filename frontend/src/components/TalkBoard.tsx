@@ -2,11 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { MicCheck } from "@/components/MicCheck";
 import { MicGate } from "@/components/MicGate";
 import { TalkFeedback } from "@/components/TalkFeedback";
 import { TalkPromptCard } from "@/components/TalkPrompt";
 import type { TalkKind, TalkPrompt, TalkResult } from "@/lib/api/talk";
-import { listenOnce, readMicState, type ListenOutcome, type MicState } from "@/lib/speech";
+import {
+  listenOnce,
+  readMicState,
+  type ListenOutcome,
+  type ListenStage,
+  type MicState,
+} from "@/lib/speech";
 
 /**
  * 소리내어 읽기 한 판.
@@ -25,6 +32,20 @@ import { listenOnce, readMicState, type ListenOutcome, type MicState } from "@/l
 
 type Phase = "gate" | "ready" | "listening" | "done";
 
+/**
+ * 듣는 동안 보여줄 말.
+ *
+ * **마이크가 열렸는지를 말해준다.** 이게 없으면 사용자는 소리가 들어가는지
+ * 모른 채 8초를 말하고, 실패해도 자기 발음을 탓한다. 실제로 그렇게 됐다 -
+ * 크롬에서 인식기가 시작조차 안 했는데 화면은 "듣고 있어요" 였다.
+ */
+const STAGE_LABEL: Record<ListenStage, string> = {
+  starting: "마이크를 여는 중이에요",
+  open: "말씀하세요",
+  sound: "소리가 들어오고 있어요",
+  speech: "듣고 있어요",
+};
+
 // 최근에 낸 것을 몇 개까지 기억할까. 표현이 60개라 12면 다섯 판에 한 번쯤
 // 겹치는 정도이고, 이보다 크게 잡으면 풀이 좁아져 404 가 빨라진다.
 const RECENT_KEEP = 12;
@@ -36,6 +57,14 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
   const [prompt, setPrompt] = useState<TalkPrompt | null>(null);
   const [result, setResult] = useState<TalkResult | null>(null);
   const [outcome, setOutcome] = useState<ListenOutcome | null>(null);
+  /**
+   * 듣기가 어디까지 갔나. **말하는 도중에** 보여주려고 상태로 둔다.
+   *
+   * 예전에는 "듣고 있어요" 한 줄만 떴다. 그러면 마이크가 안 열렸는지,
+   * 열렸는데 소리가 안 들어오는지, 잘 들어오는지를 구분할 수가 없다 -
+   * 8초를 말한 뒤에야 실패 문구를 본다.
+   */
+  const [stage, setStage] = useState<ListenStage>("starting");
   const [heardRaw, setHeardRaw] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -137,9 +166,17 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
     setResult(null);
     setOutcome(null);
     setHeardRaw([]);
+    setStage("starting");
 
     stopRef.current = listenOnce(async (heardOutcome) => {
       stopRef.current = null;
+
+      // "그만" 을 눌렀다. 실패가 아니므로 안내를 띄우지 않고 읽기 전으로 돌린다.
+      if (heardOutcome.type === "cancelled") {
+        setPhase("ready");
+        return;
+      }
+
       setOutcome(heardOutcome);
 
       if (heardOutcome.type !== "heard") {
@@ -166,7 +203,7 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
       } finally {
         setPhase("done");
       }
-    });
+    }, setStage);
   }
 
   function stopListening() {
@@ -208,7 +245,7 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
             className="text-sm"
             style={{ color: "var(--coral-deep)", fontWeight: "var(--weight-black)" }}
           >
-            듣고 있어요
+            {STAGE_LABEL[stage]}
           </p>
         )}
       </div>
@@ -216,6 +253,12 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
       {phase === "done" && outcome && (
         <TalkFeedback outcome={outcome} result={result} heardRaw={heardRaw} />
       )}
+
+      {/* 소리가 안 들어왔을 때만 띄운다.
+          평소에는 자리만 차지하고, 정작 필요한 순간에는 그 자리에 있다.
+          듣는 중에는 안 띄운다 - 같은 마이크를 둘이 동시에 열면 한쪽이
+          소리를 못 받는 기기가 있어서, 진단하려다 대상을 망가뜨린다. */}
+      {phase === "done" && outcome?.type === "no-sound" && <MicCheck />}
 
       {error && (
         <p
