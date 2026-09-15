@@ -2,11 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { MicCheck } from "@/components/MicCheck";
 import { MicGate } from "@/components/MicGate";
 import { TalkFeedback } from "@/components/TalkFeedback";
 import { TalkPromptCard } from "@/components/TalkPrompt";
 import type { TalkKind, TalkPrompt, TalkResult } from "@/lib/api/talk";
-import { listenOnce, readMicState, type ListenOutcome, type MicState } from "@/lib/speech";
+import type { TalkLevel } from "@/lib/routes";
+import {
+  listenOnce,
+  readMicState,
+  type ListenOutcome,
+  type ListenStage,
+  type MicState,
+} from "@/lib/speech";
 
 /**
  * 소리내어 읽기 한 판.
@@ -25,17 +33,56 @@ import { listenOnce, readMicState, type ListenOutcome, type MicState } from "@/l
 
 type Phase = "gate" | "ready" | "listening" | "done";
 
-// 최근에 낸 것을 몇 개까지 기억할까. 표현이 60개라 12면 다섯 판에 한 번쯤
-// 겹치는 정도이고, 이보다 크게 잡으면 풀이 좁아져 404 가 빨라진다.
+/**
+ * 듣는 동안 보여줄 말.
+ *
+ * **마이크가 열렸는지를 말해준다.** 이게 없으면 사용자는 소리가 들어가는지
+ * 모른 채 8초를 말하고, 실패해도 자기 발음을 탓한다. 실제로 그렇게 됐다 -
+ * 크롬에서 인식기가 시작조차 안 했는데 화면은 "듣고 있어요" 였다.
+ */
+const STAGE_LABEL: Record<ListenStage, string> = {
+  starting: "마이크를 여는 중이에요",
+  open: "말씀하세요",
+  sound: "소리가 들어오고 있어요",
+  speech: "듣고 있어요",
+};
+
+/**
+ * 최근에 낸 것을 몇 개까지 기억할까.
+ *
+ * 크게 잡을수록 안 겹치지만 풀이 그만큼 좁아져 "다 봤습니다" 가 빨라진다.
+ * **기준은 전체 개수가 아니라 가장 작은 통이다** - 난이도를 고르면 그
+ * 난이도 안에서만 뽑는데, 지금 제일 작은 것이 일상 표현 어려움 23개다.
+ * 12 면 거기서도 후보가 11개 남는다.
+ *
+ * 난이도 필터가 생기기 전에는 근거가 "표현이 60개" 였다. 그 숫자로 정한
+ * 값이 통이 쪼개지면서 뜻이 달라졌고, 값은 그대로 둬도 되지만 근거는
+ * 다시 써야 했다.
+ */
 const RECENT_KEEP = 12;
 
 
-export function TalkBoard({ kind }: { kind: TalkKind }) {
+export function TalkBoard({
+  kind,
+  level,
+}: {
+  kind: TalkKind;
+  /** 고른 난이도. 0 이면 전부에서 낸다. */
+  level: TalkLevel;
+}) {
   const [mic, setMic] = useState<MicState | null>(null);
   const [phase, setPhase] = useState<Phase>("gate");
   const [prompt, setPrompt] = useState<TalkPrompt | null>(null);
   const [result, setResult] = useState<TalkResult | null>(null);
   const [outcome, setOutcome] = useState<ListenOutcome | null>(null);
+  /**
+   * 듣기가 어디까지 갔나. **말하는 도중에** 보여주려고 상태로 둔다.
+   *
+   * 예전에는 "듣고 있어요" 한 줄만 떴다. 그러면 마이크가 안 열렸는지,
+   * 열렸는데 소리가 안 들어오는지, 잘 들어오는지를 구분할 수가 없다 -
+   * 8초를 말한 뒤에야 실패 문구를 본다.
+   */
+  const [stage, setStage] = useState<ListenStage>("starting");
   const [heardRaw, setHeardRaw] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,9 +122,11 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
         body: JSON.stringify({
           action: "start",
           kind,
+          // 0 은 안 보낸다. 서버가 없으면 전부에서 낸다.
+          ...(level ? { level } : {}),
           // 방금 낸 것들을 빼달라고 한다. 안 보내면 무작위로 다시 뽑아서
-          // 같은 것이 연달아 나온다 - 표현이 60개뿐이라 열 번 누르면
-          // 절반쯤은 겹친다. 문제풀기가 같은 방식을 쓴다(QuizBoard).
+          // 같은 것이 연달아 나온다. 난이도를 고르면 뽑는 통이 더 좁아져
+          // 체감이 커진다. 문제풀기가 같은 방식을 쓴다(QuizBoard).
           exclude: recentRef.current,
         }),
       });
@@ -85,9 +134,13 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
       if (!res.ok) {
         // 404 는 "낼 것이 없다" 는 뜻이다(다 봤거나 아직 데이터가 없다).
         // 실패로 다루면 사용자가 다시 눌러보게 되는데 결과가 같다.
+        // 404 일 때 서버가 준 문구를 그대로 쓴다. 난이도를 골라서 빈
+        // 것인지 통째로 빈 것인지를 서버만 알고, 사용자가 할 일이 다르다
+        // (난이도를 바꾼다 / 나중에 온다).
         setError(
           res.status === 404
-            ? "지금 낼 것이 없습니다. 다른 갈래를 보거나 나중에 다시 와주세요."
+            ? (data?.detail ??
+              "지금 낼 것이 없습니다. 다른 갈래를 보거나 나중에 다시 와주세요.")
             : (data?.detail ?? "불러오지 못했습니다."),
         );
         return;
@@ -103,11 +156,12 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
     } finally {
       setBusy(false);
     }
-  }, [kind]);
+  }, [kind, level]);
 
-  // 갈래가 바뀌어도 여기서 다시 받지 않는다. 페이지가 key={kind} 로 이
-  // 컴포넌트를 통째로 새로 만들기 때문이다(app/talk/page.tsx) - 상태가
-  // 처음부터 다시 시작하므로 옛 단어가 남을 자리가 없다.
+  // 갈래나 난이도가 바뀌어도 여기서 다시 받지 않는다. 페이지가
+  // key={`${kind}-${level}`} 로 이 컴포넌트를 통째로 새로 만들기 때문이다
+  // (app/talk/page.tsx) - 상태가 처음부터 다시 시작하므로 옛 단어가 남을
+  // 자리가 없고, 이미 낸 것을 빼는 목록도 같이 비워진다.
 
   async function allow() {
     setBusy(true);
@@ -137,9 +191,17 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
     setResult(null);
     setOutcome(null);
     setHeardRaw([]);
+    setStage("starting");
 
     stopRef.current = listenOnce(async (heardOutcome) => {
       stopRef.current = null;
+
+      // "그만" 을 눌렀다. 실패가 아니므로 안내를 띄우지 않고 읽기 전으로 돌린다.
+      if (heardOutcome.type === "cancelled") {
+        setPhase("ready");
+        return;
+      }
+
       setOutcome(heardOutcome);
 
       if (heardOutcome.type !== "heard") {
@@ -166,7 +228,7 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
       } finally {
         setPhase("done");
       }
-    });
+    }, setStage);
   }
 
   function stopListening() {
@@ -208,7 +270,7 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
             className="text-sm"
             style={{ color: "var(--coral-deep)", fontWeight: "var(--weight-black)" }}
           >
-            듣고 있어요
+            {STAGE_LABEL[stage]}
           </p>
         )}
       </div>
@@ -216,6 +278,12 @@ export function TalkBoard({ kind }: { kind: TalkKind }) {
       {phase === "done" && outcome && (
         <TalkFeedback outcome={outcome} result={result} heardRaw={heardRaw} />
       )}
+
+      {/* 소리가 안 들어왔을 때만 띄운다.
+          평소에는 자리만 차지하고, 정작 필요한 순간에는 그 자리에 있다.
+          듣는 중에는 안 띄운다 - 같은 마이크를 둘이 동시에 열면 한쪽이
+          소리를 못 받는 기기가 있어서, 진단하려다 대상을 망가뜨린다. */}
+      {phase === "done" && outcome?.type === "no-sound" && <MicCheck />}
 
       {error && (
         <p

@@ -553,8 +553,8 @@ class RoundEndTest(TestCase):
         """연출 시간이 문제당 제한 시간을 깎으면 안 된다.
 
         판 마감만 미루고 문제 시계를 그대로 두면, 사용자가 문제를 보기도
-        전에 800ms 가 흘러 있다. 3초짜리 문제의 창이 2.2초로 줄고 제때
-        맞힌 답이 "시간 초과" 로 0점이 된다.
+        전에 REACTION_PAUSE_MS 만큼(지금은 1초) 흘러 있다. 3초짜리 문제의
+        창이 2초로 줄고 제때 맞힌 답이 "시간 초과" 로 0점이 된다.
         """
         token, question = session.start()
         token, _, second = session.answer(token, question["choices"][0]["id"])
@@ -610,6 +610,44 @@ class RoundEndTest(TestCase):
             _, _, nxt = session.answer(token, question["choices"][0]["id"])
 
         self.assertIsNotNone(nxt, "보상은 답한 수만큼 쌓여야 한다")
+
+    def test_the_deadline_grows_by_exactly_one_pause_per_answer(self):
+        """마감이 답 하나당 정확히 REACTION_PAUSE_MS 만큼만 밀리는지.
+
+        위의 두 테스트는 "마감이 지났나 안 지났나" 만 본다. 그래서 보상을
+        두 배로 주는 실수(graded * 2 * PAUSE)를 둘 다 통과시킨다 - 판이
+        길어지는 쪽으로 틀린 것이라 아무도 항의하지 않고, 90초 판이 조용히
+        2분이 된다. 여기서는 값을 그대로 견준다.
+
+        넘기기를 섞는 이유: 넘긴 것은 화면이 안 멈추므로 보상이 없다.
+        그 줄이 빠지면 넘길수록 판이 길어진다.
+        """
+        token, question = session.start()
+        pause = session.REACTION_PAUSE_MS
+        base = session._deadline_ms(session._load(token))
+
+        self.assertEqual(
+            base,
+            int(session._load(token)["s"]) + session.ROUND_SECONDS * 1000,
+            "판을 열었을 때는 정확히 ROUND_SECONDS 다",
+        )
+
+        for nth in (1, 2, 3):
+            token, _, question = session.answer(token, question["choices"][0]["id"])
+            self.assertIsNotNone(question)
+            self.assertEqual(
+                session._deadline_ms(session._load(token)),
+                base + nth * pause,
+                f"{nth}번째 답까지 왔으면 마감이 {nth * pause}ms 밀려 있어야 한다. "
+                "session._deadline_ms 를 보라.",
+            )
+
+        token, _, _ = session.answer(token, None, skip=True)
+        self.assertEqual(
+            session._deadline_ms(session._load(token)),
+            base + 3 * pause,
+            "넘기기는 연출이 없으므로 마감을 더 밀면 안 된다",
+        )
 
     def test_the_last_answer_still_counts(self):
         """마감 직전에 받은 문제를 마감 직후에 답한 경우.
@@ -746,6 +784,21 @@ class RoundApiTest(TestCase):
         self.assertEqual(res.status_code, 201)
         self.assertIn("token", res.json())
         self.assertIn("question", res.json())
+
+    def test_the_start_response_publishes_the_reaction_pause(self):
+        """판을 열 때 연출 시간을 함께 내려주는지.
+
+        화면(RoundBoard)은 이 값으로 두 가지를 한다 - 채점 뒤 몇 ms 를
+        멈출지, 그리고 --duration-verdict 를 몇으로 둘지. 값이 없으면
+        0 으로 떨어져 **연출이 통째로 안 뜬다**(옛 서버 대비 방어다).
+
+        키 이름을 바꾸거나 빠뜨려도 화면은 에러 없이 그냥 안 멈춘다.
+        그런데 서버는 여전히 답마다 마감을 1초씩 밀어주므로, 아무도
+        안 기다리는 시간을 판마다 몇십 초씩 얹는 꼴이 된다.
+        """
+        body = self.start().json()
+
+        self.assertEqual(body["reaction_pause_ms"], session.REACTION_PAUSE_MS)
 
     def test_the_answer_is_not_in_the_question(self):
         """정답이 응답에 실리면 개발자도구로 미리 볼 수 있다."""

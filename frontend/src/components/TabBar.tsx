@@ -59,12 +59,13 @@ export function TabBar() {
 
           style 로 두는 이유: Tailwind 클래스로는 임의 이름의 커스텀
           프로퍼티를 문서 뿌리에 올릴 수 없다. */}
-      <style>{`:root{--tabbar-space:calc(5rem + env(safe-area-inset-bottom))}`}</style>
+      <style>{`:root{--tabbar-space:calc(5rem + env(safe-area-inset-bottom));--tabbar-height:calc(57px + env(safe-area-inset-bottom))}`}</style>
 
       {/* 자리막이. 아래 nav 가 fixed 라 흐름에서 빠져 있어서, 이게 없으면
           목록 마지막 항목과 페이지네이션이 탭바 뒤로 들어가 눌리지 않는다.
 
-          5rem 은 탭바 높이(테두리 1px + 48px)에 여유를 더한 값이고,
+          5rem 은 탭바 높이(테두리 1px + min-h-14 의 56px = 57px)에 여유를
+          더한 값이고,
           safe-area 를 더하는 이유는 탭바 자신도 그만큼 두꺼워지기 때문이다.
           이 둘이 어긋나면 아이폰에서만 마지막 항목이 가려진다.
 

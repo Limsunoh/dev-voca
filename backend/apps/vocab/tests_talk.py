@@ -11,10 +11,13 @@
 인식 결과가 제각각이라 채점이 안 되는" 부류다.
 """
 
+import re
+
 from django.core.cache import cache
 from django.test import TestCase
 
-from .models import Word
+from .management.commands.seed_phrases import PHRASES
+from .models import DailyPhrase, Word
 from .talk import (
     MAX_ALTERNATIVES,
     MAX_HEARD_LENGTH,
@@ -44,6 +47,21 @@ class NormalizeTest(TestCase):
     def test_hyphen_becomes_a_gap(self):
         """blue-green 은 "blue green" 으로 읽고 인식기도 그렇게 준다."""
         self.assertEqual(normalize("blue-green"), "blue green")
+
+    def test_digits_become_words(self):
+        """크롬 인식기는 수를 숫자로 적는 일이 흔하다.
+
+        씨드는 숫자를 못 넣어서(is_speakable) 수를 낱말로 적는다. 인식 결과만
+        숫자로 오면 제대로 읽어도 그 자리가 틀린 것으로 짚인다.
+        """
+        texts = {row[0] for row in PHRASES}
+        for text, said in {
+            "table for two please": "Table for 2 please.",
+            "one more please": "1 more please",
+        }.items():
+            with self.subTest(text=text):
+                self.assertIn(text, texts)
+                self.assertEqual(grade_one(said, text), (True, []))
 
 
 class GradeWordTest(TestCase):
@@ -490,3 +508,335 @@ class TalkEndpointTest(TestCase):
         )
 
         self.assertEqual(res.status_code, 400)
+
+
+class TalkLevelFilterTest(TestCase):
+    """난이도를 골랐을 때 그 난이도만 나오는가.
+
+    사용자가 고른 값이 실제로 WHERE 까지 가는지는 **응답을 여러 번 받아
+    봐야** 안다. 필터가 통째로 빠져도 한 번만 보면 우연히 맞는 것이 나온다
+    - 보통이 가장 많아서 아무것도 안 걸러도 절반은 보통이 뜬다.
+    """
+
+    QUESTION_URL = "/api/vocab/talk/question/"
+
+    def setUp(self):
+        cache.clear()
+        Word.objects.all().delete()
+        DailyPhrase.objects.all().delete()
+        # 난이도마다 하나씩. 소리로 채점할 수 있는 것이어야 출제된다.
+        for level, text in (
+            (Word.Difficulty.EASY, "cache"),
+            (Word.Difficulty.NORMAL, "commit"),
+            (Word.Difficulty.HARD, "rollback"),
+        ):
+            Word.objects.create(
+                term=text,
+                meaning=f"{level} 짜리",
+                pronunciation="/x/",
+                reading="엑s",
+                reading_reviewed=True,
+                is_reviewed=True,
+                difficulty=level,
+            )
+
+    def _ask(self, **params):
+        res = self.client.get(self.QUESTION_URL, {"kind": "dev", **params})
+        self.assertEqual(res.status_code, 200, res.content)
+        return res.json()
+
+    def test_고른_난이도만_나온다(self):
+        for level in (1, 2, 3):
+            with self.subTest(level=level):
+                # 여러 번 받는다. 한 번만 보면 필터가 없어도 우연히 맞는다.
+                for _ in range(8):
+                    self.assertEqual(self._ask(level=level)["difficulty"], level)
+
+    def test_난이도를_안_고르면_전부에서_낸다(self):
+        seen = {self._ask()["difficulty"] for _ in range(40)}
+        # 셋뿐이라 40번이면 전부 나온다. 하나로만 쏠리면 필터가 새고 있다.
+        self.assertEqual(seen, {1, 2, 3})
+
+    def test_모르는_값은_전부에서_낸다(self):
+        """주소를 손으로 고친 경우다.
+
+        400 을 주지 않는 이유: 연습 화면이라 잘못된 값 하나로 읽을 것을
+        통째로 막을 이유가 없다. 다만 **빈 결과로 떨어뜨리지도 않는다** -
+        difficulty=9 가 그대로 WHERE 에 실리면 "다 봤습니다" 가 뜨는데,
+        데이터가 없는 것과 고를 수 없는 값을 고른 것이 같은 화면이 된다.
+        """
+        for raw in ("9", "0", "abc", "-1", "2.5"):
+            with self.subTest(raw=raw):
+                self.assertIn(self._ask(level=raw)["difficulty"], {1, 2, 3})
+
+    def test_그_난이도가_비면_그렇다고_말한다(self):
+        """"다 봤습니다" 로 뭉뚱그리면 사용자가 전체를 다 읽은 줄 안다.
+
+        실제로는 그 난이도 하나만 비었고, 난이도를 바꾸면 계속할 수 있다.
+        할 수 있는 일이 다르므로 문구도 달라야 한다.
+        """
+        Word.objects.filter(difficulty=Word.Difficulty.HARD).delete()
+
+        res = self.client.get(self.QUESTION_URL, {"kind": "dev", "level": 3})
+
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("난이도", res.json()["detail"])
+
+    def test_전부가_비면_다른_문구다(self):
+        Word.objects.all().delete()
+
+        res = self.client.get(self.QUESTION_URL, {"kind": "dev"})
+
+        self.assertEqual(res.status_code, 404)
+        self.assertNotIn("난이도", res.json()["detail"])
+
+    def test_난이도와_이름을_같이_내린다(self):
+        """화면이 색을 고를 때는 숫자가, 배지 글자에는 이름이 필요하다.
+
+        이름을 화면에서 다시 만들면 표와 화면이 따로 논다 - 서버 choices 를
+        고쳤을 때 화면만 옛 이름으로 남는다.
+        """
+        body = self._ask(level=3)
+
+        self.assertEqual(body["difficulty"], 3)
+        self.assertEqual(body["difficulty_label"], "어려움")
+
+    def test_일상_표현에도_같은_필터가_걸린다(self):
+        """난이도 필터가 타는 모델이 둘이다.
+
+        위 테스트가 전부 kind=dev(Word)만 본다. 같은 코드가 DailyPhrase
+        에도 걸리는데 그쪽을 아무도 안 지나가면, 두 모델이 갈리는 리팩터가
+        와도 초록불이다.
+        """
+        DailyPhrase.objects.create(
+            text="thank you",
+            meaning="고맙습니다",
+            pronunciation="/θæŋk ju/",
+            reading="th앵k 유",
+            is_reviewed=True,
+            difficulty=DailyPhrase.Difficulty.EASY,
+        )
+        DailyPhrase.objects.create(
+            text="I appreciate it",
+            meaning="감사합니다",
+            pronunciation="/aɪ əˈpriʃieɪt ɪt/",
+            reading="아이 어프리시에잍 잍",
+            is_reviewed=True,
+            difficulty=DailyPhrase.Difficulty.HARD,
+        )
+
+        # 둘 중 하나를 뽑는다. 필터가 새면 반씩 섞이는데, 6번이면 1/64 로
+        # 우연히 초록이 된다. 12번이면 1/4096 이다.
+        for _ in range(12):
+            res = self.client.get(self.QUESTION_URL, {"level": 3})
+            self.assertEqual(res.status_code, 200, res.content)
+            self.assertEqual(res.json()["term"], "I appreciate it")
+
+    def test_미검수는_난이도를_골라도_안_나온다(self):
+        """난이도 필터가 검수 게이트 **뒤에** 붙어야 한다.
+
+        지금은 visible() 로 시작해 그 뒤에 체이닝하므로 AND 다. 그런데
+        이 순서는 코드를 읽어야만 보이고, 필터를 Model.objects 로 다시
+        시작하는 리팩터 한 번이면 게이트가 통째로 빠진다 - 그때 화면에는
+        아무 이상이 없고 미검수만 조용히 나간다.
+        """
+        Word.objects.all().delete()
+        Word.objects.create(
+            term="rollback",
+            meaning="아무도 확인 안 함",
+            pronunciation="/x/",
+            reading="롤백",
+            reading_reviewed=True,
+            is_reviewed=False,
+            difficulty=Word.Difficulty.HARD,
+        )
+
+        res = self.client.get(self.QUESTION_URL, {"kind": "dev", "level": 3})
+
+        self.assertEqual(res.status_code, 404)
+
+
+class TalkLevelWalkTest(TestCase):
+    """난이도 필터를 exclude 로 끝까지 걸어 본다.
+
+    위 TalkLevelFilterTest 는 무작위로 여러 번 받아 "고른 것만 나오나" 를
+    본다. 그 방식으로는 **모르는 값이 한 난이도로 떨어지는 것**을 못 잡는다 -
+    `_parse_level` 이 모르는 값에 1 을 돌려줘도 응답의 difficulty 가 {1,2,3}
+    안이라 초록불이다.
+
+    여기서는 받은 id 를 exclude 에 쌓아 풀이 빌 때까지 받는다. 그러면 무엇이
+    몇 개 나왔는지와 마지막 404 문구가 결정적으로 정해진다. 두 모델(Word,
+    DailyPhrase)을 같은 절차로 지나간다.
+    """
+
+    QUESTION_URL = "/api/vocab/talk/question/"
+    LEVEL_EMPTY = "이 난이도는 다 봤습니다. 난이도를 바꾸거나 잠시 뒤 다시 해보세요."
+    ALL_EMPTY = "읽을 것을 다 봤습니다. 잠시 뒤 다시 시작해보세요."
+
+    def setUp(self):
+        cache.clear()
+        Word.objects.all().delete()
+        DailyPhrase.objects.all().delete()
+        # 난이도마다 검수된 것 하나씩과, 어려움에 미검수 하나.
+        self.visible_ids: dict[str, dict[int, int]] = {"dev": {}, "daily": {}}
+        for level, word, phrase in (
+            (1, "cache", "thank you"),
+            (2, "commit", "see you later"),
+            (3, "rollback", "bear with me"),
+        ):
+            self.visible_ids["dev"][level] = self._word(word, level, True).pk
+            self.visible_ids["daily"][level] = self._phrase(phrase, level, True).pk
+        self.hidden_ids = {
+            "dev": self._word("deadlock", 3, False).pk,
+            "daily": self._phrase("hold on a second", 3, False).pk,
+        }
+
+    def _word(self, term: str, level: int, reviewed: bool) -> Word:
+        return Word.objects.create(
+            term=term,
+            meaning=f"{term} 뜻",
+            pronunciation="/x/",
+            reading="엑s",
+            reading_reviewed=True,
+            is_reviewed=reviewed,
+            difficulty=level,
+        )
+
+    def _phrase(self, text: str, level: int, reviewed: bool) -> DailyPhrase:
+        return DailyPhrase.objects.create(
+            text=text,
+            meaning=f"{text} 뜻",
+            pronunciation="/x/",
+            reading="엑s",
+            is_reviewed=reviewed,
+            difficulty=level,
+        )
+
+    def _walk(self, kind: str, level) -> tuple[list[int], dict]:
+        """풀이 빌 때까지 받는다. (나온 id 순서, 마지막 404 본문)."""
+        seen: list[int] = []
+        for _ in range(10):
+            params = {"exclude": ",".join(map(str, seen))}
+            if kind == "dev":
+                params["kind"] = "dev"
+            if level is not None:
+                params["level"] = level
+            res = self.client.get(self.QUESTION_URL, params)
+            if res.status_code == 404:
+                return seen, res.json()
+            self.assertEqual(res.status_code, 200, res.content)
+            seen.append(res.json()["id"])
+        self.fail(f"풀이 안 빈다: {seen}")
+
+    def test_고른_난이도를_끝까지_걸으면_그것만_나오고_난이도_문구로_끝난다(self):
+        for kind in ("dev", "daily"):
+            for level in (1, 2, 3):
+                with self.subTest(kind=kind, level=level):
+                    seen, body = self._walk(kind, level)
+                    self.assertEqual(seen, [self.visible_ids[kind][level]])
+                    self.assertEqual(body["detail"], self.LEVEL_EMPTY)
+
+    def test_모르는_값은_세_난이도를_다_내고_전체_문구로_끝난다(self):
+        """모르는 값이 한 난이도로 떨어지면 여기서 걸린다.
+
+        마지막 문구도 본다. 문구 분기가 파싱한 값이 아니라 원래 쿼리를
+        보면 "9" 를 넣었을 때 "이 난이도는" 이 뜨는데, 사용자는 난이도를
+        고른 적이 없다.
+        """
+        # 5000 자리는 파이썬 int 변환 상한(4300자리)을 넘겨 ValueError 가
+        # 나는 경로다. 500 이 아니어야 한다.
+        for raw in ("9", "0", "abc", "-1", "2.5", "", "1e0", "9" * 5000):
+            for kind in ("dev", "daily"):
+                with self.subTest(kind=kind, raw=raw[:10]):
+                    seen, body = self._walk(kind, raw)
+                    self.assertEqual(
+                        sorted(seen), sorted(self.visible_ids[kind].values())
+                    )
+                    self.assertEqual(body["detail"], self.ALL_EMPTY)
+
+    def test_미검수는_난이도를_골라도_안_골라도_안_나온다(self):
+        for kind in ("dev", "daily"):
+            for level in (None, 3, "9"):
+                with self.subTest(kind=kind, level=level):
+                    seen, _ = self._walk(kind, level)
+                    self.assertNotIn(self.hidden_ids[kind], seen)
+
+    def test_소리로_못_읽는_것만_남은_난이도도_난이도_문구다(self):
+        """풀이 비는 이유가 exclude 가 아니라 출제 필터여도 같은 안내다."""
+        Word.objects.filter(difficulty=2).delete()
+        self._word("API key", 2, True)
+
+        seen, body = self._walk("dev", 2)
+
+        self.assertEqual(seen, [])
+        self.assertEqual(body["detail"], self.LEVEL_EMPTY)
+
+
+class SeedContractionGradingTest(TestCase):
+    """씨드 표현을 채점기에 실제로 넣어 본다.
+
+    ContractionTest 는 표본 몇 개만 본다. 여기서는 207개 전부를 **적힌 대로
+    읽은 경우**와, 인식기가 모양만 바꿔 적은 경우(아포스트로피 누락·둥근
+    따옴표·첫 글자 대문자와 마침표)로 넣는다. 하나라도 떨어지면 제대로
+    읽은 사람이 오답을 받는다.
+    """
+
+    def test_적힌_대로_읽으면_전부_통과한다(self):
+        for text, *_ in PHRASES:
+            with self.subTest(text=text):
+                self.assertEqual(grade_one(text, text), (True, []))
+
+    def test_인식기가_모양만_바꿔_적어도_통과한다(self):
+        for text, *_ in PHRASES:
+            for said in (
+                text.replace("'", ""),
+                text.replace("'", "\u2019"),
+                text[0].upper() + text[1:] + ".",
+            ):
+                with self.subTest(text=text, said=said):
+                    self.assertEqual(grade_one(said, text), (True, []))
+
+
+# 사람이 말할 때 거의 늘 줄이는 짝. 뒤에 낱말이 이어질 때만 본다 -
+# "do you know where it is" 처럼 끝에 온 it is 는 줄일 수 없다.
+_UNCONTRACTED = re.compile(
+    r"\b(where is|what is|how is|there is|that is|it is|i am|i would|i will"
+    r"|you are|we are|they are|let us|do not|does not|did not|is not|are not"
+    r"|can not|cannot|could not|would not|that would)\b(?=\s+\w)"
+)
+
+
+class SeedStaysContractedTest(TestCase):
+    """씨드 표현이 풀어 쓴 형태로 되돌아가지 않는가.
+
+    **풀어 쓴 형태는 제대로 읽어도 떨어진다.** "where is the fitting room"
+    을 사람이 where's 로 읽으면 낱말 수가 어긋나 통째로 오답이 되고 틀린
+    자리 표시도 안 나온다. 그래서 표현을 더할 때 여섯 개를 축약형으로
+    바꿨다(seed_phrases 머리말).
+
+    그런데 되돌리는 것을 막는 테스트가 없었다 - 낱말 수·강세·표기 검사는
+    풀어 쓴 형태로도 전부 통과한다.
+
+    KEPT_LONG 은 일부러 풀어 둔 것의 목록이다. **지금은 비어 있다.** 이
+    테스트가 처음 생겼을 때 넷이 남아 있었는데("I am lost" 는 두 형태를 다
+    만나라고 일부러 둔 것이었다), 그 의도가 채점 비대칭 때문에 "맞게 읽어도
+    틀린다" 가 되어 전부 축약했다. 다시 풀어 둘 이유가 생기면 여기 넣고
+    이유를 seed_phrases 머리말에 적는다.
+    """
+
+    KEPT_LONG: frozenset[str] = frozenset()
+
+    def test_목록_밖의_표현은_풀어_쓰지_않는다(self):
+        long_forms = {
+            text for text, *_ in PHRASES if _UNCONTRACTED.search(text.lower())
+        }
+        self.assertEqual(
+            long_forms - self.KEPT_LONG,
+            set(),
+            "풀어 쓴 형태가 들어왔다. 사람이 줄여 읽으면 오답이 된다.",
+        )
+
+    def test_목록에_남은_것이_실제로_씨드에_있다(self):
+        """줄였는데 목록에서 안 빼면 목록이 거짓말을 한다."""
+        texts = {text for text, *_ in PHRASES}
+        self.assertEqual(self.KEPT_LONG - texts, set())

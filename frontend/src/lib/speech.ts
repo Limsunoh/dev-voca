@@ -30,6 +30,12 @@ type SpeechRecognitionLike = {
   onresult: ((event: SpeechResultEventLike) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
+  /** 마이크가 열렸다. 여기까지 안 오면 인식기가 시작을 못 한 것이다. */
+  onaudiostart: (() => void) | null;
+  /** 마이크에 소리가 들어왔다. 말인지 아닌지는 아직 모른다. */
+  onsoundstart: (() => void) | null;
+  /** 그 소리가 말로 판정됐다. */
+  onspeechstart: (() => void) | null;
 };
 
 type SpeechResultEventLike = {
@@ -117,11 +123,37 @@ export async function readMicState(): Promise<MicState> {
   }
 }
 
-/** 인식이 끝난 이유. 화면이 이걸로 문구를 고른다. */
+/**
+ * 인식이 끝난 이유. 화면이 이걸로 문구를 고른다.
+ *
+ * **어디까지 갔는지로 가른다.** 인식기는 단계마다 신호를 주는데
+ * (audiostart 마이크 열림 -> soundstart 소리 들어옴 -> speechstart 말로
+ * 판정 -> result), 예전에는 그 셋을 안 보고 실패를 전부 "잘 못 알아들었어요"
+ * 하나로 묶었다. 그러면 **마이크가 안 열린 것과 사용자가 작게 말한 것이
+ * 같은 문구로 나온다** - 사용자가 할 수 있는 일이 정반대인데도.
+ */
 export type ListenOutcome =
   /** 글자를 받았다. heard 에 후보가 들어 있다. */
   | { type: "heard"; heard: string[] }
-  /** 소리가 안 들렸다. 마이크가 조용했다. */
+  /**
+   * 인식기가 시작 자체를 못 했다. 마이크가 열린 신호(audiostart)조차 없다.
+   *
+   * 크롬에서 실제로 있다. start() 를 불러도 start·audiostart·error·end 가
+   * 하나도 안 오고 조용히 죽는다. 이걸 "잘 못 알아들었어요" 로 말하면
+   * 사용자는 자기 발음을 탓하며 계속 다시 시도한다.
+   */
+  | { type: "not-started" }
+  /**
+   * 마이크는 열렸는데 말을 한 번도 못 잡았다.
+   *
+   * **원인이 둘 섞여 있다.** 크롬이 다른 장치를 잡고 있거나 입력이 0인
+   * 기계 쪽 문제일 수도 있고, 그냥 너무 작게 말한 것일 수도 있다. 크롬은
+   * 소리 크기가 아니라 음성 구간 검출로 신호를 보내서 이 둘을 가를 수
+   * 없다(위 onsoundstart 주석). 그래서 화면은 둘 다 말하고 MicCheck 로
+   * 가르게 한다 - 기계 문제라고 단정하면 작게 말한 사람이 장치를 뒤진다.
+   */
+  | { type: "no-sound" }
+  /** 소리는 들어왔는데 말로 인식되지 않았다. */
   | { type: "no-speech" }
   /** 마이크를 못 열었다. */
   | { type: "no-mic" }
@@ -130,12 +162,34 @@ export type ListenOutcome =
   /** 인식 서버에 못 닿았다. */
   | { type: "network" }
   /**
-   * 결과도 에러도 없이 끝났다.
+   * 소리까지는 들어왔는데 결과도 에러도 없이 끝났다(모르는 에러 코드 포함).
    *
-   * abort() 로 끊었거나, 권한 창이 떠 있는 채로 시간이 다 된 경우다.
-   * 에러 코드가 안 오는 경로가 실제로 있어서 따로 둔다.
+   * 마이크가 안 열렸거나 소리가 안 들어온 채 끝나면 여기가 아니라
+   * not-started·no-sound 로 간다(stalled). 에러 코드가 안 오는 경로가 실제로
+   * 있어서 따로 둔다.
    */
-  | { type: "silent" };
+  | { type: "silent" }
+  /**
+   * 사용자가 "그만" 을 눌렀거나 화면을 떠나 끊었다.
+   *
+   * **실패가 아니라서 silent 와 가른다.** 같은 값으로 두면 화면이 "잘 못
+   * 알아들었어요, 또박또박 말해보세요" 를 띄워, 스스로 멈춘 사람에게 발음
+   * 탓을 한다.
+   */
+  | { type: "cancelled" };
+
+/**
+ * 듣기가 어디까지 갔나.
+ *
+ *     starting  start() 를 불렀다. 아직 마이크가 열렸다는 신호가 없다
+ *     open      마이크가 열렸다. 아직 소리가 안 들어왔다
+ *     sound     소리가 들어왔다. 말인지는 모른다
+ *     speech    말로 판정됐다
+ */
+export type ListenStage = "starting" | "open" | "sound" | "speech";
+
+/** 단계가 가는 순서. 앞으로만 간다. */
+const STAGES: ListenStage[] = ["starting", "open", "sound", "speech"];
 
 /**
  * 한 번 듣는다.
@@ -145,6 +199,13 @@ export type ListenOutcome =
  */
 export function listenOnce(
   onDone: (outcome: ListenOutcome) => void,
+  /**
+   * 어디까지 갔는지 알린다. 화면이 "듣고 있어요" 대신 실제 단계를 보여준다.
+   *
+   * 이게 있어야 사용자가 **말하는 도중에** 마이크가 먹는지 안다. 끝나고
+   * 문구만 보면 8초를 헛되이 쓴 뒤다.
+   */
+  onStage?: (stage: ListenStage) => void,
   /** 이 시간 안에 아무 신호도 없으면 포기한다. */
   timeoutMs = 8000,
 ): () => void {
@@ -167,27 +228,87 @@ export function listenOnce(
   // 한 번만 끝낸다. onresult 뒤에 onend 가 또 오므로, 안 막으면 결과를
   // 보낸 뒤 "결과 없음" 이 덮어쓴다.
   let settled = false;
+
+  /** 어디까지 갔나. 끝났을 때 이유를 가르는 근거다. */
+  let stage: ListenStage = "starting";
+  const reach = (next: ListenStage) => {
+    // **끝난 뒤의 신호와 뒤로 가는 신호는 버린다.** 끊긴 인식기가 늦게 쏜
+    // audiostart 를 알리면 곧바로 다시 누른 판의 "마이크를 여는 중" 을 덮고,
+    // 말까지 간 뒤 audiostart 가 한 번 더 와서 open 으로 돌아가면 끝날 때
+    // no-sound 로 떨어져 말을 한 사람에게 MicCheck 가 뜬다.
+    if (settled || STAGES.indexOf(next) <= STAGES.indexOf(stage)) return;
+    stage = next;
+    clearTimeout(startGuard);
+    onStage?.(next);
+  };
+
+  /** 단계별 신호가 없이 끝났을 때 그 자리에 맞는 이유를 고른다. */
+  const stalled = (): ListenOutcome => {
+    if (stage === "starting") return { type: "not-started" };
+    if (stage === "open") return { type: "no-sound" };
+    return { type: "silent" };
+  };
+
   const finish = (outcome: ListenOutcome) => {
     if (settled) return;
     settled = true;
     clearTimeout(timer);
+    clearTimeout(startGuard);
     onDone(outcome);
   };
 
-  // 자체 타임아웃. start() 뒤에 아무 이벤트도 안 오는 구간이 실제로 있어서
-  // (권한 창이 떠 있는 동안) 이게 없으면 "듣는 중" 이 영원히 돈다.
-  const timer = setTimeout(() => {
-    // abort 를 먼저 부른다. 안 끊으면 인식기가 살아서 나중에 결과를 던진다.
+  /**
+   * 이유를 먼저 정하고 **그다음에** 인식기를 끊는다.
+   *
+   * 순서가 거꾸로면 abort() 안에서 onend·onerror 를 곧바로 부르는 구현에서
+   * 그쪽이 먼저 끝내 버린다. 사용자가 "그만" 을 눌렀는데 "마이크에 소리가
+   * 안 들어와요" 가 뜨고 MicCheck 까지 열리는 식이다. 크롬은 이벤트를 미뤄
+   * 보내서 지금은 안 드러나지만, 순서에 기대는 약점이라 순서를 없앤다.
+   */
+  const settleThenAbort = (outcome: ListenOutcome) => {
+    finish(outcome);
     try {
       recognition.abort();
     } catch {
       // 이미 끝난 인식기를 끊으면 던지는 브라우저가 있다. 무시해도 된다.
     }
-    finish({ type: "silent" });
+  };
+
+  /**
+   * 마이크가 열리는 것만 따로 짧게 기다린다.
+   *
+   * 열리는 데는 한참 안 걸린다 - 크롬에서 audiostart 는 200ms 안에 온다.
+   * 안 오면 앞으로도 안 오므로, 전체 타임아웃(8초)까지 기다리게 두면
+   * 사용자가 8초 동안 아무 일도 안 일어나는 화면에 대고 말한다.
+   */
+  const startGuard = setTimeout(() => {
+    if (stage !== "starting") return;
+    settleThenAbort({ type: "not-started" });
+  }, 2500);
+
+  // 자체 타임아웃. 마이크는 열렸는데 그 뒤로 아무 이벤트도 안 오는 구간이
+  // 있어서, 이게 없으면 "듣는 중" 이 영원히 돈다. 열리지도 않은 경우는 위
+  // 시작 감시가 먼저 끊는다.
+  const timer = setTimeout(() => {
+    // 끊기는 반드시 한다. 안 끊으면 인식기가 살아서 나중에 결과를 던진다.
+    settleThenAbort(stalled());
   }, timeoutMs);
 
+  // 마이크가 열렸다. 여기까지 와야 인식기가 실제로 도는 것이다.
+  recognition.onaudiostart = () => reach("open");
+  // **크롬은 soundstart 와 speechstart 를 한꺼번에 쏜다.** 소리 크기가 아니라
+  // 음성 구간 검출(endpointer)이 말을 잡았을 때 둘을 연달아 보낸다. 그래서
+  // 크롬에서는 sound 에만 머무는 순간이 없고, "마이크는 열렸는데 말을 못
+  // 잡음" 에는 소리가 아예 안 들어온 경우와 **너무 작게 말한 경우가 같이
+  // 들어간다.** 둘을 따로 받는 것은 다른 엔진이 나눠 보낼 때를 위해서다.
+  recognition.onsoundstart = () => reach("sound");
+  recognition.onspeechstart = () => reach("speech");
+
   recognition.onresult = (event) => {
-    const alternatives = event.results[0];
+    // 빈 결과 이벤트를 주는 구현이 있다. 그대로 짚으면 여기서 던지고,
+    // 끝낼 사람이 없어 8초 타임아웃까지 "듣는 중" 이 돈다.
+    const alternatives = event.results?.[0];
+    if (!alternatives) return finish({ type: "no-speech" });
     const heard: string[] = [];
     for (let i = 0; i < alternatives.length; i += 1) {
       const said = alternatives[i]?.transcript?.trim();
@@ -201,7 +322,14 @@ export function listenOnce(
     // 올리면 문구를 정하는 곳이 브라우저 어휘를 알아야 한다.
     switch (event.error) {
       case "no-speech":
-        return finish({ type: "no-speech" });
+        // 말을 한 번도 못 잡았으면 no-sound 다. 마이크가 열렸다는 신호조차
+        // 없이 이 에러가 와도 마찬가지다 - 그 상태를 "소리는 들어왔는데
+        // 말이 아님" 이라고 하면 사실과 반대다.
+        return finish(
+          stage === "starting" || stage === "open"
+            ? { type: "no-sound" }
+            : { type: "no-speech" },
+        );
       case "audio-capture":
         return finish({ type: "no-mic" });
       case "not-allowed":
@@ -209,28 +337,28 @@ export function listenOnce(
         return finish({ type: "denied" });
       case "network":
         return finish({ type: "network" });
-      // aborted 는 우리가 끊은 것이라 위 타임아웃/취소가 이미 처리했다.
+      // aborted 는 우리가 끊은 것이면 위 타임아웃/취소가 이미 처리했다.
+      //
+      // 모르는 코드(language-not-supported, 브라우저가 스스로 끊은 aborted)는
+      // 간 자리로 가른다. 그냥 silent 로 두면 마이크가 열리기도 전에 온
+      // 에러에도 "잘 못 알아들었어요" 가 떠 발음 탓을 한다.
       default:
-        return finish({ type: "silent" });
+        return finish(stalled());
     }
   };
 
   // 결과도 에러도 없이 끝나는 경로가 있다(abort). 여기서 받는다.
-  recognition.onend = () => finish({ type: "silent" });
+  // 어디까지 갔는지에 따라 이유가 다르다.
+  recognition.onend = () => finish(stalled());
 
   try {
     recognition.start();
   } catch {
-    // 이미 돌고 있는 인식기를 다시 시작하면 던진다. 화면이 두 번 누른 경우다.
-    finish({ type: "silent" });
+    // 이미 돌고 있는 인식기를 다시 시작하면 던진다. 화면이 두 번 누른
+    // 경우이고, 시작을 못 한 것이 맞다.
+    finish({ type: "not-started" });
   }
 
-  return () => {
-    try {
-      recognition.abort();
-    } catch {
-      // 위와 같다.
-    }
-    finish({ type: "silent" });
-  };
+  // 사용자가 "그만" 을 누른 것은 실패가 아니다. 어디까지 갔든 cancelled 다.
+  return () => settleThenAbort({ type: "cancelled" });
 }

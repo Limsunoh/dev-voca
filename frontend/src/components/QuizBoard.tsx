@@ -119,7 +119,7 @@ export function QuizBoard({ category, content = "words" }: Props) {
    * 걸어오는 사람. 맞히든 틀리든 오므로 burst·shake 를 못 쓴다.
    *
    * 횟수와 판정을 같이 들고 있는 이유: 판정만 두면 연속으로 같은 결과가
-   * 나왔을 때 값이 안 바뀌어 다시 안 뛴다. 횟수만 두면 따봉인지 뒤통수인지
+   * 나왔을 때 값이 안 바뀌어 다시 안 뛴다. 횟수만 두면 쓰다듬는지 콩 때리는지
    * 모른다.
    *
    * 한 덩이로 묶은 것은 **둘이 한 사건이기 때문**이다. 따로 두면 나중에
@@ -329,7 +329,7 @@ export function QuizBoard({ category, content = "words" }: Props) {
       // 맞혔을 때는 화면 가운데에서 조각이 터진다. 흔들림과 같은 이유로
       // 카운터다.
       if (graded.correct) setBurst((n) => n + 1);
-      // 사람은 맞히든 틀리든 온다. 따봉이냐 뒤통수냐만 갈린다.
+      // 사람은 맞히든 틀리든 온다. 쓰다듬기냐 콩이냐만 갈린다.
       setReaction((r) => ({ fire: r.fire + 1, correct: graded.correct }));
       // 채점 뒤 화면을 옮기는 일은 아래 useEffect 가 맡는다. 여기서 하면
       // 해설 카드가 아직 DOM 에 없어 버튼 좌표를 잘못 읽는다.
@@ -364,254 +364,274 @@ export function QuizBoard({ category, content = "words" }: Props) {
     }
   }
 
-  if (loading) {
-    return (
-      <p className="mt-10 text-center" style={{ color: "var(--text-muted)" }}>
-        문제를 가져오는 중입니다.
-      </p>
-    );
-  }
+  /* 채점 연출 둘. **어느 가지에도 넣지 않는다.**
 
-  if (error && !question) {
-    return (
-      <div className="mt-10">
-        {/* 안내는 앰버 채움에 진한 앰버 글자. 채움을 진하게 하면 이 카드가
-            화면에서 가장 강한 것이 되어, 정작 눌러야 할 아래 버튼보다
-            먼저 읽힌다(가이드 color-difficulty 와 같은 원칙). */}
-        <p
-          className="p-4"
-          style={{
-            background: "var(--amber-soft)",
-            color: "var(--amber-deep)",
-            borderRadius: "var(--radius-xl)",
-            fontWeight: "var(--weight-medium)",
-          }}
-        >
-          {error}
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            // 푼 목록을 비우고 다시 부른다. 다 풀어서 404 가 난
-            // 경우에는 그냥 재시도하면 같은 404 가 반복된다.
-            // 점수도 같이 비운다 - 처음부터 다시인데 이전 판 숫자가
-            // 이어지면 몇 개를 맞혔는지 알 수 없다.
-            recentRef.current = [];
-            setScore({ solved: 0, correct: 0 });
-            setCombo(0);
-            // 축포 카운터도 되돌린다. 안 그러면 판이 바뀌어도 이전 값이
-            // 남아, 여기서 초기화하는 다른 것들과 규율이 어긋난다.
-            setBurst(0);
-            setReaction({ fire: 0, correct: false });
-            void load();
-          }}
-          // 이 화면의 유일한 동작이라 코랄을 준다.
-          className="dv-btn mt-4 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          style={
-            {
-              minHeight: "var(--hit-min)",
-              background: "var(--coral)",
-              color: "var(--text-on-color)",
-              borderRadius: "var(--radius-pill)",
-              fontWeight: "var(--weight-black)",
-              "--lift": "var(--lift-button)",
-            } as React.CSSProperties
-          }
-        >
-          처음부터 다시
-        </button>
-      </div>
-    );
-  }
+     아래는 상태에 따라 서로 다른 트리를 돌려준다(가져오는 중 · 못 가져옴 ·
+     문제 없음 · 본문). 연출을 그중 한 가지 안에 두면, 가지가 바뀌는 순간
+     React 가 그것을 언마운트했다가 돌아올 때 다시 마운트한다. reaction.fire
+     는 상태에 남아 있으므로 key 가 새로 붙어 **답도 안 한 사람에게 지난
+     판정이 처음부터 다시 재생된다.**
 
-  if (!question) return null;
+     실제로 그랬다. "다음 문제" 를 누르면 loading 가지로 빠지고, 새 문제가
+     오면 본문으로 돌아오면서 연출이 한 번 더 돌았다. 사용자가 찾았다.
 
-  return (
-    <div className="mt-6">
-      {/* 맞혔을 때 화면 가운데에서 터진다. fixed 라 이 자리에 두어도
-          문제 위치와 무관하게 화면 중앙에서 난다. */}
+     가지마다 끼워 넣는 방식으로는 못 막는다 - 가지는 계속 늘어나고, 하나만
+     빠뜨려도 같은 일이 난다. 그래서 출구를 하나로 두고 연출을 그 바깥에
+     세운다. 둘 다 fixed 오버레이라 어느 화면 위에 얹혀도 자리를 안 차지하고,
+     fire 가 0 이면 아무것도 안 그린다. */
+  const overlays = (
+    <>
       <Burst fire={burst} />
+      {/* 어둡게 깔고 1초 멈춘다. 이 화면은 답한 뒤 "다음 문제" 를 누를
+          때까지 기다리므로 가려도 되는 자리다. 곧바로 다음 문제가 뜨는
+          화면(일일학습·복습)은 dim={false} 로 끈다 - Reaction 머리말 참고. */}
+      <Reaction fire={reaction.fire} correct={reaction.correct} dim />
+    </>
+  );
 
-      {/* 화면 아래쪽에서 걸어와 반응하고 간다. Burst 와 같은 이유로
-          이 자리에 둔다 - fixed 라 문제 위치와 무관하다.
+  const body = (() => {
+    if (loading) {
+      return (
+        <p className="mt-10 text-center" style={{ color: "var(--text-muted)" }}>
+          문제를 가져오는 중입니다.
+        </p>
+      );
+    }
 
-          **한 판 모드(RoundBoard)에는 안 넣었다.** 90초 타이머가 돌아
-          문제가 빠르게 넘어가는데, 이 연출은 정답·오답 양쪽에 다 와서
-          여기보다 두 배로 자주 뜬다. 0.6초가 매번 잘리면 연출이 아니라
-          잔상이 된다. (넘긴 문제 처리는 걸림돌이 아니다 - 거기 축포가
-          이미 !skipped 로 막고 있어서 같은 조건 하나면 된다.) */}
-      <Reaction fire={reaction.fire} correct={reaction.correct} />
+    if (error && !question) {
+      return (
+        <div className="mt-10">
+          {/* 안내는 앰버 채움에 진한 앰버 글자. 채움을 진하게 하면 이 카드가
+              화면에서 가장 강한 것이 되어, 정작 눌러야 할 아래 버튼보다
+              먼저 읽힌다(가이드 color-difficulty 와 같은 원칙). */}
+          <p
+            className="p-4"
+            style={{
+              background: "var(--amber-soft)",
+              color: "var(--amber-deep)",
+              borderRadius: "var(--radius-xl)",
+              fontWeight: "var(--weight-medium)",
+            }}
+          >
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              // 푼 목록을 비우고 다시 부른다. 다 풀어서 404 가 난
+              // 경우에는 그냥 재시도하면 같은 404 가 반복된다.
+              // 점수도 같이 비운다 - 처음부터 다시인데 이전 판 숫자가
+              // 이어지면 몇 개를 맞혔는지 알 수 없다.
+              recentRef.current = [];
+              setScore({ solved: 0, correct: 0 });
+              setCombo(0);
+              // 축포 카운터도 되돌린다. 안 그러면 판이 바뀌어도 이전 값이
+              // 남아, 여기서 초기화하는 다른 것들과 규율이 어긋난다.
+              setBurst(0);
+              setReaction({ fire: 0, correct: false });
+              void load();
+            }}
+            // 이 화면의 유일한 동작이라 코랄을 준다.
+            className="dv-btn mt-4 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            style={
+              {
+                minHeight: "var(--hit-min)",
+                background: "var(--coral)",
+                color: "var(--text-on-color)",
+                borderRadius: "var(--radius-pill)",
+                fontWeight: "var(--weight-black)",
+                "--lift": "var(--lift-button)",
+              } as React.CSSProperties
+            }
+          >
+            처음부터 다시
+          </button>
+        </div>
+      );
+    }
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* 분류 칩(MetaBadge 의 CategoryChip)의 비링크 모양과 같은 문법.
-            같은 화면에 분류 고르개가 이미 서 있어서, 여기까지 다른 회색을
-            쓰면 같은 알약이 세 종류가 된다. */}
-        <span
-          className="inline-flex items-center rounded-full px-3 py-1.5 text-xs whitespace-nowrap"
+    if (!question) return null;
+
+    return (
+      <div className="mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* 분류 칩(MetaBadge 의 CategoryChip)의 비링크 모양과 같은 문법.
+              같은 화면에 분류 고르개가 이미 서 있어서, 여기까지 다른 회색을
+              쓰면 같은 알약이 세 종류가 된다. */}
+          <span
+            className="inline-flex items-center rounded-full px-3 py-1.5 text-xs whitespace-nowrap"
+            style={{
+              background: "var(--sand)",
+              color: "var(--text-muted)",
+              fontWeight: "var(--weight-bold)",
+            }}
+          >
+            {question.kind_label}
+          </span>
+          {score.solved > 0 && (
+            <div className="flex items-center gap-2.5">
+              {/* 연속 정답. 두 개부터 보여준다 - 하나는 그냥 맞힌 것이지
+                  연속이 아니다. 끊기면 사라져서 "지금 몇 개째" 가 한눈에
+                  보인다.
+
+                  key 로 숫자를 넘겨 오를 때마다 다시 마운트시킨다. 그래야
+                  등장 애니메이션이 매번 재생된다. */}
+              {combo >= 2 && (
+                <span
+                  key={combo}
+                  // 연속은 초록이다. 코랄로 두면 "지금 여기"·오답과 같은 색이
+                  // 되어, 잘 가고 있다는 신호가 경고처럼 보인다(가이드
+                  // color-accent).
+                  className="pop inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
+                  style={{
+                    background: "var(--green-soft)",
+                    color: "var(--green-deep)",
+                    fontWeight: "var(--weight-black)",
+                  }}
+                >
+                  <span aria-hidden>연속</span>
+                  {combo}
+                </span>
+              )}
+              {/* 숫자가 바뀔 때 자리가 밀리지 않게 고정폭 숫자를 쓴다.
+                  9 에서 10 이 되면 글자가 옆으로 밀려 눈에 거슬린다. */}
+              <span
+                className="text-sm tabular-nums"
+                // 맨 바탕 위라 라벨용이 아니라 --text-muted.
+                style={{ color: "var(--text-muted)" }}
+              >
+                {score.solved}문제 중 {score.correct}개
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 무엇을 고르라는 것인지. 지문보다 확실히 작고 흐리다 - 여기서
+            눈이 멈추면 안 되고, 바로 아래 지문으로 넘어가야 한다. */}
+        <h2
+          className="mt-5"
           style={{
-            background: "var(--sand)",
+            fontSize: "var(--text-xs)",
+            fontWeight: "var(--weight-black)",
+            letterSpacing: "var(--tracking-wide)",
+            // 본문이라 --text-muted. --text-dim 은 작은 라벨용이다.
+            //
+            // 한때 "카드 안이면 --text-dim 도 4.2:1 이라 괜찮다" 고 적혀
+            // 있었는데 그 숫자가 실측이 아니었다. 대비 값은 여기 적지 않고
+            // globals.css 의 토큰 주석 한 곳에만 둔다 - 값이 움직일 때
+            // 호출부마다 거짓말이 되기 때문이다.
             color: "var(--text-muted)",
-            fontWeight: "var(--weight-bold)",
           }}
         >
-          {question.kind_label}
-        </span>
-        {score.solved > 0 && (
-          <div className="flex items-center gap-2.5">
-            {/* 연속 정답. 두 개부터 보여준다 - 하나는 그냥 맞힌 것이지
-                연속이 아니다. 끊기면 사라져서 "지금 몇 개째" 가 한눈에
-                보인다.
+          {question.question}
+        </h2>
 
-                key 로 숫자를 넘겨 오를 때마다 다시 마운트시킨다. 그래야
-                등장 애니메이션이 매번 재생된다. */}
-            {combo >= 2 && (
-              <span
-                key={combo}
-                // 연속은 초록이다. 코랄로 두면 "지금 여기"·오답과 같은 색이
-                // 되어, 잘 가고 있다는 신호가 경고처럼 보인다(가이드
-                // color-accent).
-                className="pop inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
-                style={{
-                  background: "var(--green-soft)",
-                  color: "var(--green-deep)",
-                  fontWeight: "var(--weight-black)",
-                }}
-              >
-                <span aria-hidden>연속</span>
-                {combo}
-              </span>
-            )}
-            {/* 숫자가 바뀔 때 자리가 밀리지 않게 고정폭 숫자를 쓴다.
-                9 에서 10 이 되면 글자가 옆으로 밀려 눈에 거슬린다. */}
-            <span
-              className="text-sm tabular-nums"
-              // 맨 바탕 위라 라벨용이 아니라 --text-muted.
-              style={{ color: "var(--text-muted)" }}
-            >
-              {score.solved}문제 중 {score.correct}개
-            </span>
-          </div>
+        <Prompt kind={question.kind} text={question.prompt} />
+
+        {/* 틀리면 보기 묶음이 짧게 흔들린다.
+            key 로 횟수를 넘겨 매번 다시 마운트시킨다 - 클래스만 토글하면
+            연속으로 틀렸을 때 두 번째부터 애니메이션이 안 뛴다.
+
+            조건이 `shake > 0` 이 아니라 `result 가 오답` 인 이유: 누적값은
+            한 번 틀리면 계속 참이라, 그 뒤로는 맞혀도 새 문제로 넘어가도
+            클래스가 붙은 채 남는다(실측으로 14번 중 14번 붙어 있었다).
+            지금 문제의 판정을 봐야 이번에 틀렸을 때만 흔들린다.
+
+            움직임을 줄인 사용자에게는 globals.css 의 reduced-motion 블록이
+            시간을 0 으로 만들어 흔들리지 않는다. */}
+        {/* 흔들림에 key 를 쓰지 않는다. 요소를 다시 마운트시키면 그 사이에
+            스크롤 effect 가 버튼 좌표를 읽어 목표가 어긋난다(실측: 버튼이
+            993px 인데 목표가 214px 로 계산돼 화면이 제자리였다).
+
+            대신 animationName 을 짝수/홀수로 번갈아 준다. 같은 이름이면
+            두 번째 오답부터 애니메이션이 안 뛰는데, 이름이 바뀌면 브라우저가
+            새 애니메이션으로 보고 매번 재생한다. DOM 은 그대로라 레이아웃이
+            흔들리지 않는다. */}
+        <ul
+          // 데스크톱에서 두 칸으로 나눈다. 한 줄에 하나씩 두면 보기 하나가
+          // 768px 막대가 되어, 게임 선택지가 아니라 설문 문항처럼 읽힌다.
+          // 두 칸이면 시선 이동도 짧다. 폰에서는 한 칸이 맞다 - 두 칸으로
+          // 쪼개면 긴 뜻풀이가 줄바꿈되어 높이가 들쭉날쭉해진다.
+          // 간격을 두께만큼 넓힌다. 카드가 아래로 3px 를 내밀어서, gap-2(8px)
+          // 로 두면 위 보기의 두께가 아래 보기 윗선에 거의 붙는다.
+          className={`mt-5 grid gap-2.5 sm:grid-cols-2 ${
+            result && !result.correct
+              ? shake % 2 === 0
+                ? "shake"
+                : "shake-alt"
+              : ""
+          }`}
+        >
+          {question.choices.map((choice) => (
+            <li key={choice.id}>
+              <ChoiceButton
+                text={choice.text}
+                // 설명 문제는 보기가 단어라 고정폭이 읽기 좋다.
+                mono={question.kind !== "meaning"}
+                state={choiceState(choice.id, picked, result)}
+                disabled={picked !== null}
+                onClick={() => void pick(choice.id)}
+              />
+            </li>
+          ))}
+        </ul>
+
+        {/* 문제가 떠 있는 상태의 에러(주로 채점 실패). 위쪽 가드는
+            문제조차 못 받은 경우만 다뤄서 여기가 따로 필요하다. */}
+        {error && question && (
+          <p
+            role="alert"
+            className="mt-4 p-3 text-sm"
+            style={{
+              background: "var(--amber-soft)",
+              color: "var(--amber-deep)",
+              borderRadius: "var(--radius-md)",
+              fontWeight: "var(--weight-medium)",
+            }}
+          >
+            {error}
+          </p>
+        )}
+
+        {/* aria-live 를 바깥에 두고 항상 렌더한다. 리전 자체가 내용과 함께
+            새로 생기면 화면 낭독기가 대부분 그 등장을 알리지 않는다 - 리전은
+            미리 있어야 이후 변화를 감시한다. 안쪽만 조건부로 바꾼다. */}
+        <div aria-live="polite">{result && <Explanation result={result} />}</div>
+
+        {picked !== null && (
+          <button
+            ref={nextButtonRef}
+            type="button"
+            onClick={() => void load()}
+            // 채점이 끝난 뒤 이 화면의 유일한 다음 동작이라 코랄이다.
+            // 한 화면에 코랄 버튼은 하나만 둔다 - 보기 넷은 종이라 겹치지 않는다.
+            className="dv-btn mt-6 w-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            style={
+              {
+                minHeight: "var(--hit-min)",
+                background: "var(--coral)",
+                color: "var(--text-on-color)",
+                borderRadius: "var(--radius-pill)",
+                // fontSize 를 여기 적지 않는다. globals.css 가 코랄 버튼
+                // 글자를 19px 로 올리는데(대비 때문), 인라인으로 크기를
+                // 걸면 그 규칙이 덮여서 16px 로 남는다.
+                fontWeight: "var(--weight-black)",
+                "--lift": "var(--lift-button)",
+              } as React.CSSProperties
+            }
+          >
+            다음 문제
+          </button>
         )}
       </div>
+    );
+  })();
 
-      {/* 무엇을 고르라는 것인지. 지문보다 확실히 작고 흐리다 - 여기서
-          눈이 멈추면 안 되고, 바로 아래 지문으로 넘어가야 한다. */}
-      <h2
-        className="mt-5"
-        style={{
-          fontSize: "var(--text-xs)",
-          fontWeight: "var(--weight-black)",
-          letterSpacing: "var(--tracking-wide)",
-          // 본문이라 --text-muted. --text-dim 은 작은 라벨용이다.
-          //
-          // 한때 "카드 안이면 --text-dim 도 4.2:1 이라 괜찮다" 고 적혀
-          // 있었는데 그 숫자가 실측이 아니었다. 대비 값은 여기 적지 않고
-          // globals.css 의 토큰 주석 한 곳에만 둔다 - 값이 움직일 때
-          // 호출부마다 거짓말이 되기 때문이다.
-          color: "var(--text-muted)",
-        }}
-      >
-        {question.question}
-      </h2>
-
-      <Prompt kind={question.kind} text={question.prompt} />
-
-      {/* 틀리면 보기 묶음이 짧게 흔들린다.
-          key 로 횟수를 넘겨 매번 다시 마운트시킨다 - 클래스만 토글하면
-          연속으로 틀렸을 때 두 번째부터 애니메이션이 안 뛴다.
-
-          조건이 `shake > 0` 이 아니라 `result 가 오답` 인 이유: 누적값은
-          한 번 틀리면 계속 참이라, 그 뒤로는 맞혀도 새 문제로 넘어가도
-          클래스가 붙은 채 남는다(실측으로 14번 중 14번 붙어 있었다).
-          지금 문제의 판정을 봐야 이번에 틀렸을 때만 흔들린다.
-
-          움직임을 줄인 사용자에게는 globals.css 의 reduced-motion 블록이
-          시간을 0 으로 만들어 흔들리지 않는다. */}
-      {/* 흔들림에 key 를 쓰지 않는다. 요소를 다시 마운트시키면 그 사이에
-          스크롤 effect 가 버튼 좌표를 읽어 목표가 어긋난다(실측: 버튼이
-          993px 인데 목표가 214px 로 계산돼 화면이 제자리였다).
-
-          대신 animationName 을 짝수/홀수로 번갈아 준다. 같은 이름이면
-          두 번째 오답부터 애니메이션이 안 뛰는데, 이름이 바뀌면 브라우저가
-          새 애니메이션으로 보고 매번 재생한다. DOM 은 그대로라 레이아웃이
-          흔들리지 않는다. */}
-      <ul
-        // 데스크톱에서 두 칸으로 나눈다. 한 줄에 하나씩 두면 보기 하나가
-        // 768px 막대가 되어, 게임 선택지가 아니라 설문 문항처럼 읽힌다.
-        // 두 칸이면 시선 이동도 짧다. 폰에서는 한 칸이 맞다 - 두 칸으로
-        // 쪼개면 긴 뜻풀이가 줄바꿈되어 높이가 들쭉날쭉해진다.
-        // 간격을 두께만큼 넓힌다. 카드가 아래로 3px 를 내밀어서, gap-2(8px)
-        // 로 두면 위 보기의 두께가 아래 보기 윗선에 거의 붙는다.
-        className={`mt-5 grid gap-2.5 sm:grid-cols-2 ${
-          result && !result.correct
-            ? shake % 2 === 0
-              ? "shake"
-              : "shake-alt"
-            : ""
-        }`}
-      >
-        {question.choices.map((choice) => (
-          <li key={choice.id}>
-            <ChoiceButton
-              text={choice.text}
-              // 설명 문제는 보기가 단어라 고정폭이 읽기 좋다.
-              mono={question.kind !== "meaning"}
-              state={choiceState(choice.id, picked, result)}
-              disabled={picked !== null}
-              onClick={() => void pick(choice.id)}
-            />
-          </li>
-        ))}
-      </ul>
-
-      {/* 문제가 떠 있는 상태의 에러(주로 채점 실패). 위쪽 가드는
-          문제조차 못 받은 경우만 다뤄서 여기가 따로 필요하다. */}
-      {error && question && (
-        <p
-          role="alert"
-          className="mt-4 p-3 text-sm"
-          style={{
-            background: "var(--amber-soft)",
-            color: "var(--amber-deep)",
-            borderRadius: "var(--radius-md)",
-            fontWeight: "var(--weight-medium)",
-          }}
-        >
-          {error}
-        </p>
-      )}
-
-      {/* aria-live 를 바깥에 두고 항상 렌더한다. 리전 자체가 내용과 함께
-          새로 생기면 화면 낭독기가 대부분 그 등장을 알리지 않는다 - 리전은
-          미리 있어야 이후 변화를 감시한다. 안쪽만 조건부로 바꾼다. */}
-      <div aria-live="polite">{result && <Explanation result={result} />}</div>
-
-      {picked !== null && (
-        <button
-          ref={nextButtonRef}
-          type="button"
-          onClick={() => void load()}
-          // 채점이 끝난 뒤 이 화면의 유일한 다음 동작이라 코랄이다.
-          // 한 화면에 코랄 버튼은 하나만 둔다 - 보기 넷은 종이라 겹치지 않는다.
-          className="dv-btn mt-6 w-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          style={
-            {
-              minHeight: "var(--hit-min)",
-              background: "var(--coral)",
-              color: "var(--text-on-color)",
-              borderRadius: "var(--radius-pill)",
-              // fontSize 를 여기 적지 않는다. globals.css 가 코랄 버튼
-              // 글자를 19px 로 올리는데(대비 때문), 인라인으로 크기를
-              // 걸면 그 규칙이 덮여서 16px 로 남는다.
-              fontWeight: "var(--weight-black)",
-              "--lift": "var(--lift-button)",
-            } as React.CSSProperties
-          }
-        >
-          다음 문제
-        </button>
-      )}
-    </div>
+  return (
+    <>
+      {overlays}
+      {body}
+    </>
   );
 }
 

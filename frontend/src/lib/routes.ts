@@ -43,6 +43,15 @@ export type BoardKind = "weekly" | "all_time" | "streak";
  */
 export type TalkKind = "daily" | "dev";
 
+/**
+ * 고른 난이도. 0 은 "전부" 다.
+ *
+ * 0 을 쓰는 이유: 서버의 Difficulty 가 1·2·3 이라 그 바깥 값이 필요한데,
+ * null 로 두면 주소 파싱·비교·기본값이 전부 두 갈래가 된다. 0 은 거짓이라
+ * `if (level)` 한 줄로 "안 골랐다" 가 표현된다.
+ */
+export type TalkLevel = 0 | 1 | 2 | 3;
+
 export const routes = {
   home: "/",
   words: "/learn/words",
@@ -80,7 +89,14 @@ export const routes = {
    * 기본값(쿼리 없음)이 일상 표현이다. 탭 이름이 그것이라 처음 들어온
    * 사람이 보는 것과 이름이 맞아야 한다.
    */
-  talk: (kind?: TalkKind) => (kind === "dev" ? "/talk?kind=dev" : "/talk"),
+  talk: (kind?: TalkKind, level?: TalkLevel) => {
+    // 기본값은 아예 안 싣는다. 주소가 짧아야 공유했을 때 읽힌다.
+    const query = new URLSearchParams();
+    if (kind === "dev") query.set("kind", "dev");
+    if (level) query.set("level", String(level));
+    const rest = query.toString();
+    return rest ? `/talk?${rest}` : "/talk";
+  },
   /**
    * 순위표. 종류를 안 주면 이번 주.
    *

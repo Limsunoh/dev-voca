@@ -395,6 +395,29 @@ _MAX_PK = 2**63 - 1
 _MAX_PK_DIGITS = len(str(_MAX_PK))
 
 
+# 고를 수 있는 난이도.
+#
+# Difficulty 를 정의하는 것은 LearningItem 이고 Word·DailyPhrase 가 물려받는다.
+# 둘 중 하나를 집으면 세 번째 콘텐츠 타입이 왔을 때 "왜 Word 를 보지" 가 된다.
+_LEVELS = frozenset(LearningItem.Difficulty.values)
+
+
+def _parse_level(raw: str | None) -> int | None:
+    """난이도 쿼리를 읽는다. 아는 값이 아니면 None(전부)이다.
+
+    choices 에 있는 값만 통과시킨다. 정수면 다 받으면 difficulty=9 같은
+    값이 그대로 WHERE 에 실려 **빈 결과를 "다 봤습니다" 로 그린다** -
+    데이터가 없는 것과 고를 수 없는 값을 고른 것이 같은 화면이 된다.
+    """
+    if not raw:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value in _LEVELS else None
+
+
 def _parse_ids(raw: str) -> list[int]:
     """"1,2,3" 을 [1, 2, 3] 으로. 숫자가 아닌 것은 버린다.
 
@@ -640,6 +663,7 @@ class TalkViewSet(viewsets.ViewSet):
 
         ?kind=dev       개발 용어에서 낸다. 없으면 일상 표현
         ?exclude=1,2,3  방금 낸 것을 다시 내지 않는다
+        ?level=1|2|3    그 난이도만 낸다. 없거나 모르는 값이면 전부
 
         **약어·숫자·기호는 출제하지 않는다.** 소리로 채점할 수 없어서다
         (talk.is_speakable). 개발 용어 566개 중 361개만 나온다.
@@ -657,6 +681,15 @@ class TalkViewSet(viewsets.ViewSet):
         exclude = _parse_ids(request.query_params.get("exclude", ""))
         pool = model.objects.visible().exclude(pk__in=exclude)
 
+        # 난이도 고르기. 없거나 아는 값이 아니면 전부에서 낸다.
+        #
+        # **아는 값이 아닐 때 400 을 주지 않는다.** 주소를 손으로 고쳤거나
+        # 옛 화면이 부르는 경우인데, 거기서 막으면 읽을 것이 아예 안 나온다.
+        # 연습 화면이라 잘못된 값 하나로 기능을 닫을 이유가 없다.
+        level = _parse_level(request.query_params.get("level"))
+        if level is not None:
+            pool = pool.filter(difficulty=level)
+
         # 소리로 채점할 수 있는 것만 남긴다. values_list 로 두 칸만 읽어
         # 필터한 뒤 pk 로 다시 꺼낸다 - 전 항목을 객체로 만들 이유가 없다.
         speakable = [
@@ -667,8 +700,17 @@ class TalkViewSet(viewsets.ViewSet):
         if not speakable:
             # 다 봤거나 exclude 가 풀을 비웠다. 화면이 "다 봤습니다" 를
             # 그리고 다른 갈래로 가는 길을 둔다.
+            #
+            # **난이도를 골랐으면 그것을 문구에 적는다.** 안 적으면 "다
+            # 봤습니다" 만 보고 전체를 다 읽은 줄 안다 - 실제로는 그 난이도
+            # 하나만 비었고, 난이도를 바꾸면 계속할 수 있다.
+            detail = (
+                "이 난이도는 다 봤습니다. 난이도를 바꾸거나 잠시 뒤 다시 해보세요."
+                if level is not None
+                else "읽을 것을 다 봤습니다. 잠시 뒤 다시 시작해보세요."
+            )
             return Response(
-                {"detail": "읽을 것을 다 봤습니다. 잠시 뒤 다시 시작해보세요."},
+                {"detail": detail},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -682,7 +724,7 @@ class TalkViewSet(viewsets.ViewSet):
                 "token": sign(item.pk, kind),
                 # 방금 낸 것을 화면이 기억했다가 exclude 로 되돌려주기
                 # 위해서다. 없으면 화면이 뺄 값을 몰라 같은 것이 계속
-                # 나온다 - 표현이 60개뿐이라 열 번에 절반은 겹친다.
+                # 나온다.
                 #
                 # 정답이 새지 않는다. 이 값으로 목록 API 를 조회하면
                 # 뜻은 볼 수 있지만, 애초에 화면이 뜻을 함께 받고 있고
@@ -700,6 +742,17 @@ class TalkViewSet(viewsets.ViewSet):
                 # 제시하며 따라 읽으라고 시킨다.
                 "reading": visible_reading(item),
                 "meaning": item.meaning,
+                # 얼마나 어려운 것인가. 화면이 배지로 그린다.
+                #
+                # **갈래마다 기준이 다르다.** 일상 표현은 발음이 어려운
+                # 정도(seed_phrases 머리말), 개발 용어는 Word.difficulty 라
+                # 개념이 어려운 정도다(TalkLevelTabs 머리말).
+                #
+                # 숫자와 이름을 같이 내린다. 화면이 색을 고를 때는 숫자가
+                # 필요하고(1·2·3), 글자로 읽을 때는 이름이 필요하다.
+                # 화면에서 이름을 다시 만들면 표와 화면이 따로 논다.
+                "difficulty": item.difficulty,
+                "difficulty_label": item.get_difficulty_display(),
             }
         )
 
