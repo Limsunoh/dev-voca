@@ -250,3 +250,67 @@ export function safeNext(value: unknown): string {
   // 슬래시 하나로 시작하고 그다음이 슬래시가 아닌 경로만 받는다.
   return /^\/(?!\/)/.test(next) ? next : "/";
 }
+
+/**
+ * 상세에서 돌아갈 목록 주소. **목록 경로가 아니면 버린다.**
+ *
+ * 상세 화면은 이 값을 URL 쿼리로 받으므로 주소창에 아무것도 넣을 수 있다.
+ * `safeNext` 는 내부 경로인지까지만 보는데, 여기서는 그보다 좁아야 한다 -
+ * 목록으로 돌아가는 버튼이 로그아웃이나 문제풀기 시작으로 튀면 안 된다.
+ *
+ * 그래서 경로 부분이 아는 목록과 정확히 같을 때만 통과시키고, 쿼리는
+ * 그대로 둔다(페이지·검색어·필터·섞은 순서가 거기 들어 있다).
+ */
+export function safeListUrl(value: unknown, expected: string): string {
+  const next = safeNext(value);
+  const [path] = next.split("?");
+  return path === expected ? next : expected;
+}
+
+/**
+ * 상세 주소에 "돌아올 목록 주소" 를 붙인다.
+ *
+ * 목록에서 상세로 갈 때 지금 보던 주소를 같이 넘긴다. 그래야 상세의
+ * 되돌아가기가 페이지·검색어·필터·섞은 순서를 그대로 들고 돌아온다 -
+ * 이것이 없으면 2페이지에서 들어간 사람이 1페이지로 떨어진다.
+ *
+ * 브라우저 뒤로가기는 이 값과 무관하게 동작한다. 그쪽은 목록 주소가
+ * 순서를 기억하는 것으로 해결된다 - 목록 화면이 시드 없이 들어온 요청을
+ * 시드 붙인 주소로 보내는 자리를 보라(`learn/words/page.tsx`).
+ */
+export function detailWithBack(detailPath: string, backTo: string): string {
+  return `${detailPath}?from=${encodeURIComponent(backTo)}`;
+}
+
+/**
+ * 목록 주소를 만든다. 빈 값은 빼고, 1페이지는 page 를 안 적는다.
+ *
+ * 쓰는 자리가 셋이다 - 섞은 순서를 주소에 적으려 보낼 때(목록 진입),
+ * 카드가 "되돌아올 주소" 로 실어 보낼 때, 페이지 넘기기 링크를 만들 때.
+ * 한 곳에서 만들지 않으면 되돌아가기가 페이지 넘기기와 다른 주소를
+ * 가리킨다.
+ *
+ * **빈 값을 빼는 이 판정은 목록 화면의 판정과 같은 기준이어야 한다** - 둘 다
+ * 공백을 턴 뒤 값이 남는지 본다. `if (one !== undefined)` 로 바꾸면 빈
+ * 문자열이 주소에 적히기 시작해서, 고르지도 않은 조건이 `?search=` 처럼
+ * 링크마다 따라다닌다(`Pagination` 머리말이 경계하는 것과 같은 부류다).
+ *
+ * 같은 판정이 `lib/api/client.ts` 의 `buildQuery` 에도 있다 - 그쪽은 백엔드로
+ * 보내는 쿼리를 만든다. 한쪽만 고치면 화면 주소와 API 요청이 어긋난다.
+ */
+export function listUrl(
+  basePath: string,
+  filters: Record<string, string | string[] | undefined>,
+  page?: number | string,
+): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    const one = Array.isArray(value) ? value[0] : value;
+    if (one) query.set(key, one);
+  }
+  const n = Number(page);
+  if (Number.isInteger(n) && n > 1) query.set("page", String(n));
+
+  const qs = query.toString();
+  return qs ? `${basePath}?${qs}` : basePath;
+}

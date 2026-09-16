@@ -9,11 +9,19 @@ import {
 } from "@/components/DetailLayout";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { getWord } from "@/lib/api/vocab";
-import { routes } from "@/lib/routes";
+import { routes, safeListUrl } from "@/lib/routes";
 
 // Next 16 에서 params 는 Promise 다.
 type PageProps = {
   params: Promise<{ id: string }>;
+  /**
+   * 목록이 실어 보낸 자기 주소(`from`). 되돌아가기 버튼이 이 값을 쓴다.
+   *
+   * 목록 카드가 붙여 주는 것이고, 없으면 그냥 목록 첫 화면으로 간다.
+   * 주소창으로 아무 값이나 넣을 수 있는 자리라 `safeListUrl` 로 걸러
+   * 쓴다 - 되돌아가기가 엉뚱한 화면으로 튀면 안 된다.
+   */
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata({ params }: PageProps) {
@@ -27,16 +35,21 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function WordDetailPage({ params }: PageProps) {
+export default async function WordDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { id } = await params;
   const word = await getWord(id);
 
   // 검수 안 된 단어도 백엔드가 404 를 주므로 여기로 온다.
   if (!word) notFound();
 
+  const backToList = safeListUrl((await searchParams).from, routes.words);
+
   return (
     <DetailShell>
-      <DetailBack href={routes.words} label="단어장" />
+      <DetailBack href={backToList} label="단어장" />
 
       <DetailHero
         title={word.term}

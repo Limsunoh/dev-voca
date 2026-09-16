@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
@@ -17,11 +17,13 @@ import {
   getSentenceKinds,
   getSentences,
 } from "@/lib/api/sentences";
-import { routes } from "@/lib/routes";
+import { detailWithBack, listUrl, routes } from "@/lib/routes";
 
 export const metadata = {
   title: "문장 | devvoca",
   description: "리뷰 코멘트와 에러 메시지에서 실제로 만나는 영어 문장.",
+  // 이유는 learn/words/page.tsx 참고.
+  alternates: { canonical: routes.sentences },
 };
 
 // Next 16 에서 searchParams 는 Promise 다. 동기 접근은 런타임 에러.
@@ -54,12 +56,31 @@ export default async function SentencesPage({ searchParams }: PageProps) {
   const currentPage = toPageNumber(first(params.page));
   const page = currentPage > 1 ? String(currentPage) : undefined;
 
-  // 단어장과 같은 규칙이다. 들어올 때마다 새로 섞고, 페이지 넘기기에만
-  // 시드를 실어 보내고, 검색 중일 때는 섞지 않는다.
+  // 단어장과 같은 규칙이다. 섞은 순서를 주소에 적어 두고, 페이지 넘기기에도
+  // 실어 보내고, 검색 중일 때는 섞지 않는다.
   // 자세한 이유는 learn/words/page.tsx 참고.
+  //
+  // `.trim()` 은 지우면 안 된다. 백엔드가 공백을 턴 뒤 판정하므로(`.strip()`)
+  // 여기서 안 털면 `?shuffle=%20` 이 "섞인 목록" 을 사칭한다.
   const shuffle = search
     ? undefined
-    : first(params.shuffle)?.slice(0, 64) || newShuffleSeed();
+    : first(params.shuffle)?.trim().slice(0, 64) || undefined;
+
+  // 페이지 넘기기 링크와 카드의 되돌아올 주소가 같이 쓴다. 읽어들인 값만
+  // 담는 이유는 learn/words/page.tsx 참고.
+  const filters = { search, category, kind, difficulty, shuffle };
+
+  if (!search && !shuffle) {
+    redirect(
+      listUrl(
+        routes.sentences,
+        { ...filters, shuffle: newShuffleSeed() },
+        currentPage,
+      ),
+    );
+  }
+
+  const currentListUrl = listUrl(routes.sentences, filters, currentPage);
 
   // 세 요청을 동시에 띄운다. 순서대로 기다리면 세 번의 왕복이 그대로
   // 대기 시간이 된다.
@@ -241,7 +262,10 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           {data.results.map((sentence) => (
             <li key={sentence.id}>
               <LearningCard
-                href={routes.sentenceDetail(sentence.id)}
+                href={detailWithBack(
+                  routes.sentenceDetail(sentence.id),
+                  currentListUrl,
+                )}
                 title={sentence.text}
                 reading={sentence.reading || undefined}
                 subtitle={sentence.translation}
@@ -283,7 +307,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
 
       <Pagination
         basePath={routes.sentences}
-        filters={{ search, category, kind, difficulty, shuffle }}
+        filters={filters}
         currentPage={currentPage}
         hasPrevious={Boolean(data.previous)}
         hasNext={Boolean(data.next)}
