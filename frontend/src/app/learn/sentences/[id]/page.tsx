@@ -9,11 +9,17 @@ import {
 } from "@/components/DetailLayout";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { getSentence } from "@/lib/api/sentences";
-import { routes } from "@/lib/routes";
+import { routes, safeListUrl } from "@/lib/routes";
 
 // Next 16 에서 params 는 Promise 다.
 type PageProps = {
   params: Promise<{ id: string }>;
+  /**
+   * 목록이 실어 보낸 자기 주소. 되돌아가기 버튼이 쓴다. 주소창으로 아무
+   * 값이나 올 수 있어 `safeListUrl` 로 걸러 쓴다.
+   * 자세한 것은 learn/words/[id]/page.tsx 참고.
+   */
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata({ params }: PageProps) {
@@ -33,7 +39,10 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function SentenceDetailPage({ params }: PageProps) {
+export default async function SentenceDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { id } = await params;
   const sentence = await getSentence(id);
 
@@ -44,9 +53,11 @@ export default async function SentenceDetailPage({ params }: PageProps) {
   // 쓴 문장이라 가변폭으로 둔다.
   const isError = sentence.kind === "error";
 
+  const backToList = safeListUrl((await searchParams).from, routes.sentences);
+
   return (
     <DetailShell>
-      <DetailBack href={routes.sentences} label="문장" />
+      <DetailBack href={backToList} label="문장" />
 
       <DetailHero
         title={sentence.text}

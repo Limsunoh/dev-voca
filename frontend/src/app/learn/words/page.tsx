@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
@@ -23,11 +23,17 @@ import {
   getExamSubjects,
   getWords,
 } from "@/lib/api/vocab";
-import { routes } from "@/lib/routes";
+import { detailWithBack, listUrl, routes } from "@/lib/routes";
 
 export const metadata = {
   title: "단어장 | devvoca",
   description: "개발할 때 마주치는 영어 단어를 모아 봅니다.",
+  // 주소에 섞은 순서가 붙으면서 같은 내용이 매번 다른 주소가 된다. 검색엔진에
+  // 정본이 어느 것인지 알려주지 않으면 같은 목록을 수백 개 주소로 색인한다.
+  //
+  // generateMetadata 로 바꾸지 않는다 - 값이 고정 문자열이라 요청 정보가
+  // 필요 없고, searchParams 를 읽는 순간 metadata 가 막히는 경로가 생긴다.
+  alternates: { canonical: routes.words },
 };
 
 // Next 16 에서 searchParams 는 Promise 다. 동기 접근은 런타임 에러.
@@ -67,20 +73,69 @@ export default async function VocabPage({ searchParams }: PageProps) {
   // 목록을 열 때마다 새로 섞는다. 정렬이 고정이면 앞쪽 단어만 계속 보이고
   // 뒤쪽은 다음 페이지를 눌러야 만난다.
   //
-  // 시드가 URL 에 없으면 새로 만든다. 그래서 /learn/words 로 그냥 들어오면
-  // (새로고침, 상세에서 뒤로가기, 필터 누르기) 매번 다른 순서가 나온다.
-  // 반대로 페이지 넘기기 링크에는 시드를 실어 보내므로 1페이지와 2페이지는
-  // 같은 순서를 공유한다 - 안 그러면 1페이지에서 본 단어가 2페이지에 또 나온다.
+  // **섞은 순서는 URL 에 적는다.** 시드가 없으면 새로 만들어 주소에 붙인
+  // 다음 그 주소로 보낸다(아래 redirect). 그래야 같은 주소가 언제 다시
+  // 열려도 같은 순서를 낸다 - 새로고침, 브라우저 뒤로가기, 상세에서
+  // 돌아오기가 모두 그 경우다. 탭바나 필터로 새로 들어오면 주소에 시드가
+  // 없으니 그때는 새 순서가 나온다.
+  //
+  // 페이지 넘기기 링크에도 시드를 실어 보낸다 - 안 그러면 1페이지에서 본
+  // 단어가 2페이지에 또 나온다.
   //
   // 검색 중일 때는 섞지 않는다. 찾으러 온 사람에게 섞기는 방해다 -
   // "commit" 을 검색했는데 정확히 그 단어가 12번째에 나오면 안 된다.
   // (백엔드 검색은 관련도 순위가 없어서 기본 정렬이 사실상 그 역할을 한다.)
   //
-  // URL 로 들어온 시드는 길이를 자른다. 안 자르면 페이지 넘기기 링크마다
-  // 그 길이가 그대로 박힌다. 백엔드도 자르지만 그건 SQL 인자 쪽이다.
+  // URL 로 들어온 시드는 공백을 털고 길이를 자른다. 자르는 이유는 안 자르면
+  // 페이지 넘기기 링크마다 그 길이가 그대로 박히는 것이고(백엔드도 자르지만
+  // 그건 SQL 인자 쪽이다), **공백을 터는 이유는 백엔드가 그렇게 보기
+  // 때문이다.** `?shuffle=%20` 은 여기서는 값이 있는 것처럼 보이는데
+  // 백엔드(`apps/vocab/views.py` 의 `.strip()`)에는 빈 값이라 안 섞는다.
+  // 기준이 어긋나면 그 주소는 "섞인 목록" 을 사칭하면서 정렬 고정 목록을
+  // 보여주고, 주소가 순서를 기억하는 설계라 그 상태가 계속 따라다닌다.
   const shuffle = search
     ? undefined
-    : first(params.shuffle)?.slice(0, 64) || newShuffleSeed();
+    : first(params.shuffle)?.trim().slice(0, 64) || undefined;
+
+  // 지금 보고 있는 목록. 페이지 넘기기 링크와 카드의 되돌아올 주소가
+  // 이것을 같이 쓴다 - 두 곳에서 따로 조립하면 한쪽만 고쳐지고
+  // 되돌아가기가 다른 목록을 가리킨다.
+  //
+  // **읽어들인 값만 담는다.** params 를 그대로 펼치면 우리가 안 쓰는 키와
+  // 정규화 전 값이 주소에 남는다 - `?page=abc` 로 들어온 사람의 주소창에
+  // 그 글자가 계속 붙어 다닌다.
+  const filters = {
+    search,
+    category,
+    difficulty,
+    shuffle,
+    is_exam: examOnly,
+    exam_subject: examSubject,
+  };
+
+  if (!search && !shuffle) {
+    // 목록을 부르기 전에 보낸다. 시드 없이 들어올 때마다 왕복이 한 번
+    // 늘어난다 - 탭바로 들어올 때와 필터·분류를 누를 때가 그렇다(그쪽
+    // 링크들은 시드를 안 싣는다). 그 뒤로는 이 주소가 순서를 기억한다.
+    //
+    // **기록을 밀지 않고 대체한다.** 서버 컴포넌트에서 부른 redirect 는
+    // replace 로 동작하므로(액션에서 부를 때만 push 다) 뒤로가기 한 번에
+    // 시드 없는 주소를 거치지 않고 이전 화면으로 간다. 밀렸다면 뒤로가기를
+    // 두 번 눌러야 했을 것이다.
+    //
+    // 주소창에 직접 쳐서 들어오면 307 로 오고, 화면 안에서 눌러 이동하면
+    // 서버 응답 안에 같은 신호가 실려 온다. 화면 미리 가져오기는 화면
+    // 내용을 만들지 않고 경로 모양만 받아 가므로 이 자리를 지나지 않는다.
+    redirect(
+      listUrl(
+        routes.words,
+        { ...filters, shuffle: newShuffleSeed() },
+        currentPage,
+      ),
+    );
+  }
+
+  const currentListUrl = listUrl(routes.words, filters, currentPage);
 
   // 두 요청을 동시에 띄운다. 순서대로 기다리면 두 번의 왕복이 그대로
   // 대기 시간이 된다.
@@ -294,7 +349,10 @@ export default async function VocabPage({ searchParams }: PageProps) {
           {data.results.map((word) => (
             <li key={word.id}>
               <LearningCard
-                href={routes.wordDetail(word.id)}
+                href={detailWithBack(
+                  routes.wordDetail(word.id),
+                  currentListUrl,
+                )}
                 title={word.term}
                 aside={word.pronunciation || undefined}
                 reading={word.reading || undefined}
@@ -331,14 +389,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
           또 만나고 어떤 단어는 아예 못 만난다. */}
       <Pagination
         basePath={routes.words}
-        filters={{
-          search,
-          category,
-          difficulty,
-          shuffle,
-          is_exam: examOnly,
-          exam_subject: examSubject,
-        }}
+        filters={filters}
         currentPage={currentPage}
         hasPrevious={Boolean(data.previous)}
         hasNext={Boolean(data.next)}

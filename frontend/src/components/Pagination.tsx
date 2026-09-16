@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { listUrl } from "@/lib/routes";
+
 /**
  * 이전/다음 링크.
  *
@@ -23,16 +25,9 @@ export function Pagination({
 }) {
   if (!hasPrevious && !hasNext) return null;
 
-  function hrefFor(page: number): string {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(filters)) {
-      if (value) query.set(key, value);
-    }
-    if (page > 1) query.set("page", String(page));
-
-    const qs = query.toString();
-    return qs ? `${basePath}?${qs}` : basePath;
-  }
+  // 목록 주소는 routes 의 listUrl 하나로 만든다. 카드의 되돌아올 주소도
+  // 같은 함수를 쓰므로, 상세에서 돌아오면 여기서 만든 주소와 같은 목록이다.
+  const hrefFor = (page: number) => listUrl(basePath, filters, page);
 
   // 흰 알약 + 두께. 목록 맨 아래에 홀로 놓이는 버튼이라 코랄을 쓰지 않는다 -
   // 한 화면에 코랄은 하나뿐이고, 그 자리는 검색 버튼이 갖는다.
