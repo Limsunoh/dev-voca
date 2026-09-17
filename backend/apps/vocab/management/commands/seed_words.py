@@ -1302,8 +1302,8 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "cache", "/kæʃ/", "자주 쓰는 것을 가까이 두기", API, N,
         "느린 곳에서 가져온 것을 빠른 곳에 잠깐 두고 다음부터 그걸 쓰는 것. "
         "원본이 바뀌었는데 캐시가 남아 있으면 옛 값이 계속 나온다. 그래서 언제 버릴지 "
-        "정하는 것이 캐시의 절반이다. 발음은 '캐시'로, cash 와 똑같이 읽는다. "
-        "'캐치'가 아니다.",
+        "정하는 것이 캐시의 절반이다. 발음은 '캐치'가 아니라 '캐시'로, "
+        "cash 와 똑같이 읽는다.",
         "Clear the cache and try again.",
         "캐시를 지우고 다시 시도해보세요.",
     ),
@@ -1578,7 +1578,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "null", "/nʌl/", "값이 없다는 상태", DB, N,
         "값이 아직 없거나 알 수 없다는 표시. 0 이나 빈 문자열과 다르다. 가장 큰 함정은 "
         "비교가 통하지 않는다는 점이라, null = null 조차 참이 아니고 IS NULL 을 써야 한다. "
-        "발음은 '널'이다. '눌'이 아니다.",
+        "발음은 '눌' 이 아니라 '널'이다.",
         "Use IS NULL; comparing with equals will never match.",
         "IS NULL 을 쓰세요. 등호로 비교하면 절대 일치하지 않습니다.",
     ),
@@ -3723,7 +3723,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     (
         "PK", "/ˌpi ˈkeɪ/", "기본키를 줄여 부르는 말", DB, E,
         "Primary Key 의 줄임말. 설계 문서나 ERD 에서 칼럼 옆에 표시로 붙는다. "
-        "말로 할 때도 '피케이' 라고 그냥 쓴다.",
+        "말로 할 때도 '피케이' 라고 그냥 읽는다.",
         "Which column is the PK on this table?",
         "이 테이블의 PK 는 어느 칼럼인가요?",
     ),

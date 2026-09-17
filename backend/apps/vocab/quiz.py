@@ -20,7 +20,8 @@ from dataclasses import dataclass
 
 from django.conf import settings
 from django.core import signing
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
+from django.db.models.functions import Trim
 
 from .models import Sentence, Word
 
@@ -315,8 +316,14 @@ def _mask_term(description: str, term: str) -> str:
     여러 낱말로 된 단어는 낱말별로도 가린다. "pull request" 를 통째로
     가려도 "merge request 라고도 부른다" 가 남으면 답이 보인다.
 
+    한글 발음 표기도 지운다. "CIDR" 의 설명 끝에 "'사이더' 로 읽는다"
+    가 붙어 있으면 단어와 원형을 다 가려도 발음만 읽고 답을 고른다.
+    566개 중 37개가 이 모양이다. 지우는 단위는 따옴표가 아니라 문장이다 -
+    이유는 _PRONUNCIATION 주석에 있다.
+
     해설은 가리지 않는다. 채점이 끝난 뒤에는 설명 원문을 그대로
-    보여주므로 "무엇의 줄임말인가" 라는 학습 내용은 그대로 남는다.
+    보여주므로 "무엇의 줄임말인가"·"어떻게 읽는가" 라는 학습 내용은
+    그대로 남는다.
     """
     if not term:
         return description
@@ -351,6 +358,9 @@ def _mask_term(description: str, term: str) -> str:
                     flags=re.IGNORECASE,
                 )
 
+    # 발음은 약어가 아닌 단어에도 적혀 있어 종류를 가리지 않고 지운다.
+    masked = _PRONUNCIATION.sub("", masked).strip()
+
     return masked
 
 
@@ -370,6 +380,31 @@ _SEP = r"(?:[ -]|,\s*)"
 _LETTERS = r"[A-Za-z]['’A-Za-z]*"
 _EXPANSION = re.compile(
     rf"[A-Z]['’A-Za-z]*(?:{_SEP}{_LETTERS})*{_SEP}[A-Z]['’A-Za-z]*"
+)
+
+# 한글 발음 표기가 들어간 문장. "'사이더' 로 읽는다." 처럼 적는다.
+#
+# 문장을 통째로 잡는 이유: 따옴표 안만 지우면 꼬리가 남아 그대로 샌다.
+# K8s 의 설명이 "'케이츠' 로 읽거나 그냥 쿠버네티스라고 읽는다" 인데,
+# 따옴표만 가리면 "쿠버네티스라고" 가 남아 답이 그대로 보인다.
+#
+# 앞은 문장 부호나 글 시작까지, 뒤는 마침표까지 본다. 한 설명에 발음이
+# 두 번 나오는 것이 있어(ACID 는 "'에이시아이디' 가 아니라 '애시드' 로
+# 읽는다", a11y 는 "또는" 으로 둘) 문장 단위로 끊어야 둘 다 걸린다.
+#
+# "읽" 만 보면 안 된다. `발음은 '스키마'다` 처럼 **읽는다는 말 없이**
+# 적은 것이 셋 있다(schema·null·verbose). schema 는 지문 끝이 통째로
+# "발음은 '스키마'다." 라서 보기에 schema 가 있으면 바로 골라진다.
+#
+# 마침표를 필수로 두지 않는다. 지금 시드는 전부 마침표로 끝나지만,
+# AI 파이프라인이 넣는 설명에는 강제가 없어 마지막 문장이 마침표 없이
+# 끝나면 통째로 안 지워진다.
+# 표시말이 따옴표 앞에 오기도 한다("발음은 '스키마'다"). 순서를 고정하면
+# 그쪽을 놓치므로, 한 문장 안에 따옴표와 표시말이 **둘 다** 있는지만 본다.
+_PRONUNCIATION = re.compile(
+    r"(?:(?<=\.)|(?<=^))"
+    r"(?=[^.]*['’][가-힣]+['’])(?=[^.]*(?:읽|발음))"
+    r"[^.]*(?:\.|$)"
 )
 
 
@@ -624,15 +659,86 @@ def make_blank_question(
     return None
 
 
+# context 가 "어디서 보이는가" 를 가리키는 값인지 본다.
+#
+# 이 칸에는 성격이 다른 둘이 섞여 있다(seed_sentences.py 의 주석이 그렇게
+# 정의한다). "회의가 길어질 때" 는 장면이고 "운영체제 교재" 는 자리다.
+#
+# 섞어서 한 문제에 내면 안 되는 이유: "이 말이 나오는 상황은?" 에 보기가
+# [응답을 파싱할 때 / 데이터베이스 교재 / npm install 실행 시 / 위험한
+# 변경을 논의할 때] 로 나오면, 혼자 종류가 다른 것이 눈에 띄어 답이 아닌
+# 것부터 지워진다. 4지선다가 사실상 3지선다가 된다.
+#
+# 자리 쪽을 버리지 않는 이유: "이 에러 어디서 봤더라" 는 실제로 쓸모 있는
+# 물음이다. 버리는 대신 같은 종류끼리 모아 묻는 말을 바꿔 낸다.
+#
+# **가르는 기준은 낱말이 아니라 어미다.** 처음에는 "화면·응답·문서" 같은
+# 낱말이 들어 있으면 자리로 봤는데, 그러면 "화면이 덜컹거릴 때"·"응답을
+# JSON 으로 파싱할 때" 처럼 **장면인데 자리로 걸리는 것이 17개** 나왔다.
+# 그 값들이 자리형 문제에 정답으로 섞이면, 보기 셋만 진짜 자리라서
+# 혼자 튀는 정답이 그대로 드러난다 - 고치려던 결함이 더 나빠진다.
+#
+# "~때/경우/중/뒤/전" 으로 끝나면 무슨 낱말이 들어 있든 장면이다. 이걸
+# 먼저 보고, 그다음에 자리 낱말을 본다. 이 기준으로 417개가 자리 94 /
+# 장면 323 으로 갈린다.
+_SCENE_END = re.compile(r"(때|경우|중|뒤|전|후|면)$")
+_PLACE_WORD = re.compile(
+    r"(교재|로그|문서|메시지|화면|출력|콘솔|리포트|본문|응답|Events|Description)"
+)
+
+def _place_filter(pool: QuerySet[Sentence], want_place: bool) -> QuerySet[Sentence]:
+    """`_is_place` 와 같은 기준으로 거른 queryset.
+
+    **파이썬과 DB 가 같은 답을 내야 한다.** 정답의 종류는 파이썬이
+    판정하고 보기는 DB 가 고르는데, 둘이 갈리면 정답이 자기가 걸러진 쪽
+    풀에서 뽑혀 보기가 다시 섞인다.
+
+    그래서 여기서도 끝 공백을 떼고 본다(`Trim`). Postgres 의 `$` 는
+    파이썬과 달리 마지막 줄바꿈 앞에서 안 맞아서, 안 다듬으면
+    `"로그를 볼 때\\n"` 에서 둘이 어긋난다.
+
+    부정 선행 검사(negative lookahead)는 Postgres 정규식에 없으므로
+    쓰지 않고, filter 와 exclude 를 겹쳐 "어미가 장면이 아니면서 자리
+    낱말을 가진 것" 을 표현한다.
+    """
+    trimmed = pool.annotate(_ctx=Trim("context"))
+    is_place = Q(_ctx__regex=_PLACE_WORD.pattern) & ~Q(
+        _ctx__regex=_SCENE_END.pattern
+    )
+    return trimmed.filter(is_place) if want_place else trimmed.exclude(is_place)
+
+
+def _is_place(context: str) -> bool:
+    """이 값이 장면이 아니라 자리를 가리키면 참.
+
+    어미를 먼저 본다 - "~때" 로 끝나면 "화면" 이 들어 있어도 장면이다.
+
+    **끝 공백을 떼고 본다.** 파이썬의 `$` 는 마지막 줄바꿈 앞에서도 맞지만
+    Postgres 의 `$` 는 아니라서, `"로그를 볼 때\\n"` 을 한쪽은 장면으로
+    다른 쪽은 자리로 본다. 그러면 정답이 자기가 걸러진 쪽 풀에서 뽑혀
+    보기가 다시 섞인다. 판정 전에 값을 다듬어 양쪽을 같게 만든다.
+    쿼리 쪽은 `_place_filter` 가 같은 일을 한다.
+    """
+    context = context.strip()
+    if _SCENE_END.search(context):
+        return False
+    return bool(_PLACE_WORD.search(context))
+
+
 def make_situation_question(
     sentences: QuerySet[Sentence],
     exclude_ids: list[int] | None = None,
     answer: Sentence | None = None,
 ) -> Question | None:
-    """문장을 보여주고 그 말이 나오는 상황을 고르는 문제.
+    """문장을 보여주고 그 말이 나오는 상황(또는 자리)을 고르는 문제.
 
     answer 를 주면 그 문장을 정답으로 한다 - 복습이 그렇게 쓴다. 상황이
     비어 있으면 이 유형을 못 내므로 None 이다.
+
+    보기 넷은 **같은 종류로만** 모은다. 장면과 자리가 섞이면 답이 아닌
+    것이 먼저 지워진다 - 자세한 이유는 _SCENE_END 주석에 있다. 종류에
+    따라 묻는 말도 바꿔서, 보기가 전부 자리면 "이 말은 어디서 보이나?"
+    로 묻는다.
     """
     pool = sentences.exclude(context="")
 
@@ -645,6 +751,9 @@ def make_situation_question(
         if answer is None:
             return None
 
+    # 정답과 같은 종류(장면이면 장면, 자리면 자리)만 보기로 쓴다.
+    want_place = _is_place(answer.context)
+
     # 같은 상황 글자를 쓰는 문장이 있다(2026-08 기준 380개 중 149개가
     # 남과 상황을 공유하고, 한 상황에 최대 14개). 정답과 겹치는 것만
     # 빼면 **오답끼리 겹치는 것**이 남아 보기 둘이 똑같아 보인다.
@@ -652,21 +761,44 @@ def make_situation_question(
     #
     # 쿼리로는 "서로 다른 상황 셋" 을 뽑을 수 없어(DISTINCT ON 은 정렬을
     # 고정해야 해서 무작위와 섞이지 않는다) 넉넉히 받아 파이썬에서 고른다.
-    others = (
-        pool.exclude(pk=answer.pk)
-        .exclude(context=answer.context)
-        .order_by("?")[: (CHOICE_COUNT - 1) * 5]
-    )
+    #
+    # 종류를 파이썬이 아니라 **쿼리에서** 거르는 이유: 자리형이 전체의
+    # 1/4 이 안 돼서, 섞인 채로 15개를 받아 거르면 셋을 못 채우는 일이
+    # 생긴다(표본으로 재니 자리형 문제의 22%가 그랬다). 그러면 이 유형이
+    # 조용히 None 을 내고 다른 유형으로 떨어진다.
+    #
+    same_kind = _place_filter(pool, want_place)
 
-    distractors: list[Sentence] = []
-    seen = {answer.context}
-    for one in others:
-        if one.context in seen:
-            continue
-        seen.add(one.context)
-        distractors.append(one)
-        if len(distractors) == CHOICE_COUNT - 1:
-            break
+    def pick(candidates) -> list[Sentence]:
+        chosen: list[Sentence] = []
+        seen = {answer.context}
+        for one in candidates.exclude(pk=answer.pk).order_by("?")[
+            : (CHOICE_COUNT - 1) * 5
+        ]:
+            if one.context in seen:
+                continue
+            seen.add(one.context)
+            chosen.append(one)
+            if len(chosen) == CHOICE_COUNT - 1:
+                break
+        return chosen
+
+    distractors = pick(same_kind)
+
+    # 같은 종류로 넷을 못 채우면 섞어서라도 낸다.
+    #
+    # **없는 문제로 만들지 않는다.** 복습은 틀린 항목을 정답으로 지정해
+    # 부르는데(review.py), 여기서 None 을 내면 그 문장은 복습에서 영영
+    # 안 나온다. 보기가 섞이는 것보다 그쪽이 나쁘다 - 섞여도 문제는 풀 수
+    # 있지만, 안 나오면 틀린 것을 다시 볼 길이 없다.
+    #
+    # **지금 시드에서 이미 걸린다.** 문제풀기는 분류로 좁힌 pool 을
+    # 넘기는데(views.py), debug 분류는 서로 다른 자리가 셋뿐이라 자리
+    # 문제를 못 만든다. cs·git·review 처럼 한쪽이 아예 0인 분류도 있다.
+    # 전체 pool 로만 보면 넉넉해 보여서 놓치기 쉬운 자리다.
+    if len(distractors) < CHOICE_COUNT - 1:
+        distractors = pick(pool)
+        want_place = False
 
     if len(distractors) < CHOICE_COUNT - 1:
         return None
@@ -676,8 +808,12 @@ def make_situation_question(
 
     return Question(
         kind=QuizKind.SITUATION,
-        kind_label=QuizKind.LABELS[QuizKind.SITUATION],
-        question=QuizKind.QUESTIONS[QuizKind.SITUATION],
+        kind_label="자리 고르기" if want_place else QuizKind.LABELS[QuizKind.SITUATION],
+        question=(
+            "이 말은 어디서 보이나?"
+            if want_place
+            else QuizKind.QUESTIONS[QuizKind.SITUATION]
+        ),
         prompt=answer.text,
         choices=options,
         answer_id=answer.pk,

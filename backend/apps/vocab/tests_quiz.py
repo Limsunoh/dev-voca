@@ -787,6 +787,110 @@ class DescriptionQuizLeakTest(TestCase):
 
         self.assertEqual(leaks, [], f"설명에 답이 남는 단어 {len(leaks)}개")
 
+    def test_pronunciation_is_not_left_in_the_prompt(self):
+        """한글 발음이 남으면 철자를 다 가려도 답을 고를 수 있다.
+
+        "CIDR" 의 설명 끝이 "'사이더' 로 읽는다" 였다. 단어도 원형도
+        가려지는데 발음만 읽으면 보기 넷 중 하나가 바로 골라진다.
+
+        문장째 지우는지도 함께 본다. 따옴표 안만 지우면 K8s 의
+        "그냥 쿠버네티스라고 읽는다" 같은 꼬리가 남는다.
+        """
+        cases = [
+            ("CIDR", "슬래시 표기다. '사이더' 로 읽는다.", "사이더"),
+            ("ACID", "성질들이다. '에이시아이디' 가 아니라 '애시드' 로 읽는다.", "애시드"),
+            ("K8s", "관리 도구다. '케이츠' 로 읽거나 그냥 쿠버네티스라고 읽는다.", "쿠버네티스"),
+            ("a11y", "줄인 표기. '에이일레븐와이' 또는 '앨리' 로 읽는다.", "앨리"),
+            # "읽" 없이 적은 것들. 표시말이 따옴표 앞에 온다.
+            ("schema", "데이터의 틀이다. 발음은 '스키마'다.", "스키마"),
+            ("null", "값이 없음을 뜻한다. 발음은 '널'이다. '눌'이 아니다.", "널"),
+        ]
+        for term, desc, leaked in cases:
+            with self.subTest(term=term):
+                self.assertNotIn(leaked, _mask_term(desc, term))
+
+    def test_seed_data_has_no_leaking_pronunciation(self):
+        """저장소에 박힌 단어를 전수로 본다.
+
+        위 단위 테스트는 적어 넣은 네 모양만 본다. 실데이터에는
+        "'조트' 라고 읽지만"·"'셰마' 나 '스케마' 로 읽기 쉬운데" 처럼
+        끝맺음이 제각각인 것이 섞여 있어 전수로 봐야 잡힌다.
+
+        **탐지 기준을 구현보다 넓게 잡는다.** 처음에는 구현과 똑같이
+        "읽" 만 찾았는데, 그 가정을 공유하는 바람에 `발음은 '스키마'다`
+        형태 셋(schema·null·verbose)을 나란히 놓쳤다. 전수 검사의 값은
+        구현이 안 보는 것을 보는 데 있다.
+        """
+        from .tests import ALL_SEEDED
+
+        # 따옴표 친 한글이 한 문장에 있고, 그 문장이 발음 이야기를 하면
+        # 발음 안내로 본다. 표시말과 따옴표의 순서는 보지 않는다.
+        quoted = re.compile(r"['’][가-힣]+['’]")
+        leaks = []
+        for row in ALL_SEEDED:
+            if not row["description"]:
+                continue
+            masked = _mask_term(row["description"], row["term"])
+            for sentence in masked.split("."):
+                if quoted.search(sentence) and (
+                    "읽" in sentence or "발음" in sentence
+                ):
+                    leaks.append(f"{row['term']}: {sentence.strip()[:40]}")
+                    break
+
+        self.assertEqual(leaks, [], f"발음이 지문에 남는 단어 {len(leaks)}개")
+
+    def test_keeps_descriptions_long_enough_to_be_a_question(self):
+        """발음 문장을 지우고 나서도 문제로 쓸 만큼은 남아야 한다.
+
+        지우는 단위가 문장이라 짧은 설명에서는 남는 게 거의 없을 수
+        있다. 그러면 "____ 로 읽는다" 만 남은 빈 지문이 나간다.
+        """
+        from .tests import ALL_SEEDED
+
+        too_short = [
+            row["term"]
+            for row in ALL_SEEDED
+            if row["description"]
+            and len(_mask_term(row["description"], row["term"]).strip()) < 15
+        ]
+
+        self.assertEqual(too_short, [], f"지문이 너무 짧아지는 단어 {len(too_short)}개")
+
+    def test_pronunciation_without_the_read_word_is_masked_too(self):
+        """발음 안내라고 늘 "읽" 이나 "발음" 이라고 적혀 있지는 않다.
+
+        위 전수 검사는 "읽"·"발음" 이 같은 문장에 있을 때만 발음으로 본다.
+        그래서 한동안 셋이 새고 있었다.
+
+            PK      "말로 할 때도 '피케이' 라고 그냥 쓴다"
+            cache   "'캐치'가 아니다"
+            null    "'눌'이 아니다"
+
+        셋 다 앞 문장이 발음을 말하고 **뒤 문장만 따로 떨어져** 표시말이
+        없었다. 보기에 PK 가 있으면 '피케이' 를 읽고 바로 고른다.
+
+        코드로 막지 않고 시드에서 한 문장으로 합쳤다. "따옴표 안이 그
+        단어의 음차인가" 를 기계로 판정하려면 음차 규칙이 필요한데,
+        OIDC 의 "'누구인지'" 나 prototype 의 "'확인'" 처럼 발음과 무관한
+        따옴표가 섞여 있어 넓게 잡으면 멀쩡한 설명을 지운다.
+        """
+        from .tests import ALL_SEEDED
+
+        quoted = re.compile(r"['’][가-힣]+['’]")
+        speech = re.compile(r"(읽|발음|라고|부른다|불린다)")
+        leaks = []
+        for row in ALL_SEEDED:
+            if not row["description"]:
+                continue
+            masked = _mask_term(row["description"], row["term"])
+            for sentence in masked.split("."):
+                if quoted.search(sentence) and speech.search(sentence):
+                    leaks.append(f"{row['term']}: {sentence.strip()[:40]}")
+                    break
+
+        self.assertEqual(leaks, [], f"발음이 지문에 남는 단어 {len(leaks)}개")
+
 
 class ChoiceQualityTest(TestCase):
     """보기 품질. 문제가 성립하려면 정답이 하나로 읽혀야 한다."""
