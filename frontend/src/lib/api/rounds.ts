@@ -35,6 +35,16 @@ export type RoundQuestion = {
   choices: RoundChoice[];
   category: string;
   category_label: string;
+  /**
+   * 이 문제의 제한 시간(ms). 이 안에 맞히면 +1, 지나서 맞히면 0 이다.
+   *
+   * 읽을 것의 길이로 정해진다 - 지문이 단어 하나면 3초, 문장이면 7초
+   * (backend quiz.TIME_LIMITS_MS). 유형 이름만 보고는 알 수 없다.
+   *
+   * **없을 수도 있다.** 한 판만 이 값을 쓰고 일일학습·복습은 시간을 안
+   * 재는데, 세 화면이 이 타입을 같이 쓴다.
+   */
+  time_limit_ms?: number;
 };
 
 /** 답 하나의 채점 결과. */

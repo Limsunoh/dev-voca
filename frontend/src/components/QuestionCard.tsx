@@ -36,18 +36,40 @@ export function QuestionCard({
           boxShadow: "var(--lift-card)",
         }}
       >
-        <p
-          style={{
-            fontSize: "var(--text-xs)",
-            fontWeight: "var(--weight-bold)",
-            letterSpacing: "var(--tracking-wide)",
-            // --text-dim 은 흰 종이 위에서도 3.85:1 이라 본문 대비 4.5:1 에
-            // 못 미친다. 라벨이라 작을수록 더 필요하다.
-            color: "var(--text-muted)",
-          }}
-        >
-          {question.kind_label}
-        </p>
+        <div className="flex items-baseline justify-between gap-3">
+          <p
+            style={{
+              fontSize: "var(--text-xs)",
+              fontWeight: "var(--weight-bold)",
+              letterSpacing: "var(--tracking-wide)",
+              // --text-dim 은 흰 종이 위에서도 3.85:1 이라 본문 대비 4.5:1 에
+              // 못 미친다. 라벨이라 작을수록 더 필요하다.
+              color: "var(--text-muted)",
+            }}
+          >
+            {question.kind_label}
+          </p>
+          {/* **제한 시간을 문제 옆에 적는다.**
+              한 판은 문제마다 제한 시간이 다르다 - 지문이 단어면 3초,
+              문장이면 7초다(backend quiz.TIME_LIMITS_MS). 그 안에 맞혀야
+              +1 이고 지나서 맞히면 0 인데, 화면에 없으니 끝나고 점수를
+              보고서야 안다. 위의 판 타이머는 90초 전체라 이것과 다르다.
+
+              값이 없으면 안 그린다. 시간을 안 재는 화면(일일학습·복습)이
+              같은 카드를 쓴다. */}
+          {question.time_limit_ms != null && (
+            <p
+              className="tabular-nums"
+              style={{
+                fontSize: "var(--text-xs)",
+                fontWeight: "var(--weight-bold)",
+                color: "var(--text-muted)",
+              }}
+            >
+              {Math.round(question.time_limit_ms / 1000)}초 안에
+            </p>
+          )}
+        </div>
         <p
           className="mt-1"
           style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}
