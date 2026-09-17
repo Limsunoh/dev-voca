@@ -14,6 +14,7 @@ import { routes } from "@/lib/routes";
 
 import { Burst } from "./Burst";
 import { QuestionCard } from "./QuestionCard";
+import { WrongAnswer } from "./WrongAnswer";
 import { Reaction } from "./Reaction";
 
 /**
@@ -437,7 +438,10 @@ function PlayCard({
       <QuestionCard question={question} busy={busy} onPick={onPick} />
 
       {/* 새로 나타나는 영역이라 읽어준다. */}
-      <p aria-live="polite" className="min-h-6 text-sm">
+      {/* 높이를 두 줄로 잡아둔다. 오답일 때만 정답과 그 뜻으로 두 줄이
+          되는데, 한 줄 높이로 두면 오답이 뜰 때마다 아래가 통째로 내려간다
+          (일일학습·한 판도 같은 이유로 높이를 잡아뒀다). */}
+      <p aria-live="polite" className="min-h-10 text-sm">
         {result && (
           <ResultLine result={result} graduateStreak={graduateStreak} />
         )}
@@ -485,7 +489,7 @@ function ResultLine({
           fontWeight: "var(--weight-bold)",
         }}
       >
-        오답 · {result.answer_text}
+        <WrongAnswer text={result.answer_text} extra={result.answer_extra} />
       </span>
     );
   }

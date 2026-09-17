@@ -16,6 +16,7 @@ import { routes } from "@/lib/routes";
 
 import { Burst } from "./Burst";
 import { QuestionCard } from "./QuestionCard";
+import { WrongAnswer } from "./WrongAnswer";
 import { Reaction } from "./Reaction";
 import { StudyCards } from "./StudyCards";
 
@@ -531,7 +532,10 @@ function PlayCard({
       />
 
       {/* 새로 나타나는 영역이라 읽어준다. */}
-      <p aria-live="polite" className="min-h-6 text-sm">
+      {/* 높이를 두 줄로 잡아둔다. 오답일 때만 정답과 그 뜻으로 두 줄이
+          되는데, 한 줄 높이로 두면 오답이 뜰 때마다 아래 "이어서 익히기"
+          버튼이 통째로 내려간다. 누르려던 자리가 답한 직후에 움직인다. */}
+      <p aria-live="polite" className="min-h-10 text-sm">
         {result && (
           // 정답은 초록, 오답은 진한 코랄. 오답에 --coral 을 그대로 쓰지
           // 않는 이유는 --wrong-deep 이 그 자리를 위해 있어서다 - 크림
@@ -542,7 +546,11 @@ function PlayCard({
               fontWeight: "var(--weight-black)",
             }}
           >
-            {result.correct ? "정답" : `오답 · ${result.answer_text}`}
+            {result.correct ? (
+              "정답"
+            ) : (
+              <WrongAnswer text={result.answer_text} extra={result.answer_extra} />
+            )}
           </span>
         )}
       </p>
@@ -574,16 +582,41 @@ function PlayCard({
       )}
 
       {error && (
-        <p
-          role="alert"
-          className="text-sm"
-          style={{
-            color: "var(--coral-deep)",
-            fontWeight: "var(--weight-bold)",
-          }}
-        >
-          {error}
-        </p>
+        <div className="grid gap-2">
+          <p
+            role="alert"
+            className="text-sm"
+            style={{
+              color: "var(--coral-deep)",
+              fontWeight: "var(--weight-bold)",
+            }}
+          >
+            {error}
+          </p>
+          {/* **빠져나올 길을 준다.** 여기 오는 오류 중에는 다시 눌러도
+              계속 실패하는 것이 있다 - 화면이 든 이어 풀 토큰이 이미 쓴
+              것이면 보기를 누를 때마다 같은 말만 돌아온다. 진행은 서버에
+              남아 있으므로 화면만 새로 받으면 멈춘 자리에서 이어진다.
+              하루 한 번이라 "다시 시작" 은 길이 아니다. */}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="dv-btn flex items-center justify-center px-5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            style={
+              {
+                minHeight: "var(--hit-min)",
+                background: "var(--paper)",
+                color: "var(--foreground)",
+                borderRadius: "var(--radius-pill)",
+                border: 0,
+                "--lift": "var(--lift-button-paper)",
+                fontWeight: "var(--weight-bold)",
+              } as React.CSSProperties
+            }
+          >
+            화면 새로 불러오기
+          </button>
+        </div>
       )}
     </div>
   );

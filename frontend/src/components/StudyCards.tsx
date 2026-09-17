@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { CategoryChip } from "@/components/MetaBadge";
 import { Reading } from "@/components/Reading";
@@ -20,6 +20,39 @@ import type { StudyCard } from "@/lib/api/daily";
  * 넘기면 그 자리에서 문제로 간다. 알리면 왕복이 늘고 그 요청은 점수와
  * 무관해 되돌리기를 막을 이유도 없다.
  */
+/**
+ * 카드 번호를 탭에 적고 읽는다.
+ *
+ * **막혀도 화면은 돌아야 한다.** 사생활 보호 창이나 사이트 데이터를 막아둔
+ * 브라우저에서는 이 접근 자체가 예외를 던진다. 여기서 안 막으면 학습
+ * 화면이 통째로 안 뜬다 - 위치를 기억하는 편의 하나 때문에 잃기에는 큰
+ * 것이다. 못 읽으면 첫 장부터 보면 된다.
+ */
+function read(key: string): number {
+  try {
+    const saved = Number(window.sessionStorage.getItem(key));
+    return Number.isInteger(saved) && saved >= 0 ? saved : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * 바깥에서 값이 바뀌었다고 알려줄 일이 없다 - 이 값은 우리가 적고 우리가
+ * 읽는다. 구독 해제 함수만 돌려준다.
+ */
+function noSubscribe(): () => void {
+  return () => {};
+}
+
+function save(key: string, value: number): void {
+  try {
+    window.sessionStorage.setItem(key, String(value));
+  } catch {
+    // 못 적어도 그만이다. 이 판에서만 자리를 잃는다.
+  }
+}
+
 export function StudyCards({
   cards,
   chunkIndex,
@@ -33,13 +66,64 @@ export function StudyCards({
   /** 마지막 카드에서 넘기면 부른다. */
   onDone: () => void;
 }) {
-  const [at, setAt] = useState(0);
+  /**
+   * 지금 보는 카드 번호. **새로고침해도 이어지도록 탭에 적어둔다.**
+   *
+   * 여덟 장을 넘기다 새로고침하면 첫 장으로 돌아갔다. 카드를 넘긴 것은
+   * 서버에 안 알리므로(위 머리말) 화면이 기억하지 않으면 아무도 모른다.
+   * 서버에 알리는 쪽은 왕복이 늘고, 넘긴 자리는 점수와 무관해 굳이 남길
+   * 값이 아니다.
+   *
+   * 묶음마다 따로 적는다. 다음 묶음은 처음부터 봐야 한다.
+   *
+   * 탭 안에만 둔다(sessionStorage). 다른 탭이나 내일까지 들고 있으면,
+   * 새 판의 같은 번호 묶음에서 엉뚱한 자리부터 시작한다.
+   */
+  const memoryKey = `daily-card-${chunkIndex}`;
+  /**
+   * **적어둔 번호는 리액트 바깥의 값이라 전용 훅으로 읽는다.**
+   *
+   * 첫 화면은 서버가 그려 보내는데 서버에는 브라우저 저장소가 없다. 그리는
+   * 중에 그냥 읽으면 서버가 보낸 화면과 달라지고("이전" 버튼은 번호가 0 보다
+   * 클 때만 그린다), 그러면 리액트가 그 자리를 처음부터 다시 그린다.
+   *
+   * `useSyncExternalStore` 가 바로 이런 값을 위한 것이다 - 서버 몫으로 0 을
+   * 따로 받아, 서버가 그릴 때와 화면에 붙기 전까지는 그 값을 쓴다. 붙은
+   * 뒤에 적어둔 번호로 한 번 바뀐다.
+   *
+   * 값이 바뀌었다고 알려줄 바깥 신호는 없다(우리가 적고 우리가 읽는다).
+   * 그래서 구독은 빈 함수이고, 넘길 때는 아래 goTo 가 직접 다시 그리게 한다.
+   */
+  const saved = useSyncExternalStore(
+    noSubscribe,
+    () => read(memoryKey),
+    () => 0,
+  );
+  const [picked, setPicked] = useState<number | null>(null);
+  const rawAt = picked ?? saved;
+
+  const goTo = (next: number) => {
+    setPicked(next);
+    save(memoryKey, next);
+  };
 
   // 카드가 없으면 아무것도 안 그린다. 부르는 쪽이 이 경우를 거르지만,
   // 여기서도 막아야 cards[at] 이 undefined 가 되는 길이 없다.
   if (cards.length === 0) return null;
 
-  const card = cards[Math.min(at, cards.length - 1)];
+  /**
+   * 실제로 그릴 번호. **한 번만 자르고 아래는 전부 이 값을 쓴다.**
+   *
+   * 적어둔 번호가 카드 수보다 클 수 있다. 묶음 크기는 판마다 달라질 수
+   * 있는데(backend `_fit_chunks` 가 콘텐츠 수에 맞춰 줄인다) 적어두는 키는
+   * 묶음 번호뿐이라, 탭을 열어둔 채 새 판을 시작하면 지난 판의 번호를
+   * 읽는다.
+   *
+   * 카드만 자르고 표시를 안 자르면 "6/3" 이 뜨고, "이전" 도 한 번은
+   * 헛돈다(4로 줄어도 같은 카드라 화면이 안 바뀐다).
+   */
+  const at = Math.min(rawAt, cards.length - 1);
+  const card = cards[at];
   const last = at >= cards.length - 1;
 
   return (
@@ -207,26 +291,51 @@ export function StudyCards({
         )}
       </article>
 
-      {/* 이 화면의 코랄 하나. 카드를 넘기는 것이 여기서 할 일의 전부다. */}
-      <button
-        type="button"
-        onClick={() => (last ? onDone() : setAt(at + 1))}
-        className="dv-btn mt-5 flex w-full items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-        style={
-          {
-            minHeight: "var(--hit-min)",
-            background: "var(--coral)",
-            color: "var(--text-on-color)",
-            border: 0,
-            borderRadius: "var(--radius-pill)",
-            fontWeight: "var(--weight-black)",
-            letterSpacing: "var(--tracking-tight)",
-            "--lift": "var(--lift-button)",
-          } as React.CSSProperties
-        }
-      >
-        {last ? "문제 풀기" : "다음"}
-      </button>
+      <div className="mt-5 flex gap-2">
+        {/* **되돌아갈 길.** 없으면 잘못 넘긴 카드를 다시 볼 방법이 판을
+            끝낼 때까지 없다. 첫 장에서는 안 그린다 - 눌러도 갈 곳이 없는
+            버튼은 자리만 차지한다. */}
+        {at > 0 && (
+          <button
+            type="button"
+            onClick={() => goTo(at - 1)}
+            className="dv-btn flex items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            style={
+              {
+                minHeight: "var(--hit-min)",
+                background: "var(--paper)",
+                color: "var(--foreground)",
+                border: 0,
+                borderRadius: "var(--radius-pill)",
+                fontWeight: "var(--weight-bold)",
+                "--lift": "var(--lift-button-paper)",
+              } as React.CSSProperties
+            }
+          >
+            이전
+          </button>
+        )}
+        {/* 이 화면의 코랄 하나. 카드를 넘기는 것이 여기서 할 일의 전부다. */}
+        <button
+          type="button"
+          onClick={() => (last ? onDone() : goTo(at + 1))}
+          className="dv-btn flex flex-1 items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--coral)",
+              color: "var(--text-on-color)",
+              border: 0,
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              letterSpacing: "var(--tracking-tight)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
+        >
+          {last ? "문제 풀기" : "다음"}
+        </button>
+      </div>
     </section>
   );
 }
