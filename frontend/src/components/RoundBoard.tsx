@@ -7,6 +7,7 @@ import { Burst } from "@/components/Burst";
 import { Reaction } from "@/components/Reaction";
 import { ExitGuard } from "@/components/ExitGuard";
 import { QuestionCard } from "@/components/QuestionCard";
+import { WrongAnswer } from "@/components/WrongAnswer";
 import type {
   RoundAnswered,
   RoundQuestion,
@@ -664,7 +665,12 @@ function PlayCard({
           모양이어야 한다. */}
       <QuestionCard question={question} busy={busy} onPick={onPick} />
 
-      <div className="flex items-center justify-between gap-3">
+      {/* **행 높이를 버튼 높이로 고정한다.** 오답일 때 옆의 결과가 두
+          줄(정답과 그 뜻)이 되는데, 높이를 내용에 맡기면 90초가 흐르는
+          동안 "넘기기" 버튼이 위아래로 움직인다. 시간에 쫓기는 사람이
+          누를 자리가 움직이면 헛손질한다. 아래 주석이 "사라지면 버튼 줄이
+          움직인다" 로 경계하는 것과 같은 이유다. */}
+      <div className="flex min-h-11 items-center justify-between gap-3">
         {/* 흰 알약으로 물러난다. 코랄은 보기를 고르는 쪽에 있어야 하고,
             넘기기는 세 번뿐인 도피구다 - 눈에 띄게 두면 그걸 먼저 쓴다.
             횟수를 다 쓰면 흐려지지만 사라지지는 않는다. 사라지면 버튼 줄이
@@ -688,29 +694,48 @@ function PlayCard({
           넘기기 {skipsLeft > 0 && `(${skipsLeft})`}
         </button>
 
-        {/* 직전 채점 결과. 새로 나타나는 영역이라 읽어준다. */}
+        {/* 직전 채점 결과. 새로 나타나는 영역이라 읽어준다.
+
+            **넘긴 것도 정답을 보여준다.** 전에는 넘기면 이 줄이 통째로
+            비었는데, 서버는 넘긴 답에도 정답과 뜻을 실어 보낸다
+            (session._skip_result - "넘긴 것도 학습이 되어야 한다").
+            모르는 문제를 넘긴 사람이야말로 정답이 필요하다. */}
         <p aria-live="polite" className="text-sm">
-          {result && !result.skipped && (
+          {result && (
             // 맞았지만 시간이 지난 것(0점)은 초록으로 두지 않는다. 점수가
             // 안 붙은 것을 정답과 같은 색으로 칠하면 문구만 예외가 되고
             // 색은 거짓말을 한다. 잉크로 물러난다.
             <span
               style={{
-                color: !result.correct
-                  ? "var(--wrong-deep)"
-                  : result.in_time
-                    ? "var(--correct)"
-                    : "var(--text-muted)",
+                // 넘긴 것은 틀린 것이 아니다. 점수도 안 깎이므로(0점)
+                // 오답과 같은 코랄로 칠하면 벌처럼 읽힌다. 잉크로 둔다.
+                color: result.skipped
+                  ? "var(--text-muted)"
+                  : !result.correct
+                    ? "var(--wrong-deep)"
+                    : result.in_time
+                      ? "var(--correct)"
+                      : "var(--text-muted)",
                 fontWeight: "var(--weight-black)",
               }}
             >
               {/* **시간 초과로 맞힌 것은 0점이다.** 그냥 "정답" 으로 두면
                   맞혔는데 점수가 안 오르는 이유를 알 방법이 없다. */}
-              {result.correct
-                ? result.in_time
-                  ? "정답"
-                  : "정답 · 시간 초과"
-                : `오답 · ${result.answer_text}`}
+              {result.skipped ? (
+                <WrongAnswer
+                  label="넘김"
+                  text={result.answer_text}
+                  extra={result.answer_extra}
+                />
+              ) : result.correct ? (
+                result.in_time ? (
+                  "정답"
+                ) : (
+                  "정답 · 시간 초과"
+                )
+              ) : (
+                <WrongAnswer text={result.answer_text} extra={result.answer_extra} />
+              )}
             </span>
           )}
         </p>

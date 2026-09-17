@@ -288,6 +288,32 @@ class ReviewGateTest(TestCase):
 
         self.assertEqual((text, extra), ("", ""))
 
+    def test_a_sentence_without_a_situation_still_has_a_translation(self):
+        """본문만 비고 뜻은 남는 조합이 실제로 나온다.
+
+        문장 문제의 정답 본문은 문장 자체가 아니라 "나오는 상황" 이다.
+        관리자가 Admin 에서 그 칸만 비우면 이 모양이 된다.
+
+        **화면이 이 둘을 한 덩이로 다루면 안 된다는 근거다.** 본문이
+        비었다고 뜻까지 버리면, 틀린 사람이 받을 수 있었던 해석이 사라진다
+        (frontend WrongAnswer.tsx).
+        """
+        # 이 클래스의 다른 문장들은 검수 안 된 것이라(위 setUpTestData)
+        # 게이트에서 먼저 걸린다. 여기서는 검수된 것이 필요하다.
+        one = Sentence.objects.create(
+            text="ship it",
+            translation="배포하자",
+            context="",
+            kind="phrase",
+            category="git",
+            is_reviewed=True,
+        )
+
+        text, extra = session._describe(quiz.TARGET_SENTENCE, one.pk)
+
+        self.assertEqual(text, "")
+        self.assertEqual(extra, "배포하자")
+
 
 class ReplayTest(TestCase):
     """옛 토큰을 다시 보내 점수를 만드는 길이 막혀야 한다.
