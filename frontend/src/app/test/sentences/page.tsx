@@ -35,6 +35,8 @@ function first(value: string | string[] | undefined): string | undefined {
 export default async function TestSentencesPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const category = first(params.category);
+  // 상세의 "문제 풀기" 가 붙여 온다. 첫 문제만 이것으로 낸다.
+  const item = first(params.item);
 
   // 분류 목록은 실패해도 빈 배열이라 화면을 막지 않는다.
   const categories = await getSentenceCategories();
@@ -78,10 +80,12 @@ export default async function TestSentencesPage({ searchParams }: PageProps) {
       </div>
 
       {/* key 로 분류를 넘긴다. 분류가 바뀌면 판을 새로 만들어야 점수와
-          방금 푼 목록이 함께 초기화된다. */}
+          방금 푼 목록이 함께 초기화된다. 항목을 key 에 넣지 않는 이유는
+          test/words/page.tsx 에 적었다. */}
       <QuizBoard
         key={category ?? "all"}
         category={category}
+        item={item}
         content="sentences"
       />
     </main>
