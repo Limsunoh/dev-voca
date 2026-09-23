@@ -81,7 +81,7 @@ describe("immersiveRoutes", () => {
 });
 
 describe("routes.talk", () => {
-  it("기본값(일상 표현·전부)은 쿼리를 싣지 않는다", () => {
+  it("기본값(일상 표현·전체)은 쿼리를 싣지 않는다", () => {
     assert.equal(routes.talk(), "/talk");
     assert.equal(routes.talk("daily"), "/talk");
     assert.equal(routes.talk("daily", 0), "/talk");

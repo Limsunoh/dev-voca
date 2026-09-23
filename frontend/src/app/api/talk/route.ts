@@ -21,7 +21,7 @@ import { getToken } from "@/lib/session";
 type Body = {
   action?: "start" | "grade";
   kind?: string;
-  /** 고른 난이도. 없으면 전부에서 낸다. */
+  /** 고른 난이도. 없으면 전체에서 낸다. */
   level?: unknown;
   /** 최근에 낸 것. 같은 것이 연달아 나오지 않게 뺀다. */
   exclude?: unknown;

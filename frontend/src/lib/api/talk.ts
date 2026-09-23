@@ -168,7 +168,7 @@ export function fetchTalkQuestion(
     // 일상 표현이 기본이라 그때는 아예 안 보낸다.
     kind: kind === "dev" ? "dev" : undefined,
     exclude: options.exclude?.length ? options.exclude.join(",") : undefined,
-    // 난이도를 안 고르면 안 보낸다. 서버가 없으면 전부에서 낸다.
+    // 난이도를 안 고르면 안 보낸다. 서버가 없으면 전체에서 낸다.
     level: options.level ? String(options.level) : undefined,
   });
   return request(`${BASE}question/${query}`, { token: options.token });
