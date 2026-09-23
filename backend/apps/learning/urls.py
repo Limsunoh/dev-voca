@@ -12,6 +12,7 @@ from .views import (
     StreakView,
     WeeklyBestView,
 )
+from .views_history import MistakesView
 
 app_name = "learning"
 
@@ -34,4 +35,7 @@ urlpatterns = [
     # 복습. 점수가 없어 끝내기도 없다 - 목록을 다 풀면 끝난다.
     path("review/", ReviewStartView.as_view(), name="review"),
     path("review/answer/", ReviewAnswerView.as_view(), name="review-answer"),
+    # 오답 노트. 읽기만 하는 목록이라 GET 하나다. 복습과 목록이 다르다 -
+    # 여기는 마지막에 틀린 것만이고 복습은 오래된 것까지 낸다.
+    path("mistakes/", MistakesView.as_view(), name="mistakes"),
 ]
