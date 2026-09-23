@@ -1,4 +1,5 @@
 import type { RoundQuestion } from "@/lib/api/rounds";
+import { choicesAreTerms, promptIsEnglish, promptIsTerm } from "@/lib/quiz-text";
 
 /**
  * 문제 하나와 보기들.
@@ -76,28 +77,44 @@ export function QuestionCard({
         >
           {question.question}
         </p>
-        <p
-          className={[
-            "mt-3",
-            // 단어·에러 메시지는 고정폭, 사람이 쓴 문장은 가변폭.
-            question.kind === "situation" || question.kind === "blank"
-              ? ""
-              : "font-mono",
-          ].join(" ")}
-          style={{
-            fontSize: "var(--text-xl)",
-            fontWeight: "var(--weight-black)",
-            lineHeight: "var(--leading-tight)",
-            // 고정폭 제목은 한 단계 더 좁힌다(가이드 type-mono).
-            letterSpacing:
-              question.kind === "situation" || question.kind === "blank"
-                ? "var(--tracking-tight)"
-                : "var(--tracking-tighter)",
-            color: "var(--foreground)",
-          }}
-        >
-          {question.prompt}
-        </p>
+        {/* 용어만 고정폭, 나머지는 본문체(lib/quiz-text 의 표).
+            전에는 "문장이 아니면 고정폭" 이라 한글 뜻·설명까지 고정폭으로
+            나왔다. 고정폭 글꼴에는 한글이 없어 OS 글꼴로 굵고 뭉툭하게
+            떨어졌다.
+
+            설명 문제는 여러 줄 한글이라 문제풀기(QuizBoard)와 같게 본문
+            크기·보통 굵기로 둔다. 제목 굵기로 두면 다섯 줄이 검은 덩어리가
+            된다. */}
+        {question.kind === "description" ? (
+          <p
+            className="mt-3 whitespace-pre-line"
+            style={{
+              fontSize: "var(--text-md)",
+              fontWeight: "var(--weight-medium)",
+              lineHeight: "var(--leading-relaxed)",
+              color: "var(--text-body)",
+            }}
+          >
+            {question.prompt}
+          </p>
+        ) : (
+          <p
+            lang={promptIsEnglish(question.kind) ? "en" : undefined}
+            className={`mt-3 ${promptIsTerm(question.kind) ? "font-mono" : ""}`}
+            style={{
+              fontSize: "var(--text-xl)",
+              fontWeight: "var(--weight-black)",
+              lineHeight: "var(--leading-tight)",
+              // 고정폭 제목은 한 단계 더 좁힌다(가이드 type-mono).
+              letterSpacing: promptIsTerm(question.kind)
+                ? "var(--tracking-tighter)"
+                : "var(--tracking-tight)",
+              color: "var(--foreground)",
+            }}
+          >
+            {question.prompt}
+          </p>
+        )}
       </div>
 
       <ul className="flex flex-col gap-2.5">
@@ -107,9 +124,11 @@ export function QuestionCard({
               type="button"
               onClick={() => onPick(choice.id)}
               disabled={busy}
+              // 보기가 용어면 고정폭. 문제풀기(QuizBoard)의 보기와 같은 규칙이다.
+              lang={choicesAreTerms(question.kind) ? "en" : undefined}
               // dv-card dv-card-press: 누르면 두께가 0 이 되고 그만큼
               // 내려앉는다. :active 는 인라인 style 로 못 써서 공통 클래스가 맡는다.
-              className="dv-card dv-card-press w-full px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default"
+              className={`dv-card dv-card-press w-full px-4 py-3 text-left ${choicesAreTerms(question.kind) ? "font-mono" : ""} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default`}
               style={
                 {
                   // 보기는 56px(가이드 shape-hit). 터치로 연달아 누르는
