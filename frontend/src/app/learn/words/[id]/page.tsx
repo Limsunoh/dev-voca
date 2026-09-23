@@ -173,8 +173,11 @@ export default async function WordDetailPage({
         </DetailCard>
       )}
 
-      {/* 읽고 나서 할 일. 없으면 이 화면에서 나가는 길이 "뒤로" 하나뿐이다. */}
-      <DetailAction href={routes.testWords}>이 단어로 문제 풀기</DetailAction>
+      {/* 읽고 나서 할 일. 없으면 이 화면에서 나가는 길이 "뒤로" 하나뿐이다.
+          첫 문제를 이 단어로 낸다 - 방금 읽은 것을 확인하려고 누른 버튼이다. */}
+      <DetailAction href={`${routes.testWords}?item=${word.id}`}>
+        이 단어로 문제 풀기
+      </DetailAction>
     </DetailShell>
   );
 }

@@ -16,11 +16,13 @@ import { Reading } from "./Reading";
 async function fetchQuestion(params: {
   category?: string;
   exclude?: string;
+  item?: string;
   content: QuizContent;
 }): Promise<Question> {
   const query = new URLSearchParams();
   if (params.category) query.set("category", params.category);
   if (params.exclude) query.set("exclude", params.exclude);
+  if (params.item) query.set("item", params.item);
   if (params.content !== "words") query.set("content", params.content);
 
   const res = await fetch(`/api/quiz?${query}`, { cache: "no-store" });
@@ -96,9 +98,11 @@ type Props = {
   category?: string;
   /** 무엇으로 문제를 낼지. 기본은 단어. */
   content?: QuizContent;
+  /** 첫 문제로 낼 항목의 id. 상세의 "문제 풀기" 가 넘긴다. */
+  item?: string;
 };
 
-export function QuizBoard({ category, content = "words" }: Props) {
+export function QuizBoard({ category, content = "words", item }: Props) {
   const [question, setQuestion] = useState<Question | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
   const [result, setResult] = useState<GradeResult | null>(null);
@@ -146,6 +150,9 @@ export function QuizBoard({ category, content = "words" }: Props) {
   // 잡아서, 채점 직후 바로 "다음 문제" 를 누르면 방금 푼 단어가
   // 제외 목록에 안 들어간다.
   const recentRef = useRef<number[]>([]);
+  // 첫 문제로 낼 항목. 한 번 쓰고 비운다 - 그 단어를 풀고 나면 다음
+  // 문제부터는 평소처럼 무작위다. 매번 보내면 같은 단어만 계속 나온다.
+  const itemRef = useRef(item);
   // state 가 아니라 ref 인 이유: 연타는 다시 그리기 전에 들어온다.
   // setLoading 은 다음 렌더에야 반영돼서 가드로 쓸 수 없다.
   const loadingRef = useRef(false);
@@ -187,22 +194,35 @@ export function QuizBoard({ category, content = "words" }: Props) {
       setPicked(null);
       setResult(null);
 
+      const wanted = itemRef.current;
+
       try {
         const q = await fetchQuestion({
           category,
           exclude: recentRef.current.join(","),
+          item: wanted,
           content,
         });
+        itemRef.current = undefined;
         setQuestion(q);
       } catch (e) {
         // 옛 문제를 지운다. 남겨두면 이미 답을 본 문제가 다시 뜨고,
         // picked 가 비어 있어 "다음 문제" 버튼도 "다시 시도" 버튼도
         // 안 나오는 막다른 화면이 된다.
         setQuestion(null);
+        const status = e instanceof Error ? e.message : "";
+        const notFound = status === "404";
+        // 그 항목으로는 못 내는 경우(검수에서 내려감, 잘못된 번호)만 항목을
+        // 버린다. 다시 눌러도 같은 이유로 또 실패한다. 서버가 잠깐 안 될
+        // 때는 남겨 둬서, 다시 누르면 원래 청한 항목이 나온다.
+        const itemRejected = Boolean(wanted) && (notFound || status === "400");
+        if (itemRejected) itemRef.current = undefined;
         setError(
-          e instanceof Error && e.message === "404"
-            ? "낼 수 있는 문제를 다 풀었습니다. 분류를 넓히거나 처음부터 다시 시작해보세요."
-            : "문제를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+          itemRejected
+            ? "이 항목으로는 지금 문제를 낼 수 없습니다. \"처음부터 다시\" 를 누르면 다른 문제가 나옵니다."
+            : notFound
+              ? "낼 수 있는 문제를 다 풀었습니다. 분류를 넓히거나 처음부터 다시 시작해보세요."
+              : "문제를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
         );
       } finally {
         setLoading(false);
