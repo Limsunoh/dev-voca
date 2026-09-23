@@ -34,7 +34,7 @@ export default async function TalkPage({ searchParams }: PageProps) {
   // 아는 값이 아니면 기본으로 떨어뜨린다. 주소를 손으로 고쳐도 빈 화면이
   // 되지 않는다.
   const kind: TalkKind = first(params.kind) === "dev" ? "dev" : "daily";
-  // 아는 난이도가 아니면 "전부" 로 떨어진다. 서버도 같은 판단을 한 번 더
+  // 아는 난이도가 아니면 "전체" 로 떨어진다. 서버도 같은 판단을 한 번 더
   // 하지만, 여기서 정리해야 탭의 켜진 표시가 주소와 어긋나지 않는다.
   const level: TalkLevel = ((): TalkLevel => {
     const raw = Number(first(params.level));

@@ -44,7 +44,7 @@ export type BoardKind = "weekly" | "all_time" | "streak";
 export type TalkKind = "daily" | "dev";
 
 /**
- * 고른 난이도. 0 은 "전부" 다.
+ * 고른 난이도. 0 은 "전체" 다.
  *
  * 0 을 쓰는 이유: 서버의 Difficulty 가 1·2·3 이라 그 바깥 값이 필요한데,
  * null 로 두면 주소 파싱·비교·기본값이 전부 두 갈래가 된다. 0 은 거짓이라

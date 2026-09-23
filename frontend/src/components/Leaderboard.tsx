@@ -28,7 +28,7 @@ function periodText(start: string, end: string): string {
 
 type Props = {
   board: Board;
-  /** 로그인 안 했으면 하단에 안내를 붙인다. */
+  /** 로그인 안 했으면 로그인을 권한다(표가 있으면 하단 안내 줄, 비었으면 빈 칸의 버튼). */
   isGuest: boolean;
 };
 
@@ -77,7 +77,7 @@ export function Leaderboard({ board, isGuest }: Props) {
       </nav>
 
       {empty ? (
-        <EmptyBoard />
+        <EmptyBoard kind={board.kind} isGuest={isGuest} />
       ) : (
         <ol className="mt-5 flex flex-col gap-2">
           {board.rows.map((row, index) => (
@@ -126,7 +126,7 @@ export function Leaderboard({ board, isGuest }: Props) {
         >
           로그인하면 내 순위도 함께 보입니다.{" "}
           <Link
-            href="/login?next=/board"
+            href={loginToBoard(board.kind)}
             className="underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={{
               color: "var(--coral-deep)",
@@ -183,13 +183,21 @@ function TabLink({ kind, current }: { kind: BoardKind; current: BoardKind }) {
   );
 }
 
+/** 로그인하고 지금 보던 순위표 탭으로 돌아온다. */
+function loginToBoard(kind: BoardKind): string {
+  return `${routes.login}?next=${routes.board(kind)}`;
+}
+
 /**
  * 아직 아무도 없을 때.
  *
  * 0 을 채운 가짜 줄을 두지 않는다 - 0 은 "아직 아무도 안 함" 이 아니라
  * "누군가 0점을 냈다" 로 읽힌다.
+ *
+ * 게스트에게는 로그인을 권한다. 게스트가 푼 판은 순위표에 오르지 않아서,
+ * "한 판만 풀어도 올라간다" 를 믿고 풀면 다 풀고도 여전히 빈 표를 본다.
  */
-function EmptyBoard() {
+function EmptyBoard({ kind, isGuest }: { kind: BoardKind; isGuest: boolean }) {
   return (
     <div
       className="mt-6 px-5 py-10 text-center dv-card"
@@ -210,13 +218,16 @@ function EmptyBoard() {
         아직 아무도 오르지 않았습니다.
       </p>
       <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-        한 판만 풀어도 이 자리에 이름이 올라갑니다.
+        {isGuest
+          ? "로그인하고 한 판을 풀면 이 자리에 이름이 올라갑니다."
+          : "한 판만 풀어도 이 자리에 이름이 올라갑니다."}
       </p>
 
       {/* 이 화면에서 코랄 버튼은 여기 하나뿐이다 - 빈 순위표에서 할 일은
-          문제를 푸는 것 하나라, 그것이 주된 동작이다. */}
+          하나라(게스트는 로그인, 로그인했으면 문제 풀기) 그것이 주된
+          동작이다. 아래 게스트 안내 줄은 표가 비면 안 그려져 겹치지 않는다. */}
       <Link
-        href={routes.testRound}
+        href={isGuest ? loginToBoard(kind) : routes.testRound}
         className="dv-btn mt-6 inline-flex items-center rounded-[var(--radius-pill)] px-6 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         style={
           {
@@ -228,7 +239,7 @@ function EmptyBoard() {
           } as React.CSSProperties
         }
       >
-        문제 풀러 가기
+        {isGuest ? "로그인하기" : "문제 풀러 가기"}
       </Link>
     </div>
   );

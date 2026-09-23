@@ -31,7 +31,7 @@ export function TalkLevelTabs({
   current,
 }: {
   kind: TalkKind;
-  /** 지금 고른 난이도. 0 이면 전부다. */
+  /** 지금 고른 난이도. 0 이면 전체다. */
   current: TalkLevel;
 }) {
   return (
@@ -55,7 +55,7 @@ export function TalkLevelTabs({
  * 을 골랐는데 카드에는 "중간" 이 뜨는 꼴이 된다.
  */
 const LEVELS: { value: TalkLevel; label: string }[] = [
-  { value: 0, label: "전부" },
+  { value: 0, label: "전체" },
   { value: 1, label: "쉬움" },
   { value: 2, label: "보통" },
   { value: 3, label: "어려움" },
