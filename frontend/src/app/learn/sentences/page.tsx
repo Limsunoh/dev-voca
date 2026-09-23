@@ -109,9 +109,12 @@ export default async function SentencesPage({ searchParams }: PageProps) {
     // 예상 못 한 에러는 error.tsx 로 올려보낸다.
     if (!(error instanceof ApiError)) throw error;
 
-    // 없는 페이지 번호(?page=999)는 DRF 가 404 를 준다. 이걸 서버 장애처럼
-    // 안내하면 사용자가 원인을 오해하므로 "그런 페이지 없음"으로 구분한다.
-    if (error.status === 404) notFound();
+    // 없는 페이지 번호는 조건을 둔 채 첫 페이지로 보낸다. 이유는
+    // learn/words/page.tsx 참고.
+    if (error.status === 404) {
+      if (page) redirect(listUrl(routes.sentences, filters));
+      notFound();
+    }
 
     // 400 은 대부분 URL 의 조건값이 잘못된 경우다(오타·오래된 북마크).
     // 서버 문제가 아니므로 그렇게 안내하고, 상태 코드는 보여주지 않는다.
