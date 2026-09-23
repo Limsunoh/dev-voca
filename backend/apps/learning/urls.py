@@ -12,7 +12,7 @@ from .views import (
     StreakView,
     WeeklyBestView,
 )
-from .views_history import MistakesView
+from .views_history import HistoryView, MistakesView
 
 app_name = "learning"
 
@@ -38,4 +38,6 @@ urlpatterns = [
     # 오답 노트. 읽기만 하는 목록이라 GET 하나다. 복습과 목록이 다르다 -
     # 여기는 마지막에 틀린 것만이고 복습은 오래된 것까지 낸다.
     path("mistakes/", MistakesView.as_view(), name="mistakes"),
+    # 내 학습 기록. 내정보가 부른다. 최근 14일 하루 점수와 최근 판.
+    path("history/", HistoryView.as_view(), name="history"),
 ]
