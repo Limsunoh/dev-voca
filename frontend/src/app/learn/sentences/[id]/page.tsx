@@ -98,9 +98,9 @@ export default async function SentenceDetailPage({
         </DetailCard>
       )}
 
-      {/* 문장 낱개 문제로 보낸다. testWords 로 보내면 문장을 보다 단어
-          문제가 나와 흐름을 잃는다(routes.ts 의 tabHref 와 같은 판단). */}
-      <DetailAction href={routes.testSentences}>
+      {/* 문장 문제로 보내고, 첫 문제를 이 문장으로 낸다. testWords 로
+          보내면 문장을 보다 단어 문제가 나와 흐름을 잃는다. */}
+      <DetailAction href={`${routes.testSentences}?item=${sentence.id}`}>
         이 문장으로 문제 풀기
       </DetailAction>
     </DetailShell>

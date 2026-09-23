@@ -24,6 +24,8 @@ function first(value: string | string[] | undefined): string | undefined {
 export default async function TestWordsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const category = first(params.category);
+  // 상세의 "문제 풀기" 가 붙여 온다. 첫 문제만 이것으로 낸다.
+  const item = first(params.item);
 
   // 분류 목록은 실패해도 빈 배열이라 화면을 막지 않는다.
   const categories = await getCategories();
@@ -80,8 +82,13 @@ export default async function TestWordsPage({ searchParams }: PageProps) {
       </div>
 
       {/* key 로 분류를 넘긴다. 분류가 바뀌면 판을 새로 만들어야 점수와
-          방금 푼 목록이 함께 초기화된다. */}
-      <QuizBoard key={category ?? "all"} category={category} />
+          방금 푼 목록이 함께 초기화된다.
+
+          항목은 key 에 넣지 않는다. 넣으면 ?item= 으로 들어온 판에서 분류
+          "전체" 를 누를 때 판이 새로 만들어져 푼 것이 확인 없이 사라진다 -
+          이미 고른 칩이라 확인 창을 건너뛰기 때문이다. 항목은 첫 문제에만
+          쓰이므로 판이 알아서 한 번 쓰고 버린다. */}
+      <QuizBoard key={category ?? "all"} category={category} item={item} />
     </main>
   );
 }

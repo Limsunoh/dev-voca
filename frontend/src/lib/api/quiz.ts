@@ -58,6 +58,8 @@ export type QuizParams = {
   kind?: string;
   /** 방금 낸 문제를 다시 내지 않으려고 보낸다. "1,2,3" 형태. */
   exclude?: string;
+  /** 이 항목을 정답으로 낸다. 상세의 "문제 풀기" 가 보낸다. */
+  item?: string;
 };
 
 /**
