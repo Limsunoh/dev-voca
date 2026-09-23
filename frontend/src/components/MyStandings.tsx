@@ -58,19 +58,42 @@ export function MyStandings({
       </div>
 
       {empty ? (
-        <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
-          아직 오른 순위가 없습니다.{" "}
-          <Link
-            href={routes.testRound}
-            className="underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            style={{
-              color: "var(--coral-deep)",
-              fontWeight: "var(--weight-bold)",
-            }}
-          >
-            한 판 풀어보기
-          </Link>
-        </p>
+        <>
+          <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
+            아직 오른 순위가 없습니다.
+          </p>
+          {/* 문장 안에 링크로 두면 누를 수 있는 곳이 글자만큼이다 - 폰에서
+              85x20 이라 터치 최소 크기(44px)의 절반도 안 됐다. 그래서 문장에서
+              빼내 알약으로 세운다. 재질·높이·글자는 같은 화면의 흰 알약(비밀번호
+              저장 버튼·로그아웃)에 맞췄다 - 한 화면에 흰 알약이 여럿 서는데
+              이것만 작으면 덜 중요한 것처럼 보인다. 폭은 그쪽처럼 폰에서 꽉
+              채우지 않는다. 그쪽은 절의 주된 동작이고 이쪽은 곁들이 카드 안의
+              안내다.
+
+              흰 알약인 이유: 이 화면의 코랄은 프로필 저장 버튼이 갖고 있다
+              (한 화면에 코랄 하나). 판을 시작하는 동작이라 코랄이 어울리지만
+              그쪽을 밀어낼 자리는 아니다.
+
+              문장과 버튼 사이를 mt-4 로 둔다. 카드 안 제목-문장 간격(mt-3)과
+              같으면 문장과 버튼이 한 덩어리로 읽혀, 빼낸 의미가 흐려진다. */}
+          <div className="mt-4">
+            <Link
+              href={routes.testRound}
+              className="dv-btn inline-flex items-center rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={
+                {
+                  minHeight: "var(--hit-min)",
+                  background: "var(--paper)",
+                  color: "var(--foreground)",
+                  fontWeight: "var(--weight-bold)",
+                  "--lift": "var(--lift-button-paper)",
+                } as React.CSSProperties
+              }
+            >
+              한 판 풀어보기
+            </Link>
+          </div>
+        </>
       ) : (
         <dl className="mt-3 grid grid-cols-3 gap-2">
           {BOARD_KINDS.map((kind) => (
