@@ -681,9 +681,14 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
 
       <div className="mt-6 flex flex-col gap-2.5">
         {/* 순위표가 주된 동작이라 코랄. 홈으로는 흰 알약으로 물러난다 -
-            둘 다 코랄이면 여기서 뭘 해야 할지가 사라진다. */}
+            둘 다 코랄이면 여기서 뭘 해야 할지가 사라진다.
+
+            꾸준함 탭으로 보낸다. 일일공부 점수는 하루 점수(DailyScore)에만
+            쌓이고, 그것을 읽는 것은 꾸준함뿐이다. 이번 주·전체 순위표는
+            자유 문제풀이 판만 센다(backend learning/leaderboards.py).
+            그냥 /board 로 보내면 이번 주 탭이 열려 방금 딴 점수가 안 보인다. */}
         <Link
-          href={routes.board()}
+          href={routes.board("streak")}
           className="dv-btn flex items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
