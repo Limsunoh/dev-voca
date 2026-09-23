@@ -61,12 +61,16 @@ class WordAdmin(admin.ModelAdmin):
         ("검수", {"fields": ("is_reviewed", "created_at", "updated_at")}),
     )
 
-    @admin.action(description="선택한 단어를 검수 완료로 표시")
+    # 동작마다 permissions=["change"] 를 붙인다(문장 쪽도 같다). 안 붙이면
+    # Django 는 보기 권한만 있는 staff 에게도 동작을 보여 주고 실행해 준다 -
+    # 그러면 보기만 하라고 준 계정이 "검수 완료로 표시" 로 미검수 콘텐츠를
+    # 공개할 수 있다. 검수 게이트가 그 한 칸에 걸려 있다.
+    @admin.action(description="선택한 단어를 검수 완료로 표시", permissions=["change"])
     def mark_reviewed(self, request, queryset):
         updated = queryset.update(is_reviewed=True)
         self.message_user(request, f"{updated}개 단어를 검수 완료로 표시했습니다.")
 
-    @admin.action(description="선택한 단어의 발음을 검수 완료로 표시")
+    @admin.action(description="선택한 단어의 발음을 검수 완료로 표시", permissions=["change"])
     def mark_reading_reviewed(self, request, queryset):
         """발음만 따로 켠다.
 
@@ -77,7 +81,22 @@ class WordAdmin(admin.ModelAdmin):
         updated = queryset.update(reading_reviewed=True)
         self.message_user(request, f"{updated}개 단어의 발음을 검수 완료로 표시했습니다.")
 
-    actions = ["mark_reviewed", "mark_reading_reviewed"]
+    @admin.action(description="선택한 단어의 발음 검수를 취소", permissions=["change"])
+    def unmark_reading_reviewed(self, request, queryset):
+        """고친 발음을 파일로 다시 넣기 전에 쓴다.
+
+        load_readings 는 검수된 발음을 덮지 않는다(사람이 고친 것을 지키려고).
+        그래서 파일에서 발음을 고쳐도 이미 검수된 줄은 그대로 남는다. 여기서
+        검수를 풀면 다음 load_readings 가 새 발음을 채우고, 새 발음은 다시
+        검수해야 화면에 나온다(fixtures/README.md 의 "고쳐서 다시 넣기").
+        """
+        updated = queryset.update(reading_reviewed=False)
+        self.message_user(
+            request,
+            f"{updated}개 단어의 발음 검수를 취소했습니다. 다시 검수할 때까지 화면에 발음이 안 나옵니다.",
+        )
+
+    actions = ["mark_reviewed", "mark_reading_reviewed", "unmark_reading_reviewed"]
 
 
 @admin.register(Sentence)
@@ -139,18 +158,27 @@ class SentenceAdmin(admin.ModelAdmin):
         """목록에서는 앞부분만. 문장을 통째로 찍으면 표가 읽기 어려워진다."""
         return obj.text if len(obj.text) <= 60 else f"{obj.text[:60]}..."
 
-    @admin.action(description="선택한 문장을 검수 완료로 표시")
+    @admin.action(description="선택한 문장을 검수 완료로 표시", permissions=["change"])
     def mark_reviewed(self, request, queryset):
         updated = queryset.update(is_reviewed=True)
         self.message_user(request, f"{updated}개 문장을 검수 완료로 표시했습니다.")
 
-    @admin.action(description="선택한 문장의 발음을 검수 완료로 표시")
+    @admin.action(description="선택한 문장의 발음을 검수 완료로 표시", permissions=["change"])
     def mark_reading_reviewed(self, request, queryset):
         """발음만 따로 켠다. 이유는 WordAdmin 쪽 주석과 같다."""
         updated = queryset.update(reading_reviewed=True)
         self.message_user(request, f"{updated}개 문장의 발음을 검수 완료로 표시했습니다.")
 
-    actions = ["mark_reviewed", "mark_reading_reviewed"]
+    @admin.action(description="선택한 문장의 발음 검수를 취소", permissions=["change"])
+    def unmark_reading_reviewed(self, request, queryset):
+        """고친 발음을 파일로 다시 넣기 전에 쓴다. 이유는 WordAdmin 쪽 주석과 같다."""
+        updated = queryset.update(reading_reviewed=False)
+        self.message_user(
+            request,
+            f"{updated}개 문장의 발음 검수를 취소했습니다. 다시 검수할 때까지 화면에 발음이 안 나옵니다.",
+        )
+
+    actions = ["mark_reviewed", "mark_reading_reviewed", "unmark_reading_reviewed"]
 
 
 @admin.register(DailyPhrase)
