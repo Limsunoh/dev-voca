@@ -11,8 +11,10 @@ import {
 } from "@/app/profile/actions";
 import { EmailCard } from "@/components/EmailCard";
 import { PasswordCard } from "@/components/PasswordCard";
+import { MyHistory } from "@/components/MyHistory";
 import { MyStandings } from "@/components/MyStandings";
 import { ProfileForm } from "@/components/ProfileForm";
+import { fetchMyHistory } from "@/lib/api/history";
 import { fetchMyStandings } from "@/lib/api/leaderboards";
 import { getCurrentUser, getToken } from "@/lib/session";
 
@@ -36,10 +38,13 @@ export default async function ProfilePage() {
   // 로그인해야 볼 수 있다. 돌아올 곳을 넘겨 로그인 뒤 여기로 오게 한다.
   if (!user) redirect("/login?next=/profile");
 
-  // 순위는 곁들이는 정보라 하나가 실패해도 나머지를 보여준다
-  // (fetchMyStandings 가 안에서 처리한다).
+  // 순위와 기록은 곁들이는 정보라 하나가 실패해도 나머지를 보여준다
+  // (둘 다 안에서 실패를 삼킨다). 동시에 부른다 - 차례로 기다리면 두
+  // 번의 왕복이 그대로 화면이 뜨는 시간이 된다.
   const token = await getToken();
-  const standings = token ? await fetchMyStandings(token) : {};
+  const [standings, history] = token
+    ? await Promise.all([fetchMyStandings(token), fetchMyHistory(token)])
+    : [{}, null];
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
@@ -83,8 +88,9 @@ export default async function ProfilePage() {
         >
           학습 기록
         </h2>
-        <div className="mt-3">
+        <div className="mt-3 grid gap-3">
           <MyStandings standings={standings} />
+          <MyHistory history={history} />
         </div>
       </section>
 
