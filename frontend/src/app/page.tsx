@@ -5,10 +5,8 @@ import { Avatar } from "@/components/Avatar";
 import { Highlight } from "@/components/Highlight";
 import { LearningCard } from "@/components/LearningCard";
 import { Reading } from "@/components/Reading";
-import { ProgressDots, StatCard } from "@/components/StatCard";
+import { loadToday, type Today, TodayCards } from "@/components/TodayCards";
 import type { User } from "@/lib/api/accounts";
-import { fetchDailyStatus, type StudyProgress } from "@/lib/api/daily";
-import { fetchDue, type ReviewDue } from "@/lib/api/review";
 import { getDailyWords, HOME_WORDS, type WordListItem } from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
 import { getCurrentUser, getToken, isGuestChosen } from "@/lib/session";
@@ -64,32 +62,9 @@ export default async function Home() {
   // 순위는 홈에서 뺐다. "나" 탭과 순위표 화면이 맡는다. 부르지도 않으므로
   // 홈이 뜨는 데 필요한 왕복이 하나 줄었다.
 
-  // 일일공부는 로그인해야 쓸 수 있다. 게스트에게는 아예 안 물어본다 -
-  // 못 누르는 카드를 띄워두면 눌러보고 로그인으로 튕기는 경험이 된다.
-  const dailyPromise = token
-    ? fetchDailyStatus(token)
-        .then((s) => s.today)
-        .catch((error: unknown) => {
-          console.error("일일공부 상태를 불러오지 못했습니다.", error);
-          return null;
-        })
-    : Promise.resolve(null);
-
-  // 복습도 로그인해야 쓴다. 실패해도 홈을 막지 않는다 - 카드 하나가
-  // 안 뜰 뿐이고, 없으면 어차피 안 그리는 카드다.
-  const duePromise = token
-    ? fetchDue(token).catch((error: unknown) => {
-        console.error("복습 개수를 불러오지 못했습니다.", error);
-        return null;
-      })
-    : Promise.resolve(null);
-
-  const [user, words, daily, due]: [
-    User | null,
-    WordListItem[],
-    StudyProgress | null,
-    ReviewDue | null,
-  ] = await Promise.all([userPromise, wordsPromise, dailyPromise, duePromise]);
+  // 일일공부·복습 카드. 게스트에게 안 묻는 것과 실패 처리는 loadToday 가 한다.
+  const [user, words, today]: [User | null, WordListItem[], Today] =
+    await Promise.all([userPromise, wordsPromise, loadToday(token)]);
 
   const [word, ...rest] = words;
 
@@ -112,43 +87,8 @@ export default async function Home() {
             그리고 있고, 홈에 두면 같은 모양의 카드가 늘어서서 무엇이 오늘
             할 일인지가 흐려진다. */}
         {user && (
-          <div className="mt-4 flex gap-2.5">
-            {/* 세 상태를 구분한다 - 안 시작 / 푸는 중 / 오늘 몫 완료.
-                done 을 안 읽으면 다 끝낸 사람의 카드가 10/10 인 채로
-                여전히 "할 일" 처럼 보인다.
-
-                시작 전에는 0 이 아니라 하이픈이다. 위 주석에 적어둔
-                규칙이고 MyStandings 가 같은 자리에서 같은 것을 쓴다 -
-                0 은 "0점을 냈다" 로 읽혀서 아직 안 한 것과 구분되지
-                않는다. */}
-            <StatCard
-              href={routes.testDaily}
-              label="일일공부"
-              value={daily ? daily.answered : "-"}
-              unit={daily ? `/${daily.total}` : undefined}
-              footer={
-                daily?.done ? (
-                  <StatNote>오늘 몫 완료</StatNote>
-                ) : daily ? (
-                  <ProgressDots total={daily.total} done={daily.answered} />
-                ) : (
-                  <StatNote>아직 시작 전</StatNote>
-                )
-              }
-            />
-
-            {/* 볼 것이 없으면 이 자리를 비운다. 0 을 띄우면 "할 일이 있는
-                카드" 모양으로 보여서, 눌러 들어갔다 빈 화면을 만난다. */}
-            {due && due.due > 0 && (
-              <StatCard
-                href={routes.testReview}
-                label="다시 보기"
-                value={due.due}
-                unit="개"
-                tone="coral"
-                footer={<StatNote>틀린 것부터</StatNote>}
-              />
-            )}
+          <div className="mt-4">
+            <TodayCards {...today} />
           </div>
         )}
 
@@ -394,21 +334,6 @@ function DailyWord({ word }: { word: WordListItem }) {
         </Link>
       </div>
     </section>
-  );
-}
-
-/** 통계 카드 아래 한 줄. 진행 점이 없는 자리를 이 문구가 대신한다. */
-function StatNote({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      className="text-[length:var(--text-11)]"
-      style={{
-        fontWeight: "var(--weight-bold)",
-        color: "var(--text-dim)",
-      }}
-    >
-      {children}
-    </span>
   );
 }
 

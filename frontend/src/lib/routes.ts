@@ -61,8 +61,15 @@ export const routes = {
   login: "/login",
   signup: "/signup",
   profile: "/profile",
+  /**
+   * 문제풀기 허브. 탭바 "문제풀기" 가 여기로 온다.
+   *
+   * 일일공부·다시 보기·한 판은 탭 안에 입구가 없었다. 탭이 단어 문제로
+   * 곧장 가서, 그 셋은 홈 카드나 단어 문제 화면 구석 링크로만 닿았다.
+   */
+  test: "/test",
   /*
-   * 아래 넷 중 words 만 콘텐츠 축을 따른다.
+   * 아래 다섯 중 words·sentences 만 콘텐츠 축을 따른다.
    *
    * round·daily·review 는 콘텐츠가 아니라 **판의 종류**다. 한 판에
    * 단어와 문장이 섞여 나오므로 /test/words 옆에 나란히 두면 같은 축인
@@ -139,13 +146,16 @@ export type Tab = {
 /**
  * 탭을 눌렀을 때 갈 곳.
  *
- * 익히기·문제풀기는 보고 있던 콘텐츠를 유지한다. 문장을 보다 "문제풀기"
- * 를 눌렀는데 단어 문제가 나오면 사용자가 흐름을 잃는다.
+ * 익히기는 보고 있던 콘텐츠를 유지한다. 문장을 보다 "익히기" 를 눌렀는데
+ * 단어 목록이 나오면 사용자가 흐름을 잃는다.
+ *
+ * 문제풀기는 허브로 간다. 예전에는 익히기처럼 콘텐츠를 따라 단어·문장
+ * 문제로 곧장 갔는데, 그러면 일일공부·다시 보기·한 판으로 가는 길이
+ * 탭 안에 없었다. 단어·문장 문제는 허브에서 한 번 더 누른다.
  */
 export function tabHref(tab: Tab, pathname: string): string {
-  if (tab.segment === "learn" || tab.segment === "test") {
-    const content = contentFromPath(pathname);
-    return contentPath(tab.segment, content);
+  if (tab.segment === "learn") {
+    return contentPath(tab.segment, contentFromPath(pathname));
   }
   return tab.segment ? `/${tab.segment}` : routes.home;
 }
@@ -177,9 +187,8 @@ export type LearningMode = {
  * ready 가 false 인 모드는 눌리지 않고 "준비 중" 으로 보인다. 지금은
  * 셋 다 열려 있고, 다음 모드(놀이 등)를 만들 때 다시 쓴다.
  *
- * 경로를 여기 박아두지 않는 이유: 모드를 바꿀 때 보고 있던 콘텐츠를
- * 유지해야 한다. 문장을 보다 "문제풀기" 를 눌렀는데 단어 문제가 나오면
- * 사용자가 흐름을 잃는다. 링크는 tabHref 가 현재 콘텐츠로 만든다.
+ * 경로를 여기 박아두지 않는 이유: 익히기는 모드를 바꿀 때 보고 있던
+ * 콘텐츠를 유지해야 한다. 링크는 tabHref 가 만든다.
  */
 export const learningModes: LearningMode[] = [
   { slug: "learn", label: "익히기", ready: true },
