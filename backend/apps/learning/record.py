@@ -19,9 +19,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import date, timedelta
 
 from django.db import IntegrityError, transaction
-from django.db.models import F, Q
+from django.db.models import F, Max, Q
 from django.utils import timezone
 
 from . import calendar_kst
@@ -238,10 +239,23 @@ def _bump_daily(session: QuizSession) -> None:
 
     읽고-고치고-쓰지 않고 UPDATE 한 문장으로 끝내는 이유: 한 사람이 탭
     두 개로 동시에 판을 끝낼 수 있다. 파이썬에서 비교하면 둘 다 옛 값을
-    읽어 낮은 쪽이 나중에 덮어쓴다.
+    읽어 낮은 쪽이 나중에 덮어쓴다. 지금은 아래에서 그날 줄을 잠가 두 판이
+    줄을 서므로 이 경합은 잠금이 먼저 막고, 조건부 UPDATE 는 두 번째 방어로
+    남겨 둔 것이다.
+
+    **트랜잭션 안에서만 부른다**(select_for_update). 지금은 save_round 의
+    atomic 안 한 곳뿐이다.
     """
     day = calendar_kst.day_of(session.finished_at)
-    row, _ = DailyScore.objects.get_or_create(user=session.user, day=day)
+    # **그날 줄을 잠근다.** 아래 UPDATE 는 조건(최고점보다 높나)이 거짓이면
+    # 줄을 건드리지도 잠그지도 않는다. 그러면 Admin 이 판을 지우고 다시 세는
+    # recount_best_free 와 순서가 정해지지 않아, 저쪽이 아직 커밋 안 된 이
+    # 판을 못 보고 그보다 낮은 값을 써 버릴 수 있다. 줄 하나를 둘 다 잠그면
+    # 먼저 잡은 쪽이 끝난 뒤에 다른 쪽이 새 값을 보고 돈다. 잠금이 겹치는
+    # 것은 같은 사람의 같은 날뿐이다.
+    row, _ = DailyScore.objects.select_for_update().get_or_create(
+        user=session.user, day=day
+    )
     rows = DailyScore.objects.filter(pk=row.pk)
 
     if session.kind == SessionKind.DAILY:
@@ -266,6 +280,45 @@ def _bump_daily(session: QuizSession) -> None:
     rows.filter(
         Q(best_free_score__isnull=True) | Q(best_free_score__lt=session.score)
     ).update(best_free_score=session.score)
+
+
+def recount_best_free(user_id: int, day: date) -> None:
+    """그날 best_free_score 를 남아 있는 자유 판들로 다시 센다.
+
+    Admin 에서 판을 지운 뒤에 부른다. 하루 점수는 판을 가리키지 않고
+    "그날 최고 판의 점수" 를 복사해 둔 값이라, 판만 지우면 이번 주·전체
+    순위표에서는 빠지는데 꾸준함에는 그 점수가 남는다.
+
+    **날짜를 세는 규칙이 _bump_daily 와 같아야 한다**(끝낸 시각, 한국 날짜).
+    그래서 이 모듈에 둔다 - Admin 쪽에 따로 쓰면 두 벌이 되고 한쪽만 고쳐진다.
+
+    남은 판이 없으면 null 로 되돌린다. **줄은 지우지 않는다.** 같은 사람이
+    그 순간 일일공부 답을 내면 add_daily_study 는 잠그지 않고 읽어 둔 줄
+    번호로 UPDATE 하는데, 그 줄이 지워져 있으면 0 줄을 고치고 그 점수가
+    조용히 사라진다(_bump_daily 는 줄을 잠그므로 이 경우가 아니다).
+    대가로 그날은 학습 기록에 "안 함" 이 아니라 "0점" 으로 남는다. 꾸준함의
+    "며칠" 은 점수가 0 보다 큰 날만 세므로 거기에는 안 잡힌다.
+
+    그날 줄을 잠그고 센다. _bump_daily 도 같은 줄을 잠그므로(그쪽 주석),
+    판이 끝나는 것과 여기서 세는 것이 겹치면 한쪽이 끝날 때까지 다른 쪽이
+    기다린다. 이쪽이 먼저면 판 쪽이 여기서 쓴 값과 다시 비교하고, 판 쪽이
+    먼저면 여기서 셀 때 그 판이 보인다.
+    """
+    begins = calendar_kst.day_begins(day)
+    ends = calendar_kst.day_begins(day + timedelta(days=1))
+
+    with transaction.atomic():
+        row = DailyScore.objects.select_for_update().filter(user_id=user_id, day=day).first()
+        if row is None:
+            return
+
+        row.best_free_score = QuizSession.objects.filter(
+            user_id=user_id,
+            kind=SessionKind.FREE,
+            finished_at__gte=begins,
+            finished_at__lt=ends,
+        ).aggregate(best=Max("score"))["best"]
+        row.save(update_fields=["best_free_score"])
 
 
 def add_daily_study(user, day, score: int) -> None:
