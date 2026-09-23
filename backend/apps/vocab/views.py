@@ -20,6 +20,7 @@ from .quiz import (
     QuizKind,
     grade_answer,
     make_blank_question,
+    make_for_word,
     make_question,
     make_situation_question,
     sign_question,
@@ -262,6 +263,7 @@ class WordViewSet(LearningItemViewSet):
         ?category=git   분류를 좁힌다
         ?kind=meaning   유형을 고정한다. 없으면 매번 무작위
         ?exclude=1,2,3  방금 낸 문제를 다시 내지 않는다
+        ?item=12        이 단어를 정답으로 낸다. 상세의 "이 단어로 문제 풀기"
         """
         # 목록과 달리 filter_queryset 을 쓰지 않는다. SearchFilter 가
         # 붙어 있어서 ?search=commit 으로 풀을 좁혀 정답 후보를 추릴 수
@@ -277,10 +279,17 @@ class WordViewSet(LearningItemViewSet):
                 )
             pool = pool.filter(category=category)
 
-        exclude = _parse_ids(request.query_params.get("exclude", ""))
-        question = make_question(
-            pool, kind=request.query_params.get("kind"), exclude_ids=exclude
-        )
+        item, error = _item_of(request, pool, "단어로")
+        if error is not None:
+            return error
+
+        if item is not None:
+            question = make_for_word(item, pool, kind=request.query_params.get("kind"))
+        else:
+            exclude = _parse_ids(request.query_params.get("exclude", ""))
+            question = make_question(
+                pool, kind=request.query_params.get("kind"), exclude_ids=exclude
+            )
 
         if question is None:
             # 보기 4개를 채울 만큼 단어가 없다. 분류를 너무 좁혔거나
@@ -402,6 +411,43 @@ _MAX_PK_DIGITS = len(str(_MAX_PK))
 _LEVELS = frozenset(LearningItem.Difficulty.values)
 
 
+def _item_of(
+    request: Request, pool: QuerySet, name: str
+) -> tuple[LearningItem | None, Response | None]:
+    """?item= 으로 정답을 정했으면 그 항목을 찾는다.
+
+    돌려주는 것: (항목, 오류 응답). 안 정했으면 (None, None) 이다.
+    name 은 못 찾았을 때 문구에 들어갈 말이다("단어로", "문장으로").
+
+    **pool 에서 찾는다.** pool 은 이미 검수된 것만 담고 있어서, 검수 안 된
+    항목의 번호를 넣어 그 뜻을 정답으로 받아 가는 길이 여기서 막힌다.
+    없는 번호와 검수 안 된 번호는 같은 404 다 - 둘을 가르면 번호를 돌려가며
+    검수 상태를 알아낼 수 있다.
+    """
+    raw = request.query_params.get("item", "")
+    if not raw:
+        return None, None
+
+    # exclude 와 같은 읽기로 한다. 숫자가 아니거나 너무 긴 값이 pk 조회로
+    # 가면 500 이 난다. 하나만 받는다 - "1,2" 는 무엇을 낼지 모른다.
+    # 읽은 숫자가 원래 값과 같은지도 본다. _parse_ids 는 쓰레기 조각을
+    # 조용히 버려서 "1,abc" 도 1 로 읽는다.
+    ids = _parse_ids(raw)
+    if len(ids) != 1 or str(ids[0]) != raw.strip():
+        return None, Response(
+            {"detail": "문제 번호가 올바르지 않습니다."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    item = pool.filter(pk=ids[0]).first()
+    if item is None:
+        return None, Response(
+            {"detail": f"이 {name}는 지금 문제를 낼 수 없습니다."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return item, None
+
+
 def _parse_level(raw: str | None) -> int | None:
     """난이도 쿼리를 읽는다. 아는 값이 아니면 None(전부)이다.
 
@@ -493,6 +539,7 @@ class SentenceViewSet(LearningItemViewSet):
         ?category=git     분류를 좁힌다
         ?kind=blank       유형을 고정한다. 없으면 무작위
         ?exclude=1,2,3    방금 낸 문장을 다시 내지 않는다
+        ?item=12          이 문장으로 낸다. 상세의 "이 문장으로 문제 풀기"
         """
         # 목록과 달리 filter_queryset 을 쓰지 않는다. 단어 쪽과 같은 이유다 -
         # SearchFilter 로 풀을 좁혀 정답 후보를 추릴 수 있다.
@@ -514,6 +561,10 @@ class SentenceViewSet(LearningItemViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        item, error = _item_of(request, pool, "문장으로")
+        if error is not None:
+            return error
+
         exclude = _parse_ids(request.query_params.get("exclude", ""))
 
         # 유형을 안 정했으면 무작위로 고르되, 못 내면 남은 쪽으로 넘어간다.
@@ -527,10 +578,18 @@ class SentenceViewSet(LearningItemViewSet):
 
         question = None
         for one in order:
-            if one == QuizKind.BLANK:
+            # 문장을 정했으면 빈칸은 그 문장에서만 뚫고, 상황 고르기는 그
+            # 문장을 정답으로 한다. 보기는 둘 다 전체에서 채운다.
+            if one == QuizKind.BLANK and item is not None:
+                question = make_blank_question(
+                    pool.filter(pk=item.pk), Word.objects.visible()
+                )
+            elif one == QuizKind.BLANK:
                 question = make_blank_question(
                     pool, Word.objects.visible(), exclude_sentence_ids=exclude
                 )
+            elif item is not None:
+                question = make_situation_question(pool, answer=item)
             else:
                 question = make_situation_question(pool, exclude_ids=exclude)
             if question is not None:

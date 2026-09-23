@@ -35,6 +35,7 @@ export async function GET(request: Request) {
         category: params.get("category") ?? undefined,
         kind: params.get("kind") ?? undefined,
         exclude: params.get("exclude") ?? undefined,
+        item: params.get("item") ?? undefined,
       },
       toContent(params.get("content")),
     );
