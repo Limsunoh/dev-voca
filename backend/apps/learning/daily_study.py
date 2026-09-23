@@ -44,7 +44,7 @@ from dataclasses import asdict, dataclass
 
 from django.core import signing
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import Case, F, When
 from django.utils import timezone
 
 from apps.vocab import quiz
@@ -810,13 +810,6 @@ def _finish(study: DailyStudy) -> None:
     완주 보너스는 **다 풀었을 때만** 준다. 중간에 못 끝내고 문제가 떨어져
     닫히는 경우도 있어서 여기서 조건을 본다.
     """
-    # **먼저 읽는다.** 보너스 판정이 호출부의 refresh 여부에 달리면,
-    # 새 호출부 하나가 그걸 빠뜨렸을 때 보너스가 조용히 나가거나 안 나간다.
-    study.refresh_from_db()
-
-    bonus = study.bonus if study.answered >= study.total_questions else 0
-    final = study.score + bonus
-
     # **저장된 문제를 함께 비운다.** 마지막 답은 다음 문제를 안 심으므로
     # study.question 이 한 순번 뒤처진 채 남는다. 그 상태에서 이 UPDATE 가
     # 실패하면(점수판 반영은 트랜잭션 밖이라 여기서 터질 수 있다) resume 이
@@ -826,13 +819,33 @@ def _finish(study: DailyStudy) -> None:
     #
     # 닫는 자리에서 함께 비우면 세 호출자(answer, resume, settle_stale)가
     # 전부 여기를 지나므로 한 곳으로 막힌다.
+    #
+    # **최종 점수를 이 UPDATE 안에서 계산한다.** 파이썬에서 읽어 둔 값으로
+    # 쓰면, 읽은 뒤 이 UPDATE 사이에 들어온 답(_take_step 의 +1)을 옛
+    # 점수로 덮어쓴다. 자정 직후 한 탭은 답하고 다른 탭은 새로고침(=어제
+    # 판 정산)하면 실제로 그렇게 됐다 - 판은 0점, 그날 줄은 1점으로
+    # 갈렸다(add_daily_study 는 낮추지 않으므로 1점이 남는다). 행의 지금
+    # 값으로 계산하면 먼저 커밋된 답이 반드시 들어간다. 이 UPDATE 가 끝난
+    # 뒤 오는 답은 finished_at 조건에 막힌다.
+    #
+    # 보너스는 다 풀었을 때만이다. 판정도 같은 이유로 여기서 한다.
     closed = DailyStudy.objects.filter(
         pk=study.pk, finished_at__isnull=True
-    ).update(score=final, finished_at=timezone.now(), question=None)
+    ).update(
+        score=Case(
+            When(
+                answered__gte=F("total_questions"),
+                then=F("score") + F("bonus"),
+            ),
+            default=F("score"),
+        ),
+        finished_at=timezone.now(),
+        question=None,
+    )
 
-    # **진 요청은 여기서 돌아간다.** 반환값을 안 보면 두 요청이 각자 계산한
-    # final 로 add_daily_study 를 불러, DailyScore 가 DailyStudy 와 다른
-    # 값을 갖는다. 어느 쪽이 남는지도 순서에 달렸다.
+    # **진 요청은 여기서 돌아간다.** 이긴 쪽이 이미 최종 점수를 그날 줄에
+    # 옮겼다. 순서가 엇갈리는 경우는 tests_daily_finish 의 InterleavingTest
+    # 가 하나씩 끼워 넣어 본다.
     if not closed:
         # 이미 다른 요청이 닫았다. 그쪽이 쓴 값을 읽어 인스턴스를 맞춘다 -
         # 호출부가 이걸 화면에 그리므로 낡은 상태를 들고 나가면 안 된다.

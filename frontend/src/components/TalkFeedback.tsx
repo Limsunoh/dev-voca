@@ -4,6 +4,13 @@ import type { TalkResult } from "@/lib/api/talk";
 import type { ListenOutcome } from "@/lib/speech";
 
 /**
+ * 마이크가 막혔을 때 할 일. 결과 안내와, 막힌 뒤 새 문장에서 보이는 한 줄
+ * 안내(TalkBoard)가 같이 쓴다 - 두 곳에 따로 적으면 한쪽만 고쳐진다.
+ */
+export const MIC_BLOCKED_HELP =
+  "주소창 왼쪽 자물쇠 아이콘에서 마이크를 허용으로 바꾸고 화면을 새로고침해주세요.";
+
+/**
  * 한 번 읽은 결과.
  *
  * **"정답/오답" 이라고 말하지 않는다.** 채점이 글자 비교라 판정이 흐릿하다 -
@@ -130,8 +137,7 @@ function describe(
       return {
         ...wrong,
         title: "마이크가 막혔어요",
-        detail:
-          "주소창 왼쪽 자물쇠 아이콘에서 마이크를 허용으로 바꾸고 화면을 새로고침해주세요.",
+        detail: MIC_BLOCKED_HELP,
       };
     case "network":
       return {

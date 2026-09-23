@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MicCheck } from "@/components/MicCheck";
 import { MicGate } from "@/components/MicGate";
-import { TalkFeedback } from "@/components/TalkFeedback";
+import { MIC_BLOCKED_HELP, TalkFeedback } from "@/components/TalkFeedback";
 import { TalkPromptCard } from "@/components/TalkPrompt";
 import type { TalkKind, TalkPrompt, TalkResult } from "@/lib/api/talk";
 import type { TalkLevel } from "@/lib/routes";
@@ -78,6 +78,17 @@ const RECENT_KEEP = 12;
 let startedThisVisit = false;
 
 /**
+ * 이번 방문에서 마이크가 막혔는지(결과 "denied"). 막히면 주 버튼이
+ * "새로고침" 이 된다.
+ *
+ * startedThisVisit 과 같은 이유로 모듈 변수다 - 갈래·난이도 탭을 바꾸면
+ * 이 컴포넌트가 새로 만들어지는데, 그때 잊으면 주 버튼이 "읽기" 로 돌아가
+ * 누르고 또 막힌다. 권한은 새로고침해야 풀리고, 새로고침하면 이 값도
+ * 사라진다.
+ */
+let micBlockedThisVisit = false;
+
+/**
  * 소개 화면을 건너뛰고 곧장 이어가도 되나.
  *
  * "prompt" 도 넣는다. 사파리는 한 번 허락해도 사이트 설정에 "허용" 으로
@@ -98,7 +109,7 @@ export function TalkBoard({
   level,
 }: {
   kind: TalkKind;
-  /** 고른 난이도. 0 이면 전부에서 낸다. */
+  /** 고른 난이도. 0 이면 전체에서 낸다. */
   level: TalkLevel;
 }) {
   const [mic, setMic] = useState<MicState | null>(null);
@@ -118,6 +129,10 @@ export function TalkBoard({
   const [error, setError] = useState<string | null>(null);
   const [errorSeq, setErrorSeq] = useState(0);
   const [busy, setBusy] = useState(false);
+  // 결과 한 번만 보고 정하지 않는 이유: "다음" 으로 새 문장을 받는 순간
+  // 주 버튼이 다시 "읽기" 로 돌아가고 누르면 또 막힌다. 값은 모듈 변수
+  // (micBlockedThisVisit)에 두고, 화면을 다시 그리려고 상태로도 든다.
+  const [micBlocked, setMicBlocked] = useState(micBlockedThisVisit);
 
   // 듣기를 끊는 함수. 화면을 떠나거나 "그만" 을 누를 때 부른다.
   // 안 끊으면 인식기가 살아남아 다음 판에 옛 결과가 끼어든다.
@@ -155,7 +170,7 @@ export function TalkBoard({
         body: JSON.stringify({
           action: "start",
           kind,
-          // 0 은 안 보낸다. 서버가 없으면 전부에서 낸다.
+          // 0 은 안 보낸다. 서버가 없으면 전체에서 낸다.
           ...(level ? { level } : {}),
           // 방금 낸 것들을 빼달라고 한다. 안 보내면 무작위로 다시 뽑아서
           // 같은 것이 연달아 나온다. 난이도를 고르면 뽑는 통이 더 좁아져
@@ -241,6 +256,9 @@ export function TalkBoard({
 
   function listen() {
     if (!prompt) return;
+    // 건너뛰기·다음이 실패해 떠 있던 오류를 지운다. 안 지우면 새 결과
+    // 옆에 지난 오류가 같이 남는다.
+    setError(null);
     setPhase("listening");
     setResult(null);
     setOutcome(null);
@@ -257,6 +275,10 @@ export function TalkBoard({
       }
 
       setOutcome(heardOutcome);
+      if (heardOutcome.type === "denied") {
+        micBlockedThisVisit = true;
+        setMicBlocked(true);
+      }
 
       if (heardOutcome.type !== "heard") {
         // 글자를 못 받았으면 서버에 갈 것이 없다.
@@ -319,8 +341,9 @@ export function TalkBoard({
           멈추는 게 아니라 0.01ms 로 무한 반복해서 사실상 안 보인다
           (globals.css 의 감소 모션 주석). 그래서 글자로도 말한다. */}
       <div aria-live="polite" className="min-h-6 text-center">
-        {/* 첫 문제를 받는 동안. 카드가 아직 없어 잠긴 버튼만 보이므로 말로 알린다. */}
-        {busy && !prompt && (
+        {/* 문제를 받는 동안. 첫 문제는 카드가 없어 잠긴 버튼만 보이고,
+            건너뛰기·다음은 옛 문장이 그대로 보여서 눌렸는지 모른다. */}
+        {busy && (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             불러오는 중이에요
           </p>
@@ -337,6 +360,15 @@ export function TalkBoard({
 
       {phase === "done" && outcome && (
         <TalkFeedback outcome={outcome} result={result} heardRaw={heardRaw} />
+      )}
+
+      {/* 막힌 뒤 결과 안내가 안 보이는 동안 - 새 문장을 받는 중이거나 받은
+          뒤, 받기에 실패한 뒤 - 주 버튼이 왜 "새로고침" 인지 한 줄로 알린다.
+          결과 안내가 보일 때는 그쪽이 같은 말을 하므로 빠진다. */}
+      {micBlocked && !(phase === "done" && outcome) && (
+        <p className="text-center text-sm" style={{ color: "var(--coral-deep)" }}>
+          마이크가 막혀 있어요. {MIC_BLOCKED_HELP}
+        </p>
       )}
 
       {/* 소리가 안 들어왔을 때만 띄운다.
@@ -361,7 +393,8 @@ export function TalkBoard({
       <div className="grid gap-2 sm:flex sm:justify-center">
         {/* 읽을 것을 못 받았으면(error && !prompt) 읽기를 아예 빼고 아래
             "다시 불러오기" 만 남긴다. 잠긴 코랄이 옆에 있으면 누를 수 없는
-            쪽이 먼저 눈에 든다. */}
+            쪽이 먼저 눈에 든다. 마이크가 막혔으면 "새로고침" 은 남긴다 -
+            문장을 받아 와도 새로고침 전에는 읽을 수 없다. */}
         {phase === "listening" ? (
           <button
             type="button"
@@ -380,11 +413,13 @@ export function TalkBoard({
           >
             그만
           </button>
-        ) : error && !prompt ? null : (
+        ) : error && !prompt && !micBlocked ? null : (
           <button
             type="button"
-            onClick={listen}
-            disabled={busy || !prompt}
+            // 마이크가 막혔으면(micBlocked) 다시 읽어도 또 막힌다. 안내가
+            // "허용으로 바꾸고 새로고침" 이라 주 버튼도 같은 말을 한다.
+            onClick={micBlocked ? () => window.location.reload() : listen}
+            disabled={!micBlocked && (busy || !prompt)}
             // 이 화면의 유일한 코랄. 주된 동작이 하나여야 무엇을 눌러야
             // 할지 한눈에 보인다.
             className="dv-btn rounded-[var(--radius-pill)] px-8 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
@@ -400,13 +435,17 @@ export function TalkBoard({
               } as React.CSSProperties
             }
           >
-            {phase === "done" ? "다시 읽기" : "읽기"}
+            {micBlocked ? "새로고침" : phase === "done" ? "다시 읽기" : "읽기"}
           </button>
         )}
 
-        {/* 못 받았으면(prompt 없음) 같은 자리에 다시 받는 버튼을 둔다.
-            읽기는 읽을 것이 없어 잠겨 있으니, 이게 없으면 누를 것이 하나도 없다. */}
-        {(phase === "done" || (error && !prompt)) && (
+        {/* 다음 것을 받는 버튼. 자리에 따라 이름만 바뀐다.
+            - 읽기 전: "건너뛰기". 없으면 한 번 읽고 실패해야만 넘어갈 수
+              있어서, 모르는 문장이 나오면 억지로 틀려야 했다
+            - 결과 뒤: "다음"
+            - 못 받았으면(prompt 없음): "다시 불러오기". 읽기는 읽을 것이
+              없어 잠겨 있으니, 이게 없으면 누를 것이 하나도 없다 */}
+        {(phase === "done" || (phase === "ready" && prompt) || (error && !prompt)) && (
           <button
             type="button"
             // disabled 가 아니라 aria-disabled 다. disabled 로 바뀌는 순간
@@ -427,7 +466,7 @@ export function TalkBoard({
               } as React.CSSProperties
             }
           >
-            {prompt ? "다음" : "다시 불러오기"}
+            {!prompt ? "다시 불러오기" : phase === "ready" ? "건너뛰기" : "다음"}
           </button>
         )}
       </div>

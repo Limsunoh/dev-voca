@@ -6,6 +6,7 @@ import { Burst } from "@/components/Burst";
 import { Reaction } from "@/components/Reaction";
 import type { GradeResult, QuizContent, Question } from "@/lib/api/quiz";
 import { clearSolved, markSolved } from "@/lib/quiz-progress";
+import { choicesAreTerms, promptIsTerm } from "@/lib/quiz-text";
 import { Reading } from "./Reading";
 
 /**
@@ -601,8 +602,9 @@ export function QuizBoard({ category, content = "words", item }: Props) {
             <li key={choice.id}>
               <ChoiceButton
                 text={choice.text}
-                // 설명 문제는 보기가 단어라 고정폭이 읽기 좋다.
-                mono={question.kind !== "meaning"}
+                // 보기가 용어일 때만 고정폭(lib/quiz-text). 전에는 "뜻 고르기가
+                // 아니면 고정폭" 이라 상황 고르기의 한글 보기까지 고정폭이었다.
+                mono={choicesAreTerms(question.kind)}
                 state={choiceState(choice.id, picked, result)}
                 disabled={picked !== null}
                 onClick={() => void pick(choice.id)}
@@ -750,13 +752,14 @@ function Prompt({ kind, text }: { kind: string; text: string }) {
             // 크기와 같으면 받침과 다음 줄 윗선이 맞닿는다. 영어 용어도
             // 안전하지 않다 - "eventual consistency" 가 390px 에서 한 줄에
             // 겨우 들어간다.
-            className: kind === "meaning" ? "font-mono" : "",
+            lang: promptIsTerm(kind) ? "en" : undefined,
+            className: promptIsTerm(kind) ? "font-mono" : "",
             style: {
               fontSize: "var(--text-3xl)",
               fontWeight: "var(--weight-black)",
               lineHeight: "var(--leading-tight)",
               letterSpacing:
-                kind === "meaning"
+                promptIsTerm(kind)
                   ? "var(--tracking-tighter)"
                   : "var(--tracking-tight)",
               color: "var(--foreground)",
@@ -913,7 +916,10 @@ function ChoiceButton({
       {/* min-w-0 이 있어야 flex 항목이 내용보다 작아진다. 글자를 끊는 쪽은
           globals.css 의 base 규칙(body 상속)이 맡는다. 둘 중 하나만 있으면
           보기 문구가 길 때 버튼이 화면 밖으로 밀린다. */}
-      <span className={`min-w-0 flex-1 ${mono ? "font-mono" : ""}`}>
+      <span
+        lang={mono ? "en" : undefined}
+        className={`min-w-0 flex-1 ${mono ? "font-mono" : ""}`}
+      >
         {text}
       </span>
       {mark && (
