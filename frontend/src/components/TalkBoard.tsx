@@ -61,6 +61,37 @@ const STAGE_LABEL: Record<ListenStage, string> = {
  */
 const RECENT_KEEP = 12;
 
+/**
+ * 이번 방문에서 "시작하기" 를 한 번이라도 눌렀는지.
+ *
+ * 갈래·난이도 탭을 바꾸면 페이지가 이 컴포넌트를 key 로 통째로 새로 만든다
+ * (app/talk/page.tsx - 옛 문제와 뺄 목록을 비우려는 것이다). 그러면 상태가
+ * 처음으로 돌아가 소개 화면이 다시 뜨고, 방금 시작한 사람이 탭 하나 바꿀
+ * 때마다 "시작하기" 를 또 눌러야 했다.
+ *
+ * 컴포넌트 상태가 아니라 모듈 변수에 두는 이유가 그것이다 - 새로 만들어져도
+ * 이 값은 남는다. 새로고침하면 모듈이 다시 읽혀 사라지므로, 기억하는 범위는
+ * "앱 안에서 이동하는 동안" 이다. 저장소에 남기지 않는 것은 일부러다. 소개
+ * 화면에 녹음이 어디로 가는지 안내가 있어서, 새로 들어온 방문에는 한 번은
+ * 보여주는 편이 맞다.
+ */
+let startedThisVisit = false;
+
+/**
+ * 소개 화면을 건너뛰고 곧장 이어가도 되나.
+ *
+ * "prompt" 도 넣는다. 사파리는 한 번 허락해도 사이트 설정에 "허용" 으로
+ * 고정하지 않으면 권한 조회가 "prompt" 로 답할 수 있어서, granted 만 보면
+ * 아이폰에서는 안 고쳐질 수 있다. 소개 안내는 이번 방문에 이미 읽었다.
+ *
+ * 대가: 권한이 정말 "prompt" 로 돌아갔으면 권한 창을 인식기가 띄우게 되고,
+ * 창이 떠 있는 동안 시작 감시가 먼저 끊어 "인식을 시작하지 못했어요" 가
+ * 한 번 뜬다(TalkFeedback 이 그 경우를 안내한다). 거절·마이크 없음 같은
+ * 나머지는 소개 화면이 맞는 안내를 해야 하므로 넣지 않는다.
+ */
+function canResume(mic: MicState | null): boolean {
+  return startedThisVisit && (mic === "granted" || mic === "prompt");
+}
 
 export function TalkBoard({
   kind,
@@ -85,6 +116,7 @@ export function TalkBoard({
   const [stage, setStage] = useState<ListenStage>("starting");
   const [heardRaw, setHeardRaw] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [errorSeq, setErrorSeq] = useState(0);
   const [busy, setBusy] = useState(false);
 
   // 듣기를 끊는 함수. 화면을 떠나거나 "그만" 을 누를 때 부른다.
@@ -111,7 +143,8 @@ export function TalkBoard({
 
   const loadPrompt = useCallback(async () => {
     setBusy(true);
-    setError(null);
+    // 오류는 받은 뒤에 지운다. 먼저 지우면 오류에 매달린 "다시 불러오기"
+    // 버튼이 누르는 순간 사라져 포커스가 날아간다.
     setResult(null);
     setOutcome(null);
     setHeardRaw([]);
@@ -143,16 +176,19 @@ export function TalkBoard({
               "지금 낼 것이 없습니다. 다른 갈래를 보거나 나중에 다시 와주세요.")
             : (data?.detail ?? "불러오지 못했습니다."),
         );
+        setErrorSeq((n) => n + 1);
         return;
       }
       const next = data as TalkPrompt;
       // 방금 낸 것을 기억한다. 최근 것만 들고 있는다 - 다 모으면 뺄 것이
       // 풀 전체가 되어 "낼 것이 없습니다" 가 뜬다.
       recentRef.current = [next.id, ...recentRef.current].slice(0, RECENT_KEEP);
+      setError(null);
       setPrompt(next);
       setPhase("ready");
     } catch {
       setError("서버에 연결할 수 없습니다.");
+      setErrorSeq((n) => n + 1);
     } finally {
       setBusy(false);
     }
@@ -162,6 +198,18 @@ export function TalkBoard({
   // key={`${kind}-${level}`} 로 이 컴포넌트를 통째로 새로 만들기 때문이다
   // (app/talk/page.tsx) - 상태가 처음부터 다시 시작하므로 옛 단어가 남을
   // 자리가 없고, 이미 낸 것을 빼는 목록도 같이 비워진다.
+  //
+  // 대신 이번 방문에 이미 시작했으면 소개 화면을 건너뛰고 곧장 받는다
+  // (canResume). 소개 화면을 가리는 것은 아래 렌더가 한다 - 여기서
+  // phase 를 바꾸면 효과가 그린 뒤에 돌아 소개 화면이 한 프레임 번쩍인다.
+  // ref 는 allow() 가 마이크 상태를 바꿀 때 이 효과가 같은 것을 한 번 더
+  // 받지 않게 막는다(allow 가 먼저 세운다).
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (!canResume(mic) || resumedRef.current) return;
+    resumedRef.current = true;
+    void loadPrompt();
+  }, [mic, loadPrompt]);
 
   async function allow() {
     setBusy(true);
@@ -175,7 +223,13 @@ export function TalkBoard({
       // 곧바로 끈다. 여기서는 권한만 받으면 되고, 실제 듣기는 인식기가 한다.
       // 안 끄면 탭에 녹음 표시가 계속 남아서 듣고 있는 것처럼 보인다.
       stream.getTracks().forEach((track) => track.stop());
+      // 위 효과가 같은 문제를 한 번 더 받지 않게 먼저 표시한다.
+      resumedRef.current = true;
+      startedThisVisit = true;
       setMic("granted");
+      // 먼저 넘어간다. 소개 화면에 머문 채 받다가 실패하면 오류 문구가
+      // 그려질 자리가 없다 - 오류는 아래 읽기 화면에만 있다.
+      setPhase("ready");
       await loadPrompt();
     } catch {
       // 거절했거나 마이크를 못 열었다. 상태를 다시 읽어 맞는 안내를 그린다.
@@ -240,7 +294,7 @@ export function TalkBoard({
   // 그리면 곧바로 다른 것으로 바뀌어 깜빡인다.
   if (mic === null) return <div className="min-h-40" />;
 
-  if (phase === "gate") {
+  if (phase === "gate" && !canResume(mic)) {
     return <MicGate state={mic} onAllow={allow} pending={busy} />;
   }
 
@@ -265,6 +319,12 @@ export function TalkBoard({
           멈추는 게 아니라 0.01ms 로 무한 반복해서 사실상 안 보인다
           (globals.css 의 감소 모션 주석). 그래서 글자로도 말한다. */}
       <div aria-live="polite" className="min-h-6 text-center">
+        {/* 첫 문제를 받는 동안. 카드가 아직 없어 잠긴 버튼만 보이므로 말로 알린다. */}
+        {busy && !prompt && (
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            불러오는 중이에요
+          </p>
+        )}
         {phase === "listening" && (
           <p
             className="text-sm"
@@ -287,6 +347,9 @@ export function TalkBoard({
 
       {error && (
         <p
+          // 실패할 때마다 새 요소로 붙인다. 같은 문구로 또 실패하면 그대로
+          // 남아 있어 스크린리더가 다시 안 읽는다.
+          key={errorSeq}
           role="alert"
           className="rounded-[var(--radius-xl)] p-3 text-sm"
           style={{ background: "var(--wrong-soft)", color: "var(--coral-deep)" }}
@@ -296,6 +359,9 @@ export function TalkBoard({
       )}
 
       <div className="grid gap-2 sm:flex sm:justify-center">
+        {/* 읽을 것을 못 받았으면(error && !prompt) 읽기를 아예 빼고 아래
+            "다시 불러오기" 만 남긴다. 잠긴 코랄이 옆에 있으면 누를 수 없는
+            쪽이 먼저 눈에 든다. */}
         {phase === "listening" ? (
           <button
             type="button"
@@ -314,7 +380,7 @@ export function TalkBoard({
           >
             그만
           </button>
-        ) : (
+        ) : error && !prompt ? null : (
           <button
             type="button"
             onClick={listen}
@@ -338,12 +404,18 @@ export function TalkBoard({
           </button>
         )}
 
-        {phase === "done" && (
+        {/* 못 받았으면(prompt 없음) 같은 자리에 다시 받는 버튼을 둔다.
+            읽기는 읽을 것이 없어 잠겨 있으니, 이게 없으면 누를 것이 하나도 없다. */}
+        {(phase === "done" || (error && !prompt)) && (
           <button
             type="button"
-            onClick={() => void loadPrompt()}
-            disabled={busy}
-            className="dv-btn rounded-[var(--radius-pill)] px-8 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+            // disabled 가 아니라 aria-disabled 다. disabled 로 바뀌는 순간
+            // 브라우저가 포커스를 빼서, 키보드로 누른 사람이 제자리를 잃는다.
+            onClick={() => {
+              if (!busy) void loadPrompt();
+            }}
+            aria-disabled={busy}
+            className="dv-btn rounded-[var(--radius-pill)] px-8 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-disabled:opacity-60"
             style={
               {
                 minHeight: "var(--hit-min)",
@@ -355,7 +427,7 @@ export function TalkBoard({
               } as React.CSSProperties
             }
           >
-            다음
+            {prompt ? "다음" : "다시 불러오기"}
           </button>
         )}
       </div>
