@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { ContentTabs } from "@/components/ContentTabs";
 import { ExitGuard } from "@/components/ExitGuard";
+import { LeaveLink } from "@/components/LeaveLink";
 import { QuizBoard } from "@/components/QuizBoard";
 import { getSentenceCategories } from "@/lib/api/sentences";
 import { contentPath, routes } from "@/lib/routes";
@@ -45,11 +45,13 @@ export default async function TestSentencesPage({ searchParams }: PageProps) {
       <h1 className="sr-only">문장 문제풀기</h1>
 
       {/* 이 화면에는 탭바가 없다(TabBar 의 return null 참고). 나가는 길이
-          여기뿐이라 빠지면 막다른 화면이 된다. */}
+          여기뿐이라 빠지면 막다른 화면이 된다. 푼 것이 있을 때만 묻는
+          이유는 test/words 쪽에 적어뒀다. */}
       <div className="mb-3 flex items-center justify-between gap-3">
-        <ExitGuard to={routes.home} label="홈" />
-        <Link
+        <ExitGuard to={routes.home} label="홈" confirmWhenSolved />
+        <LeaveLink
           href={routes.testRound}
+          confirmLabel="한 판 풀기"
           className="flex items-center px-2.5 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={{
             minHeight: "var(--hit-floor)",
@@ -59,10 +61,10 @@ export default async function TestSentencesPage({ searchParams }: PageProps) {
           }}
         >
           한 판 풀기
-        </Link>
+        </LeaveLink>
       </div>
 
-      <ContentTabs mode="test" current="sentences" />
+      <ContentTabs mode="test" current="sentences" warnOnLeave />
 
       <div className="mt-4 flex items-center justify-between gap-3">
         {/* key 로 분류를 넘겨 주소가 바뀌면 새로 만든다. 뒤로가기로 돌아올

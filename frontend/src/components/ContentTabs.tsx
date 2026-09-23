@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 
 import { contentPath, contents } from "@/lib/routes";
+
+import { useLeaveGuard } from "./useLeaveGuard";
 
 /**
  * 한 모드 안에서 콘텐츠를 오가는 탭(단어 / 문장).
@@ -14,12 +18,23 @@ import { contentPath, contents } from "@/lib/routes";
 export function ContentTabs({
   mode,
   current,
+  warnOnLeave = false,
 }: {
   /** 지금 모드의 slug. 링크가 이 모드 안에 머문다. */
   mode: string;
   /** 지금 콘텐츠의 slug. */
   current: string;
+  /**
+   * 옮기면 진행이 사라지는 화면인가.
+   *
+   * 문제풀기가 그렇다 - 단어와 문장은 각각 다른 판이라, 탭을 누르면 지금
+   * 판이 끝나고 푼 점수가 사라진다(되돌릴 수 없다). 익히기 같은 목록
+   * 화면은 잃을 것이 없다.
+   */
+  warnOnLeave?: boolean;
 }) {
+  const { guard, dialog } = useLeaveGuard({ confirmLabel: "옮기기" });
+
   return (
     // 세그먼트. 옅은 띠 안에서 흰 알약이 켜진 쪽으로 옮겨간다.
     //
@@ -45,6 +60,11 @@ export function ContentTabs({
           <Link
             key={content.slug}
             href={contentPath(mode, content.slug)}
+            onClick={(event) => {
+              if (!active && warnOnLeave) {
+                guard(event, contentPath(mode, content.slug));
+              }
+            }}
             aria-current={active ? "page" : undefined}
             // after 로 히트영역을 44px 까지 넓힌다. 알약 자체를 키우면
             // 세그먼트가 두꺼워져 제목 줄과 균형이 깨지는데, 눌리는 넓이는
@@ -71,6 +91,9 @@ export function ContentTabs({
           </Link>
         );
       })}
+      {/* 확인 창은 문제풀기에서만 그린다. 익히기 화면에 숨은 창을 둘
+          이유가 없다. */}
+      {warnOnLeave && dialog}
     </nav>
   );
 }
