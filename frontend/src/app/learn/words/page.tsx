@@ -165,9 +165,17 @@ export default async function VocabPage({ searchParams }: PageProps) {
     // 예상 못 한 에러는 error.tsx 로 올려보낸다.
     if (!(error instanceof ApiError)) throw error;
 
-    // 없는 페이지 번호(?page=999)는 DRF 가 404 를 준다. 이걸 서버 장애처럼
-    // 안내하면 사용자가 원인을 오해하므로 "그런 페이지 없음"으로 구분한다.
-    if (error.status === 404) notFound();
+    // 없는 페이지 번호(?page=999)는 DRF 가 404 를 준다. 404 화면을 띄우면
+    // "주소가 잘못됐거나 공개되지 않은 단어" 로 읽히므로, 조건은 둔 채 첫
+    // 페이지로 보낸다(오답 노트와 같은 동작). 목록이 줄어 옛 링크의 뒤쪽
+    // 페이지가 사라진 경우도 여기로 온다.
+    //
+    // 번호가 있을 때만이다. 번호 없는 404 는 주소 자체가 없는 것이라, 첫
+    // 페이지로 보내면 같은 주소로 끝없이 돌아간다.
+    if (error.status === 404) {
+      if (page) redirect(listUrl(routes.words, filters));
+      notFound();
+    }
 
     // 400 은 대부분 URL 의 조건값이 잘못된 경우다(오타·오래된 북마크).
     // 서버 문제가 아니므로 그렇게 안내하고, 상태 코드는 보여주지 않는다.
