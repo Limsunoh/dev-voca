@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { FormState } from "@/app/(auth)/actions";
-import { routes } from "@/lib/routes";
+import { continueAsGuestAction } from "@/app/start/actions";
 
 /**
  * 로그인·가입 폼.
@@ -244,17 +244,34 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
           그래서 여기에 나가는 문이 없으면 막다른 곳이 된다 - 전에는 화면
           맨 위 devvoca 로고가 그 역할을 했는데 앱 셸로 바꾸며 없앴다.
           가입 없이 둘러보려던 사람이 갇히지 않게 한 줄 남긴다. */}
-      <p className="mt-4 text-center text-sm">
-        <Link
-          href={routes.home}
-          className="underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          // 링크는 --text-faint(크림 위 2.51:1)로 두지 않는다. 누를 수
-          // 있는 것이 배경에 묻히면 있는 줄도 모른다.
-          style={{ color: "var(--text-muted)" }}
+      {/* **링크가 아니라 폼 버튼이다.** 홈(/)으로 가는 링크였을 때는 홈이
+          "로그인도 안 했고 게스트도 안 고른 사람" 을 시작 화면으로 돌려보내,
+          거기서 "게스트로 둘러보기" 를 한 번 더 눌러야 했다. 시작 화면과 같은
+          action 을 불러 게스트 표시를 남기고 곧장 홈으로 간다.
+
+          링크(GET)로 두지 않는 이유는 action 주석에 있다 - GET 이 상태를
+          바꾸면 브라우저가 미리 불러오기만 해도 게스트 선택이 굳는다. */}
+      <form action={continueAsGuestAction} className="mt-2 text-center text-sm">
+        <button
+          type="submit"
+          className="inline-flex cursor-pointer items-center px-2 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          // 링크처럼 보이게 둔다. 밑줄은 늘 켠다 - 폰에는 hover 가 없어서
+          // hover 에만 걸면 회색 글자 한 줄로만 보인다. 버튼은 기본 커서가
+          // 화살표라 손가락 커서도 따로 준다.
+          //
+          // --text-faint(크림 위 2.51:1)로 두지 않는다 - 누를 수 있는 것이
+          // 배경에 묻히면 있는 줄도 모른다. 높이는 누르는 영역만 44px
+          // (--hit-floor)로 넓힌다. 주 버튼 높이(--hit-min)까지는 필요 없다.
+          style={{
+            minHeight: "var(--hit-floor)",
+            color: "var(--text-muted)",
+            background: "transparent",
+            border: 0,
+          }}
         >
           로그인 없이 둘러보기
-        </Link>
-      </p>
+        </button>
+      </form>
     </div>
   );
 }
