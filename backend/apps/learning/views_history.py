@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import timedelta
 
 from django.db.models import Q
 from rest_framework.pagination import PageNumberPagination
@@ -23,7 +24,8 @@ from apps.vocab.models import Sentence, Word
 # 두 벌이 되면 한쪽만 고쳐졌을 때 그 종류가 통째로 목록에서 사라진다.
 from apps.vocab.quiz import TARGET_SENTENCE, TARGET_WORD
 
-from .models import ReviewState
+from . import calendar_kst
+from .models import DailyScore, QuizSession, ReviewState, SessionKind
 
 
 class MistakesThrottle(UserRateThrottle):
@@ -40,6 +42,9 @@ class MistakesThrottle(UserRateThrottle):
     `DEFAULT_THROTTLE_RATES` 에 있는데 이것만 빠져 있다. 클래스에 `rate` 가
     있으면 DRF 는 settings 를 읽지 않으므로, 나중에 settings 에 "mistakes"
     를 더해도 이 줄이 조용히 이긴다 - 그쪽으로 옮길 때는 이 줄을 지운다.
+    **그때 settings 에 "history" 도 같이 넣는다.** `HistoryThrottle` 이 이
+    rate 를 물려받고 있어서, 이 줄만 지우면 그쪽이 한도를 못 찾아 학습
+    기록 요청이 전부 500 이 된다.
     테스트에서 넉넉히 여는 모양은 settings 의 관용구를 그대로 따랐다.
     """
 
@@ -188,3 +193,87 @@ def _serialize(rows: list[ReviewState]) -> list[dict]:
         )
 
     return out
+
+
+# 최근 며칠을 보여줄지. 두 주면 "이번 주와 지난주" 가 한눈에 들어오고,
+# 폰 폭(390px)에 칸 열넷이 한 줄로 들어간다.
+HISTORY_DAYS = 14
+
+# 최근 판을 몇 개까지 보여줄지. 내정보는 지나온 기록을 훑는 자리라 긴
+# 목록이 필요 없다. 더 보려면 페이지를 따로 만든다.
+HISTORY_ROUNDS = 10
+
+
+class HistoryThrottle(MistakesThrottle):
+    """학습 기록 조회. 오답 노트와 같은 한도, 다른 통.
+
+    통을 나누는 이유: 내정보를 열면 이것과 순위표가 함께 불린다. 오답
+    노트와 한 통을 쓰면 내정보를 몇 번 새로고침한 것만으로 오답 노트가
+    막힌다.
+    """
+
+    scope = "history"
+
+
+class HistoryView(APIView):
+    """내 학습 기록. 최근 14일의 하루 점수와 최근 판 10개.
+
+    **하루 점수는 꾸준함 순위표와 같은 값이다.** `DailyScore.total` 을
+    그대로 쓴다 - 그날 가장 잘한 판 + 일일공부 점수, 0 밑으로는 안 간다.
+    여기서 따로 계산하면 순위표의 "며칠" 과 이 화면의 칸 수가 어긋난다.
+
+    **날짜는 한국 날짜 문자열로 보낸다(시각이 아니라).** 시각을 보내면
+    화면(기기 시간대)이 다시 잘라, 한국 새벽에 끝낸 판이 전날로 붙을 수
+    있다. 하루를 어디서 끊을지는 서버가 정한다.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [HistoryThrottle]
+
+    def get(self, request: Request) -> Response:
+        today = calendar_kst.today()
+        first = today - timedelta(days=HISTORY_DAYS - 1)
+
+        scores = {
+            row.day: row
+            for row in DailyScore.objects.filter(user=request.user, day__gte=first)
+        }
+
+        # 안 한 날도 칸을 채운다. 빠진 날을 화면이 메우게 하면 "몇 일을
+        # 보여주나" 를 화면도 알아야 해서 규칙이 두 곳이 된다.
+        days = []
+        for offset in range(HISTORY_DAYS):
+            day = first + timedelta(days=offset)
+            row = scores.get(day)
+            days.append(
+                {
+                    "day": day.isoformat(),
+                    "total": row.total if row else 0,
+                    # 그날 줄이 있나. 점수가 0 인 날이 "공부했는데 0점" 인지
+                    # "안 한 날" 인지를 이것으로 가른다. 아래 두 칸으로 짐작하면
+                    # 틀린다 - 일일공부는 감점이 없어 다 틀려도 줄만 생기고
+                    # 두 칸은 null·0 으로, 안 한 날과 똑같이 보인다.
+                    "recorded": row is not None,
+                    # 두 칸을 따로도 준다. "판을 했나 일일공부를 했나" 를
+                    # 화면이 구분해 보여줄 수 있게. 판을 안 한 날은 null 이다
+                    # (0 은 "0점짜리 판을 했다" 로 읽힌다).
+                    "best_round": row.best_free_score if row else None,
+                    "daily_study": row.daily_study_score if row else 0,
+                }
+            )
+
+        # 자유 문제풀이만. 일일공부는 판(QuizSession)을 만들지 않고 위 하루
+        # 점수에 들어간다(record._bump_daily 주석).
+        rounds = [
+            {
+                "day": session.day.isoformat(),
+                "score": session.score,
+                "answered": session.answered,
+                "correct": session.correct,
+            }
+            for session in QuizSession.objects.filter(
+                user=request.user, kind=SessionKind.FREE
+            ).order_by("-finished_at")[:HISTORY_ROUNDS]
+        ]
+
+        return Response({"days": days, "rounds": rounds})
