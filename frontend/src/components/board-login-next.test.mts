@@ -36,6 +36,13 @@ mock.module("next/link", {
   },
 });
 
+// AuthForm 의 "로그인 없이 둘러보기" 가 부르는 server action. 원본은
+// "use server" 파일이라 session(server-only)을 끌고 와 Next 밖에서는
+// import 자체가 안 된다. 여기서는 전환 링크만 보므로 빈 함수로 둔다.
+mock.module("@/app/start/actions", {
+  namedExports: { continueAsGuestAction: async () => {} },
+});
+
 const { Leaderboard } = await import("./Leaderboard");
 const { AuthForm } = await import("./AuthForm");
 
