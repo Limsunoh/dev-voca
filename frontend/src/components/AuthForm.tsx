@@ -228,8 +228,21 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
         style={{ color: "var(--text-muted)" }}
       >
         {copy.switchText}{" "}
+        {/* 돌아갈 곳(next)을 들고 넘어간다. 안 들고 가면 순위표에서 로그인하러
+            온 사람이 계정이 없어 가입으로 넘어가는 순간 행선지를 잃고, 가입을
+            마치면 홈에 떨어진다.
+
+            화면(login·signup page)은 이 값을 거르지 않고 그대로 받는다.
+            거르는 곳은 제출할 때의 safeNext 다((auth)/actions.ts). 여기서는
+            쿼리 값으로만 싣고 가는 곳은 고정이라 괜찮지만, 걸러지지 않은 이
+            값을 redirect(next) 처럼 가는 곳 자체로 쓰면 밖으로 나가는 길이
+            된다. */}
         <Link
-          href={copy.switchHref}
+          href={
+            next
+              ? `${copy.switchHref}?next=${encodeURIComponent(next)}`
+              : copy.switchHref
+          }
           className="underline underline-offset-4"
           style={{
             color: "var(--coral-deep)",
