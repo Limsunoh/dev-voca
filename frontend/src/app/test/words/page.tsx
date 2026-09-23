@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { ContentTabs } from "@/components/ContentTabs";
 import { ExitGuard } from "@/components/ExitGuard";
+import { LeaveLink } from "@/components/LeaveLink";
 import { QuizBoard } from "@/components/QuizBoard";
 import { getCategories } from "@/lib/api/vocab";
 import { contentPath, routes } from "@/lib/routes";
@@ -45,12 +45,15 @@ export default async function TestWordsPage({ searchParams }: PageProps) {
       {/* 이 화면에는 탭바가 없다(TabBar 의 return null 참고). 나가는 길이
           여기뿐이라 빠지면 막다른 화면이 된다.
 
-          묻지 않고 나간다 - 낱개 연습은 점수가 안 남아서 잃을 게 없다.
-          매번 물으면 성가시기만 하다. 묻는 것은 한 판 모드다. */}
+          푼 것이 있을 때만 묻는다. 낱개 연습은 점수가 서버에 안 남아서
+          판을 떠나면 그대로 사라진다. 한 문제도 안 풀었으면 잃을 것이
+          없으니 묻지 않는다 - 매번 물으면 성가시다. 옆의 "한 판 풀기" 도
+          이 판을 끝내는 출구라 같은 규칙을 쓴다. */}
       <div className="mb-3 flex items-center justify-between gap-3">
-        <ExitGuard to={routes.home} label="홈" />
-        <Link
+        <ExitGuard to={routes.home} label="홈" confirmWhenSolved />
+        <LeaveLink
           href={routes.testRound}
+          confirmLabel="한 판 풀기"
           className="flex items-center px-2.5 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={{
             minHeight: "var(--hit-floor)",
@@ -60,10 +63,10 @@ export default async function TestWordsPage({ searchParams }: PageProps) {
           }}
         >
           한 판 풀기
-        </Link>
+        </LeaveLink>
       </div>
 
-      <ContentTabs mode="test" current="words" />
+      <ContentTabs mode="test" current="words" warnOnLeave />
 
       <div className="mt-4 flex items-center justify-between gap-3">
         {/* key 로 분류를 넘겨 주소가 바뀌면 새로 만든다. 뒤로가기로 돌아올

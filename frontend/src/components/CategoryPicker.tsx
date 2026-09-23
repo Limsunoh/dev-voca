@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 
 import type { ChoiceOption } from "@/lib/api/client";
 
+import { useLeaveGuard } from "./useLeaveGuard";
+
 /**
  * 접히는 분류 고르개.
  *
@@ -25,9 +27,9 @@ import type { ChoiceOption } from "@/lib/api/client";
  *
  * **여기서 분류를 바꾸면 판이 새로 시작된다.** 위의 key 와는 다른 이야기다 -
  * 호출부가 문제 판(`QuizBoard`)에도 분류를 key 로 주기 때문에, 항목을
- * 누르면 그쪽이 함께 새로 만들어지고 점수가 사라진다. 되돌릴 수 없는데
- * 확인 절차가 없다. 목록용 칩은 `CategoryFilter` 의 `toggle` 로 같은
- * 위험을 막는다. 판 상태를 끌어올려야 하는 일이라 따로 다룬다.
+ * 누르면 그쪽이 함께 새로 만들어지고 점수가 사라진다. 되돌릴 수 없으므로
+ * 푼 것이 있으면 먼저 확인을 묻는다(useLeaveGuard). 목록용 칩은
+ * `CategoryFilter` 의 `toggle` 로 같은 위험을 막는다.
  */
 export function CategoryPicker({
   options,
@@ -41,6 +43,10 @@ export function CategoryPicker({
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const { guard, dialog } = useLeaveGuard({
+    confirmLabel: "분류 바꾸기",
+    beforeLeave: () => setOpen(false),
+  });
 
   /**
    * 메뉴가 쓸 수 있는 최대 높이. 열 때 재고 화면이 바뀌면 다시 잰다.
@@ -71,6 +77,10 @@ export function CategoryPicker({
     }
     // Esc 로도 닫는다. 키보드로 연 사람에게 닫을 방법이 없으면 갇힌다.
     function onKeyDown(event: KeyboardEvent) {
+      // 확인 창 안에서 누른 Esc 는 창만 닫는다. 여기까지 올라와 메뉴도
+      // 닫으면, 창이 포커스를 돌려줄 링크가 메뉴와 함께 사라져 포커스가
+      // 문서 맨 앞으로 떨어진다.
+      if ((event.target as Element | null)?.closest?.("dialog")) return;
       if (event.key === "Escape") setOpen(false);
     }
     // Tab 으로 메뉴 밖으로 나가면 닫는다. pointerdown 만 들으면 마우스로는
@@ -216,6 +226,7 @@ export function CategoryPicker({
             href={href()}
             active={!selected}
             onNavigate={() => setOpen(false)}
+            onGuard={guard}
           >
             전체
           </PickerItem>
@@ -225,12 +236,17 @@ export function CategoryPicker({
               href={href(option.value)}
               active={option.value === selected}
               onNavigate={() => setOpen(false)}
+              onGuard={guard}
             >
               {option.label}
             </PickerItem>
           ))}
         </nav>
       )}
+
+      {/* 확인 창. 메뉴가 닫힌 뒤에도 남아 있어야 해서 open 밖에 둔다.
+          화면 위에 따로 떠서 메뉴 자리를 밀지 않는다. */}
+      {dialog}
     </div>
   );
 }
@@ -239,17 +255,23 @@ function PickerItem({
   href,
   active,
   onNavigate,
+  onGuard,
   children,
 }: {
   href: string;
   active: boolean;
   onNavigate: () => void;
+  /** 푼 것이 있으면 이동을 막고 확인 창을 연다. 막았으면 true. */
+  onGuard: (event: React.MouseEvent, href: string) => boolean;
   children: React.ReactNode;
 }) {
   return (
     <Link
       href={href}
-      onClick={onNavigate}
+      onClick={(event) => {
+        if (!active && onGuard(event, href)) return;
+        onNavigate();
+      }}
       // 고른 것을 색만으로 표시하지 않는다. 색각 이상이 있으면 구분이 안 된다.
       // "page" 인 이유: 이 링크를 누르면 그 분류 화면으로 가고, 지금 그
       // 화면에 있다는 뜻이다. ContentTabs 도 같은 값을 쓴다.

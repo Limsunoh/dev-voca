@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Burst } from "@/components/Burst";
 import { Reaction } from "@/components/Reaction";
 import type { GradeResult, QuizContent, Question } from "@/lib/api/quiz";
+import { clearSolved, markSolved } from "@/lib/quiz-progress";
 import { Reading } from "./Reading";
 
 /**
@@ -104,6 +105,20 @@ export function QuizBoard({ category, content = "words" }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [score, setScore] = useState({ solved: 0, correct: 0 });
+
+  /**
+   * 푼 문제 수를 적어 둔다. **판을 끝내는 출구들이 읽는다.**
+   *
+   * 이 화면의 출구 넷(홈·"한 판 풀기"·분류·탭)을 누르면 이 판이 사라져
+   * 점수가 없어지는데, 점수는 서버에 안 남아 되돌릴 수 없다. 그래서 푼 것이
+   * 있으면 먼저 확인을 묻는다. 이 판과 출구들은 서로를 모르고 값 하나만
+   * 주고받는다(lib/quiz-progress.ts).
+   */
+  useEffect(() => {
+    markSolved(score.solved);
+  }, [score.solved]);
+  // 판이 사라지면 지운다. 안 지우면 판이 없는 화면에서도 확인이 뜬다.
+  useEffect(() => clearSolved, []);
   /**
    * 연속 정답 수.
    *
