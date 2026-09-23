@@ -674,12 +674,16 @@ function PlayCard({
         {/* 흰 알약으로 물러난다. 코랄은 보기를 고르는 쪽에 있어야 하고,
             넘기기는 세 번뿐인 도피구다 - 눈에 띄게 두면 그걸 먼저 쓴다.
             횟수를 다 쓰면 흐려지지만 사라지지는 않는다. 사라지면 버튼 줄이
-            통째로 움직여 옆의 채점 결과가 다른 자리로 뛴다. */}
+            통째로 움직여 옆의 채점 결과가 다른 자리로 뛴다.
+
+            줄지 않게 한다(shrink-0 whitespace-nowrap). 옆의 오답 결과가 길면
+            flex 가 이 버튼을 밀어, 폰에서 "넘기 / 기 / (3)" 세 줄이 되고 행
+            높이도 따라 커졌다 - 위에서 고정하려던 바로 그 높이다. */}
         <button
           type="button"
           onClick={onSkip}
           disabled={busy || skipsLeft === 0}
-          className="dv-btn inline-flex min-h-11 items-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
+          className="dv-btn inline-flex min-h-11 shrink-0 items-center px-4 text-sm whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
           style={
             {
               background: "var(--paper)",
