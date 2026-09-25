@@ -9,18 +9,18 @@ import { routes } from "@/lib/routes";
  *
  * 형제 not-found 셋도 같은 상태인데 이번에는 루트만 고친다. 셋은 한 문구로
  * 묶일 것이 아니라서다 - 그쪽은 `notFound()` 로 오는 자리라 위 세그먼트
- * 이름을 쓰는 것이 맞고(`단어장 | devvoca` 계열), 루트만 속한 세그먼트가
+ * 이름을 쓰는 것이 맞고(`단어장 · devvoca` 계열), 루트만 속한 세그먼트가
  * 없다.
  *
- * **같이 고칠 것이 따로 있다.** `learn/words/[id]/page.tsx:22` 와 문장 쪽
- * 짝이 `if (!word) return { title: ... }` 로 제목을 정하는데 35행의
- * `notFound()` 가 그 결과를 버린다 - 화면에 뜬 적 없는 문구다. 그 두 줄과
+ * **같이 고칠 것이 따로 있다.** `learn/words/[id]/page.tsx` 의
+ * generateMetadata 와 문장 쪽 짝이 `if (!word) return { title: ... }` 로
+ * 제목을 정하는데 페이지 본문의 `notFound()` 가 그 결과를 버린다 - 화면에 뜬 적 없는 문구다. 그 두 줄과
  * `learn/` not-found 둘은 한 이야기라 묶어서 다룬다.
  *
  * 문구는 아래 h1 과 같게 둔다. 화면 이름이 아니라 상태라서 `없는 주소` 로
  * 줄이지 않았다 - 방문기록에서 그런 화면이 있는 것처럼 읽힌다.
  */
-export const metadata: Metadata = { title: "없는 주소입니다 | devvoca" };
+export const metadata: Metadata = { title: "없는 주소입니다 · devvoca" };
 
 /**
  * 어디에도 없는 주소로 들어왔을 때.

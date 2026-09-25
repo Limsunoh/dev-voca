@@ -6,7 +6,7 @@ import { routes } from "@/lib/routes";
 import { getCurrentUser, getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "문제풀기 | devvoca",
+  title: "문제풀기 · devvoca",
   description: "일일공부, 다시 보기, 한 판, 단어·문장 연습 중에 고릅니다.",
 };
 
