@@ -224,12 +224,14 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
     #
     # 일일공부가 이 함수를 답 하나마다 부르면서 그 창이 25배로 넓어졌다.
     # 자유 문제풀이는 판이 끝날 때 한 번이라 눈에 안 띄었다.
+    #
+    # 같은 이유로 틀린 줄에는 last_correct_at 을 쓰지 않는다. 안 바꾼 값을
+    # 되쓰면 그 사이 복습에서 맞힌 시각을 옛 값으로 되돌린다.
     if hit:
         ReviewState.objects.bulk_update(hit, ["is_wrong", "last_correct_at"])
     if miss:
-        ReviewState.objects.bulk_update(
-            miss, ["is_wrong", "last_correct_at", "streak"]
-        )
+        ReviewState.objects.bulk_update(miss, ["is_wrong", "streak"])
+
 
 def _bump_daily(session: QuizSession) -> None:
     """그날 한 줄을 갱신한다.
