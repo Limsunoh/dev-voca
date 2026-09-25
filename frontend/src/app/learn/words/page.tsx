@@ -22,6 +22,7 @@ import {
   getDifficulties,
   getExamSubjects,
   getWords,
+  WORD_SORTS,
 } from "@/lib/api/vocab";
 import { detailWithBack, listUrl, routes } from "@/lib/routes";
 
@@ -70,6 +71,12 @@ export default async function VocabPage({ searchParams }: PageProps) {
   const currentPage = toPageNumber(first(params.page));
   const page = currentPage > 1 ? String(currentPage) : undefined;
 
+  // 정렬. 아는 이름만 받는다 - 모르는 값을 그대로 두면 주소에 남아
+  // 페이지 넘기기마다 따라다니고, 칩은 아무것도 안 켜진 채로 보인다.
+  const sort = WORD_SORTS.find(
+    (option) => option.value === first(params.sort),
+  );
+
   // 목록을 열 때마다 새로 섞는다. 정렬이 고정이면 앞쪽 단어만 계속 보이고
   // 뒤쪽은 다음 페이지를 눌러야 만난다.
   //
@@ -82,6 +89,9 @@ export default async function VocabPage({ searchParams }: PageProps) {
   // 페이지 넘기기 링크에도 시드를 실어 보낸다 - 안 그러면 1페이지에서 본
   // 단어가 2페이지에 또 나온다.
   //
+  // 정렬을 골랐으면 섞지 않는다. 고른 순서를 보러 온 것이다(백엔드도
+  // ordering 이 오면 시드를 무시한다 - views.py 의 _shuffle).
+  //
   // 검색 중일 때는 섞지 않는다. 찾으러 온 사람에게 섞기는 방해다 -
   // "commit" 을 검색했는데 정확히 그 단어가 12번째에 나오면 안 된다.
   // (백엔드 검색은 관련도 순위가 없어서 기본 정렬이 사실상 그 역할을 한다.)
@@ -93,9 +103,10 @@ export default async function VocabPage({ searchParams }: PageProps) {
   // 백엔드(`apps/vocab/views.py` 의 `.strip()`)에는 빈 값이라 안 섞는다.
   // 기준이 어긋나면 그 주소는 "섞인 목록" 을 사칭하면서 정렬 고정 목록을
   // 보여주고, 주소가 순서를 기억하는 설계라 그 상태가 계속 따라다닌다.
-  const shuffle = search
-    ? undefined
-    : first(params.shuffle)?.trim().slice(0, 64) || undefined;
+  const shuffle =
+    search || sort
+      ? undefined
+      : first(params.shuffle)?.trim().slice(0, 64) || undefined;
 
   // 지금 보고 있는 목록. 페이지 넘기기 링크와 카드의 되돌아올 주소가
   // 이것을 같이 쓴다 - 두 곳에서 따로 조립하면 한쪽만 고쳐지고
@@ -108,12 +119,13 @@ export default async function VocabPage({ searchParams }: PageProps) {
     search,
     category,
     difficulty,
+    sort: sort?.value,
     shuffle,
     is_exam: examOnly,
     exam_subject: examSubject,
   };
 
-  if (!search && !shuffle) {
+  if (!search && !shuffle && !sort) {
     // 목록을 부르기 전에 보낸다. 시드 없이 들어올 때마다 왕복이 한 번
     // 늘어난다 - 탭바로 들어올 때와 필터·분류를 누를 때가 그렇다(그쪽
     // 링크들은 시드를 안 싣는다). 그 뒤로는 이 주소가 순서를 기억한다.
@@ -149,6 +161,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
     difficulty,
     page,
     shuffle,
+    ordering: sort?.ordering,
     is_exam: examOnly,
     exam_subject: examSubject,
   });
@@ -237,8 +250,14 @@ export default async function VocabPage({ searchParams }: PageProps) {
       </div>
 
       {/* 필터 링크에는 시드를 싣지 않는다. 그래서 난이도나 분류를 누르면
-          그 조건 안에서 새로 섞인 목록이 나온다. */}
-      <FilterPanel active={[difficulty, category, examOnly, examSubject]}>
+          그 조건 안에서 새로 섞인 목록이 나온다. 정렬은 싣는다 - 쉬운
+          것부터 보다가 분류를 바꿨는데 순서가 풀리면 다시 골라야 한다.
+
+          배지는 정렬도 센다. 필터가 접혀 있을 때 순서가 바뀌어 있다는
+          것을 알려줄 곳이 배지뿐이다. */}
+      <FilterPanel
+        active={[difficulty, category, examOnly, examSubject, sort?.value]}
+      >
         {/* 정처기 줄이 맨 위다. 다른 조건은 목록을 좁히지만 이건 무엇을
             공부하는지 자체를 바꾼다 - 정처기를 켠 사람에게 분류(Git·리뷰)는
             부차적이고 과목이 먼저다.
@@ -249,7 +268,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
         <ExamScopeFilter
           basePath={routes.words}
           active={Boolean(examOnly)}
-          keep={{ search, category, difficulty }}
+          keep={{ search, category, difficulty, sort: sort?.value }}
         />
 
         {/* 과목은 정처기를 켰을 때만 뜬다. 안 켠 사람에게는 5과목이
@@ -261,7 +280,13 @@ export default async function VocabPage({ searchParams }: PageProps) {
             options={examSubjects}
             basePath={routes.words}
             selected={examSubject}
-            keep={{ search, category, difficulty, is_exam: examOnly }}
+            keep={{
+              search,
+              category,
+              difficulty,
+              is_exam: examOnly,
+              sort: sort?.value,
+            }}
           />
         )}
 
@@ -276,6 +301,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
             category,
             is_exam: examOnly,
             exam_subject: examSubject,
+            sort: sort?.value,
           }}
         />
 
@@ -285,7 +311,32 @@ export default async function VocabPage({ searchParams }: PageProps) {
           selected={category}
           search={search}
           difficulty={difficulty}
-          extra={{ is_exam: examOnly, exam_subject: examSubject }}
+          extra={{
+            is_exam: examOnly,
+            exam_subject: examSubject,
+            sort: sort?.value,
+          }}
+        />
+
+        {/* 정렬은 맨 아래다. 위 줄들은 무엇을 볼지 좁히고, 이것은 그것을
+            어떤 순서로 볼지만 정한다. 고르지 않으면 섞는다.
+
+            검색 중에는 섞지 않으므로(위 shuffle) 맨 앞 칩을 "기본순" 이라
+            부른다. "섞어서" 로 두면 켜진 칩이 실제 순서와 다른 말을 한다. */}
+        <ChoiceFilter
+          label="정렬"
+          paramName="sort"
+          options={WORD_SORTS}
+          allLabel={search ? "기본순" : "섞어서"}
+          basePath={routes.words}
+          selected={sort?.value}
+          keep={{
+            search,
+            category,
+            difficulty,
+            is_exam: examOnly,
+            exam_subject: examSubject,
+          }}
         />
       </FilterPanel>
 
