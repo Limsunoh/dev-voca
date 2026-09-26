@@ -9,7 +9,7 @@ import { routes } from "@/lib/routes";
 import { getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "오답 노트 | devvoca",
+  title: "오답 노트 · devvoca",
   description: "마지막으로 풀었을 때 틀린 단어와 문장을 모아 봅니다.",
 };
 

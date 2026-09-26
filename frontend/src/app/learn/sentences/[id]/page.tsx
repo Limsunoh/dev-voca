@@ -25,7 +25,7 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params;
   const sentence = await getSentence(id);
-  if (!sentence) return { title: "문장을 찾을 수 없습니다 | devvoca" };
+  if (!sentence) return { title: "문장을 찾을 수 없습니다 · devvoca" };
 
   // 문장은 길어서 제목에 통째로 넣으면 탭 이름이 잘린다.
   const head =
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: PageProps) {
       : `${sentence.text.slice(0, 40)}...`;
 
   return {
-    title: `${head} | devvoca`,
+    title: `${head} · devvoca`,
     description: sentence.translation,
   };
 }
@@ -87,11 +87,12 @@ export default async function SentenceDetailPage({
         </DetailCard>
       )}
 
-      {/* 설명이 이 화면의 강조점이다. 단어 상세는 예문이 그 자리를 갖지만
-          문장에는 예문이 없다 - 문장 자체가 이미 예문이라 히어로가 그것을
-          맡고, 여기서 더 알려주는 것은 설명뿐이다. */}
+      {/* 설명은 흰 카드다. 어두운 카드는 "예문처럼 실제로 보러 온 것" 에만
+          준다(DetailCard 의 tone 주석) - 단어 상세에서는 예문이 그 자리다.
+          문장 화면에서 보러 온 것은 문장 자체이고 그건 위 히어로가 맡는다.
+          설명을 어둡게 두면 두 상세에서 어두운 카드의 뜻이 갈린다. */}
       {sentence.description && (
-        <DetailCard label="설명" delay="[animation-delay:360ms]" tone="dark">
+        <DetailCard label="설명" delay="[animation-delay:360ms]">
           <p className="whitespace-pre-line text-pretty">
             {sentence.description}
           </p>

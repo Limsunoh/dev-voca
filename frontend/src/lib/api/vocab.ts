@@ -65,8 +65,31 @@ export type WordDetail = WordListItem & {
   updated_at: string;
 };
 
-// 백엔드는 ordering 도 받지만 화면에 정렬 UI 가 없어 넣지 않았다.
-// 정렬 기능을 만들 때 추가한다.
+/**
+ * 목록 정렬. 주소에는 짧은 이름(`?sort=easy`)을 싣고 백엔드에는 `ordering`
+ * 으로 바꿔 보낸다 - 주소를 공유했을 때 읽히고, 백엔드 필드 이름이 바뀌어도
+ * 옛 주소가 산다.
+ *
+ * **동점은 term 으로 끊는다.** 난이도만으로 정렬하면 같은 난이도 300개의
+ * 순서를 DB 가 정하는데, 페이지마다 따로 조회하니 1페이지에서 본 단어가
+ * 2페이지에 또 나올 수 있다. term 은 unique 라 순서가 하나로 정해진다.
+ * 같은 난이도 안의 순서는 DB 의 글자 정렬 규칙을 따라서, 로컬
+ * (postgres alpine)에서는 대문자 약어(API·CI)가 소문자 단어보다 먼저 온다.
+ * 여기서 term 이 맡는 일은 순서를 하나로 정하는 것뿐이라 그대로 둔다.
+ *
+ * 없는 것:
+ * - 최신순. 지금 단어는 시드로 같은 1분 안에 들어가서 created_at 순서가
+ *   사실상 입력 순서일 뿐이다. 검수로 단어가 따로 늘기 시작하면 넣는다.
+ * - ABC순. term 으로만 정렬하면 위의 글자 정렬 규칙 때문에 대문자로
+ *   시작하는 단어 200여 개가 다 지나간 뒤(11페이지쯤) 알파벳이 a 부터 다시
+ *   시작한다.
+ *   운영 DB 는 규칙이 달라 순서가 또 다르다. 대소문자를 무시한 정렬은
+ *   백엔드(WordViewSet)가 Lower("term") 을 받아야 한다.
+ */
+export const WORD_SORTS = [
+  { value: "easy", label: "쉬운 것부터", ordering: "difficulty,term" },
+] as const;
+
 export type WordListParams = {
   search?: string;
   category?: string;
@@ -83,12 +106,14 @@ export type WordListParams = {
   /** 정처기 과목 코드(design·develop·database·language·system). */
   exam_subject?: string;
   /**
-   * 목록을 섞을 시드. 없으면 기본 정렬(가나다순)로 온다.
+   * 목록을 섞을 시드. 없으면 백엔드 기본 정렬(term 순)로 온다.
    *
    * 같은 시드면 같은 순서라 페이지를 넘겨도 겹치거나 빠지지 않는다.
    * 새로 섞고 싶으면 새 시드를 만들어 보낸다.
    */
   shuffle?: string;
+  /** 백엔드 ordering 값. WORD_SORTS 에서 고른 것만 보낸다. 오면 섞지 않는다. */
+  ordering?: string;
 };
 
 /**
@@ -97,8 +122,9 @@ export type WordListParams = {
  * **토큰을 넘기지 않는다.** 백엔드(views.py 의 get_queryset)는 검수 권한이
  * 있는 사람에게 미검수까지 준다. 여기서 토큰을 실으면 검수자 화면에만
  * 미검수 단어가 조용히 섞이고, 백엔드도 프론트도 정상 동작이라 아무도
- * 모른다. 개인화(정렬·최근 본 것)를 붙일 일이 생기면 그때 미검수를 어떻게
- * 할지부터 정한다.
+ * 모른다. 사용자별 개인화(내 진도순·최근 본 것)를 붙일 일이 생기면 그때
+ * 미검수를 어떻게 할지부터 정한다. (WORD_SORTS 의 정렬은 누구에게나 같아
+ * 토큰이 필요 없다.)
  */
 export function getWords(
   params: WordListParams = {},

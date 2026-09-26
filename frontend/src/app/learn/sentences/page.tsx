@@ -16,11 +16,12 @@ import {
   getSentenceDifficulties,
   getSentenceKinds,
   getSentences,
+  SENTENCE_SORTS,
 } from "@/lib/api/sentences";
 import { detailWithBack, listUrl, routes } from "@/lib/routes";
 
 export const metadata = {
-  title: "문장 | devvoca",
+  title: "문장 · devvoca",
   description: "리뷰 코멘트와 에러 메시지에서 실제로 만나는 영어 문장.",
   // 이유는 learn/words/page.tsx 참고.
   alternates: { canonical: routes.sentences },
@@ -56,21 +57,34 @@ export default async function SentencesPage({ searchParams }: PageProps) {
   const currentPage = toPageNumber(first(params.page));
   const page = currentPage > 1 ? String(currentPage) : undefined;
 
+  // 정렬. 아는 이름만 받는다(이유는 learn/words/page.tsx).
+  const sort = SENTENCE_SORTS.find(
+    (option) => option.value === first(params.sort),
+  );
+
   // 단어장과 같은 규칙이다. 섞은 순서를 주소에 적어 두고, 페이지 넘기기에도
-  // 실어 보내고, 검색 중일 때는 섞지 않는다.
+  // 실어 보내고, 검색 중이거나 정렬을 골랐으면 섞지 않는다.
   // 자세한 이유는 learn/words/page.tsx 참고.
   //
   // `.trim()` 은 지우면 안 된다. 백엔드가 공백을 턴 뒤 판정하므로(`.strip()`)
   // 여기서 안 털면 `?shuffle=%20` 이 "섞인 목록" 을 사칭한다.
-  const shuffle = search
-    ? undefined
-    : first(params.shuffle)?.trim().slice(0, 64) || undefined;
+  const shuffle =
+    search || sort
+      ? undefined
+      : first(params.shuffle)?.trim().slice(0, 64) || undefined;
 
   // 페이지 넘기기 링크와 카드의 되돌아올 주소가 같이 쓴다. 읽어들인 값만
   // 담는 이유는 learn/words/page.tsx 참고.
-  const filters = { search, category, kind, difficulty, shuffle };
+  const filters = {
+    search,
+    category,
+    kind,
+    difficulty,
+    sort: sort?.value,
+    shuffle,
+  };
 
-  if (!search && !shuffle) {
+  if (!search && !shuffle && !sort) {
     redirect(
       listUrl(
         routes.sentences,
@@ -95,6 +109,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
     difficulty,
     page,
     shuffle,
+    ordering: sort?.ordering,
   });
   const [categories, kinds, difficulties] = await Promise.all([
     getSentenceCategories(),
@@ -179,15 +194,15 @@ export default async function SentencesPage({ searchParams }: PageProps) {
       </div>
 
       {/* 필터 링크에는 시드를 싣지 않는다. 누를 때마다 그 조건 안에서
-          새로 섞인 목록이 나온다. */}
-      <FilterPanel active={[kind, difficulty, category]}>
+          새로 섞인 목록이 나온다. 정렬은 싣는다(이유는 learn/words/page.tsx). */}
+      <FilterPanel active={[kind, difficulty, category, sort?.value]}>
         <ChoiceFilter
           label="종류"
           paramName="kind"
           options={kinds}
           basePath={routes.sentences}
           selected={kind}
-          keep={{ search, category, difficulty }}
+          keep={{ search, category, difficulty, sort: sort?.value }}
         />
 
         <ChoiceFilter
@@ -196,7 +211,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           options={difficulties}
           basePath={routes.sentences}
           selected={difficulty}
-          keep={{ search, category, kind }}
+          keep={{ search, category, kind, sort: sort?.value }}
         />
 
         <CategoryFilter
@@ -205,7 +220,18 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           selected={category}
           search={search}
           difficulty={difficulty}
-          extra={{ kind }}
+          extra={{ kind, sort: sort?.value }}
+        />
+
+        {/* 검색 중에 "기본순" 인 이유는 learn/words/page.tsx 참고. */}
+        <ChoiceFilter
+          label="정렬"
+          paramName="sort"
+          options={SENTENCE_SORTS}
+          allLabel={search ? "기본순" : "섞어서"}
+          basePath={routes.sentences}
+          selected={sort?.value}
+          keep={{ search, category, kind, difficulty }}
         />
       </FilterPanel>
 
