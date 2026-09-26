@@ -132,10 +132,10 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
       // 판단이다(위 reaction 주석).
       //
       // **연출을 기다렸다가 다음 문제를 내지 않는다.** 판 모드가 멈추는
-      // 이유는 거기서 화면을 어둡게 깔아(dim) 1초 동안 새 문제가 안 보이고,
-      // 판정이 보기 버튼 색으로만 남아 다음 문제가 뜨면 사라지기 때문이다.
-      // 이 화면은 어둡게 안 깔고, 결과 줄이 문제 카드와 별개 요소라 다음
-      // 문제가 떠도 그대로 남는다.
+      // 이유는 거기서 화면을 어둡게 깔아(dim) 그동안 문제와 결과 줄이
+      // 가려지기 때문이다(RoundBoard 의 그 자리 주석). 이 화면은 어둡게 안
+      // 깔고, 결과 줄이 문제 카드와 별개 요소라 다음 문제가 떠도 "앞 문제"
+      // 로 그대로 남는다.
       if (got.result.correct) {
         setReaction((r) => ({ fire: r.fire + 1, correct: true }));
         setBurst((n) => n + 1);
@@ -435,17 +435,33 @@ function PlayCard({
         />
       </div>
 
-      <QuestionCard question={question} busy={busy} onPick={onPick} />
+      {/* 방금 푼 문제의 결과. 새로 나타나는 영역이라 읽어준다.
 
-      {/* 새로 나타나는 영역이라 읽어준다. */}
-      {/* 높이를 두 줄로 잡아둔다. 오답일 때만 정답과 그 뜻으로 두 줄이
-          되는데, 한 줄 높이로 두면 오답이 뜰 때마다 아래가 통째로 내려간다
-          (일일학습·한 판도 같은 이유로 높이를 잡아뒀다). */}
-      <p aria-live="polite" className="min-h-10 text-sm">
+          **문제 위에 두고 "앞 문제" 라고 붙인다.** 이유는 DailyStudyBoard 의
+          같은 자리와 같다 - 답하면 곧바로 다음 문제가 뜨므로, 아래에 두면
+          방금 답의 결과가 새 문제의 답처럼 읽혔다.
+
+          높이를 두 줄로 잡아둔다. 단어를 틀리면 정답과 그 뜻으로 두 줄이
+          되는데, 한 줄 높이로 두면 오답마다 아래 문제와 보기가 내려간다.
+          문장을 틀려 해석이 길면 그보다 늘어나는 것, aria-atomic 을 거는
+          이유는 DailyStudyBoard 의 같은 자리에 적었다. */}
+      <p aria-live="polite" aria-atomic="true" className="min-h-10 text-sm">
         {result && (
-          <ResultLine result={result} graduateStreak={graduateStreak} />
+          <>
+            <span
+              style={{
+                color: "var(--text-muted)",
+                fontWeight: "var(--weight-bold)",
+              }}
+            >
+              앞 문제 ·{" "}
+            </span>
+            <ResultLine result={result} graduateStreak={graduateStreak} />
+          </>
         )}
       </p>
+
+      <QuestionCard question={question} busy={busy} onPick={onPick} />
 
       {error && (
         <p
