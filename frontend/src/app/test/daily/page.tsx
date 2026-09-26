@@ -27,6 +27,17 @@ export default async function DailyPage() {
   try {
     status = await fetchDailyStatus(token);
   } catch (error) {
+    // 서버가 쿠키의 토큰을 거절했으면(다른 기기에서 로그아웃 등) 로그인
+    // 화면으로 보낸다. 아래 실패 화면을 띄우면 "잠시 뒤 다시 시도해주세요"
+    // 가 되는데, 다시 해도 안 풀리는 막다른 화면이었다(오답 노트도 401 이면
+    // 로그인으로 보낸다). 로그인 확인을 먼저 하지 않는 이유: 로그인한 사람의
+    // 화면 로딩에 백엔드 왕복이 하나 순서대로 늘어난다.
+    //
+    // catch 안에서 redirect 를 부른다. redirect 는 예외로 동작하니, 이
+    // 블록을 다시 try 로 감싸면 그 catch 가 이것을 삼킨다.
+    if (error instanceof ApiError && error.status === 401) {
+      redirect(`/login?next=${routes.testDaily}`);
+    }
     const offline = error instanceof ApiError && error.status === 0;
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-8 text-center">

@@ -163,6 +163,12 @@ const RESULT = {
 let finishNext = false;
 /** 끝내기 요청이 실패하는가. */
 let finishFails = false;
+/**
+ * 판을 닫을 때 서버가 알려주는 guest. 기본은 판을 연 화면의 isGuest 와 같다
+ * (startRound 가 맞춘다). 쿠키의 토큰을 서버가 거절해 판이 게스트로 열린
+ * 경우처럼 둘이 어긋나는 상황은 테스트가 직접 덮어쓴다.
+ */
+let serverGuest: boolean | undefined;
 
 const realFetch = globalThis.fetch;
 const realDocument = (globalThis as { document?: unknown }).document;
@@ -175,6 +181,7 @@ beforeEach(() => {
   slots = [];
   finishNext = false;
   finishFails = false;
+  serverGuest = undefined;
   token = null;
   (globalThis as { document?: unknown }).document = {
     documentElement: { style: { setProperty() {}, removeProperty() {} } },
@@ -207,8 +214,8 @@ beforeEach(() => {
       answered: 2,
       correct: 2,
       skipped: 0,
-      recorded: true,
-      guest: false,
+      recorded: !serverGuest,
+      guest: serverGuest,
     });
   }) as typeof fetch;
 });
@@ -217,6 +224,7 @@ beforeEach(() => {
 function fresh() {
   slots = [];
   finishNext = false;
+  serverGuest = undefined;
 }
 
 /** 한 번 그린다. 상태 칸은 이어 쓴다. */
@@ -230,6 +238,7 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 
 /** 시작 전 -> 판 진행 중. */
 async function startRound(isGuest: boolean) {
+  serverGuest ??= isGuest;
   const idle = render(isGuest);
   (withProp(idle, "onStart").props.onStart as () => Promise<void>)();
   await settle();
@@ -287,6 +296,24 @@ describe("한 판의 출구", () => {
   it("로그인한 사람은 판을 끝낸 뒤 \"내 기록\" 으로 나간다", async () => {
     const done = await playToEnd(false);
     onlyExit(done, { to: routes.profile, label: "내 기록" });
+  });
+
+  it("쿠키는 있었지만 서버가 게스트 판으로 열었으면 결과 화면은 게스트다", async () => {
+    // 페이지는 쿠키만 보고 isGuest=false 로 열었는데, 중계가 죽은 토큰을
+    // 거절당해 게스트 판을 열었다. 기록 안 된 판에 "내 기록" 을 주면 안 된다.
+    serverGuest = true;
+    const done = await playToEnd(false);
+    onlyExit(done, { to: routes.test, label: "문제풀기", ariaLabel: "문제풀기로 나가기" });
+    const card = flatten(done).find((e) => "summary" in e.props);
+    assert.equal(card?.props.isGuest, true, "결과 카드도 게스트로 그려야 한다");
+  });
+
+  it("서버가 기록된 판이라고 하면 페이지의 isGuest 보다 그것을 따른다", async () => {
+    serverGuest = false;
+    const done = await playToEnd(true);
+    onlyExit(done, { to: routes.profile, label: "내 기록" });
+    const card = flatten(done).find((e) => "summary" in e.props);
+    assert.equal(card?.props.isGuest, false);
   });
 
   it("끝내기가 실패해 결과 화면으로 가도 출구는 게스트 여부를 따른다", async () => {

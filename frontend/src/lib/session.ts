@@ -40,11 +40,25 @@ export async function setToken(token: string): Promise<void> {
   });
 }
 
-export async function clearToken(): Promise<void> {
+/**
+ * 토큰 쿠키만 지운다. 서버가 거절한 토큰을 치울 때 쓴다.
+ *
+ * clearToken 과 달리 게스트 선택은 남긴다. 사용자가 로그아웃한 것이
+ * 아니라 쿠키가 낡은 것이라, 첫 화면(/start)을 다시 띄울 이유가 없다.
+ *
+ * **쿠키를 쓸 수 있는 곳(route handler·서버 액션)에서만 부른다.** 화면을
+ * 그리는 중에는 쿠키가 읽기 전용이라 예외가 난다(getCurrentUser 의 catch 주석).
+ */
+export async function forgetToken(): Promise<void> {
   const store = await cookies();
   store.delete(COOKIE_NAME);
+}
+
+export async function clearToken(): Promise<void> {
+  await forgetToken();
   // 게스트 선택도 함께 지운다. 로그아웃했는데 첫 화면을 건너뛰면
   // 나가는 문만 있고 들어오는 문이 없는 상태가 된다.
+  const store = await cookies();
   store.delete(GUEST_COOKIE);
 }
 
@@ -80,6 +94,47 @@ export async function getToken(): Promise<string | null> {
 }
 
 /**
+ * **토큰이 없어도 되는 요청**(순위표, 한 판 시작, 일상영어)을 쿠키의 토큰을
+ * 실어 부르고, 서버가 그 토큰을 거절하면(401) 토큰 없이 한 번 더 부른다.
+ *
+ * 그냥 실으면 백엔드는 로그인 없이 쓰는 API 라도 무효 토큰에 401 을 내서,
+ * 로그인이 풀린 사람(다른 기기에서 로그아웃, 다른 DB 에서 받은 쿠키)에게
+ * 순위표가 "불러오지 못했습니다", 한 판 "시작" 이 "토큰이 유효하지
+ * 않습니다" 가 됐다.
+ *
+ * 정상 경로에는 추가 왕복이 없다. 로그인 확인(/me)을 먼저 하지 않고,
+ * 거절된 경우에만 한 번 더 부른다. 처음에는 로그인 확인을 먼저 하게
+ * 짰는데, 로그인한 사람이 화면을 열 때마다 - 일상영어는 문장마다 - 왕복이
+ * 하나씩 순서대로 늘었다.
+ *
+ * forget 이 true 면 거절된 쿠키를 지운다 - 쿠키를 쓸 수 있는 곳(route
+ * handler·서버 액션)에서만 켠다. 화면을 그리는 중에 켜면 예외가 난다. 지워
+ * 두어야 한 판을 게스트로 연 뒤 이어지는 답 요청에 죽은 토큰이 안 실린다.
+ *
+ * token 은 호출하는 쪽이 getToken() 으로 읽어 넘긴다. 여기서 쿠키를 읽으면
+ * 호출부의 try 안에서 읽게 되는데, 그러면 빌드 때 Next 가 쿠키 접근으로
+ * 던지는 신호(DynamicServerError)까지 호출부의 catch 에 잡힌다(홈의 "토큰은
+ * catch 밖에서 읽는다" 주석과 같은 이유).
+ *
+ * 돌려주는 token 은 실제로 쓴 토큰이다. 게스트로 불렀으면 null.
+ */
+export async function withTokenOrGuest<T>(
+  token: string | null,
+  call: (token?: string) => Promise<T>,
+  { forget }: { forget: boolean },
+): Promise<{ value: T; token: string | null }> {
+  if (!token) return { value: await call(undefined), token: null };
+
+  try {
+    return { value: await call(token), token };
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) throw error;
+    if (forget) await forgetToken();
+    return { value: await call(undefined), token: null };
+  }
+}
+
+/**
  * 지금 로그인한 사용자. 로그인 안 했으면 null.
  *
  * 쿠키에 토큰이 있어도 서버에 물어본다. 로그아웃을 다른 기기에서 했거나
@@ -101,8 +156,11 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
     // 루트 레이아웃까지 올라가 사이트 전체가 500 이 되고, 로그인 화면조차
     // 같은 레이아웃 아래라 사용자가 스스로 복구할 방법이 없어진다.
     //
-    // 죽은 토큰은 다시 로그인할 때 덮어써진다. 그때까지는 남아 있지만,
-    // 화면은 로그아웃 상태로 그려지고 그 토큰이 다른 요청을 막지도 않는다.
+    // 죽은 토큰은 쿠키를 쓸 수 있는 곳에서 지운다 - "로그인 없이 둘러보기",
+    // 중계 라우트(withTokenOrGuest, relayError). 그때까지는 남아 있으므로,
+    // 토큰이 없어도 되는 요청은 거절되면 토큰 없이 다시 부른다. 한때 "남아
+    // 있어도 다른 요청을 막지 않는다" 고 여겼는데, 백엔드는 로그인 없이 보는
+    // API 에도 무효 토큰이면 401 을 내서 순위표와 한 판을 막았다.
 
     // 401 이 아니면 토큰 문제가 아니다. 백엔드가 잠깐 죽었을 뿐인데
     // 로그아웃 상태로 그리면 멀쩡한 로그인이 날아간 것처럼 보인다.
