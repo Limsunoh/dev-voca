@@ -17,7 +17,7 @@ import { routes } from "@/lib/routes";
 import { Burst } from "./Burst";
 import { QuestionCard } from "./QuestionCard";
 import { WrongAnswer } from "./WrongAnswer";
-import { Reaction } from "./Reaction";
+import { Reaction, verdictMs } from "./Reaction";
 import { StudyCards } from "./StudyCards";
 
 /**
@@ -90,6 +90,14 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
   const [reaction, setReaction] = useState({ fire: 0, correct: false });
   /** 맞혔을 때 터지는 조각. 카운터인 이유는 위와 같다. */
   const [burst, setBurst] = useState(0);
+  /**
+   * 마지막 답의 연출이 끝나기를 기다리는 중인가. 그동안 문제 카드를 안 그린다.
+   *
+   * 기다리는 1초 동안 문제는 방금 답한 그것이라, 그대로 두면 그 위 결과
+   * 줄이 지금 보이는 문제를 "앞 문제" 라고 부르고, 잠긴 보기가 눌러도
+   * 반응 없는 멈춘 화면으로 보인다. 비워 두면 결과 줄과 연출만 남는다.
+   */
+  const [ending, setEnding] = useState(false);
 
   const tokenRef = useRef("");
   const busyRef = useRef(false);
@@ -122,6 +130,7 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
       setQuestion(started.question);
       setStudy(started.study);
       setResult(null);
+      setEnding(false);
       // 지난 판의 연출을 끈다. 안 끄면 새 판 첫 화면에 지난 판 마지막
       // 판정이 그대로 떠 있다(fire 가 0 이 아니라서 그려진다).
       setReaction({ fire: 0, correct: false });
@@ -174,6 +183,13 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
       if (answered.result.correct) setBurst((n) => n + 1);
 
       if (answered.finished || !answered.question) {
+        // **마지막 답이면 연출이 끝난 뒤 결과로 넘어간다.** 결과 화면이
+        // 가운데에 서는데 사람과 축포도 화면 가운데에서 돌아, 바로 넘기면
+        // 그 글자 위로 겹쳤다. 이 화면은 맞든 틀리든 사람이 오므로 늘
+        // 기다린다. 복습의 같은 자리와 같은 판단이다.
+        setEnding(true);
+        await new Promise((r) => setTimeout(r, verdictMs()));
+        if (!aliveRef.current) return;
         // busyRef 를 쥔 채 화면을 넘긴다. finally 에서 풀리지만 그때는
         // 이미 phase 가 done 이라 보기 버튼이 없다. 마지막 답 직후의
         // 짧은 창에 한 번 더 눌리는 것을 막는다.
@@ -201,9 +217,9 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
      아래는 phase 마다 다른 트리를 돌려준다. 연출을 그중 한 가지 안에 두면
      두 가지가 깨진다.
 
-     하나. 마지막 답에서는 연출을 켜는 것과 phase 를 done 으로 바꾸는 것이
-     같이 반영되므로, playing 가지에만 두면 그 한 문제는 마운트되기도 전에
-     잘린다.
+     하나. 마지막 답은 연출이 끝난 뒤에 done 으로 넘어가지만(verdictMs), 층이
+     done 가지와 겹치는 마지막 한 프레임까지 같은 층이 이어져야 한다.
+     playing 가지에만 두면 넘어가는 순간 층이 언마운트돼 끝이 툭 끊긴다.
 
      둘. 가지가 바뀌며 언마운트됐다가 돌아오면 reaction.fire 가 상태에 남아
      있어 key 가 새로 붙고, **답도 안 한 사람에게 지난 판정이 처음부터 다시
@@ -259,6 +275,7 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
           study={study}
           busy={busy}
           error={error}
+          ending={ending}
           onPick={send}
           // 다음 묶음이 시작되면 다음 문제 대신 "이어서 익히기" 가 뜬다.
           // 자동으로 넘기지 않는 이유: 이 화면은 채점 결과를 문제 위
@@ -457,6 +474,7 @@ function PlayCard({
   study,
   busy,
   error,
+  ending,
   onPick,
   onLearn,
 }: {
@@ -465,6 +483,8 @@ function PlayCard({
   study: StudyProgress | null;
   busy: boolean;
   error: string;
+  /** 마지막 답의 연출을 기다리는 중. 문제 카드를 안 그린다(보드의 같은 이름 상태). */
+  ending: boolean;
   onPick: (id: number) => void;
   /**
    * 다음 묶음의 학습이 기다릴 때만 온다. 있으면 다음 문제를 가리고
@@ -579,7 +599,7 @@ function PlayCard({
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           다음 문제는 새 단어를 익힌 뒤에 나옵니다.
         </p>
-      ) : (
+      ) : ending ? null : (
         <QuestionCard question={question} busy={busy} onPick={onPick} />
       )}
 

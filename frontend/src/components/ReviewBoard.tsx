@@ -16,7 +16,7 @@ import { routes } from "@/lib/routes";
 import { Burst } from "./Burst";
 import { QuestionCard } from "./QuestionCard";
 import { WrongAnswer } from "./WrongAnswer";
-import { Reaction } from "./Reaction";
+import { Reaction, verdictMs } from "./Reaction";
 
 /**
  * 틀린 것 다시 풀기. 화면 셋을 phase 로 오간다.
@@ -214,6 +214,14 @@ export function ReviewBoard({
   const [reaction, setReaction] = useState({ fire: 0, correct: true });
   /** 맞혔을 때 터지는 조각. */
   const [burst, setBurst] = useState(0);
+  /**
+   * 마지막 답의 연출이 끝나기를 기다리는 중인가. 그동안 문제 카드를 안 그린다.
+   *
+   * 기다리는 1초 동안 문제는 방금 답한 그것이라, 그대로 두면 그 위 결과
+   * 줄이 지금 보이는 문제를 "앞 문제" 라고 부르고, 잠긴 보기가 눌러도
+   * 반응 없는 멈춘 화면으로 보인다. 비워 두면 결과 줄과 연출만 남는다.
+   */
+  const [ending, setEnding] = useState(false);
 
   const tokenRef = useRef("");
   const busyRef = useRef(false);
@@ -236,6 +244,7 @@ export function ReviewBoard({
     setGraduated(round.graduated);
     setResult(null);
     setError("");
+    setEnding(false);
     // 지난 판의 연출을 끈다. 안 끄면 새 판 첫 화면에 지난 판 마지막
     // 연출이 그대로 떠 있다(fire 가 0 이 아니라서 그려진다).
     setReaction({ fire: 0, correct: true });
@@ -334,6 +343,18 @@ export function ReviewBoard({
       }
 
       if (got.finished || !got.question) {
+        // **마지막 답을 맞혔으면 연출이 끝난 뒤 결과로 넘어간다.** 결과
+        // 화면은 가운데에 점수와 "N개를 다 외워 목록에서 뺐습니다" 를 두는데,
+        // 축포와 사람도 화면 가운데에서 돈다. 바로 넘기면 조각이 그 글자
+        // 위로 날아갔다. 판정을 먼저 보고 결과로 넘어가는 순서는 한 판
+        // (RoundBoard)과 같다. 중간 문제에서는 기다리지 않는다 - 다음 문제를
+        // 곧바로 내는 화면이다(위 연출 주석). 틀린 답에는 연출이 없어 안
+        // 기다린다.
+        if (got.result.correct) {
+          setEnding(true);
+          await new Promise((r) => setTimeout(r, verdictMs()));
+          if (!aliveRef.current) return;
+        }
         // busyRef 를 쥔 채 화면을 넘긴다. finally 에서 풀리지만 그때는
         // 이미 phase 가 done 이라 보기 버튼이 없다. 마지막 답 직후의
         // 짧은 창에 한 번 더 눌리는 것을 막는다.
@@ -375,8 +396,8 @@ export function ReviewBoard({
   };
 
   /* 채점 연출 둘. **어느 가지에도 넣지 않는다.** 이유는 DailyStudyBoard 의
-     같은 자리 주석에 있다 - 마지막 한 문제가 잘리는 것과, 가지를 오갈 때
-     지난 판정이 다시 재생되는 것 둘 다 막는다. */
+     같은 자리 주석에 있다 - 가지를 오갈 때 지난 판정이 다시 재생되는 것을
+     막는다. */
   const overlays = (
     <>
       <Burst fire={burst} />
@@ -408,6 +429,7 @@ export function ReviewBoard({
           total={total}
           busy={busy}
           error={error}
+          ending={ending}
           onPick={send}
         />
       );
@@ -652,6 +674,7 @@ function PlayCard({
   total,
   busy,
   error,
+  ending,
   onPick,
 }: {
   question: ReviewQuestion;
@@ -661,6 +684,8 @@ function PlayCard({
   total: number;
   busy: boolean;
   error: string;
+  /** 마지막 답의 연출을 기다리는 중. 문제 카드를 안 그린다(보드의 같은 이름 상태). */
+  ending: boolean;
   onPick: (id: number) => void;
 }) {
   return (
@@ -740,7 +765,9 @@ function PlayCard({
         )}
       </p>
 
-      <QuestionCard question={question} busy={busy} onPick={onPick} />
+      {!ending && (
+        <QuestionCard question={question} busy={busy} onPick={onPick} />
+      )}
 
       {error && (
         <p
