@@ -34,6 +34,9 @@ void _kindsAgree;
  *
  * 한 곳에 모아둔다 - 탭·제목·단위가 화면마다 흩어지면 "판" 과 "일" 이
  * 어긋나 꾸준함 순위표에 "5판" 이 뜬다.
+ *
+ * scoreUnit 은 score(순위를 매기는 값), unit 은 entries(곁들이는 값)의
+ * 단위다. 꾸준함은 날 수로 매기므로 둘이 최고점과 반대다.
  */
 export const BOARD_LABELS: Record<
   BoardKind,
@@ -56,9 +59,9 @@ export const BOARD_LABELS: Record<
   streak: {
     tab: "꾸준함",
     title: "꾸준함",
-    note: "점수를 얻은 날을 모두 더합니다. 하루라도 쉬면 그날은 빠집니다.",
-    unit: "일",
-    scoreUnit: "점",
+    note: "지금까지 점수를 얻은 날을 셉니다. 날 수가 같으면 점수를 더 모은 쪽이 위입니다.",
+    unit: "점",
+    scoreUnit: "일",
   },
 };
 
@@ -76,8 +79,9 @@ export type BoardRow = {
   rank: number;
   display_name: string;
   avatar: BoardAvatar;
+  /** 순위를 매기는 값. 최고점은 한 판 점수, 꾸준함은 점수를 얻은 날 수(BOARD_LABELS.scoreUnit). */
   score: number;
-  /** 몇 판 / 며칠. 종류에 따라 단위가 다르다(BOARD_LABELS.unit). */
+  /** 곁들이는 값. 최고점은 판 수, 꾸준함은 점수 합(BOARD_LABELS.unit). */
   entries: number;
   /**
    * 이 줄이 나인가.

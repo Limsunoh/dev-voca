@@ -732,9 +732,9 @@ class StreakLinkTest(TestCase):
         return daily_study.today_of(self.user)
 
     def test_a_daily_study_only_day_counts_as_an_active_day(self):
-        """자유 문제풀이를 한 판도 안 해도 일일공부만으로 활동일이 된다.
+        """자유 문제풀이를 한 판도 안 해도 일일공부만으로 하루가 센다.
 
-        활동일은 그날 총점이 0보다 큰지로 센다. 일일공부 점수를 안 보면
+        날 수는 그날 총점이 0보다 큰지로 센다. 일일공부 점수를 안 보면
         매일 공부만 한 사람의 꾸준함이 0일로 나온다.
         """
         study = self._run()
@@ -743,8 +743,8 @@ class StreakLinkTest(TestCase):
         mine = [row for row in rows if row.display_name == self.user.display_name]
 
         self.assertEqual(len(mine), 1, "꾸준함 순위표에 안 들어갔다")
-        self.assertEqual(mine[0].score, study.score, "점수가 다르다")
-        self.assertEqual(mine[0].entries, 1, "활동일로 안 세어졌다")
+        self.assertEqual(mine[0].entries, study.score, "점수가 다르다")
+        self.assertEqual(mine[0].score, 1, "날 수에 안 들어갔다")
 
     def test_the_python_total_and_the_sql_total_agree(self):
         """DailyScore.total 과 순위표 SQL 이 같은 값을 내야 한다.
@@ -757,7 +757,7 @@ class StreakLinkTest(TestCase):
         rows = leaderboards.build(leaderboards.STREAK).rows
         mine = next(r for r in rows if r.display_name == self.user.display_name)
 
-        self.assertEqual(mine.score, row.total)
+        self.assertEqual(mine.entries, row.total)
 
     def test_the_streak_api_shows_a_daily_study_only_user(self):
         """API 로도 보인다. 화면이 읽는 경로다."""

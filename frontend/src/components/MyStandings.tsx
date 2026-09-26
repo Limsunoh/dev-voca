@@ -45,10 +45,16 @@ export function MyStandings({
         >
           내 순위
         </h3>
+        {/* 누르는 영역은 44px(--hit-floor)이다. 글자 높이(py-1)만 누를 수
+            있던 때는 71x24 라 폰에서 잘 안 눌렸다. 모양은 글자 링크로 두고
+            -my-2.5 로 늘린 높이만큼을 되돌린다 - 안 그러면 제목 줄이 20px
+            높아져 "내 순위" 와 세 칸 사이가 벌어진다. 늘어난 위쪽 10px 은
+            카드 안쪽 여백(py-4, 16px) 안에 들어간다. */}
         <Link
           href={routes.board()}
-          className="rounded-md px-1.5 py-1 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="-my-2.5 inline-flex items-center rounded-md px-1.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={{
+            minHeight: "var(--hit-floor)",
             color: "var(--text-muted)",
             fontWeight: "var(--weight-bold)",
           }}
@@ -118,8 +124,9 @@ function StandingCell({ kind, row }: { kind: BoardKind; row?: BoardRow }) {
         borderRadius: "var(--radius-lg)",
       }}
     >
+      {/* 12px. 11px 은 폰에서 세 칸 이름이 잘 안 읽혔다. */}
       <dt
-        className="text-[length:var(--text-11)]"
+        className="text-xs"
         style={{
           color: "var(--text-dim)",
           fontWeight: "var(--weight-bold)",
@@ -141,6 +148,14 @@ function StandingCell({ kind, row }: { kind: BoardKind; row?: BoardRow }) {
             }}
           >
             {row.score.toLocaleString()}
+            {/* 꾸준함은 날 수라 단위가 없으면 점수로 읽힌다. 한글이라 본문
+                글꼴로 둔다(고정폭 글꼴에는 한글이 없다). */}
+            <span
+              className="ml-0.5 text-xs"
+              style={{ fontFamily: "var(--font-sans)" }}
+            >
+              {labels.scoreUnit}
+            </span>
           </span>
           {/* 순위는 코랄. 점수와 같은 색이면 두 줄이 한 덩어리로 읽혀
               무엇이 점수고 무엇이 등수인지 헷갈린다. */}
