@@ -56,7 +56,11 @@ function toPageNumber(value: string | undefined): number {
 
 export default async function VocabPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const search = first(params.search);
+  // 공백만 있으면 검색이 아니다. 검색창은 제출할 때 공백을 털지만 주소를
+  // 손으로 고치거나 옛 링크로 오면 "  " 이 그대로 온다. 그러면 검색 중으로
+  // 보고 섞지 않은 채 `"  " 검색 결과 566개` 를 띄웠다(백엔드는 공백을
+  // 검색어로 안 봐서 전부 준다).
+  const search = first(params.search)?.trim() || undefined;
   const category = first(params.category);
   const difficulty = first(params.difficulty);
   // 정처기 범위만 보기. 값은 "true" 하나뿐이라 그것만 통과시킨다 -
@@ -83,8 +87,9 @@ export default async function VocabPage({ searchParams }: PageProps) {
   // **섞은 순서는 URL 에 적는다.** 시드가 없으면 새로 만들어 주소에 붙인
   // 다음 그 주소로 보낸다(아래 redirect). 그래야 같은 주소가 언제 다시
   // 열려도 같은 순서를 낸다 - 새로고침, 브라우저 뒤로가기, 상세에서
-  // 돌아오기가 모두 그 경우다. 탭바나 필터로 새로 들어오면 주소에 시드가
-  // 없으니 그때는 새 순서가 나온다.
+  // 돌아오기가 모두 그 경우다. 탭바로 새로 들어오면 주소에 시드가 없어
+  // 새 순서가 나오고, 필터 칩은 새로 만든 시드를 실어 와서(아래 chipSeed)
+  // 역시 새 순서다.
   //
   // 페이지 넘기기 링크에도 시드를 실어 보낸다 - 안 그러면 1페이지에서 본
   // 단어가 2페이지에 또 나온다.
@@ -127,8 +132,10 @@ export default async function VocabPage({ searchParams }: PageProps) {
 
   if (!search && !shuffle && !sort) {
     // 목록을 부르기 전에 보낸다. 시드 없이 들어올 때마다 왕복이 한 번
-    // 늘어난다 - 탭바로 들어올 때와 필터·분류를 누를 때가 그렇다(그쪽
-    // 링크들은 시드를 안 싣는다). 그 뒤로는 이 주소가 순서를 기억한다.
+    // 늘어난다 - 탭바로 들어올 때, 검색어를 지울 때, 상세의 분류 링크로
+    // 올 때가 그렇다. 필터 칩은 새 시드를 미리 실어 여기를 안 지난다(아래
+    // chipSeed - 지나면 그 사이 펼쳐 둔 필터 상자가 닫힌다). 그 뒤로는 이
+    // 주소가 순서를 기억한다.
     //
     // **기록을 밀지 않고 대체한다.** 서버 컴포넌트에서 부른 redirect 는
     // replace 로 동작하므로(액션에서 부를 때만 push 다) 뒤로가기 한 번에
@@ -148,6 +155,22 @@ export default async function VocabPage({ searchParams }: PageProps) {
   }
 
   const currentListUrl = listUrl(routes.words, filters, currentPage);
+
+  // 필터 칩 링크에 미리 실어 둘 새 시드.
+  //
+  // 칩을 누르면 그 조건 안에서 새로 섞인 목록이 나와야 한다. 링크에 시드가
+  // 없으면 서버가 시드를 붙여 한 번 더 보내는데(위 redirect), 그 사이 화면이
+  // 새로 그려져 펼쳐 둔 필터 상자가 닫혔다 - 칩 하나 누를 때마다 다시 펼쳐야
+  // 했다. 처음부터 새 시드를 실어 두면 한 번에 도착하고 상자도 그대로다.
+  //
+  // 지금 보는 시드(shuffle)를 쓰지 않는 것은 조건을 바꾸면 새 순서여야 해서다.
+  // 시드는 이 화면을 그릴 때 한 번 만드므로, 뒤로가기로 이 화면에 돌아와
+  // 같은 칩을 다시 누르면 전과 같은 순서가 나온다 - 그 칩이 가리키는 주소가
+  // 전과 같아서다. 검색·정렬 중에는 섞지 않으므로 칩 링크에 싣지 않는다.
+  // 정렬을 끄는 링크는 정렬 중이어도 섞인 목록으로 가므로 따로 싣는다
+  // (unsortSeed).
+  const chipSeed = search || sort ? undefined : newShuffleSeed();
+  const unsortSeed = search ? undefined : newShuffleSeed();
 
   // 두 요청을 동시에 띄운다. 순서대로 기다리면 두 번의 왕복이 그대로
   // 대기 시간이 된다.
@@ -249,9 +272,10 @@ export default async function VocabPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
 
-      {/* 필터 링크에는 시드를 싣지 않는다. 그래서 난이도나 분류를 누르면
-          그 조건 안에서 새로 섞인 목록이 나온다. 정렬은 싣는다 - 쉬운
-          것부터 보다가 분류를 바꿨는데 순서가 풀리면 다시 골라야 한다.
+      {/* 필터 링크에는 지금 시드가 아니라 새 시드(chipSeed)를 싣는다. 그래서
+          난이도나 분류를 누르면 그 조건 안에서 새로 섞인 목록이 나온다.
+          정렬은 싣는다 - 쉬운 것부터 보다가 분류를 바꿨는데 순서가 풀리면
+          다시 골라야 한다.
 
           배지는 정렬도 센다. 필터가 접혀 있을 때 순서가 바뀌어 있다는
           것을 알려줄 곳이 배지뿐이다. */}
@@ -268,7 +292,13 @@ export default async function VocabPage({ searchParams }: PageProps) {
         <ExamScopeFilter
           basePath={routes.words}
           active={Boolean(examOnly)}
-          keep={{ search, category, difficulty, sort: sort?.value }}
+          keep={{
+            search,
+            category,
+            difficulty,
+            sort: sort?.value,
+            shuffle: chipSeed,
+          }}
         />
 
         {/* 과목은 정처기를 켰을 때만 뜬다. 안 켠 사람에게는 5과목이
@@ -286,6 +316,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
               difficulty,
               is_exam: examOnly,
               sort: sort?.value,
+              shuffle: chipSeed,
             }}
           />
         )}
@@ -302,6 +333,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
             is_exam: examOnly,
             exam_subject: examSubject,
             sort: sort?.value,
+            shuffle: chipSeed,
           }}
         />
 
@@ -315,6 +347,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
             is_exam: examOnly,
             exam_subject: examSubject,
             sort: sort?.value,
+            shuffle: chipSeed,
           }}
         />
 
@@ -337,6 +370,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
             is_exam: examOnly,
             exam_subject: examSubject,
           }}
+          keepWhenOff={{ shuffle: unsortSeed }}
         />
       </FilterPanel>
 
@@ -383,7 +417,10 @@ export default async function VocabPage({ searchParams }: PageProps) {
                   경로라(분류 9 x 난이도 4) 여기서 바로 풀 수 있게 둔다.
                   링크라 서버 컴포넌트 그대로이고 접힘과 무관하게 보인다. */}
               <Link
-                href={routes.words}
+                // 새 시드를 싣는다. 이 링크는 펼친 필터 상자에서 칩으로
+                // 좁히다 0개가 됐을 때 나오는데, 시드가 없으면 서버가 한 번
+                // 더 보내며 상자가 닫힌다(위 chipSeed 와 같은 이유).
+                href={listUrl(routes.words, { shuffle: newShuffleSeed() })}
                 className="dv-btn mt-4 inline-flex min-h-11 items-center rounded-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 style={
                   {
@@ -443,9 +480,9 @@ export default async function VocabPage({ searchParams }: PageProps) {
         </ul>
       )}
 
-      {/* 페이지 넘기기에는 시드를 실어 보낸다. 필터와 반대다 - 여기서
-          시드가 빠지면 2페이지가 새 순서로 섞여서 1페이지에 본 단어를
-          또 만나고 어떤 단어는 아예 못 만난다. */}
+      {/* 페이지 넘기기에는 지금 시드를 실어 보낸다. 필터 칩은 새 시드라
+          여기와 반대다 - 여기서 시드가 바뀌면 2페이지가 새 순서로 섞여서
+          1페이지에 본 단어를 또 만나고 어떤 단어는 아예 못 만난다. */}
       <Pagination
         basePath={routes.words}
         filters={filters}

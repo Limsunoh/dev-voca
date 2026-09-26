@@ -46,7 +46,8 @@ function toPageNumber(value: string | undefined): number {
 
 export default async function SentencesPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const search = first(params.search);
+  // 공백만 있으면 검색이 아니다(이유는 learn/words/page.tsx).
+  const search = first(params.search)?.trim() || undefined;
   const category = first(params.category);
   const kind = first(params.kind);
   const difficulty = first(params.difficulty);
@@ -95,6 +96,12 @@ export default async function SentencesPage({ searchParams }: PageProps) {
   }
 
   const currentListUrl = listUrl(routes.sentences, filters, currentPage);
+
+  // 필터 칩 링크에 미리 실어 둘 새 시드. 없으면 칩을 누를 때마다 서버가
+  // 시드를 붙여 한 번 더 보내고 그 사이 필터 상자가 닫힌다(자세한 이유는
+  // learn/words/page.tsx 의 같은 자리).
+  const chipSeed = search || sort ? undefined : newShuffleSeed();
+  const unsortSeed = search ? undefined : newShuffleSeed();
 
   // 세 요청을 동시에 띄운다. 순서대로 기다리면 세 번의 왕복이 그대로
   // 대기 시간이 된다.
@@ -193,8 +200,9 @@ export default async function SentencesPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
 
-      {/* 필터 링크에는 시드를 싣지 않는다. 누를 때마다 그 조건 안에서
-          새로 섞인 목록이 나온다. 정렬은 싣는다(이유는 learn/words/page.tsx). */}
+      {/* 필터 링크에는 지금 시드가 아니라 새 시드(chipSeed)를 싣는다. 누를
+          때마다 그 조건 안에서 새로 섞인 목록이 나온다. 정렬은 싣는다(이유는
+          learn/words/page.tsx). */}
       <FilterPanel active={[kind, difficulty, category, sort?.value]}>
         <ChoiceFilter
           label="종류"
@@ -202,7 +210,13 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           options={kinds}
           basePath={routes.sentences}
           selected={kind}
-          keep={{ search, category, difficulty, sort: sort?.value }}
+          keep={{
+            search,
+            category,
+            difficulty,
+            sort: sort?.value,
+            shuffle: chipSeed,
+          }}
         />
 
         <ChoiceFilter
@@ -211,7 +225,13 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           options={difficulties}
           basePath={routes.sentences}
           selected={difficulty}
-          keep={{ search, category, kind, sort: sort?.value }}
+          keep={{
+            search,
+            category,
+            kind,
+            sort: sort?.value,
+            shuffle: chipSeed,
+          }}
         />
 
         <CategoryFilter
@@ -220,7 +240,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           selected={category}
           search={search}
           difficulty={difficulty}
-          extra={{ kind, sort: sort?.value }}
+          extra={{ kind, sort: sort?.value, shuffle: chipSeed }}
         />
 
         {/* 검색 중에 "기본순" 인 이유는 learn/words/page.tsx 참고. */}
@@ -232,6 +252,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           basePath={routes.sentences}
           selected={sort?.value}
           keep={{ search, category, kind, difficulty }}
+          keepWhenOff={{ shuffle: unsortSeed }}
         />
       </FilterPanel>
 
@@ -267,7 +288,8 @@ export default async function SentencesPage({ searchParams }: PageProps) {
               <p>조건에 맞는 문장이 없습니다.</p>
               {/* 접힌 필터를 가리키지 않는다. 이유는 learn/words/page.tsx 참고. */}
               <Link
-                href={routes.sentences}
+                // 새 시드를 싣는 이유는 learn/words/page.tsx 의 같은 자리.
+                href={listUrl(routes.sentences, { shuffle: newShuffleSeed() })}
                 className="dv-btn mt-4 inline-flex min-h-11 items-center rounded-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 style={
                   {
