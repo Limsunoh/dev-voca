@@ -92,7 +92,12 @@ beforeEach(() => {
 });
 
 /** 이 문제를 받아온 뒤의 판을 HTML 로. */
-async function board(kind: string, prompt: string, choices: string[]): Promise<string> {
+async function board(
+  kind: string,
+  prompt: string,
+  choices: string[],
+  sentenceKind?: string,
+): Promise<string> {
   served = {
     kind,
     kind_label: "유형이름",
@@ -102,6 +107,7 @@ async function board(kind: string, prompt: string, choices: string[]): Promise<s
     category_label: "Git",
     choices: choices.map((text, i) => ({ id: i + 1, text })),
     token: "t",
+    ...(sentenceKind === undefined ? {} : { sentence_kind: sentenceKind }),
   };
   render();
   const load = effects.filter(
@@ -118,7 +124,12 @@ async function board(kind: string, prompt: string, choices: string[]): Promise<s
   return html;
 }
 
-function card(kind: string, prompt: string, choices: string[]): string {
+function card(
+  kind: string,
+  prompt: string,
+  choices: string[],
+  sentenceKind?: string,
+): string {
   const question = {
     kind,
     kind_label: "유형이름",
@@ -127,6 +138,7 @@ function card(kind: string, prompt: string, choices: string[]): string {
     category: "git",
     category_label: "Git",
     choices: choices.map((text, i) => ({ id: i + 1, text })),
+    ...(sentenceKind === undefined ? {} : { sentence_kind: sentenceKind }),
   };
   return renderToStaticMarkup(
     createElement(QuestionCard, {
@@ -182,13 +194,28 @@ describe("QuizBoard 지문", () => {
     assert.match(tag, /whitespace-pre-line/);
   });
 
-  // 문장 지문은 lib/quiz-text 가 정하지 않는다. 문제풀기는 해설이 같은
-  // 문장을 고정폭으로 그려서 지문도 고정폭이다(QuizBoard 의 Prompt 주석).
-  it("빈칸·상황: 영어 문장 지문은 고정폭 + lang=en", async () => {
-    let html = await board("blank", "I ran ____ before push.", ["git fetch", "git stash"]);
-    assert.deepEqual(look(tagOf(html, "I ran ____ before push.")), TERM);
-    html = await board("situation", "Can you rebase onto main?", ["리뷰 전에", "배포할 때"]);
-    assert.deepEqual(look(tagOf(html, "Can you rebase onto main?")), TERM);
+  // 문장 지문은 문장 종류로 가른다(lib/quiz-text 의 promptIsMono). 에러
+  // 메시지만 고정폭이고, 실무 표현과 종류를 모르는 문장은 본문체다. 어느
+  // 쪽이든 영어라 lang=en 은 붙는다.
+  const SENTENCE_BODY: Look = { mono: false, en: true };
+
+  it("빈칸·상황: 에러 메시지 문장 지문은 고정폭 + lang=en", async () => {
+    let html = await board("blank", "fatal: ____ unrelated histories", ["refusing to merge", "x"], "error");
+    assert.deepEqual(look(tagOf(html, "fatal: ____ unrelated histories")), TERM);
+    html = await board("situation", "error: failed to push some refs", ["push 가 거부될 때", "배포할 때"], "error");
+    assert.deepEqual(look(tagOf(html, "error: failed to push some refs")), TERM);
+  });
+
+  it("빈칸·상황: 실무 표현 문장 지문은 본문체 + lang=en", async () => {
+    let html = await board("blank", "I ran ____ before push.", ["git fetch", "git stash"], "phrase");
+    assert.deepEqual(look(tagOf(html, "I ran ____ before push.")), SENTENCE_BODY);
+    html = await board("situation", "Can you rebase onto main?", ["리뷰 전에", "배포할 때"], "phrase");
+    assert.deepEqual(look(tagOf(html, "Can you rebase onto main?")), SENTENCE_BODY);
+  });
+
+  it("빈칸·상황: 문장 종류가 없으면 본문체다(옛 응답)", async () => {
+    const html = await board("situation", "Can you rebase onto main?", ["리뷰 전에", "배포할 때"]);
+    assert.deepEqual(look(tagOf(html, "Can you rebase onto main?")), SENTENCE_BODY);
   });
 
   it("모르는 유형: 지문을 고정폭으로 그리지 않는다", async () => {
@@ -262,11 +289,125 @@ describe("QuestionCard 와 QuizBoard 가 같은 규칙을 쓴다", () => {
   });
 
   it("지문: 용어·한글 지문은 두 화면이 같다", async () => {
-    // 문장 지문(blank·situation)은 화면마다 다르게 둔다(lib/quiz-text 머리말).
+    // 문장 지문(blank·situation)은 아래 "문장 지문: ... 같은 규칙" 에서 본다.
     for (const kind of ["meaning", "term", "description", "error"]) {
       const fromBoard = look(tagOf(await board(kind, "지문글자", ["a"]), "지문글자"));
       const fromCard = look(tagOf(card(kind, "지문글자", ["a"]), "지문글자"));
       assert.deepEqual(fromCard, fromBoard, `유형 "${kind}"`);
+    }
+  });
+});
+
+describe("QuizBoard 문장 지문 - 문장 종류의 경계값", () => {
+  const SENTENCE_BODY: Look = { mono: false, en: true };
+
+  it("빈 문자열·모르는 값(ERROR·code·Error)은 본문체", async () => {
+    for (const kind of ["blank", "situation"]) {
+      for (const sk of ["", "ERROR", "code", "Error", " error"]) {
+        const text = `It broke ${kind} [${sk}]`;
+        const html = await board(kind, text, ["a", "b"], sk);
+        assert.deepEqual(look(tagOf(html, text)), SENTENCE_BODY, `${kind} "${sk}"`);
+      }
+    }
+  });
+
+  it("뜻 고르기 용어 지문은 문장 종류가 붙어 와도 고정폭", async () => {
+    for (const sk of ["phrase", "", "code"]) {
+      const html = await board("meaning", "rebase", ["옮기기", "합치기"], sk);
+      assert.deepEqual(look(tagOf(html, "rebase")), TERM, sk);
+    }
+  });
+
+  it("단어 고르기·설명 지문은 error 가 붙어 와도 본문체", async () => {
+    for (const kind of ["term", "description"]) {
+      const html = await board(kind, "한글 지문", ["fetch", "push"], "error");
+      assert.deepEqual(look(tagOf(html, "한글 지문")), BODY, kind);
+    }
+  });
+
+  it("고정폭이면 자간을 한 단계 더 좁히고, 본문체면 되돌린다", async () => {
+    const styleOf = (tag: string) => /style="([^"]*)"/.exec(tag)?.[1] ?? "";
+    let html = await board("blank", "fatal: ____ here", ["a", "b"], "error");
+    assert.match(styleOf(tagOf(html, "fatal: ____ here")), /letter-spacing:var\(--tracking-tighter\)/);
+    html = await board("blank", "Please ____ here", ["a", "b"], "phrase");
+    assert.match(styleOf(tagOf(html, "Please ____ here")), /letter-spacing:var\(--tracking-tight\)/);
+  });
+});
+
+describe("문장 지문: QuestionCard 와 QuizBoard 가 같은 규칙", () => {
+  it("문장 종류마다 두 화면의 글꼴·lang 이 같다", async () => {
+    for (const kind of ["blank", "situation"]) {
+      for (const sk of ["error", "phrase", "", "ERROR", undefined]) {
+        const text = `same rule ${kind} ${String(sk)}`;
+        const fromBoard = look(tagOf(await board(kind, text, ["a"], sk), text));
+        const fromCard = look(tagOf(card(kind, text, ["a"], sk), text));
+        assert.deepEqual(fromCard, fromBoard, `${kind} ${String(sk)}`);
+      }
+    }
+  });
+});
+
+/*
+ * 해설 카드(SentenceAnswer). 상황 고르기를 채점하면 정답 문장을 다시
+ * 보여 주는데, 그 문장의 글꼴도 채점 응답의 sentence.kind 로 가른다.
+ * 보기 버튼의 onClick 을 트리에서 찾아 눌러 채점 응답을 받게 한다.
+ */
+describe("QuizBoard 해설 카드의 문장", () => {
+  type Node = { type?: unknown; props?: Record<string, unknown> };
+
+  /** 트리에서 text 가 이 글자인 보기 버튼 요소. */
+  function choiceNamed(node: unknown, text: string): Node | null {
+    if (!node || typeof node !== "object") return null;
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const hit = choiceNamed(child, text);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    const el = node as Node;
+    if (el.props?.text === text && typeof el.props.onClick === "function") return el;
+    return choiceNamed(el.props?.children, text);
+  }
+
+  async function graded(sentenceKind: string | undefined, text: string): Promise<string> {
+    await board("situation", "Prompt sentence here.", ["배포할 때", "리뷰할 때"], sentenceKind);
+    const button = choiceNamed(render(), "배포할 때");
+    assert.ok(button, "보기 버튼을 못 찾았다");
+    served = {
+      correct: true,
+      answer_id: 1,
+      answer_type: "sentence",
+      sentence: {
+        id: 1,
+        text,
+        reading: "",
+        translation: "해석",
+        context: "배포할 때",
+        description: "",
+        ...(sentenceKind === undefined ? {} : { kind: sentenceKind }),
+        kind_label: "종류",
+        category: "git",
+      },
+    };
+    (button.props!.onClick as () => void)();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    const html = renderToStaticMarkup(render() as never);
+    assert.match(html, /맞았습니다/, "채점 결과가 안 그려졌다");
+    return html;
+  }
+
+  it("에러 메시지 문장은 고정폭 + lang=en", async () => {
+    const html = await graded("error", "fatal: refusing unrelated histories");
+    assert.deepEqual(look(tagOf(html, "fatal: refusing unrelated histories")), TERM);
+  });
+
+  it("실무 표현·빈 값·없음·모르는 값은 본문체 + lang=en", async () => {
+    for (const sk of ["phrase", "", undefined, "ERROR", "code"]) {
+      const text = `Could you take a look ${String(sk)}?`;
+      const html = await graded(sk, text);
+      assert.deepEqual(look(tagOf(html, text)), { mono: false, en: true }, String(sk));
     }
   });
 });

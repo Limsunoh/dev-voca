@@ -462,6 +462,8 @@ def _issue(state: dict, now: datetime, shown_after_ms: int = 0) -> dict | None:
         "choices": [asdict(c) for c in question.choices],
         "category": question.category,
         "category_label": question.category_label,
+        # 지문이 에러 메시지인지(문장 문제만). 화면이 그것만 고정폭으로 그린다.
+        "sentence_kind": question.sentence_kind,
         "time_limit_ms": question.time_limit_ms,
         "skips_left": MAX_SKIPS - int(state["sk"]),
         "deadline_ms": _deadline_ms(state),

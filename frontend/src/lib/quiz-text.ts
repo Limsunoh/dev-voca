@@ -17,17 +17,57 @@
  *   blank         문장(영어)      용어
  *   situation     문장(영어)      상황(한글)
  *
- * 문장 지문(blank·situation)의 글꼴은 화면마다 다르다. 영어지만 낱말이
- * 아니라 문장이라서다. 문제풀기(QuizBoard)는 promptIsTerm 을 안 보고 따로
- * 고정폭으로 그린다 - 아래 해설이 같은 문장을 고정폭으로 보여 줘서다(Prompt
- * 주석). 한 판·일일공부·복습(QuestionCard)은 promptIsTerm 이 false 라
- * 본문체다. 어느 쪽이든 영어이긴 하므로 lang 은 promptIsEnglish 로 붙인다.
+ * 문장 지문(blank·situation)은 **문장의 종류로 가른다.** 에러 메시지는
+ * 고정폭, 실무 표현은 본문체다(promptIsMono). 익히기 목록·상세가 이미 이
+ * 규칙이고, 디자인 가이드도 "단어·에러 메시지는 고정폭, 사람이 쓴 문장은
+ * 가변폭" 이라고 적는다. 에러 메시지는 터미널에서 마주칠 모양 그대로 보여야
+ * 익숙해지고, 실무 표현을 고정폭으로 쓰면 코드 주석처럼 보이고 폰에서 줄이
+ * 늘어난다. 전에는 문제풀기만 고정폭, 한 판·일일공부·복습은 본문체로 화면
+ * 마다 달랐다. 어느 쪽이든 영어이긴 하므로 lang 은 promptIsEnglish 로 붙인다.
  *
  * 모르는 유형은 용어가 아닌 것으로 본다. 본문체는 영어도 멀쩡히 그리지만,
  * 고정폭은 한글을 망가뜨린다.
  */
 export function promptIsTerm(kind: string): boolean {
   return kind === "meaning";
+}
+
+const SENTENCE_PROMPT = new Set(["blank", "situation"]);
+
+/**
+ * 지문을 고정폭으로 그릴지. 용어(뜻 고르기)와 에러 메시지 문장만 고정폭이다.
+ *
+ * sentenceKind 는 서버가 문장 문제에 실어 보내는 문장 종류(error·phrase)다.
+ * **모르면 본문체다.** 단어 문제에는 안 오고, 이 칸이 생기기 전에 저장된
+ * 일일공부 문제(서버가 판에 저장해 두었다가 이어 풀 때 다시 준다)에도 없다.
+ * 본문체는 영어도 멀쩡히 그리지만 고정폭은 한글을 망가뜨린다(위 원칙).
+ */
+export function promptIsMono(
+  kind: string,
+  sentenceKind?: string | null,
+): boolean {
+  return (
+    promptIsTerm(kind) ||
+    (SENTENCE_PROMPT.has(kind) && isErrorSentence(sentenceKind))
+  );
+}
+
+/**
+ * 문장 종류가 에러 메시지인지. 지문(promptIsMono)과 문제풀기 해설 카드가 같이
+ * 쓴다 - 둘이 따로 비교하면 한 화면에서 같은 문장이 두 서체로 갈릴 수 있다.
+ * 값은 백엔드 SentenceKind 그대로("error")라 대소문자를 맞춰 비교한다.
+ */
+export function isErrorSentence(sentenceKind?: string | null): boolean {
+  return sentenceKind === "error";
+}
+
+/**
+ * 지문이 문장인지(빈칸·상황). 문장은 단어 하나보다 훨씬 길어 여러 줄로
+ * 감기므로, 굵기와 줄간격을 제목보다 한 단계 푼다. 고정폭을 가장 굵게
+ * 여러 줄 그리면 글자가 뭉친다.
+ */
+export function promptIsSentence(kind: string): boolean {
+  return SENTENCE_PROMPT.has(kind);
 }
 
 const ENGLISH_PROMPT = new Set(["meaning", "blank", "situation"]);
