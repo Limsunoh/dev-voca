@@ -18,12 +18,15 @@ async function fetchQuestion(params: {
   category?: string;
   exclude?: string;
   item?: string;
+  /** 문제 유형. 비어 있으면 서버가 섞어서 낸다. */
+  kind?: string;
   content: QuizContent;
 }): Promise<Question> {
   const query = new URLSearchParams();
   if (params.category) query.set("category", params.category);
   if (params.exclude) query.set("exclude", params.exclude);
   if (params.item) query.set("item", params.item);
+  if (params.kind) query.set("kind", params.kind);
   if (params.content !== "words") query.set("content", params.content);
 
   const res = await fetch(`/api/quiz?${query}`, { cache: "no-store" });
@@ -157,6 +160,20 @@ export function QuizBoard({ category, content = "words", item }: Props) {
   // state 가 아니라 ref 인 이유: 연타는 다시 그리기 전에 들어온다.
   // setLoading 은 다음 렌더에야 반영돼서 가드로 쓸 수 없다.
   const loadingRef = useRef(false);
+  /**
+   * 고른 문제 유형. 빈 문자열이면 섞어서 낸다.
+   *
+   * 화면이 그리는 값(state)과 load 가 읽는 값(ref)을 따로 둔다. load 는
+   * 첫 문제 effect 의 의존성이라, kind 를 의존성에 넣으면 유형을 바꿀
+   * 때마다 load 가 새로 만들어져 effect 가 문제를 다시 받는다 - 답을
+   * 고른 뒤라면 해설을 보는 도중에 문제가 바뀐다. 언제 새로 받을지는
+   * changeKind 가 정한다.
+   *
+   * 분류처럼 판을 새로 만들지 않는다. 유형은 "다음 문제를 어떻게 낼까" 라
+   * 점수와 푼 목록이 그대로 이어져도 된다. 그래서 확인 창도 필요 없다.
+   */
+  const [kind, setKind] = useState("");
+  const kindRef = useRef("");
   // "다음 문제" 버튼. 답을 고른 뒤 이 버튼이 보이는 자리까지 스크롤한다.
   //
   // 해설 카드가 아니라 버튼을 기준으로 삼는다. 해설은 설명·예문·번역이 다
@@ -196,14 +213,30 @@ export function QuizBoard({ category, content = "words", item }: Props) {
       setResult(null);
 
       const wanted = itemRef.current;
-
-      try {
-        const q = await fetchQuestion({
+      // 이 요청에 실은 유형. 안내 문구는 응답이 올 때가 아니라 보낸 것을 본다 -
+      // 그 사이 유형을 바꿨으면 지금 값은 이 요청과 무관하다.
+      let sentKind = kindRef.current;
+      const ask = () =>
+        fetchQuestion({
           category,
           exclude: recentRef.current.join(","),
           item: wanted,
+          kind: sentKind,
           content,
         });
+
+      try {
+        let q = await ask();
+        // **받는 도중에 유형을 바꿨으면 그 자리에서 다시 받는다.** 겹치는
+        // 요청은 위에서 막으므로 changeKind 가 새로 부를 수 없다. Windows
+        // 크롬은 닫힌 select 에서 화살표를 누를 때마다 change 를 보내서,
+        // 키보드로 고르면 거의 매번 이 경우다. 안 하면 고르개는 "설명" 인데
+        // 문제는 섞어서로 받은 것이 뜬다. loading 을 쥔 채 도므로 그 사이
+        // 보기가 그려져 눌리는 틈도 없다.
+        while (sentKind !== kindRef.current) {
+          sentKind = kindRef.current;
+          q = await ask();
+        }
         itemRef.current = undefined;
         setQuestion(q);
       } catch (e) {
@@ -218,12 +251,18 @@ export function QuizBoard({ category, content = "words", item }: Props) {
         // 때는 남겨 둬서, 다시 누르면 원래 청한 항목이 나온다.
         const itemRejected = Boolean(wanted) && (notFound || status === "400");
         if (itemRejected) itemRef.current = undefined;
+        // **유형을 골랐으면 그것을 문구에 적는다.** 설명 문제는 설명이
+        // 있는 단어로만, 빈칸 문제는 용어가 든 문장으로만 낼 수 있어서
+        // 유형 하나로는 금방 바닥난다. "다 풀었습니다" 만 뜨면 분류만
+        // 넓히려 하는데, 유형을 섞어서로 돌리는 편이 먼저다.
         setError(
           itemRejected
             ? "이 항목으로는 지금 문제를 낼 수 없습니다. \"처음부터 다시\" 를 누르면 다른 문제가 나옵니다."
-            : notFound
-              ? "낼 수 있는 문제를 다 풀었습니다. 분류를 넓히거나 처음부터 다시 시작해보세요."
-              : "문제를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+            : notFound && sentKind
+              ? KIND_EXHAUSTED
+              : notFound
+                ? "낼 수 있는 문제를 다 풀었습니다. 분류를 넓히거나 처음부터 다시 시작해보세요."
+                : "문제를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
         );
       } finally {
         setLoading(false);
@@ -237,6 +276,28 @@ export function QuizBoard({ category, content = "words", item }: Props) {
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  /**
+   * 유형을 바꾼다.
+   *
+   * 아직 답을 안 고른 문제면 곧바로 그 유형으로 새로 받는다 - 골랐는데 화면이
+   * 그대로면 안 먹은 것처럼 보인다. 채점 전이라 점수에 센 것도 없다. 답을
+   * 고른 뒤면 다음 문제부터 적용한다. 해설을 읽는 도중에 문제를 바꾸지
+   * 않는다. 문제를 못 내 안내가 떠 있을 때(picked 가 비어 있다)도 곧바로
+   * 새로 받아서, 유형을 섞어서로 돌리면 그 자리에서 다시 풀 수 있다.
+   *
+   * 불러오는 도중이면 부르지 않는다. 받는 쪽(load)이 끝나기 전에 유형이
+   * 바뀐 것을 보고 다시 받는다.
+   *
+   * 상세의 "이 단어로 문제 풀기" 로 뜬 문제를 답하기 전에 바꾸면 그 단어가
+   * 아니라 새 무작위 문제가 나온다. 항목은 첫 문제에 한 번만 쓰기 때문이다
+   * (itemRef). 그 단어를 다른 유형으로 풀고 싶으면 답한 뒤 상세로 돌아간다.
+   */
+  const changeKind = (next: string) => {
+    kindRef.current = next;
+    setKind(next);
+    if (picked === null && !loadingRef.current) void load(false);
+  };
 
   /**
    * 채점이 끝나면 "다음 문제" 버튼이 보이는 자리까지 화면을 옮긴다.
@@ -425,7 +486,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
     </>
   );
 
-  const body = (() => {
+  const branch = (() => {
     if (loading) {
       return (
         <p className="mt-10 text-center" style={{ color: "var(--text-muted)" }}>
@@ -451,37 +512,61 @@ export function QuizBoard({ category, content = "words", item }: Props) {
           >
             {error}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              // 푼 목록을 비우고 다시 부른다. 다 풀어서 404 가 난
-              // 경우에는 그냥 재시도하면 같은 404 가 반복된다.
-              // 점수도 같이 비운다 - 처음부터 다시인데 이전 판 숫자가
-              // 이어지면 몇 개를 맞혔는지 알 수 없다.
-              recentRef.current = [];
-              setScore({ solved: 0, correct: 0 });
-              setCombo(0);
-              // 축포 카운터도 되돌린다. 안 그러면 판이 바뀌어도 이전 값이
-              // 남아, 여기서 초기화하는 다른 것들과 규율이 어긋난다.
-              setBurst(0);
-              setReaction({ fire: 0, correct: false });
-              void load();
-            }}
-            // 이 화면의 유일한 동작이라 코랄을 준다.
-            className="dv-btn mt-4 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            style={
-              {
-                minHeight: "var(--hit-min)",
-                background: "var(--coral)",
-                color: "var(--text-on-color)",
-                borderRadius: "var(--radius-pill)",
-                fontWeight: "var(--weight-black)",
-                "--lift": "var(--lift-button)",
-              } as React.CSSProperties
-            }
-          >
-            처음부터 다시
-          </button>
+          {/* 유형 때문에 못 낸 것이면 유형을 섞어서로 돌린다. "처음부터 다시"
+              를 두면 점수를 지우고도 같은 유형이라 같은 안내가 또 뜬다 -
+              분류·유형에 따라 이 화면에 곧바로 닿기 쉬워서 그 손해가 크다.
+              점수는 그대로 이어진다. 한 화면에 코랄은 하나라 둘 중 하나만. */}
+          {error === KIND_EXHAUSTED ? (
+            <button
+              type="button"
+              onClick={() => changeKind("")}
+              className="dv-btn mt-4 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={
+                {
+                  minHeight: "var(--hit-min)",
+                  background: "var(--coral)",
+                  color: "var(--text-on-color)",
+                  borderRadius: "var(--radius-pill)",
+                  fontWeight: "var(--weight-black)",
+                  "--lift": "var(--lift-button)",
+                } as React.CSSProperties
+              }
+            >
+              섞어서로 풀기
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                // 푼 목록을 비우고 다시 부른다. 다 풀어서 404 가 난
+                // 경우에는 그냥 재시도하면 같은 404 가 반복된다.
+                // 점수도 같이 비운다 - 처음부터 다시인데 이전 판 숫자가
+                // 이어지면 몇 개를 맞혔는지 알 수 없다.
+                recentRef.current = [];
+                setScore({ solved: 0, correct: 0 });
+                setCombo(0);
+                // 축포 카운터도 되돌린다. 안 그러면 판이 바뀌어도 이전 값이
+                // 남아, 여기서 초기화하는 다른 것들과 규율이 어긋난다.
+                setBurst(0);
+                setReaction({ fire: 0, correct: false });
+                void load();
+              }}
+              // 이 화면의 유일한 동작이라 코랄을 준다.
+              className="dv-btn mt-4 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={
+                {
+                  minHeight: "var(--hit-min)",
+                  background: "var(--coral)",
+                  color: "var(--text-on-color)",
+                  borderRadius: "var(--radius-pill)",
+                  fontWeight: "var(--weight-black)",
+                  "--lift": "var(--lift-button)",
+                } as React.CSSProperties
+              }
+            >
+              처음부터 다시
+            </button>
+          )}
         </div>
       );
     }
@@ -489,59 +574,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
     if (!question) return null;
 
     return (
-      <div className="mt-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* 분류 칩(MetaBadge 의 CategoryChip)의 비링크 모양과 같은 문법.
-              같은 화면에 분류 고르개가 이미 서 있어서, 여기까지 다른 회색을
-              쓰면 같은 알약이 세 종류가 된다. */}
-          <span
-            className="inline-flex items-center rounded-full px-3 py-1.5 text-xs whitespace-nowrap"
-            style={{
-              background: "var(--sand)",
-              color: "var(--text-muted)",
-              fontWeight: "var(--weight-bold)",
-            }}
-          >
-            {question.kind_label}
-          </span>
-          {score.solved > 0 && (
-            <div className="flex items-center gap-2.5">
-              {/* 연속 정답. 두 개부터 보여준다 - 하나는 그냥 맞힌 것이지
-                  연속이 아니다. 끊기면 사라져서 "지금 몇 개째" 가 한눈에
-                  보인다.
-
-                  key 로 숫자를 넘겨 오를 때마다 다시 마운트시킨다. 그래야
-                  등장 애니메이션이 매번 재생된다. */}
-              {combo >= 2 && (
-                <span
-                  key={combo}
-                  // 연속은 초록이다. 코랄로 두면 "지금 여기"·오답과 같은 색이
-                  // 되어, 잘 가고 있다는 신호가 경고처럼 보인다(가이드
-                  // color-accent).
-                  className="pop inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
-                  style={{
-                    background: "var(--green-soft)",
-                    color: "var(--green-deep)",
-                    fontWeight: "var(--weight-black)",
-                  }}
-                >
-                  <span aria-hidden>연속</span>
-                  {combo}
-                </span>
-              )}
-              {/* 숫자가 바뀔 때 자리가 밀리지 않게 고정폭 숫자를 쓴다.
-                  9 에서 10 이 되면 글자가 옆으로 밀려 눈에 거슬린다. */}
-              <span
-                className="text-sm tabular-nums"
-                // 맨 바탕 위라 라벨용이 아니라 --text-muted.
-                style={{ color: "var(--text-muted)" }}
-              >
-                {score.solved}문제 중 {score.correct}개
-              </span>
-            </div>
-          )}
-        </div>
-
+      <div>
         {/* 무엇을 고르라는 것인지. 지문보다 확실히 작고 흐리다 - 여기서
             눈이 멈추면 안 되고, 바로 아래 지문으로 넘어가야 한다. */}
         <h2
@@ -664,11 +697,159 @@ export function QuizBoard({ category, content = "words", item }: Props) {
     );
   })();
 
+  // 머리 줄(유형 고르개·점수)은 가지 밖, 가지보다 앞에 둔다. fragment 의 첫
+  // 자식이라 가지가 바뀌어도 같은 자리에 남는다(다시 마운트되지 않는다).
+  const body = (
+    <>
+      {/* 유형 고르개와 점수 줄. **문제 가지 밖에 둔다.** 유형을 바꾸면
+          "가져오는 중" 가지를 거치는데, 고르개가 문제 가지 안에 있으면 그때
+          사라졌다가 다시 생겨 키보드 초점을 잃는다. 문제를 못 낸 안내 가지
+          에서도 유형을 바꿀 수 있어야 한다 - 그 안내가 "유형을 바꿔보라" 고
+          말한다. */}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
+        <KindPicker content={content} value={kind} onChange={changeKind} />
+        {score.solved > 0 && (
+          <div className="flex items-center gap-2.5">
+            {/* 연속 정답. 두 개부터 보여준다 - 하나는 그냥 맞힌 것이지
+                연속이 아니다. 끊기면 사라져서 "지금 몇 개째" 가 한눈에
+                보인다.
+
+                key 로 숫자를 넘겨 오를 때마다 다시 마운트시킨다. 그래야
+                등장 애니메이션이 매번 재생된다. */}
+            {combo >= 2 && (
+              <span
+                key={combo}
+                // 연속은 초록이다. 코랄로 두면 "지금 여기"·오답과 같은 색이
+                // 되어, 잘 가고 있다는 신호가 경고처럼 보인다(가이드
+                // color-accent).
+                className="pop inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
+                style={{
+                  background: "var(--green-soft)",
+                  color: "var(--green-deep)",
+                  fontWeight: "var(--weight-black)",
+                }}
+              >
+                <span aria-hidden>연속</span>
+                {combo}
+              </span>
+            )}
+            {/* 숫자가 바뀔 때 자리가 밀리지 않게 고정폭 숫자를 쓴다.
+                9 에서 10 이 되면 글자가 옆으로 밀려 눈에 거슬린다. */}
+            <span
+              className="text-sm tabular-nums"
+              // 맨 바탕 위라 라벨용이 아니라 --text-muted.
+              style={{ color: "var(--text-muted)" }}
+            >
+              {score.solved}문제 중 {score.correct}개
+            </span>
+          </div>
+        )}
+      </div>
+      {branch}
+    </>
+  );
+
   return (
     <>
       {overlays}
       {body}
     </>
+  );
+}
+
+/**
+ * 고른 유형으로 낼 문제가 없을 때의 안내. 오류 화면이 이 문구일 때만 버튼을
+ * "섞어서로 풀기" 로 바꾸므로 문구와 판정이 한 값을 본다.
+ */
+const KIND_EXHAUSTED =
+  "이 유형으로 낼 수 있는 문제가 없거나 다 풀었습니다. 유형을 \"섞어서\" 로 바꾸거나 분류를 넓혀보세요.";
+
+/**
+ * 고를 수 있는 문제 유형.
+ *
+ * 이름은 서버의 QuizKind.LABELS 와 같게 둔다. 문제마다 오는 kind_label 은
+ * 그 문제 하나의 이름이라, 문제를 받기 전에 목록을 그릴 수 없다. 한 판·
+ * 일일공부·복습은 문제 카드(QuestionCard)에 서버가 준 kind_label 을 그대로
+ * 쓰는데, 여기서 다른 말을 쓰면 같은 유형이 화면마다 다른 이름이 된다.
+ */
+const KINDS: Record<QuizContent, { value: string; label: string }[]> = {
+  words: [
+    { value: "meaning", label: "뜻 고르기" },
+    { value: "term", label: "단어 고르기" },
+    { value: "description", label: "설명 보고 맞히기" },
+  ],
+  sentences: [
+    { value: "blank", label: "빈칸 채우기" },
+    { value: "situation", label: "상황 고르기" },
+  ],
+};
+
+/**
+ * 유형 고르개. 전에는 지금 문제의 유형을 보여주기만 하던 알약이었다.
+ *
+ * **보이는 알약은 바로 위 분류 고르개(CategoryPicker)와 같은 모양이다.**
+ * 흰 종이, "유형" 라벨, 고른 값, ▼. 한 화면에 고르개 둘이 다르게 생기면
+ * 하나는 누르는 것이 아닌 줄 안다.
+ *
+ * 그 위에 브라우저 기본 select 를 투명하게 덮는다. 목록이 서너 개뿐이라
+ * CategoryPicker 같은 메뉴를 새로 만들 이유가 없고, 기본 select 는 폰에서
+ * 운영체제의 고르기 창이 떠서 누르기 쉽다. 누르는 영역이 알약 전체가 된다.
+ * 알약이 보여주던 "지금 문제의 유형" 은 바로 아래 질문("이 단어의 뜻은?")이
+ * 이미 말한다.
+ */
+function KindPicker({
+  content,
+  value,
+  onChange,
+}: {
+  content: QuizContent;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const current =
+    KINDS[content].find((one) => one.value === value)?.label ?? "섞어서";
+
+  return (
+    // 초점 표시는 알약에 그린다. select 는 투명해서 제 테두리가 안 보인다.
+    <label
+      className="dv-btn dv-press-card relative inline-flex items-center gap-2 rounded-full px-4 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus"
+      style={
+        {
+          minHeight: "var(--hit-floor)",
+          background: "var(--paper)",
+          color: "var(--foreground)",
+          fontWeight: "var(--weight-bold)",
+          "--lift": "var(--lift-card)",
+        } as React.CSSProperties
+      }
+    >
+      <span aria-hidden style={{ color: "var(--text-muted)" }}>
+        유형
+      </span>
+      <span aria-hidden>{current}</span>
+      <span
+        aria-hidden
+        className="text-xs"
+        style={{ color: "var(--text-dim)" }}
+      >
+        ▼
+      </span>
+      <select
+        aria-label="문제 유형"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        // text-base: iOS Safari 는 16px 보다 작은 입력칸을 누르면 화면을
+        // 확대한다. 투명해서 보이는 모양은 그대로다.
+        className="absolute inset-0 h-full w-full cursor-pointer text-base opacity-0"
+      >
+        <option value="">섞어서</option>
+        {KINDS[content].map((one) => (
+          <option key={one.value} value={one.value}>
+            {one.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
