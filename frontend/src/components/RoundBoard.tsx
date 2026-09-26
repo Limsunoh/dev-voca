@@ -376,9 +376,14 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         // 맨 위에 있어야 한다.
         <div className="flex flex-1 flex-col justify-center">
           {/* 아직 판이 안 열렸다. 점수로 잃을 게 없으니 묻지 않고 나간다.
-              대신 갈 곳을 여럿 둔다 - 여기는 고르는 자리다. */}
+              대신 갈 곳을 여럿 둔다 - 여기는 고르는 자리다.
+
+              나가면 홈이 아니라 문제풀기 허브(/test)다. 이 화면에 들어오는
+              길(허브·문제풀기의 "한 판 풀기"·순위표·내정보·다시 보기)에 홈은 없고,
+              탭바가 없는 화면이라 홈으로 보내면 허브까지 한 번 더 누른다.
+              아래 두 출구(그만두기·게스트 결과)도 같은 곳으로 보낸다. */}
           <div className="mb-5 flex items-center justify-between gap-3">
-            <ExitGuard to={routes.home} label="홈" />
+            <ExitGuard to={routes.test} label="문제풀기" ariaLabel="문제풀기로 나가기" />
             {/* 맨몸 글자 링크로 둔다. 옆의 나가기가 흰 알약이라, 여기까지
                 알약이면 같은 무게의 버튼 둘이 나란히 서서 어느 것이 나가는
                 길인지 안 보인다. */}
@@ -402,9 +407,18 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       return (
         // 결과 카드도 하나뿐이라 가운데가 맞다.
         <div className="flex flex-1 flex-col justify-center">
-          {/* 판이 끝났다. 점수는 이미 서버에 올라갔으니 경고할 것이 없다. */}
+          {/* 판이 끝났다. 점수는 이미 서버에 올라갔으니 경고할 것이 없다.
+
+              **게스트에게는 "내 기록" 을 주지 않는다.** 게스트는 기록이
+              없어서 내정보가 로그인 화면으로 보낸다 - 이름과 다른 곳에
+              닿는다. 로그인 권유는 아래 결과 카드의 "로그인" 링크가 이미
+              한다. 게스트는 들어온 쪽인 문제풀기 허브로 나간다. */}
           <div className="mb-5 flex items-center gap-3">
-            <ExitGuard to={routes.profile} label="내 기록" />
+            {isGuest ? (
+              <ExitGuard to={routes.test} label="문제풀기" ariaLabel="문제풀기로 나가기" />
+            ) : (
+              <ExitGuard to={routes.profile} label="내 기록" />
+            )}
           </div>
           <RoundResultCard
             summary={summary}
@@ -428,7 +442,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
               무엇을 눌러야 진짜 나가는지 헷갈린다. 여는 쪽과 확정하는 쪽의
               이름을 다르게 둔다. */}
           <ExitGuard
-            to={routes.home}
+            to={routes.test}
             label="그만두기"
             confirm
             score={tally.score}

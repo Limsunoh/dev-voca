@@ -29,6 +29,7 @@ import { LeaveConfirm } from "./LeaveConfirm";
 export function ExitGuard({
   to,
   label = "나가기",
+  ariaLabel,
   confirm = false,
   confirmWhenSolved = false,
   score,
@@ -38,6 +39,14 @@ export function ExitGuard({
   to: string;
   /** 버튼에 쓸 글자. */
   label?: string;
+  /**
+   * 화면낭독기가 읽을 이름. 없으면 보이는 글자(label)를 읽는다.
+   *
+   * 보이는 글자가 목적지 이름뿐일 때 준다. 화살표(←)는 aria-hidden 이라
+   * "문제풀기, 버튼" 으로만 읽히는데, 문제풀기 화면 안에서는 나가는 버튼인지
+   * 풀기를 시작하는 버튼인지 구분이 안 된다.
+   */
+  ariaLabel?: string;
   /** 나가기 전에 늘 물어볼지. 점수가 남는 판에서만 켠다. */
   confirm?: boolean;
   /** 푼 것이 있을 때만 물어볼지. 문제풀기가 이쪽이다. */
@@ -161,6 +170,7 @@ export function ExitGuard({
 
       <button
         type="button"
+        aria-label={ariaLabel}
         onClick={() => {
           if (confirm || (confirmWhenSolved && solvedNow() > 0)) open();
           else leave();
