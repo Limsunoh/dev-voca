@@ -278,6 +278,12 @@ class Question:
     # 지문은 검수가 취소돼도 걸리지 않는다.
     source_sentence_id: int | None = None
 
+    # 지문 문장의 종류(SentenceKind: error·phrase). 문장이 지문인 문제(빈칸·
+    # 상황)에만 채우고, 단어 문제는 빈 값이다. 화면이 에러 메시지만 고정폭
+    # 으로 그리는 데 쓴다 - 익히기 목록·상세가 이미 이 규칙이다
+    # (devvoca-design SKILL: 단어·에러 메시지는 고정폭, 사람이 쓴 문장은 가변폭).
+    sentence_kind: str = ""
+
 
 def _pick_distractors(answer: Word, pool: QuerySet[Word], count: int) -> list[Word]:
     """오답 후보를 고른다.
@@ -661,6 +667,7 @@ def make_blank_question(
             answer_type=QuizKind.TARGETS[QuizKind.BLANK],
             time_limit_ms=TIME_LIMITS_MS[QuizKind.BLANK],
             source_sentence_id=sentence.pk,
+            sentence_kind=sentence.kind,
         )
 
     return None
@@ -828,4 +835,5 @@ def make_situation_question(
         category_label=answer.get_category_display(),
         answer_type=QuizKind.TARGETS[QuizKind.SITUATION],
         time_limit_ms=TIME_LIMITS_MS[QuizKind.SITUATION],
+        sentence_kind=answer.kind,
     )

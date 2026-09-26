@@ -17,11 +17,22 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { RoundQuestion } from "@/lib/api/rounds";
-import { choicesAreTerms, promptIsEnglish, promptIsTerm } from "@/lib/quiz-text";
+import {
+  choicesAreTerms,
+  promptIsEnglish,
+  promptIsMono,
+  promptIsSentence,
+  promptIsTerm,
+} from "@/lib/quiz-text";
 
 import { QuestionCard } from "./QuestionCard";
 
-function card(kind: string, prompt: string, choices: string[]) {
+function card(
+  kind: string,
+  prompt: string,
+  choices: string[],
+  sentenceKind?: string | null,
+) {
   const question: RoundQuestion = {
     kind,
     kind_label: kind,
@@ -30,6 +41,8 @@ function card(kind: string, prompt: string, choices: string[]) {
     category: "git",
     category_label: "Git",
     choices: choices.map((text, i) => ({ id: i + 1, text })),
+    // 칸이 아예 없는 것(옛 저장분)과 값이 있는 것을 가른다.
+    ...(sentenceKind === undefined ? {} : { sentence_kind: sentenceKind as string }),
   };
   return renderToStaticMarkup(
     createElement(QuestionCard, { question, busy: false, onPick: () => {} }),
@@ -102,5 +115,111 @@ describe("QuestionCard (한 판·일일공부·복습)", () => {
     assert.ok(!isMono(tagOf(html, "리뷰 전에 정리할 때")));
     // 없으면 화면 낭독기가 영어 문장을 한국어 음성으로 읽는다.
     assert.match(tagOf(html, "Can you rebase"), /lang="en"/);
+  });
+});
+
+/*
+ * 문장 지문(빈칸·상황)은 문장 종류로 가른다. 에러 메시지("error")만
+ * 고정폭이고, 실무 표현·빈 값·칸 없음·모르는 값은 본문체다.
+ * 굵기·줄간격은 문장이면 bold·snug, 용어·뜻 지문이면 black·tight 다.
+ */
+describe("문장 종류로 가르는 규칙(promptIsMono)", () => {
+  it("에러 메시지 문장만 고정폭", () => {
+    for (const kind of ["blank", "situation"]) {
+      assert.equal(promptIsMono(kind, "error"), true, kind);
+      assert.equal(promptIsMono(kind, "phrase"), false, kind);
+      assert.equal(promptIsMono(kind, ""), false, kind);
+      assert.equal(promptIsMono(kind, undefined), false, kind);
+      assert.equal(promptIsMono(kind, null), false, kind);
+      assert.equal(promptIsMono(kind), false, kind);
+    }
+  });
+
+  it("모르는 값은 본문체 - 대소문자·공백까지 정확히 맞아야 고정폭", () => {
+    for (const odd of ["ERROR", "Error", " error", "error ", "code", "에러 메시지", "mono"]) {
+      assert.equal(promptIsMono("blank", odd), false, odd);
+      assert.equal(promptIsMono("situation", odd), false, odd);
+    }
+  });
+
+  it("뜻 고르기(용어)는 문장 종류와 무관하게 고정폭", () => {
+    for (const sk of [undefined, null, "", "phrase", "error", "code"]) {
+      assert.equal(promptIsMono("meaning", sk), true, String(sk));
+    }
+  });
+
+  it("단어 유형·모르는 유형에 error 가 붙어 와도 고정폭이 아니다", () => {
+    // 한글 지문(뜻·설명)을 고정폭으로 그리면 한글이 뭉개진다.
+    for (const kind of ["term", "description", "error", "Blank", "SITUATION", ""]) {
+      assert.equal(promptIsMono(kind, "error"), false, kind);
+    }
+  });
+
+  it("문장 지문은 빈칸·상황 둘뿐", () => {
+    assert.deepEqual(
+      ["meaning", "term", "description", "blank", "situation", "Blank", "error"].map(
+        promptIsSentence,
+      ),
+      [false, false, false, true, true, false, false],
+    );
+  });
+});
+
+describe("QuestionCard 문장 지문 (한 판·일일공부·복습)", () => {
+  const style = (tag: string) => /style="([^"]*)"/.exec(tag)?.[1] ?? "";
+
+  it("에러 메시지 문장은 고정폭 + lang=en", () => {
+    for (const kind of ["blank", "situation"]) {
+      const text = `fatal: refusing ____ ${kind}`;
+      const tag = tagOf(card(kind, text, ["a", "b"], "error"), text);
+      assert.ok(isMono(tag), kind);
+      assert.match(tag, /lang="en"/);
+      assert.match(style(tag), /letter-spacing:var\(--tracking-tighter\)/);
+    }
+  });
+
+  it("실무 표현·빈 값·칸 없음·null 은 본문체 + lang=en", () => {
+    for (const kind of ["blank", "situation"]) {
+      for (const sk of ["phrase", "", undefined, null]) {
+        const text = `Could you ____ it ${kind} ${String(sk)}`;
+        const tag = tagOf(card(kind, text, ["a", "b"], sk), text);
+        assert.ok(!isMono(tag), `${kind} ${String(sk)}`);
+        assert.match(tag, /lang="en"/);
+        assert.match(style(tag), /letter-spacing:var\(--tracking-tight\)/);
+      }
+    }
+  });
+
+  it("모르는 값(ERROR·code)은 본문체", () => {
+    for (const sk of ["ERROR", "code"]) {
+      const text = `panic: ${sk}`;
+      assert.ok(!isMono(tagOf(card("situation", text, ["a", "b"], sk), text)), sk);
+    }
+  });
+
+  it("문장 지문은 bold·snug, 에러든 실무 표현이든 같다", () => {
+    for (const sk of ["error", "phrase", undefined]) {
+      const text = `sentence ${String(sk)}`;
+      const s = style(tagOf(card("blank", text, ["a", "b"], sk), text));
+      assert.match(s, /font-weight:var\(--weight-bold\)/, String(sk));
+      assert.match(s, /line-height:var\(--leading-snug\)/, String(sk));
+    }
+  });
+
+  it("용어 지문은 그대로 black·tight + 고정폭(문장 종류가 와도)", () => {
+    for (const sk of [undefined, "", "phrase"]) {
+      const tag = tagOf(card("meaning", "rebase", ["옮기기", "합치기"], sk), "rebase");
+      assert.ok(isMono(tag), String(sk));
+      const s = style(tag);
+      assert.match(s, /font-weight:var\(--weight-black\)/);
+      assert.match(s, /line-height:var\(--leading-tight\)/);
+    }
+  });
+
+  it("단어 고르기 한글 지문은 error 가 붙어 와도 본문체·black", () => {
+    const text = "원격 저장소를 가져오기";
+    const tag = tagOf(card("term", text, ["fetch", "push"], "error"), text);
+    assert.ok(!isMono(tag));
+    assert.match(style(tag), /font-weight:var\(--weight-black\)/);
   });
 });
