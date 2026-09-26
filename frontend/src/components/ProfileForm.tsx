@@ -10,6 +10,7 @@ import {
   AvatarMark,
   avatarLabel,
 } from "@/components/Avatar";
+import { useUnsavedGuard } from "@/components/useUnsavedGuard";
 import type { AvatarDisplay } from "@/lib/api/accounts";
 
 /**
@@ -70,13 +71,8 @@ export function ProfileForm({
   // 자리라 더 그렇다.
   const [name, setName] = useState(initialName);
 
-  // 서버가 앞뒤 공백 따위를 다듬어 저장한다. 그 결과로 맞춰주지 않으면
-  // 화면에는 다듬기 전 값이 남아, 저장된 것과 보이는 것이 어긋난다.
-  const [syncedWith, setSyncedWith] = useState<string | undefined>(undefined);
-  if (state.savedName !== undefined && state.savedName !== syncedWith) {
-    setSyncedWith(state.savedName);
-    setName(state.savedName);
-  }
+  // 마지막으로 저장된 이름. 화면의 이름과 다르면 저장 안 한 변경이다.
+  const [savedName, setSavedName] = useState(initialName);
 
   const googlePhoto = googlePicture || null;
 
@@ -113,15 +109,17 @@ export function ProfileForm({
 
   // 저장된 값이 비어 있으면 서버가 정한 것을 고른 상태로 보여준다.
   // 아무것도 선택되지 않은 것처럼 보이면 지금 뭐가 적용 중인지 알 수 없다.
+  //
+  // 저장된 것이 화면에 없는 선택지를 가리키면(사진 없이 photo, 구글 사진
+  // 없이 google - Admin 에서 고치면 생긴다) 서버가 실제로 그리는 것을
+  // 고른다. 그대로 두면 골라진 칸이 하나도 없는 채로 그 값을 보내, 저장할
+  // 때마다 "올린 사진이 없습니다" 로 막히는데 사용자는 이유를 모른다.
+  const usable =
+    Boolean(initialAvatar) &&
+    !(initialAvatar === "photo" && !hasMyPhoto) &&
+    !(initialAvatar === "google" && !googlePhoto);
   const [avatar, setAvatar] = useState(
-    initialAvatar ||
-      (hasMyPhoto
-        ? "photo"
-        : googlePhoto
-          ? "google"
-          : shown.type === "preset"
-            ? shown.key
-            : "a1"),
+    usable ? initialAvatar : fallbackAvatar(hasMyPhoto, googlePhoto, shown),
   );
 
   // 사진을 새로 올리면 서버가 avatar 를 photo 로 바꿔서 내려준다. 화면의
@@ -132,22 +130,89 @@ export function ProfileForm({
   // 올렸으면 "올린 사진" 으로. 안 옮기면 사진은 올라갔는데 링은 아바타에
   // 남아, 무엇이 적용된 것인지 알 수 없다.
   //
-  // 지웠으면 서버가 정한 것으로. 서버도 같은 판단으로 avatar 를 비운다
-  // (views.py 의 delete). 안 옮기면 링이 사라진 칸을 가리킨다.
+  // 지웠으면 서버를 따른다. 서버는 저장된 것이 photo 일 때만 avatar 를
+  // 비운다(views.py 의 delete) - 구글 사진이나 아바타를 골라 둔 채 지우면
+  // 그 선택은 그대로다. 무엇이 남았는지는 지우기 결과(savedAvatar)로 받는다.
+  // 한때 지우면 늘 아바타로 옮겼는데, 그러면 구글 사진이 있는 사람은
+  // 머리말은 구글 사진인데 링은 a1 에 있고, 그대로 이름만 저장하면 a1 이
+  // 실제로 저장됐다.
   //
   // 시각으로 한 번만 반응한다. 값으로 비교하면 지웠다가 같은 사진을 다시
   // 올렸을 때 주소가 같아 못 알아챈다.
+  //
+  // 저장된 선택도 같이 옮긴다. 사진을 올리거나 지우면 서버가 그 자리에서
+  // avatar 를 바꿔 저장하므로, 여기는 "저장 안 한 변경" 이 아니다.
+  const [savedAvatar, setSavedAvatar] = useState(avatar);
   const [syncedAt, setSyncedAt] = useState<number | undefined>(undefined);
   if (lastPhotoChange.at && lastPhotoChange.at !== syncedAt) {
     setSyncedAt(lastPhotoChange.at);
-    setAvatar(
-      lastPhotoChange.photoUrl
-        ? "photo"
-        : shown.type === "preset"
-          ? shown.key
-          : "a1",
-    );
+    if (lastPhotoChange.photoUrl) {
+      setAvatar("photo");
+      setSavedAvatar("photo");
+    } else {
+      // 서버가 알려준 값을 먼저 쓴다(deletePhotoAction). 없으면 같은 규칙으로
+      // 짐작한다.
+      const kept =
+        lastPhotoChange.savedAvatar ??
+        (savedAvatar === "photo"
+          ? fallbackAvatar(false, googlePhoto, shown)
+          : savedAvatar);
+      setSavedAvatar(kept);
+      // 올린 사진 칸이 사라지므로 그것을 고르고 있었으면 옮긴다. 다른 것을
+      // 고르고 있었으면(저장 안 했어도) 그대로 둔다.
+      if (avatar === "photo") setAvatar(kept);
+    }
   }
+
+  // 저장 결과가 새로 올 때 한 번만 반응한다.
+  //
+  // 서버가 앞뒤 공백 따위를 다듬어 저장한다. 그 결과로 맞춰주지 않으면
+  // 화면에는 다듬기 전 값이 남아, 저장된 것과 보이는 것이 어긋난다.
+  //
+  // 저장된 값(비교 기준)은 **서버가 돌려준 값**으로 옮긴다. 결과가 온
+  // 순간의 화면 값을 쓰면, 저장이 도는 사이 다른 아바타를 누른 것까지
+  // 저장된 것으로 잡혀 떠날 때 묻지 않는다(저장 중에도 선택지는 눌린다).
+  const [handledSave, setHandledSave] = useState(state);
+  // 저장할 때마다 사진 고르기 칸을 새로 그린다. React 가 폼을 비우면
+  // 라디오의 DOM 체크는 처음 그린 것으로 돌아가(아래 hidden 칸 주석), 링은
+  // 새 아바타인데 키보드 포커스와 낭독기는 옛 것을 "선택됨" 으로 읽는다.
+  // 새로 그리면 그때의 선택이 기본 체크가 된다.
+  const [saveCount, setSaveCount] = useState(0);
+  if (state !== handledSave) {
+    setHandledSave(state);
+    if (state.saved) {
+      const trimmed = state.savedName ?? name;
+      // 저장이 도는 사이 더 친 글자는 지우지 않는다. 보낸 그대로일 때만
+      // 서버가 다듬은 모양으로 맞춘다.
+      if (state.sentName === undefined || name === state.sentName) {
+        setName(trimmed);
+      }
+      setSavedName(trimmed);
+      setSaveCount((count) => count + 1);
+      // 빈 값은 "서버가 정함" 이라 화면 값과 비교할 수 없다. 이 폼은 늘
+      // 무엇인가를 골라 보내므로 실제로는 안 오지만, 오면 화면 값을 쓴다.
+      setSavedAvatar(state.savedAvatar || avatar);
+    }
+  }
+
+  // **저장 안 한 변경.** 사진 고르기는 누르면 미리보기가 바로 바뀌어서
+  // 저장된 것처럼 보이는데, 실제로는 아래 저장 버튼을 눌러야 반영된다.
+  // 모른 채 탭바로 떠나면 고른 것이 말없이 사라졌다. 그래서 떠나기 전에
+  // 묻고, 저장 버튼 위에도 적어 둔다.
+  const avatarChanged = avatar !== savedAvatar;
+  const nameChanged = name !== savedName;
+  const dirty = avatarChanged || nameChanged;
+  const unsaved = [avatarChanged && "고른 사진", nameChanged && "바꾼 이름"]
+    .filter(Boolean)
+    .join("과 ");
+  const leaveDialog = useUnsavedGuard({
+    dirty,
+    title: "저장하지 않고 나갈까요?",
+    // 바꾼 것이 없으면 창이 안 열리지만 문장은 DOM 에 있다. 빈 주어로 두지 않는다.
+    detail: unsaved ? `${unsaved}이 저장되지 않습니다.` : "",
+    confirmLabel: "나가기",
+    cancelLabel: "계속 고치기",
+  });
 
   // 고른 것이 구글 사진이나 올린 사진인데 그것이 없어진 경우는 서버가 정한
   // 것을 그대로 쓴다. 여기서 임의로 정하면 이 화면과 머리말이 다른 그림을
@@ -232,6 +297,13 @@ export function ProfileForm({
       {/* 이름과 아바타는 저장 버튼을 눌러야 반영된다. 사진과 달리 되돌리기
           쉽고, 치는 도중에 매번 보내면 "이미 쓰는 이름" 이 글자마다 뜬다. */}
       <form action={formAction} className="grid gap-4">
+      {/* **서버로 보내는 아바타는 이 칸이 든다. 라디오가 아니다.** React 는
+          폼 액션이 끝날 때마다 폼을 비우는데, 라디오의 체크는 처음 그린
+          때로 돌아간다(글자 칸과 달리 기본값을 따라 고쳐 두지 않는다).
+          그러면 링은 방금 저장한 것에 있는데 DOM 의 체크는 옛 것이라, 다음
+          저장 때 옛 아바타가 조용히 서버에 들어갔다. hidden 칸은 값이 곧
+          기본값이라 비우기에 영향을 안 받는다. */}
+      <input type="hidden" name="avatar" value={avatar} />
       <section
         className="grid gap-5 p-5"
         style={{
@@ -255,7 +327,10 @@ export function ProfileForm({
           {/* 폰에서는 한 줄에 다 안 들어간다. 그냥 흘리면 5개 + 1개로
               갈려서 마지막 하나가 혼자 남는다. 네 칸씩 끊어 4+3(구글 사진이
               있을 때) 또는 4+2 로 떨어지게 한다. */}
-          <div className="mt-3 grid grid-cols-4 justify-items-center gap-3 sm:flex sm:flex-wrap sm:justify-items-start">
+          <div
+            key={saveCount}
+            className="mt-3 grid grid-cols-4 justify-items-center gap-3 sm:flex sm:flex-wrap sm:justify-items-start"
+          >
             {/* 올린 사진을 맨 앞에 둔다. 직접 올린 것이 가장 나중에 한
                 행동이라 여기 있을 것을 먼저 찾는다. */}
             {hasMyPhoto && (
@@ -358,7 +433,9 @@ export function ProfileForm({
         </p>
       )}
 
-      {state.saved && !state.error && (
+      {/* 저장한 뒤 또 바꿨으면 "저장했습니다" 를 내린다. 둘이 같이 뜨면
+          지금 바꾼 것까지 저장된 것으로 읽힌다. */}
+      {state.saved && !state.error && !dirty && (
         <p
           role="status"
           className="rounded-[var(--radius-xl)] p-3 text-sm"
@@ -371,10 +448,37 @@ export function ProfileForm({
         </p>
       )}
 
+      {/* 알림 상자가 아니라 글 한 줄이다. 잘못된 것이 아니라 할 일이 남은
+          것이라, 오류와 같은 모양이면 무언가 틀린 줄 안다. */}
+      {dirty && (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          {unsaved}은 아직 저장하지 않았습니다.
+        </p>
+      )}
+
       <SaveButton />
       </form>
+
+      {leaveDialog}
     </div>
   );
+}
+
+/**
+ * 저장된 선택이 없을 때 고른 상태로 보여줄 것.
+ *
+ * 서버가 그리는 순서(accounts/models.py 의 avatar_display)와 같다 - 올린
+ * 사진, 구글 사진, 서버가 정한 아바타. 처음 들어올 때와 사진을 지운 뒤가
+ * 같이 쓴다. 두 곳이 따로 정하던 때 지운 뒤에만 구글 사진이 빠졌다.
+ */
+function fallbackAvatar(
+  hasMyPhoto: boolean,
+  googlePhoto: string | null,
+  shown: AvatarDisplay,
+): string {
+  if (hasMyPhoto) return "photo";
+  if (googlePhoto) return "google";
+  return shown.type === "preset" ? shown.key : "a1";
 }
 
 /**
@@ -420,9 +524,11 @@ function AvatarOption({
         } as React.CSSProperties
       }
     >
+      {/* name 이 avatar 가 아니다. 서버로 가는 값은 폼의 hidden 칸이
+          들고 있다(ProfileForm 의 주석). */}
       <input
         type="radio"
-        name="avatar"
+        name="avatar_choice"
         value={value}
         checked={checked}
         onChange={() => onSelect(value)}
@@ -447,13 +553,17 @@ function AvatarOption({
  *
  * 지우기 버튼은 여기 없다. 그것은 다른 폼(지우기 액션)에 속하고, 폼은
  * 겹칠 수 없어서 형제로 나란히 둔다.
+ *
+ * **inline-flex 가 꼭 있어야 한다.** label 은 인라인 요소라 min-height 가
+ * 안 먹는다. 빠져 있던 동안 이 버튼만 52px 이 아니라 글자 높이(24px)로
+ * 그려져, 옆의 "사진 지우기" 버튼과 달리 밑줄 친 글자처럼 보였다.
  */
 function PhotoPicker({ hasPhoto }: { hasPhoto: boolean }) {
   const { pending } = useFormStatus();
 
   return (
     <label
-      className="dv-btn cursor-pointer rounded-[var(--radius-pill)] px-5 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus"
+      className="dv-btn inline-flex cursor-pointer items-center rounded-[var(--radius-pill)] px-5 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus"
       style={
         {
           minHeight: "var(--hit-min)",

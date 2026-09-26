@@ -212,7 +212,7 @@ async function photoRequest(
   }
 
   if (!res.ok) {
-    // 400 대의 본문만 안내로 쓴다. 이유는 client.ts 의 errorMessage 와
+    // 400 대의 본문만 안내로 쓴다. 이유는 client.ts 의 errorDetail 과
     // 같다 - 서버 오류 본문에는 사용자가 할 수 있는 일이 없다.
     let message = `사진을 저장하지 못했습니다. (${res.status})`;
     if (res.status < 500) {
