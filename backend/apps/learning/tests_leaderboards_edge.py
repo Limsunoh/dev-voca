@@ -7,7 +7,7 @@ tests_leaderboards.py 가 규칙이 지켜지는지를 본다면, 여기는 규�
     - 목록 경계: 정확히 20등 / 21등 / 동점이 경계에 걸릴 때
     - KST 주 경계: 월요일 0시 정각 직전 1마이크로초, 지난주 일요일 끝
     - total 등가성: 마이너스·null·0 을 섞은 무작위 입력에서 파이썬 == SQL
-    - 0점 여럿: 활동일이 다르면 등수가 갈려야 한다
+    - 0일 여럿: 목록에는 없어도 가입 순으로 등수가 갈려야 한다
     - 아바타: 프리셋 / 구글 사진만 / 둘 다 없음 / 목록에 없는 값
     - API: 게스트, 빈 순위표, 탈퇴 계정, 잘못된 종류
 """
@@ -435,16 +435,16 @@ class TotalEquivalenceTest(TestCase):
                     )
 
                 expected = sum(row.total for row in rows)
-                # 활동일도 total 기준이다. 두 칸을 따로 보면 상쇄되어 0인
-                # 날(best=5, study=-5)이 활동일로 세어진다.
+                # 날 수도 total 기준이다. 두 칸을 따로 보면 상쇄되어 0인
+                # 날(best=5, study=-5)이 날 수에 들어간다.
                 active_days = sum(1 for row in rows if row.total > 0)
 
                 board = leaderboards.build(leaderboards.STREAK, user=user)
                 mine = board.rows[0] if board.rows else board.me
 
                 self.assertIsNotNone(mine, "행이 30개인데 줄이 없다")
-                self.assertEqual(mine.score, expected, "SQL 합이 파이썬 합과 다르다")
-                self.assertEqual(mine.entries, active_days, "활동일 셈이 다르다")
+                self.assertEqual(mine.entries, expected, "SQL 합이 파이썬 합과 다르다")
+                self.assertEqual(mine.score, active_days, "날 수 셈이 다르다")
 
     def test_a_day_that_is_only_negative_contributes_zero(self):
         """하루가 통째로 마이너스여도 누적이 줄지 않는다.
@@ -458,8 +458,8 @@ class TotalEquivalenceTest(TestCase):
 
         board = leaderboards.build(leaderboards.STREAK, user=user)
 
-        self.assertEqual(board.rows[0].score, 20, "마이너스 날이 누적을 깎았다")
-        self.assertEqual(board.rows[0].entries, 1)
+        self.assertEqual(board.rows[0].entries, 20, "마이너스 날이 누적을 깎았다")
+        self.assertEqual(board.rows[0].score, 1)
 
     def test_a_null_best_with_study_points_is_not_lost(self):
         """best_free_score 가 null 인 날의 일일공부 점수가 사라지면 안 된다.
@@ -474,8 +474,8 @@ class TotalEquivalenceTest(TestCase):
 
         board = leaderboards.build(leaderboards.STREAK, user=user)
 
-        self.assertEqual(board.rows[0].score, 20, "null 인 날이 합계에서 빠졌다")
-        self.assertEqual(board.rows[0].entries, 4, "공부만 한 날이 활동일이 아니다")
+        self.assertEqual(board.rows[0].entries, 20, "null 인 날이 합계에서 빠졌다")
+        self.assertEqual(board.rows[0].score, 4, "공부만 한 날을 날 수에 안 셌다")
 
 
 class ZeroScoreOrderingTest(BoardConsistencyMixin, TestCase):
@@ -485,7 +485,7 @@ class ZeroScoreOrderingTest(BoardConsistencyMixin, TestCase):
         cache.clear()
 
     def test_zero_score_users_are_ordered_among_themselves(self):
-        """0점 다섯 명. 전부 활동일 0 이면 pk 순으로 갈린다."""
+        """0일 다섯 명. 날 수도 점수 합도 0 이라 pk 순으로 갈린다."""
         today = calendar_kst.today()
         scorer = make_user("유일한점수자")
         daily(scorer, today, best=10)
@@ -499,8 +499,8 @@ class ZeroScoreOrderingTest(BoardConsistencyMixin, TestCase):
         for user in zeros:
             board = leaderboards.build(leaderboards.STREAK, user=user)
             self.assertBoardIsSane(board, expect_me_user=user)
-            self.assertEqual(board.me.score, 0)
-            self.assertEqual(board.me.entries, 0, "마이너스 날을 활동일로 셌다")
+            self.assertEqual(board.me.score, 0, "마이너스 날을 날 수에 셌다")
+            self.assertEqual(board.me.entries, 0)
             ranks.append(board.me.rank)
 
         self.assertEqual(len(set(ranks)), len(ranks), f"0점끼리 등수가 겹친다: {ranks}")
