@@ -1,9 +1,43 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import type { PasswordState } from "@/app/profile/actions";
+import type { PasswordField, PasswordState } from "@/app/profile/actions";
+
+type Passwords = Record<PasswordField, string>;
+
+const EMPTY: Passwords = {
+  current_password: "",
+  new_password: "",
+  new_password_confirm: "",
+};
+
+/**
+ * 결과를 받은 뒤 세 칸에 남길 값.
+ *
+ * 성공하면 셋 다 비운다. 실패하면 틀린 칸만 비운다 - 현재 비밀번호가
+ * 틀렸으면 그 칸만, 확인 값이 다르면 확인 칸만. 새 비밀번호가 규칙에
+ * 걸렸으면 확인 칸도 같이 비운다. 새 값을 다시 정해야 하니 옛 확인 값은
+ * 어차피 안 맞는다. 칸 탓이 아닌 실패(연결 끊김 등)는 아무것도 안 비운다.
+ */
+export function passwordsAfter(
+  state: PasswordState,
+  values: Passwords,
+): Passwords {
+  if (state.saved) return EMPTY;
+
+  switch (state.field) {
+    case "current_password":
+      return { ...values, current_password: "" };
+    case "new_password":
+      return { ...values, new_password: "", new_password_confirm: "" };
+    case "new_password_confirm":
+      return { ...values, new_password_confirm: "" };
+    default:
+      return values;
+  }
+}
 
 /**
  * 비밀번호 변경 카드. 처음 설정하는 경우도 같이 받는다.
@@ -17,7 +51,7 @@ import type { PasswordState } from "@/app/profile/actions";
  * 가늠하면 이메일로 가입한 뒤 구글을 붙인 사람이 잘못 걸린다.
  *
  * 'use client' 인 이유는 ProfileForm 과 같다. useActionState 로 서버가
- * 돌려준 결과를 받고, 성공하면 입력칸을 비운다.
+ * 돌려준 결과를 받아 입력칸을 정리한다(passwordsAfter).
  *
  * page.tsx 에 직접 붙지 않는다. 지금 세 기능이 그 파일에 절을 추가하려
  * 해서, 각자 카드만 만들고 배치는 한 곳에서 한 번에 한다.
@@ -53,17 +87,35 @@ export function PasswordCard({
     action,
     {},
   );
-  const formRef = useRef<HTMLFormElement>(null);
 
-  // 성공하면 입력칸을 비운다. 남겨두면 방금 정한 비밀번호가 화면에 그대로
-  // 남아, 자리를 비운 사이 누가 보면 바꾼 의미가 없어진다.
+  // **세 칸을 상태로 든다(제어 입력).** 값을 칸에 맡겨 두면 React 가 폼
+  // 액션이 끝날 때마다 폼을 통째로 비운다 - 실패해도 그렇다. 그래서 현재
+  // 비밀번호 하나 틀려도 새 비밀번호 두 칸까지 다시 쳐야 했다. 상태로
+  // 들면 그 비우기가 이 값을 못 건드리고, 무엇을 비울지를 여기서 정한다.
   //
-  // reset() 을 쓰는 이유: 값을 state 로 들고 있지 않다. 비밀번호는 서버가
-  // 돌려주지 않는 값이라 화면이 굳이 기억할 이유가 없고, 기억하면 리렌더
-  // 때마다 메모리에 남는 시간만 길어진다.
-  useEffect(() => {
-    if (state.saved) formRef.current?.reset();
-  }, [state.saved]);
+  // 값은 브라우저 안에만 있다. 서버 결과에 비밀번호를 실어 되돌려 받는
+  // 방식(로그인 폼이 이메일에 쓰는 defaultValue)은 쓰지 않는다 - 그러면
+  // 비밀번호가 서버 응답에 실려 다시 내려온다. 다만 React 는 제어 입력의
+  // 값을 input 의 value 속성에도 적어 두어서, 친 동안은 개발자 도구에서
+  // 속성으로 보인다. 결과를 받으면 비운 칸은 속성도 같이 비워진다.
+  const [values, setValues] = useState<Passwords>(EMPTY);
+
+  // 결과가 새로 올 때 한 번만 정리한다. 같은 오류가 두 번 나도 결과
+  // 객체는 매번 새것이라 두 번째에도 다시 비운다.
+  const [handled, setHandled] = useState(state);
+  if (state !== handled) {
+    setHandled(state);
+    setValues(passwordsAfter(state, values));
+  }
+
+  const bind = (field: PasswordField) => ({
+    name: field,
+    value: values[field],
+    onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+      const next = event.target.value;
+      setValues((prev) => ({ ...prev, [field]: next }));
+    },
+  });
 
   // 바깥을 감싸지 않는다. 이 카드는 page.tsx 의 "계정" 절 안에 EmailCard 와
   // 형제로 놓이므로, 여기서 section 을 또 두면 절 안에 절이 생기고 h2 가
@@ -72,7 +124,6 @@ export function PasswordCard({
   // 벌어져 나머지와 리듬이 어긋난다.
   return (
     <form
-      ref={formRef}
       action={formAction}
       className="grid gap-4 p-5"
       style={{
@@ -139,7 +190,7 @@ export function PasswordCard({
           </label>
           <input
             id="pw-current"
-            name="current_password"
+            {...bind("current_password")}
             type="password"
             required
             autoComplete="current-password"
@@ -168,7 +219,7 @@ export function PasswordCard({
         </label>
         <input
           id="pw-new"
-          name="new_password"
+          {...bind("new_password")}
           type="password"
           required
           // 브라우저에 "새 비밀번호" 라고 알려준다. current-password 로
@@ -212,7 +263,7 @@ export function PasswordCard({
               막는 자리다. */}
         <input
           id="pw-new-confirm"
-          name="new_password_confirm"
+          {...bind("new_password_confirm")}
           type="password"
           required
           autoComplete="new-password"
@@ -227,21 +278,41 @@ export function PasswordCard({
         />
       </div>
 
-      {/* 결과를 aria-live 로 알린다. 화면을 못 보는 사용자에게 저장
-            여부가 전달되어야 한다 - 폼이 그대로 남아 있어서 눈으로도
-            성공했는지 알기 어렵다. */}
-      <p aria-live="polite" className="text-sm">
+      {/* 결과는 같은 화면의 다른 카드(이름·이메일)와 같은 채움 상자로
+            보인다. 색 글자만 두던 때는 이 카드만 모양이 달라 같은 화면의
+            알림으로 안 읽혔다.
+
+            알림 자리(aria-live)는 **항상 그린다.** 리전이 내용과 함께 새로
+            생기면 화면 낭독기가 대부분 그 등장을 안 알린다(AuthForm 과 같은
+            이유). 이제 실패해도 칸이 남아서, 알림이 안 읽히면 화면을 못 보는
+            사용자에게는 아무 일도 안 일어난 것과 같다. */}
+      <div aria-live="polite">
         {state.error && (
-          <span style={{ color: "var(--wrong-deep)" }}>{state.error}</span>
+          <p
+            role="alert"
+            className="rounded-[var(--radius-xl)] p-3 text-sm"
+            style={{
+              background: "var(--wrong-soft)",
+              color: "var(--coral-deep)",
+            }}
+          >
+            {state.error}
+          </p>
         )}
         {state.saved && (
-          <span style={{ color: "var(--correct-deep)" }}>
+          <p
+            className="rounded-[var(--radius-xl)] p-3 text-sm"
+            style={{
+              background: "var(--correct-soft)",
+              color: "var(--correct-deep)",
+            }}
+          >
             {state.created
               ? "비밀번호를 설정했습니다. 이제 이메일로도 로그인할 수 있습니다."
               : "비밀번호를 바꿨습니다. 다른 기기는 로그아웃했습니다."}
-          </span>
+          </p>
         )}
-      </p>
+      </div>
 
       <SubmitButton hasPassword={hasPassword} />
     </form>

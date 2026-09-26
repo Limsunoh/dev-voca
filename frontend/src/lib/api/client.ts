@@ -51,6 +51,13 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /**
+     * 칸별 오류였다면 그 칸 이름(예: "current_password"). 아니면 없다.
+     *
+     * 폼이 어느 칸을 비울지 고를 때 쓴다. 문구로 가르면 백엔드가 문구만
+     * 다듬어도 조용히 틀린 칸을 비운다.
+     */
+    readonly field?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -107,9 +114,14 @@ type RequestOptions = {
  *   {"detail": "..."}                  권한·인증 오류
  *   {"non_field_errors": ["..."]}      폼 전체에 걸린 오류
  *   {"email": ["..."], "password": [...]}  칸별 오류
+ *
+ * 칸별 오류면 그 칸 이름도 같이 돌려준다(ApiError.field). 칸이 아닌 것 -
+ * 폼 전체 오류(non_field_errors), 목록 모양 본문, detail - 은 뺀다.
  */
-async function errorMessage(res: Response): Promise<string> {
-  const fallback = `요청이 실패했습니다. (${res.status})`;
+async function errorDetail(
+  res: Response,
+): Promise<{ message: string; field?: string }> {
+  const fallback = { message: `요청이 실패했습니다. (${res.status})` };
 
   // 서버 오류의 본문은 그대로 보여주지 않는다. 거기엔 사용자가 할 수 있는
   // 일이 없고, 내부 사정이 적혀 나갈 수 있다. 400 대만 안내로 쓴다.
@@ -122,12 +134,22 @@ async function errorMessage(res: Response): Promise<string> {
     // Object.values 가 글자 하나씩 쪼개서 첫 글자만 보여준다.
     if (!data || typeof data !== "object") return fallback;
 
-    if (typeof data.detail === "string") return data.detail;
+    if (typeof data.detail === "string") return { message: data.detail };
 
     // 칸별 오류는 첫 줄만 보여준다. 여러 개를 이어 붙이면 읽기 어렵다.
-    for (const value of Object.values(data)) {
-      if (typeof value === "string") return value;
-      if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+    //
+    // 칸 이름으로 싣지 않는 키: 폼 전체 오류(non_field_errors), 목록 모양
+    // 오류(DRF 가 ["..."] 로 줄 때 키가 "0"), detail 이 목록으로 온 경우.
+    const fieldless = Array.isArray(data);
+    for (const [key, value] of Object.entries(data)) {
+      const field =
+        fieldless || key === "non_field_errors" || key === "detail"
+          ? undefined
+          : key;
+      if (typeof value === "string") return { message: value, field };
+      if (Array.isArray(value) && typeof value[0] === "string") {
+        return { message: value[0], field };
+      }
     }
   } catch {
     // 본문이 JSON 이 아닌 경우. 아래 기본 문구를 쓴다.
@@ -164,7 +186,8 @@ export async function request<T>(
   }
 
   if (!res.ok) {
-    throw new ApiError(await errorMessage(res), res.status);
+    const { message, field } = await errorDetail(res);
+    throw new ApiError(message, res.status, field);
   }
   // 204 는 본문이 없다. json() 을 부르면 파싱 에러가 난다.
   if (res.status === 204) return undefined as T;

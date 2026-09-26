@@ -26,6 +26,19 @@ export type ProfileState = {
   saved?: boolean;
   /** 서버가 다듬어 저장한 이름. 화면의 입력칸을 이 값에 맞춘다. */
   savedName?: string;
+  /**
+   * 서버에 저장된 아바타. 화면이 "저장 안 한 변경" 을 가를 기준으로 쓴다.
+   * 결과가 온 순간의 화면 선택으로 대신하면, 저장이 도는 사이 누른 것까지
+   * 저장된 것으로 잡힌다.
+   */
+  savedAvatar?: string;
+  /**
+   * 보낸 그대로의 이름(다듬기 전). 화면이 저장이 도는 사이 글자를 더
+   * 쳤는지 가를 때 쓴다 - 칸이 이 값 그대로일 때만 savedName 으로 맞춘다.
+   * 서버는 공백을 합치고 보이지 않는 글자를 지우는 등 여러 가지를 다듬어서,
+   * 화면에서 다듬어 비교하는 것으로는 못 가른다.
+   */
+  sentName?: string;
 };
 
 export async function updateProfileAction(
@@ -39,7 +52,8 @@ export async function updateProfileAction(
     redirect("/login?next=/profile");
   }
 
-  const displayName = String(formData.get("display_name") ?? "").trim();
+  const sentName = String(formData.get("display_name") ?? "");
+  const displayName = sentName.trim();
   const avatar = String(formData.get("avatar") ?? "");
 
   if (!displayName) {
@@ -58,7 +72,12 @@ export async function updateProfileAction(
   // 옛 이름인 채로 남는다.
   revalidatePath("/", "layout");
 
-  return { saved: true, savedName: saved.display_name };
+  return {
+    saved: true,
+    savedName: saved.display_name,
+    savedAvatar: saved.avatar,
+    sentName,
+  };
 }
 
 export type EmailChangeState = {
@@ -105,8 +124,21 @@ export async function requestEmailChangeAction(
   }
 }
 
+/** 비밀번호 카드의 세 칸. 폼의 name 과 같다. */
+export type PasswordField =
+  | "current_password"
+  | "new_password"
+  | "new_password_confirm";
+
 export type PasswordState = {
   error?: string;
+  /**
+   * 오류가 난 칸. 화면이 이 칸만 비우고 나머지는 친 그대로 둔다.
+   *
+   * 칸 탓이 아닌 실패(연결 끊김, 요청 한도)면 없다 - 그때는 아무 칸도
+   * 안 비운다. 다시 누르기만 하면 되는데 세 칸을 다시 치게 할 이유가 없다.
+   */
+  field?: PasswordField;
   /** 저장에 성공했나. 화면이 안내를 띄우고 입력칸을 비운다. */
   saved?: boolean;
   /** 처음 설정한 것인가. 안내 문구가 갈린다. */
@@ -141,13 +173,13 @@ export async function changePasswordAction(
   const currentRaw = formData.get("current_password");
 
   if (!newPassword) {
-    return { error: "새 비밀번호를 입력해주세요." };
+    return { error: "새 비밀번호를 입력해주세요.", field: "new_password" };
   }
 
   // 확인 칸은 화면에서만 본다. 서버에 보낼 값이 아니라 오타 방지용이고,
   // 여기서 걸러야 잘못 적은 비밀번호로 다른 기기가 끊기는 일이 없다.
   if (newPassword !== confirm) {
-    return { error: "새 비밀번호가 서로 다릅니다." };
+    return { error: "새 비밀번호가 서로 다릅니다.", field: "new_password_confirm" };
   }
 
   let result;
@@ -159,7 +191,15 @@ export async function changePasswordAction(
       new_password: newPassword,
     });
   } catch (error) {
-    if (error instanceof ApiError) return { error: error.message };
+    if (error instanceof ApiError) {
+      // 백엔드가 칸을 짚는 것은 이 둘뿐이다(현재 비밀번호 틀림, 새
+      // 비밀번호 규칙 위반). 그 밖의 칸 이름이 오면 칸 탓이 아닌 것으로 둔다.
+      const field =
+        error.field === "current_password" || error.field === "new_password"
+          ? error.field
+          : undefined;
+      return { error: error.message, field };
+    }
     return { error: "잠시 후 다시 시도해주세요." };
   }
 
@@ -207,6 +247,14 @@ export type PhotoState = {
   at?: number;
   /** 지금 화면에 그릴 사진 주소. 지웠으면 빈 문자열. */
   photoUrl?: string;
+  /**
+   * 지운 뒤 서버에 남은 선택을 화면의 선택지 이름으로 옮긴 것.
+   *
+   * 서버는 저장된 것이 photo 일 때만 비우고, 비면 구글 사진이나 계정마다
+   * 정해진 아바타를 그린다. 화면이 이 규칙을 다시 계산하면 서버가 정한
+   * 아바타(계정 번호로 고른다)를 모르고 a1 로 짐작하게 된다.
+   */
+  savedAvatar?: string;
 };
 
 export async function uploadPhotoAction(
@@ -261,8 +309,9 @@ export async function deletePhotoAction(): Promise<PhotoState> {
   const token = await getToken();
   if (!token) redirect("/login?next=/profile");
 
+  let saved;
   try {
-    await deleteMyPhoto(token);
+    saved = await deleteMyPhoto(token);
   } catch (error) {
     if (error instanceof ApiError) return { error: error.message };
     return { error: "잠시 후 다시 시도해주세요." };
@@ -270,7 +319,13 @@ export async function deletePhotoAction(): Promise<PhotoState> {
 
   revalidatePath("/", "layout");
 
+  // 빈 avatar 는 "서버가 정함" 이다. 그때 그리는 것이 아바타면 그 이름,
+  // 사진이면 구글 사진이다(올린 사진은 방금 지웠다).
+  const display = saved.avatar_display;
+  const savedAvatar =
+    saved.avatar || (display.type === "preset" ? display.key : "google");
+
   // 빈 문자열이라야 화면이 "사진 없음" 으로 읽는다. undefined 로 두면
   // 화면의 ?? 가 서버에서 온 옛 주소로 떨어져 지운 사진이 다시 뜬다.
-  return { at: Date.now(), photoUrl: "" };
+  return { at: Date.now(), photoUrl: "", savedAvatar };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { EmailChangeState } from "@/app/profile/actions";
@@ -35,6 +35,19 @@ export function EmailCard({
     action,
     {},
   );
+
+  // **새 이메일만 상태로 든다.** React 는 폼 액션이 끝날 때마다 폼을
+  // 비우는데, 칸에 맡겨 둔 값은 실패해도 사라진다. 비밀번호 하나 틀렸다고
+  // 적어 둔 새 주소까지 다시 치게 된다. 비밀번호 칸은 그대로 칸에 맡긴다 -
+  // 실패든 성공이든 비워지는 것이 맞다(로그인 폼과 같은 규칙).
+  const [newEmail, setNewEmail] = useState("");
+
+  // 보내기에 성공하면 새 주소 칸도 비운다. 결과가 새로 올 때 한 번만 본다.
+  const [handled, setHandled] = useState(state);
+  if (state !== handled) {
+    setHandled(state);
+    if (state.sentTo) setNewEmail("");
+  }
 
   return (
     <details
@@ -115,6 +128,8 @@ export function EmailCard({
             <input
               id="em-new-email"
               name="new_email"
+              value={newEmail}
+              onChange={(event) => setNewEmail(event.target.value)}
               type="email"
               required
               // 백엔드가 254자에서 거절한다. 여기가 더 크면 다 적고 나서
