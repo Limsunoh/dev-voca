@@ -47,10 +47,16 @@ export default async function TestSentencesPage({ searchParams }: PageProps) {
       <h1 className="sr-only">문장 문제풀기</h1>
 
       {/* 이 화면에는 탭바가 없다(TabBar 의 return null 참고). 나가는 길이
-          여기뿐이라 빠지면 막다른 화면이 된다. 푼 것이 있을 때만 묻는
-          이유는 test/words 쪽에 적어뒀다. */}
+          여기뿐이라 빠지면 막다른 화면이 된다. 홈이 아니라 문제풀기 허브로
+          보내는 이유와 푼 것이 있을 때만 묻는 이유는 test/words 쪽에
+          적어뒀다. */}
       <div className="mb-3 flex items-center justify-between gap-3">
-        <ExitGuard to={routes.home} label="홈" confirmWhenSolved />
+        <ExitGuard
+          to={routes.test}
+          label="문제풀기"
+          ariaLabel="문제풀기로 나가기"
+          confirmWhenSolved
+        />
         <LeaveLink
           href={routes.testRound}
           confirmLabel="한 판 풀기"

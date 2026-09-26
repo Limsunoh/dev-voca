@@ -47,12 +47,21 @@ export default async function TestWordsPage({ searchParams }: PageProps) {
       {/* 이 화면에는 탭바가 없다(TabBar 의 return null 참고). 나가는 길이
           여기뿐이라 빠지면 막다른 화면이 된다.
 
+          나가면 홈이 아니라 문제풀기 허브(/test)로 간다. 이 화면에 들어오는
+          길은 허브와 상세의 "이 단어로 문제 풀기" 뿐이고 홈에서 곧장 오는
+          길은 없다. 홈으로 보내면 허브로 돌아가는 데 탭을 한 번 더 누른다.
+
           푼 것이 있을 때만 묻는다. 낱개 연습은 점수가 서버에 안 남아서
           판을 떠나면 그대로 사라진다. 한 문제도 안 풀었으면 잃을 것이
           없으니 묻지 않는다 - 매번 물으면 성가시다. 옆의 "한 판 풀기" 도
           이 판을 끝내는 출구라 같은 규칙을 쓴다. */}
       <div className="mb-3 flex items-center justify-between gap-3">
-        <ExitGuard to={routes.home} label="홈" confirmWhenSolved />
+        <ExitGuard
+          to={routes.test}
+          label="문제풀기"
+          ariaLabel="문제풀기로 나가기"
+          confirmWhenSolved
+        />
         <LeaveLink
           href={routes.testRound}
           confirmLabel="한 판 풀기"
