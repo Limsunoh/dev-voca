@@ -48,6 +48,14 @@ export type SentenceDetail = SentenceListItem & {
   updated_at: string;
 };
 
+/**
+ * 문장 목록 정렬. 이유와 동점 처리는 vocab 의 WORD_SORTS 참고 - 문장은
+ * unique 한 글자 필드가 없어 id 로 끊는다.
+ */
+export const SENTENCE_SORTS = [
+  { value: "easy", label: "쉬운 것부터", ordering: "difficulty,id" },
+] as const;
+
 export type SentenceListParams = {
   search?: string;
   category?: string;
@@ -56,6 +64,8 @@ export type SentenceListParams = {
   page?: string;
   /** 목록을 섞을 시드. 자세한 설명은 vocab 의 WordListParams 참고. */
   shuffle?: string;
+  /** 백엔드 ordering 값. SENTENCE_SORTS 에서 고른 것만 보낸다. */
+  ordering?: string;
 };
 
 export function getSentences(
