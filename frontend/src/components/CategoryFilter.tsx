@@ -67,7 +67,16 @@ export function CategoryFilter({
   };
 
   return (
-    <nav aria-label="분류 필터" className="mt-4 flex flex-wrap gap-2">
+    <nav aria-label="분류 필터" className="mt-4 flex flex-wrap items-center gap-2">
+      {/* 줄 이름. 난이도·종류 줄(ChoiceFilter)과 같은 모양이다. 이게 없으면
+          필터를 펼쳤을 때 "전체" 가 두 번 나오고 두 번째가 무엇의 전체인지
+          알 수 없다. */}
+      <span
+        className="text-sm"
+        style={{ color: "var(--text-muted)", fontWeight: "var(--weight-bold)" }}
+      >
+        분류
+      </span>
       {/* "전체" 는 화면에 필터 줄이 여러 개일 때 이름이 겹친다. 스크린리더의
           링크 목록에서는 nav 이름이 안 읽히므로 여기서 한정해 준다. */}
       <FilterChip href={href()} active={!selected} ariaLabel="분류 전체">

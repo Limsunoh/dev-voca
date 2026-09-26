@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/session";
 import { loginAction } from "../actions";
 
 export const metadata = {
-  title: "로그인 | devvoca",
+  title: "로그인 · devvoca",
   description: "devvoca 에 로그인합니다.",
 };
 

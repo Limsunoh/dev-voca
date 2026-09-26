@@ -231,6 +231,10 @@ export function DetailCard({
    * 안 보인다. 대신 잉크 바탕으로 뒤집는다 - 크림 화면에서 유일하게
    * 어두운 면이라 페이지를 훑으면 여기서 눈이 멈춘다(가이드 shape-lift 의
    * --lift-dark 가 이 자리를 위해 있다).
+   *
+   * 문장 상세에는 dark 카드가 없다. 거기서 보러 온 것은 문장 자체이고 그건
+   * 맨 위 히어로가 크게 맡는다. 설명을 dark 로 두면 단어 상세(예문)와
+   * 어두운 카드의 뜻이 갈린다(learn/sentences/[id]/page.tsx).
    */
   tone?: "paper" | "dark";
   children: React.ReactNode;

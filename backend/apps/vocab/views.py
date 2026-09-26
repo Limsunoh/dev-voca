@@ -13,7 +13,7 @@ from rest_framework.permissions import (
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import DailyPhrase, LearningItem, Sentence, Word
+from .models import DailyPhrase, LearningItem, PhraseScene, Sentence, Word
 from .quiz import (
     TARGET_SENTENCE,
     TARGET_WORD,
@@ -410,6 +410,9 @@ _MAX_PK_DIGITS = len(str(_MAX_PK))
 # 둘 중 하나를 집으면 세 번째 콘텐츠 타입이 왔을 때 "왜 Word 를 보지" 가 된다.
 _LEVELS = frozenset(LearningItem.Difficulty.values)
 
+# 고를 수 있는 상황. 일상 표현에만 있다(개발 용어에는 상황이 없다).
+_SCENES = frozenset(PhraseScene.values)
+
 
 def _item_of(
     request: Request, pool: QuerySet, name: str
@@ -462,6 +465,14 @@ def _parse_level(raw: str | None) -> int | None:
     except ValueError:
         return None
     return value if value in _LEVELS else None
+
+
+def _parse_scene(raw: str | None) -> str | None:
+    """상황 쿼리를 읽는다. 아는 값이 아니면 None(전부)이다.
+
+    _parse_level 과 같은 이유로 choices 에 있는 값만 통과시킨다.
+    """
+    return raw if raw in _SCENES else None
 
 
 def _parse_ids(raw: str) -> list[int]:
@@ -723,6 +734,8 @@ class TalkViewSet(viewsets.ViewSet):
         ?kind=dev       개발 용어에서 낸다. 없으면 일상 표현
         ?exclude=1,2,3  방금 낸 것을 다시 내지 않는다
         ?level=1|2|3    그 난이도만 낸다. 없거나 모르는 값이면 전부
+        ?scene=<slug>   그 상황(PhraseScene)만 낸다. 없거나 모르는 값이면
+                        전부. 일상 표현에만 걸린다
 
         **약어·숫자·기호는 출제하지 않는다.** 소리로 채점할 수 없어서다
         (talk.is_speakable). 개발 용어 566개 중 361개만 나온다.
@@ -749,6 +762,16 @@ class TalkViewSet(viewsets.ViewSet):
         if level is not None:
             pool = pool.filter(difficulty=level)
 
+        # 상황 고르기. 난이도와 같은 규칙이다 - 모르는 값이면 전부에서 낸다.
+        #
+        # **개발 용어에서는 무시한다.** Word 에는 상황 칸이 없다. 화면이
+        # 갈래를 바꾸면서 주소에 scene 을 남겨도 개발 용어가 안 막힌다.
+        scene = _parse_scene(request.query_params.get("scene"))
+        if kind != KIND_PHRASE:
+            scene = None
+        if scene is not None:
+            pool = pool.filter(scene=scene)
+
         # 소리로 채점할 수 있는 것만 남긴다. values_list 로 두 칸만 읽어
         # 필터한 뒤 pk 로 다시 꺼낸다 - 전 항목을 객체로 만들 이유가 없다.
         speakable = [
@@ -760,14 +783,17 @@ class TalkViewSet(viewsets.ViewSet):
             # 다 봤거나 exclude 가 풀을 비웠다. 화면이 "다 봤습니다" 를
             # 그리고 다른 갈래로 가는 길을 둔다.
             #
-            # **난이도를 골랐으면 그것을 문구에 적는다.** 안 적으면 "다
-            # 봤습니다" 만 보고 전체를 다 읽은 줄 안다 - 실제로는 그 난이도
-            # 하나만 비었고, 난이도를 바꾸면 계속할 수 있다.
-            detail = (
-                "이 난이도는 다 봤습니다. 난이도를 바꾸거나 잠시 뒤 다시 해보세요."
-                if level is not None
-                else "읽을 것을 다 봤습니다. 잠시 뒤 다시 시작해보세요."
-            )
+            # **난이도·상황을 골랐으면 그것을 문구에 적는다.** 안 적으면 "다
+            # 봤습니다" 만 보고 전체를 다 읽은 줄 안다 - 실제로는 고른 것
+            # 하나만 비었고, 그것을 바꾸면 계속할 수 있다.
+            if level is not None and scene is not None:
+                detail = "이 난이도·상황은 다 봤습니다. 다른 것을 고르거나 잠시 뒤 다시 해보세요."
+            elif scene is not None:
+                detail = "이 상황은 다 봤습니다. 상황을 바꾸거나 잠시 뒤 다시 해보세요."
+            elif level is not None:
+                detail = "이 난이도는 다 봤습니다. 난이도를 바꾸거나 잠시 뒤 다시 해보세요."
+            else:
+                detail = "읽을 것을 다 봤습니다. 잠시 뒤 다시 시작해보세요."
             return Response(
                 {"detail": detail},
                 status=status.HTTP_404_NOT_FOUND,
@@ -812,6 +838,11 @@ class TalkViewSet(viewsets.ViewSet):
                 # 화면에서 이름을 다시 만들면 표와 화면이 따로 논다.
                 "difficulty": item.difficulty,
                 "difficulty_label": item.get_difficulty_display(),
+                # 어떤 상황의 표현인가. 난이도와 같은 이유로 값과 이름을
+                # 같이 내린다. 개발 용어와 아직 상황을 못 정한 표현은 빈
+                # 문자열이다 - 화면은 비어 있으면 배지를 안 그려야 한다.
+                "scene": item.scene if kind == KIND_PHRASE else "",
+                "scene_label": item.get_scene_display() if kind == KIND_PHRASE else "",
             }
         )
 

@@ -6,11 +6,17 @@ type Props = {
   label: string;
   /** URL 쿼리 키. 예: kind */
   paramName: string;
-  options: ChoiceOption[];
+  options: readonly ChoiceOption[];
   /** 링크를 만들 기준 경로. */
   basePath: string;
-  /** 지금 선택된 값. 없으면 "전체". */
+  /** 지금 선택된 값. 없으면 맨 앞 칩(allLabel)이 켜진다. */
   selected?: string;
+  /**
+   * 아무것도 안 골랐을 때의 칩 이름. 거르는 줄은 "전체" 가 맞지만 정렬
+   * 줄에서 고르지 않은 상태는 "섞어서"(검색 중에는 "기본순") 다 - 전체를
+   * 보여주는 것은 같고 순서만 다르다.
+   */
+  allLabel?: string;
   /** 이 필터를 바꿔도 유지할 다른 조건들. */
   keep?: Record<string, string | undefined>;
 };
@@ -30,6 +36,7 @@ export function ChoiceFilter({
   options,
   basePath,
   selected,
+  allLabel = "전체",
   keep,
 }: Props) {
   if (options.length === 0) return null;
@@ -63,11 +70,15 @@ export function ChoiceFilter({
       >
         {label}
       </span>
-      {/* "전체" 는 화면에 여러 줄이 나란히 설 때 이름이 겹친다(문장 화면은
-          종류·난이도·분류 셋). 스크린리더의 링크 목록에서는 nav 이름이
-          안 읽히므로 여기서 한정해 준다. */}
-      <FilterChip href={href()} active={!selected} ariaLabel={`${label} 전체`}>
-        전체
+      {/* 맨 앞 칩("전체" 등)은 화면에 여러 줄이 나란히 설 때 이름이
+          겹친다(문장 화면은 종류·난이도·분류 셋). 스크린리더의 링크
+          목록에서는 nav 이름이 안 읽히므로 여기서 한정해 준다. */}
+      <FilterChip
+        href={href()}
+        active={!selected}
+        ariaLabel={`${label} ${allLabel}`}
+      >
+        {allLabel}
       </FilterChip>
       {options.map((option) => {
         const active = selected === option.value;
