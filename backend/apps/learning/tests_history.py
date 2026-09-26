@@ -390,8 +390,8 @@ class HistoryByApiTest(TestCase):
         body = self.client.get(URL).json()
         me = next(r for r in self.client.get(self.STREAK_URL).json()["rows"] if r["is_me"])
 
-        self.assertEqual(sum(d["total"] > 0 for d in body["days"]), me["entries"])
-        self.assertEqual(sum(d["total"] for d in body["days"]), me["score"])
+        self.assertEqual(sum(d["total"] > 0 for d in body["days"]), me["score"])
+        self.assertEqual(sum(d["total"] for d in body["days"]), me["entries"])
         # 마이너스 판만 한 날: 칸은 0 이지만 판은 있었다(null 이 아니다).
         self.assertEqual(
             (body["days"][-2]["total"], body["days"][-2]["best_round"]), (0, -1)

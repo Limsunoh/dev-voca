@@ -110,7 +110,9 @@ class DailyScoreAdmin(ViewOnlyAdmin):
     list_display = ("day", "user", "best_free_score", "daily_study_score", "streak_points")
     date_hierarchy = "day"
 
-    @admin.display(description="꾸준함 점수")
+    # "꾸준함 점수" 라고 부르지 않는다. 꾸준함 순위표는 이 값이 0 보다 큰
+    # 날 수로 매기므로, 그 이름이면 여기 42 를 순위표의 "3일" 과 맞춰 보게 된다.
+    @admin.display(description="하루 점수")
     def streak_points(self, obj):
         return obj.total
 

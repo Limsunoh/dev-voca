@@ -89,6 +89,14 @@ def record_everywhere(user, score: int) -> None:
     daily(user, calendar_kst.today(), best=score)
 
 
+def recorded(row: dict, url: str) -> int:
+    """record_everywhere 로 넣은 점수를 줄에서 읽는다.
+
+    꾸준함은 score 가 날 수라(전원 하루) 넣은 점수는 entries 에 있다.
+    """
+    return row["entries"] if url == STREAK_URL else row["score"]
+
+
 class IsMeMarkTest(TestCase):
     """표시가 정확히 한 줄에만 붙는가."""
 
@@ -133,7 +141,7 @@ class IsMeMarkTest(TestCase):
 
                 self.assertEqual(len(marked), 1, "표시가 하나가 아니다")
                 self.assertEqual(marked[0]["display_name"], "안쪽나")
-                self.assertEqual(marked[0]["score"], 25, "남의 줄에 표시가 붙었다")
+                self.assertEqual(recorded(marked[0], url), 25, "남의 줄에 표시가 붙었다")
                 self.assertIsNone(body["me"], "목록 안인데 내 줄이 또 나왔다")
 
     def test_outside_the_top_only_the_me_row_is_marked(self):
@@ -234,7 +242,7 @@ class IsMeMarkTest(TestCase):
                 marked = [row for row in rows if row["is_me"]]
 
                 self.assertEqual(len(marked), 1, "비슷한 이름에 표시가 같이 붙었다")
-                self.assertEqual(marked[0]["score"], 10, "남의 줄에 붙었다")
+                self.assertEqual(recorded(marked[0], url), 10, "남의 줄에 붙었다")
 
 
 class PrimaryKeyNeverLeaksTest(TestCase):

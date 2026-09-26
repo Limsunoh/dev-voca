@@ -3,8 +3,8 @@
 지키려는 것은 넷이다.
 
     - 최고점 2종은 사용자별 **한 판**만 센다. 여러 판을 더하지 않는다
-    - 꾸준함은 DailyScore.total 과 **같은 값**을 낸다(파이썬/SQL 두 곳)
-    - 동점이면 먼저 달성한 쪽이 위. 꾸준함은 활동한 날이 많은 쪽이 위
+    - 꾸준함의 점수 합은 DailyScore.total 과 **같은 값**이다(파이썬/SQL 두 곳)
+    - 동점이면 먼저 달성한 쪽이 위. 꾸준함은 날 수가 먼저, 같으면 점수 합
     - 상위 20명. 내가 밖이면 내 줄이 따로 붙는다
 
 세 번째가 특히 잘 깨진다. 정렬 규칙은 눈에 안 보이고, 틀려도 화면은
@@ -180,7 +180,7 @@ class WeeklyWindowTest(TestCase):
 
 
 class StreakTest(TestCase):
-    """꾸준함. 하루 점수를 전부 더한 값."""
+    """꾸준함. 점수를 얻은 날 수(score), 동점이면 점수 합(entries)."""
 
     def setUp(self):
         cache.clear()
@@ -204,15 +204,16 @@ class StreakTest(TestCase):
 
         board = leaderboards.build(leaderboards.STREAK)
 
-        self.assertEqual(board.rows[0].score, expected)
+        self.assertEqual(board.rows[0].entries, expected)
         self.assertEqual(expected, 10, "픽스처가 의도한 값이 아니다")
+        self.assertEqual(board.rows[0].score, 2, "0 으로 잘린 날을 날 수에 셌다")
 
-    def test_a_wasted_day_is_not_an_active_day(self):
-        """점수가 안 남은 날은 활동일로 안 센다.
+    def test_a_wasted_day_is_not_counted(self):
+        """점수가 안 남은 날은 날 수에 안 들어간다.
 
         판을 열기만 해도 그 날 행이 생긴다. 행 수로 세면 망친 날도
-        활동일이 되어, 같은 점수라면 **더 많이 망친 쪽이 위**로 온다.
-        꾸준함이 아니라 "행을 많이 만든 사람" 이 이기는 순위표가 된다.
+        하루가 되어 **더 많이 망친 쪽이 위**로 온다. 꾸준함이 아니라
+        "행을 많이 만든 사람" 이 이기는 순위표가 된다.
         """
         today = calendar_kst.today()
 
@@ -223,22 +224,21 @@ class StreakTest(TestCase):
         wasteful = make_user("이틀에망친날들")
         daily(wasteful, today, best=6)
         daily(wasteful, today - timedelta(days=1), best=6)
-        # 점수가 안 남은 날들. 행은 생기지만 활동일은 아니다.
+        # 점수가 안 남은 날들. 행은 생기지만 날 수에는 안 들어간다.
         for i in range(2, 6):
             daily(wasteful, today - timedelta(days=i), best=-5)
 
         board = leaderboards.build(leaderboards.STREAK)
 
-        self.assertEqual(board.rows[0].score, board.rows[1].score, "동점이 아니다")
         self.assertEqual(board.rows[0].display_name, "사흘꾸준")
-        self.assertEqual(board.rows[1].entries, 2, "망친 날을 활동일로 셌다")
+        self.assertEqual(board.rows[1].score, 2, "망친 날을 날 수에 셌다")
 
-    def test_a_cancelled_out_day_is_not_an_active_day(self):
-        """서로 상쇄되어 총점 0인 날도 활동일이 아니다.
+    def test_a_cancelled_out_day_is_not_counted(self):
+        """서로 상쇄되어 총점 0인 날도 날 수에 안 들어간다.
 
         best=5, study=-5 인 날은 두 칸 중 하나가 양수라, 칸을 따로 보면
-        활동일로 세어진다. 그러면 **점수를 1점도 안 준 날**을 여럿 쌓아
-        동점자를 이길 수 있다 - 위 테스트가 막으려는 것과 같은 구멍이
+        하루로 세어진다. 그러면 **점수를 1점도 안 준 날**을 여럿 쌓아
+        순위를 올릴 수 있다 - 위 테스트가 막으려는 것과 같은 구멍이
         다른 입력으로 열린다.
         """
         today = calendar_kst.today()
@@ -254,9 +254,9 @@ class StreakTest(TestCase):
         daily(padded, today - timedelta(days=4), best=3, study=-3)
 
         board = leaderboards.build(leaderboards.STREAK)
-        entries = {row.display_name: row.entries for row in board.rows}
+        days = {row.display_name: row.score for row in board.rows}
 
-        self.assertEqual(entries["상쇄날쌓은사람"], 3, "상쇄된 날을 활동일로 셌다")
+        self.assertEqual(days["상쇄날쌓은사람"], 3, "상쇄된 날을 날 수에 셌다")
         self.assertEqual(board.rows[0].display_name, "사흘한사람", "동점 순서가 뒤집혔다")
 
     def test_my_row_shows_up_even_with_no_points(self):
@@ -280,16 +280,16 @@ class StreakTest(TestCase):
 
         self.assertEqual(len(board.rows), 3, "0점이 목록에 들어갔다")
         self.assertIsNotNone(board.me, "기록이 있는데 없다고 한다")
-        self.assertEqual(board.me.score, 0)
-        self.assertEqual(board.me.entries, 0, "점수 안 남은 날을 활동일로 셌다")
+        self.assertEqual(board.me.score, 0, "점수 안 남은 날을 날 수에 셌다")
+        self.assertEqual(board.me.entries, 0)
         self.assertEqual(board.me.rank, 4, "점수 있는 사람들 뒤여야 한다")
 
     def test_zero_score_users_do_not_all_share_one_rank(self):
-        """0점끼리도 순서가 있어야 한다.
+        """0일끼리도 순서가 있어야 한다.
 
-        목록은 0점을 빼지만 세는 쿼리에서까지 빼면 0점 가지가 죽어
-        **활동일이 달라도 전부 같은 등수**가 된다. 목록에 안 보이는
-        사람들이라 눈에 안 띈다.
+        목록은 0일을 빼지만 세는 쿼리에서까지 빼면 0 가지가 죽어 **전부
+        같은 등수**가 된다. 목록에 안 보이는 사람들이라 눈에 안 띈다.
+        날 수도 점수 합도 0 이라 가입 순(pk)으로 갈린다.
         """
         today = calendar_kst.today()
         scorer = make_user("점수낸사람")
@@ -308,12 +308,12 @@ class StreakTest(TestCase):
         self.assertEqual(first.me.score, 0)
         self.assertEqual(second.me.score, 0)
         self.assertNotEqual(first.me.rank, second.me.rank, "0점끼리 등수가 같다")
-        self.assertLess(first.me.rank, second.me.rank, "더 나온 쪽이 뒤에 있다")
+        self.assertLess(first.me.rank, second.me.rank, "먼저 가입한 쪽이 뒤에 있다")
 
     def test_my_streak_rank_follows_the_list_order(self):
         """꾸준함도 목록 밖 등수가 목록 순서와 이어져야 한다.
 
-        점수가 같으면 활동한 날이 많은 쪽이 앞이다. 내 줄을 셀 때 그
+        날 수가 같으면 점수 합이 많은 쪽이 앞이다. 내 줄을 셀 때 그
         기준을 안 쓰면 목록과 등수 규칙이 갈린다.
         """
         today = calendar_kst.today()
@@ -322,45 +322,96 @@ class StreakTest(TestCase):
             for i in range(25)
         )
 
-        # 전원 12점 동점. 앞 22명은 사흘(4+4+4), 뒤 3명은 이틀(6+6).
-        # 활동일이 많은 쪽이 앞이므로 사흘 22명이 1~22등, 이틀 3명이
-        # 23~25등이다. 그 안에서는 pk 오름차순.
+        # 전원 사흘. 앞 22명은 12점(4+4+4), 뒤 3명은 9점(3+3+3). 점수 합이
+        # 많은 쪽이 앞이므로 12점 22명이 1~22등, 9점 3명이 23~25등이다.
+        # 그 안에서는 pk 오름차순.
         for i, user in enumerate(people):
-            if i < 22:
-                for d in range(3):
-                    daily(user, today - timedelta(days=d), best=4)
-            else:
-                for d in range(2):
-                    daily(user, today - timedelta(days=d), best=6)
+            points = 4 if i < 22 else 3
+            for d in range(3):
+                daily(user, today - timedelta(days=d), best=points)
 
         last = people[-1]
 
         board = leaderboards.build(leaderboards.STREAK, user=last)
 
-        self.assertEqual(board.rows[0].entries, 3, "사흘 쪽이 위가 아니다")
+        self.assertEqual(board.rows[0].entries, 12, "12점 쪽이 위가 아니다")
         self.assertEqual(board.me.rank, 25, "목록 순서와 등수가 어긋난다")
 
-    def test_a_tie_puts_the_more_active_first(self):
-        """동점이면 활동한 날이 많은 쪽이 위.
+    def test_more_days_beat_more_points(self):
+        """날 수가 많으면 점수 합이 적어도 위.
 
-        같은 점수를 더 여러 날에 걸쳐 쌓았다는 뜻이다. 순위표 이름이
-        '꾸준함' 인 이상 그쪽이 위여야 한다.
+        점수 합으로 매기면 이틀 몰아친 사람이 매일 조금씩 한 사람을
+        이긴다. 화면 설명("점수를 얻은 날을 셉니다")과 순위가 갈린다.
+        몰아친 쪽을 먼저 가입시켜, pk 로 우연히 맞는 일을 막는다.
         """
         today = calendar_kst.today()
 
-        spread = make_user("사흘에걸쳐")
-        for i, points in enumerate((4, 4, 4)):
-            daily(spread, today - timedelta(days=i), best=points)
-
         burst = make_user("이틀에몰아")
-        daily(burst, today, best=6)
-        daily(burst, today - timedelta(days=1), best=6)
+        daily(burst, today, best=50)
+        daily(burst, today - timedelta(days=1), best=50)
+
+        spread = make_user("사흘에조금씩")
+        for d in range(3):
+            daily(spread, today - timedelta(days=d), best=1)
 
         board = leaderboards.build(leaderboards.STREAK)
 
-        self.assertEqual(board.rows[0].score, board.rows[1].score, "동점이 아니다")
-        self.assertEqual(board.rows[0].display_name, "사흘에걸쳐")
-        self.assertEqual(board.rows[0].entries, 3)
+        self.assertEqual(
+            [(row.display_name, row.score, row.entries) for row in board.rows],
+            [("사흘에조금씩", 3, 3), ("이틀에몰아", 2, 100)],
+        )
+
+    def test_same_days_puts_more_points_first(self):
+        """날 수가 같으면 점수 합이 많은 쪽이 위. 가입 순이 아니다.
+
+        점수 합이 적은 쪽을 먼저 가입시킨다. 동점 가르기가 빠지면 pk 로
+        떨어져 이 사람이 위로 온다.
+        """
+        today = calendar_kst.today()
+
+        light = make_user("이틀조금")
+        heavy = make_user("이틀많이")
+        for d in range(2):
+            daily(light, today - timedelta(days=d), best=2)
+            daily(heavy, today - timedelta(days=d), best=9)
+
+        board = leaderboards.build(leaderboards.STREAK, user=light)
+
+        self.assertEqual(
+            [row.display_name for row in board.rows], ["이틀많이", "이틀조금"]
+        )
+        self.assertEqual(board.rows[1].rank, 2)
+        self.assertTrue(board.rows[1].is_me)
+
+    def test_my_rank_outside_the_top_counts_more_points_on_the_same_days(self):
+        """목록 밖 내 등수도 같은 규칙으로 센다(_streak_ahead).
+
+        목록(TOP_SIZE)을 채운 뒤, 나와 날 수가 같고 점수만 많은 사람을
+        **나보다 늦게** 가입시킨다. 세는 쪽이 점수 합을 안 보면 이 사람을
+        뒤로 쳐서 내 등수가 하나 앞당겨진다.
+        """
+        today = calendar_kst.today()
+        top = User.objects.bulk_create(
+            User(email=f"사흘꽉{i:02d}@example.com", display_name=f"사흘꽉{i:02d}")
+            for i in range(leaderboards.TOP_SIZE)
+        )
+        for user in top:
+            for d in range(3):
+                daily(user, today - timedelta(days=d), best=5)
+
+        me = make_user("이틀조금한나")
+        late = make_user("이틀많이늦게")
+        for d in range(2):
+            daily(me, today - timedelta(days=d), best=1)
+            daily(late, today - timedelta(days=d), best=8)
+
+        board = leaderboards.build(leaderboards.STREAK, user=me)
+
+        self.assertEqual(
+            [row.score for row in board.rows], [3] * leaderboards.TOP_SIZE
+        )
+        self.assertEqual(board.me.rank, leaderboards.TOP_SIZE + 2)
+        self.assertEqual((board.me.score, board.me.entries), (2, 2))
 
 
 class TopAndMeTest(TestCase):

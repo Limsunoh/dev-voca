@@ -516,7 +516,7 @@ class IdenticalTieTest(RankAgreementMixin, TestCase):
         )
 
     def test_streak_users_identical_in_score_and_days_get_distinct_ranks(self):
-        """꾸준함도 점수·활동일이 완전히 같으면 pk 로 갈려야 한다."""
+        """꾸준함도 날 수·점수 합이 완전히 같으면 pk 로 갈려야 한다."""
         today = calendar_kst.today()
         people = bulk_users("꾸준완전_", 24)
         for user in people:
@@ -564,12 +564,12 @@ class StreakAheadBranchTest(RankAgreementMixin, TestCase):
         cache.clear()
 
     def test_all_three_branches_together(self):
-        """점수·활동일·pk 가 골고루 다른 무리에서 전원 등수가 이어져야 한다."""
+        """날 수·점수 합·pk 가 골고루 다른 무리에서 전원 등수가 이어져야 한다."""
         today = calendar_kst.today()
         people = bulk_users("가지_", 27)
 
         for i, user in enumerate(people):
-            # 점수는 세 덩이, 그 안에서 활동일이 갈리고, 또 그 안은 pk.
+            # 날 수는 사흘/하루 둘, 그 안에서 점수 합이 세 덩이, 또 그 안은 pk.
             group = i // 9
             spread = 3 if (i % 9) < 5 else 1
             points = (30 - group * 10) // spread
@@ -603,22 +603,22 @@ class StreakAheadBranchTest(RankAgreementMixin, TestCase):
         )
 
     def test_a_cancelled_day_is_not_an_active_day(self):
-        """상쇄되어 총점 0인 날은 활동일이 아니다.
+        """상쇄되어 총점 0인 날은 날 수에 안 들어간다.
 
         best=5, study=-5 인 날은 두 칸 중 하나가 양수라 칸을 따로 보면
-        활동일이 된다. 그러면 **점수를 안 준 날**로 등수를 살 수 있다.
-        활동일 판정도 하루 총점으로 해야 한다.
+        하루로 세어진다. 그러면 **점수를 안 준 날**로 등수를 살 수 있다.
+        날 수 판정도 하루 총점으로 해야 한다.
         """
         today = calendar_kst.today()
         scorer = make_user("유일점수")
         daily(scorer, today, best=99)
 
-        # 상쇄된 날 둘. 총점 0이고 활동일도 0이어야 한다.
+        # 상쇄된 날 둘. 총점 0이고 날 수도 0이어야 한다.
         cancelled = make_user("상쇄된사람")
         daily(cancelled, today, best=5, study=-5)
         daily(cancelled, today - timedelta(days=1), best=3, study=-3)
 
-        # 전부 마이너스. 역시 총점 0, 활동일 0.
+        # 전부 마이너스. 역시 총점 0, 날 수 0.
         blank = make_user("전부마이너스")
         for d in range(4):
             daily(blank, today - timedelta(days=d), best=-1)
@@ -626,11 +626,11 @@ class StreakAheadBranchTest(RankAgreementMixin, TestCase):
         first = leaderboards.build(leaderboards.STREAK, user=cancelled)
         second = leaderboards.build(leaderboards.STREAK, user=blank)
 
-        self.assertEqual(first.me.score, 0)
+        self.assertEqual(first.me.score, 0, "상쇄된 날을 날 수에 셌다")
         self.assertEqual(second.me.score, 0)
-        self.assertEqual(first.me.entries, 0, "상쇄된 날을 활동일로 셌다")
+        self.assertEqual(first.me.entries, 0)
         self.assertEqual(second.me.entries, 0)
-        # 활동일이 같으니 pk 순. 먼저 가입한 쪽이 앞이다.
+        # 날 수도 점수 합도 같으니 pk 순. 먼저 가입한 쪽이 앞이다.
         self.assertLess(first.me.rank, second.me.rank)
 
     def test_the_python_total_matches_when_days_cancel_out(self):
@@ -648,7 +648,8 @@ class StreakAheadBranchTest(RankAgreementMixin, TestCase):
         board = leaderboards.build(leaderboards.STREAK, user=user)
 
         self.assertEqual(expected, 4, "픽스처가 의도한 값이 아니다")
-        self.assertEqual(board.rows[0].score, expected, "SQL 합이 다르다")
+        self.assertEqual(board.rows[0].entries, expected, "SQL 합이 다르다")
+        self.assertEqual(board.rows[0].score, 1, "상쇄된 날을 날 수에 셌다")
 
     def test_daily_rows_of_inactive_users_do_not_shift_zero_ranks(self):
         """비활성 계정은 0점 무리 안에서도 등수를 밀면 안 된다.
@@ -857,7 +858,7 @@ class StreakRankSweepTest(RankAgreementMixin, TestCase):
         today = calendar_kst.today()
         people = bulk_users("꾸준전수_", 26)
 
-        # 전원 12점 동점. 활동일이 3일 또는 2일로 갈려 순서를 정한다.
+        # 전원 12점. 날 수가 3일 또는 2일로 갈려 순서를 정한다.
         for i, user in enumerate(people):
             if i % 2 == 0:
                 for d in range(3):
@@ -869,10 +870,10 @@ class StreakRankSweepTest(RankAgreementMixin, TestCase):
         ranks = self.ranks_of(leaderboards.STREAK, people)
 
         self.assertEqual(len(ranks), 26, "빠진 사람이 있다")
-        self.assertRanksFormASequence(ranks, " (꾸준함 26명 동점)")
+        self.assertRanksFormASequence(ranks, " (꾸준함 26명)")
 
-        # 활동일 3일인 사람들이 앞이어야 한다.
+        # 3일인 사람들이 앞이어야 한다.
         top_half = {people[i].pk for i in range(0, 26, 2)}
         for pk, rank in ranks.items():
             if pk in top_half:
-                self.assertLessEqual(rank, 13, "활동일이 많은 쪽이 뒤로 갔다")
+                self.assertLessEqual(rank, 13, "날 수가 많은 쪽이 뒤로 갔다")

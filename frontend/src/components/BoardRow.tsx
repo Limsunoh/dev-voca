@@ -46,7 +46,7 @@ type Props = {
 
 export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
   const medal = MEDALS[row.rank];
-  const unit = BOARD_LABELS[kind].unit;
+  const { unit, scoreUnit } = BOARD_LABELS[kind];
 
   // 내 줄은 옅은 코랄로 채운다(번들 identity/BoardRow.jsx). 스무 줄이 전부
   // 흰 종이라 채움 하나만 달라도 눈이 바로 찾는다.
@@ -125,6 +125,15 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
           }}
         >
           {row.score.toLocaleString()}
+          {/* 단위를 붙인다. 꾸준함은 큰 숫자가 날 수이고 작은 줄이 점수라,
+              단위가 없으면 "3" 을 3점으로 읽는다. 한글이라 본문 글꼴로 -
+              고정폭 글꼴에는 한글이 없어 OS 글꼴로 떨어진다. */}
+          <span
+            className="ml-0.5 text-xs"
+            style={{ fontFamily: "var(--font-sans)" }}
+          >
+            {scoreUnit}
+          </span>
         </span>
         <span
           className="block text-[length:var(--text-11)] sm:text-xs"
@@ -133,7 +142,9 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
             fontWeight: "var(--weight-bold)",
           }}
         >
-          {row.entries}
+          {/* 꾸준함에서는 점수 합이라 네 자리가 된다. 위 큰 숫자와 같이
+              쉼표를 찍는다. */}
+          {row.entries.toLocaleString()}
           {unit}
         </span>
       </span>
