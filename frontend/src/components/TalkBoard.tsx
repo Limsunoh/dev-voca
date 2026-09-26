@@ -7,7 +7,7 @@ import { MicGate } from "@/components/MicGate";
 import { MIC_BLOCKED_HELP, TalkFeedback } from "@/components/TalkFeedback";
 import { TalkPromptCard } from "@/components/TalkPrompt";
 import type { TalkKind, TalkPrompt, TalkResult } from "@/lib/api/talk";
-import type { TalkLevel } from "@/lib/routes";
+import type { TalkLevel, TalkScene } from "@/lib/routes";
 import {
   listenOnce,
   readMicState,
@@ -51,20 +51,22 @@ const STAGE_LABEL: Record<ListenStage, string> = {
  * 최근에 낸 것을 몇 개까지 기억할까.
  *
  * 크게 잡을수록 안 겹치지만 풀이 그만큼 좁아져 "다 봤습니다" 가 빨라진다.
- * **기준은 전체 개수가 아니라 가장 작은 통이다** - 난이도를 고르면 그
- * 난이도 안에서만 뽑는데, 지금 제일 작은 것이 일상 표현 어려움 23개다.
- * 12 면 거기서도 후보가 11개 남는다.
  *
- * 난이도 필터가 생기기 전에는 근거가 "표현이 60개" 였다. 그 숫자로 정한
- * 값이 통이 쪼개지면서 뜻이 달라졌고, 값은 그대로 둬도 되지만 근거는
- * 다시 써야 했다.
+ * **통보다 클 수 있다.** 상황 탭이 생기면서 난이도 x 상황 칸이 2개(인사·
+ * 어려움)까지 작아졌다. 15칸 중 9칸이 12개 이하라, 그 칸에서는 한 바퀴
+ * 돌면 뺄 목록이 통 전체를 덮는다. 그때 목록을 줄이는 일은 loadPrompt 의
+ * 404 처리가 한다 - 이 값을 칸마다 맞추면 큰 칸에서 같은 것이 너무 자주
+ * 나온다.
+ *
+ * 근거가 바뀐 것이 두 번째다. 처음에는 "표현이 60개", 난이도 필터 뒤에는
+ * "가장 작은 통(어려움 23개)보다 작게" 였다.
  */
 const RECENT_KEEP = 12;
 
 /**
  * 이번 방문에서 "시작하기" 를 한 번이라도 눌렀는지.
  *
- * 갈래·난이도 탭을 바꾸면 페이지가 이 컴포넌트를 key 로 통째로 새로 만든다
+ * 갈래·난이도·상황 탭을 바꾸면 페이지가 이 컴포넌트를 key 로 통째로 새로 만든다
  * (app/talk/page.tsx - 옛 문제와 뺄 목록을 비우려는 것이다). 그러면 상태가
  * 처음으로 돌아가 소개 화면이 다시 뜨고, 방금 시작한 사람이 탭 하나 바꿀
  * 때마다 "시작하기" 를 또 눌러야 했다.
@@ -81,7 +83,7 @@ let startedThisVisit = false;
  * 이번 방문에서 마이크가 막혔는지(결과 "denied"). 막히면 주 버튼이
  * "새로고침" 이 된다.
  *
- * startedThisVisit 과 같은 이유로 모듈 변수다 - 갈래·난이도 탭을 바꾸면
+ * startedThisVisit 과 같은 이유로 모듈 변수다 - 갈래·난이도·상황 탭을 바꾸면
  * 이 컴포넌트가 새로 만들어지는데, 그때 잊으면 주 버튼이 "읽기" 로 돌아가
  * 누르고 또 막힌다. 권한은 새로고침해야 풀리고, 새로고침하면 이 값도
  * 사라진다.
@@ -107,10 +109,13 @@ function canResume(mic: MicState | null): boolean {
 export function TalkBoard({
   kind,
   level,
+  scene,
 }: {
   kind: TalkKind;
   /** 고른 난이도. 0 이면 전체에서 낸다. */
   level: TalkLevel;
+  /** 고른 상황. 빈 문자열이면 전체에서 낸다. */
+  scene: TalkScene;
 }) {
   const [mic, setMic] = useState<MicState | null>(null);
   const [phase, setPhase] = useState<Phase>("gate");
@@ -138,6 +143,10 @@ export function TalkBoard({
   // 안 끊으면 인식기가 살아남아 다음 판에 옛 결과가 끼어든다.
   // 방금 낸 것들. 서버에 빼달라고 넘긴다.
   const recentRef = useRef<number[]>([]);
+  // 몇 개까지 뺄까. 처음엔 RECENT_KEEP 이고, 칸이 그보다 작다는 것을 알게
+  // 되면(아래 404 처리) 칸 크기 - 1 로 줄어든다. 탭을 바꾸면 이 컴포넌트가
+  // 새로 만들어지므로 칸마다 처음부터 다시 잰다.
+  const keepRef = useRef(RECENT_KEEP);
   const stopRef = useRef<(() => void) | null>(null);
 
   // 마이크 상태를 먼저 읽는다. **권한 창은 안 뜬다.**
@@ -172,6 +181,7 @@ export function TalkBoard({
           kind,
           // 0 은 안 보낸다. 서버가 없으면 전체에서 낸다.
           ...(level ? { level } : {}),
+          ...(scene ? { scene } : {}),
           // 방금 낸 것들을 빼달라고 한다. 안 보내면 무작위로 다시 뽑아서
           // 같은 것이 연달아 나온다. 난이도를 고르면 뽑는 통이 더 좁아져
           // 체감이 커진다. 문제풀기가 같은 방식을 쓴다(QuizBoard).
@@ -185,6 +195,22 @@ export function TalkBoard({
         // 404 일 때 서버가 준 문구를 그대로 쓴다. 난이도를 골라서 빈
         // 것인지 통째로 빈 것인지를 서버만 알고, 사용자가 할 일이 다르다
         // (난이도를 바꾼다 / 나중에 온다).
+        //
+        // **작은 칸에서는 뺄 목록 때문에 빈 것이다.** 인사·어려움(2개)은
+        // 두 번 만에 뺄 목록이 칸 전체를 덮는다. 목록을 그대로 두면 "다음"
+        // 을 몇 번 눌러도 같은 요청이라 같은 404 가 나고, 탭을 바꾸거나
+        // 새로고침하기 전에는 못 빠져나온다.
+        //
+        // 이때 뺄 목록의 길이가 곧 칸 크기다. 그래서 404 를 한 번 보여준
+        // 뒤 이후로는 "칸 크기 - 1" 개만 뺀다 - 다음 "다음" 부터 그 칸을
+        // 처음부터 다시 돌고, 방금 본 것은 곧바로 또 나오지 않는다(칸에
+        // 하나뿐이면 달리 낼 것이 없어 그것이 계속 나온다). 목록만
+        // 한 번 비우고 길이는 그대로 두면, 2개짜리 칸에서 한 바퀴 돌 때마다
+        // 다시 차서 "다 봤습니다" 가 한 번 걸러 한 번씩 뜬다(실측).
+        if (res.status === 404 && recentRef.current.length > 0) {
+          keepRef.current = recentRef.current.length - 1;
+          recentRef.current = recentRef.current.slice(0, keepRef.current);
+        }
         setError(
           res.status === 404
             ? (data?.detail ??
@@ -197,7 +223,10 @@ export function TalkBoard({
       const next = data as TalkPrompt;
       // 방금 낸 것을 기억한다. 최근 것만 들고 있는다 - 다 모으면 뺄 것이
       // 풀 전체가 되어 "낼 것이 없습니다" 가 뜬다.
-      recentRef.current = [next.id, ...recentRef.current].slice(0, RECENT_KEEP);
+      recentRef.current = [next.id, ...recentRef.current].slice(
+        0,
+        keepRef.current,
+      );
       setError(null);
       setPrompt(next);
       setPhase("ready");
@@ -207,10 +236,10 @@ export function TalkBoard({
     } finally {
       setBusy(false);
     }
-  }, [kind, level]);
+  }, [kind, level, scene]);
 
-  // 갈래나 난이도가 바뀌어도 여기서 다시 받지 않는다. 페이지가
-  // key={`${kind}-${level}`} 로 이 컴포넌트를 통째로 새로 만들기 때문이다
+  // 갈래·난이도·상황이 바뀌어도 여기서 다시 받지 않는다. 페이지가
+  // key={`${kind}-${level}-${scene}`} 로 이 컴포넌트를 통째로 새로 만들기 때문이다
   // (app/talk/page.tsx) - 상태가 처음부터 다시 시작하므로 옛 단어가 남을
   // 자리가 없고, 이미 낸 것을 빼는 목록도 같이 비워진다.
   //
