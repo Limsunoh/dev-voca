@@ -130,3 +130,46 @@ describe("연출 길이는 서버와 같은 값이다", () => {
     assert.equal(inCss[1], inPy[1]);
   });
 });
+
+describe("부장님은 무대 밖에서 걸어 들어온다", () => {
+  /**
+   * 출발점이 무대(300 x 300 svg) 왼쪽 밖이다(무대 좌표 96 - 190 = -94).
+   * svg 는 기본으로 자기 영역 밖을 자르므로, 풀면 몸이 무대 경계에서 세로로
+   * 잘려 보이던 것이 사라진다. 대신 넓은 화면에서는 출발점이 화면 안이라
+   * 허공에 갑자기 서 있게 되므로 첫 두 걸음 동안 나타나게 한다.
+   */
+  const svg = body(css, "\n.vx svg {");
+  const walk = stops(body(css, "@keyframes vx-walk {"));
+
+  it("무대 svg 는 자기 밖도 그린다", () => {
+    assert.match(svg, /overflow:\s*visible/);
+    // 같은 셀렉터를 뒤에 또 두면 거기서 덮일 수 있다.
+    assert.equal((css.match(/\n\.vx svg\s*\{/g) ?? []).length, 1);
+  });
+
+  it("층(.vx)은 여전히 화면 가장자리에서 자른다", () => {
+    // svg 가 밖을 그리게 됐으니 이것이 유일한 가위다. 없으면 폰에서 출발점
+    // (화면 밖)이 가로 스크롤을 만든다.
+    assert.match(body(css, "\n.vx {"), /overflow:\s*hidden/);
+  });
+
+  it("출발점에서는 안 보이고 26% 에 다 보인다", () => {
+    const first = walk[0];
+    assert.match(first.at, /^0%/);
+    assert.match(first.decls, /translate\(-190px/);
+    assert.match(first.decls, /opacity:\s*0\s*;/);
+    const full = walk.find((s) => s.at === "26%");
+    assert.ok(full, "vx-walk 에 26% 정지점이 없다");
+    assert.match(full.decls, /opacity:\s*1\s*;/);
+  });
+
+  it("다 보인 뒤로는 걷는 동안 다시 흐려지지 않는다", () => {
+    // 사라지는 것은 층 전체의 vx-out 몫이다. 여기서 끝에 opacity 0 을 두면
+    // 판정 도중 부장님만 먼저 없어진다.
+    const at26 = walk.findIndex((s) => s.at === "26%");
+    for (const s of walk.slice(at26 + 1)) {
+      const m = s.decls.match(/opacity:\s*([\d.]+)/);
+      if (m) assert.equal(Number(m[1]), 1, `${s.at} 에서 opacity 가 ${m[1]} 이다`);
+    }
+  });
+});
