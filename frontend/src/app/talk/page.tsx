@@ -6,7 +6,7 @@ import { TalkLevelTabs } from "@/components/TalkLevelTabs";
 import type { TalkKind, TalkLevel } from "@/lib/routes";
 
 export const metadata: Metadata = {
-  title: "일상영어 | devvoca",
+  title: "일상영어 · devvoca",
   description: "소리내어 읽고 맞게 읽었는지 확인합니다.",
 };
 
