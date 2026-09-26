@@ -359,6 +359,20 @@ describe("getDailyWords - 하루 고정", () => {
     );
   });
 
+  it("KST 자정 직전과 직후는 정확히 한 칸 차이다", async () => {
+    // 날짜 스윕 테스트들은 정오로만 날을 바꾼다. 자정 바로 앞뒤에서도 시작점이
+    // 정확히 한 칸 움직여야 한다 - 1ms 라도 일찍 바뀌면 한국 시각 밤 11시
+    // 59분에 다음 날 단어가 나온다. 아래 KST 테스트는 "바뀐다" 만 보므로 몇 칸
+    // 튀어도 초록이다.
+    installFakeBackend(566);
+    const midnight = Date.UTC(2026, 8, 6, 15, 0); // 2026-09-07 00:00 KST
+    Date.now = () => midnight - 1;
+    const before = await getDailyWords(HOME_WORDS);
+    Date.now = () => midnight;
+    const [first] = await getDailyWords(HOME_WORDS);
+    assert.equal(first.id, before[1].id);
+  });
+
   it("KST 로 센다 - UTC 15:00 (KST 자정) 에 날짜가 바뀐다", async () => {
     installFakeBackend(566);
     // UTC 14:59 와 15:00 은 KST 로 다른 날이다.
