@@ -278,11 +278,13 @@ def resume(study: DailyStudy) -> tuple[str, dict] | None:
         # 여기서 새로 뽑아도 문제 갈아타기는 안 열린다. 갈아타려면 답을
         # 해야 하는데, 순번이 어긋난 문제로는 애초에 답이 안 된다.
         stale_step = saved.get("state", {}).get("n") != study.step
-        if not stale_step and _still_visible(saved):
+        hidden = None if stale_step else _hidden_reason(saved)
+        if not stale_step and hidden is None:
             body = {**saved["body"], "answered": study.answered}
             return _sign(saved["state"]), body
 
-        # 저장한 뒤 검수가 취소됐거나 지워졌다. 그대로 내보내면 아무도
+        # 저장한 뒤 검수가 취소됐거나 지워졌다(보기든 빈칸 지문의 원문이든),
+        # 또는 확인할 수 없는 옛 저장본이다. 그대로 내보내면 아무도
         # 확인하지 않은 내용을 정답이라고 알려주게 된다(_describe 가 같은
         # 이유로 낼 때마다 visible() 을 다시 건다). 새로 뽑는다 - 문제를
         # 갈아탈 수 있게 되지만, 그건 검수가 실제로 바뀐 판에서만이고
@@ -295,7 +297,9 @@ def resume(study: DailyStudy) -> tuple[str, dict] | None:
                 study.step,
             )
         else:
-            logger.info("보기가 더는 보이지 않아 새로 냅니다. study=%s", study.pk)
+            # 원인을 문구에 싣는다. 배포 직후 옛 빈칸 저장본이 한꺼번에
+            # 빠질 때 "보기가 사라졌다" 로 찍히면 검수 사고처럼 읽힌다.
+            logger.info("저장된 문제를 다시 낼 수 없어 새로 냅니다(%s). study=%s", hidden, study.pk)
     else:
         # 저장된 것이 없다. 이 칸이 생기기 전에 시작한 판이거나 저장에
         # 실패한 경우다. 새로 뽑되 그때 저장되므로 다음부터는 고정된다.
@@ -858,8 +862,10 @@ def _finish(study: DailyStudy) -> None:
     _publish(study)
 
 
-def _still_visible(saved: dict) -> bool:
-    """저장해둔 문제의 보기가 아직 사용자에게 보여도 되는가.
+def _hidden_reason(saved: dict) -> str | None:
+    """저장해둔 문제를 그대로 다시 낼 수 없는 이유. 낼 수 있으면 None.
+
+    이유는 로그에 그대로 찍힌다(resume). 원인마다 문구를 가른다.
 
     낼 때 visible() 로 걸렀어도 그 뒤에 검수가 취소되거나 지워질 수 있다.
     토큰 수명이 6시간이라 그 사이에 충분히 일어난다.
@@ -867,19 +873,47 @@ def _still_visible(saved: dict) -> bool:
     보기 하나라도 사라졌으면 문제를 통째로 버린다 - 그 자리만 비우면
     보기가 셋이 되어 찍기 확률이 올라가고, 정답이 사라진 경우에는 답이
     없는 문제가 된다.
+
+    **빈칸 문제는 지문으로 쓴 문장도 본다.** 다른 유형은 지문이 보기
+    안에 들어 있다 - 뜻·단어·설명 문제는 정답 단어가, 상황 문제는 정답
+    문장이 보기에 있어서 위 검사로 함께 걸린다. 빈칸 문제만 지문을 따로
+    문장 하나에서 가져오고 보기는 단어라, 그 문장의 검수가 취소돼도 보기
+    검사를 그대로 통과해 검수 안 된 글이 지문으로 나갔다.
+
+    지문을 보기 밖에서 따로 가져오는 유형을 새로 만들면 그 원천도 여기서
+    다시 걸러야 한다. 원천 번호는 _next_question 이 저장본에 같이 둔다.
     """
     body = saved.get("body")
     if not isinstance(body, dict):
-        return False
+        return "저장본 모양이 아니다"
 
     ids = [c.get("id") for c in body.get("choices") or [] if isinstance(c, dict)]
     if not ids:
-        return False
+        return "저장본에 보기가 없다"
 
     # 보기의 종류는 정답의 종류와 같다(같은 표에서 뽑는다).
     target_type = (saved.get("state") or {}).get("q", {}).get("tt")
     model = Word if target_type == quiz.TARGET_WORD else Sentence
-    return model.objects.visible().filter(pk__in=ids).count() == len(ids)
+    if model.objects.visible().filter(pk__in=ids).count() != len(ids):
+        return "보기가 더는 보이지 않는다"
+
+    # **원문 번호가 있으면 유형과 상관없이 본다.** 빈칸으로만 거르면, 나중에
+    # 원문 번호를 채우는 다른 유형이 생겼을 때 저장은 되고 검사는 안 된다.
+    source = saved.get("source_sentence_id")
+    if source is not None:
+        if (
+            not isinstance(source, int)
+            or isinstance(source, bool)
+            or not Sentence.objects.visible().filter(pk=source).exists()
+        ):
+            return "지문의 원문 문장이 더는 보이지 않는다"
+    elif body.get("kind") == quiz.QuizKind.BLANK:
+        # 이 칸이 생기기 전에 저장한 빈칸 문제. 원문을 확인할 수 없으니
+        # 버리고 새로 낸다 - 검수 안 된 글을 낼 수 있는 쪽보다 문제가 한 번
+        # 바뀌는 쪽이 작다.
+        return "원문 번호가 없는 옛 빈칸 저장본이다"
+
+    return None
 
 
 def _next_question(
@@ -951,7 +985,15 @@ def _next_question(
     # **이 순번의 문제를 못박는다.** 저장해두지 않으면 화면을 새로 열
     # 때마다 다시 뽑게 되고, 순번은 답할 때만 오르므로 아는 문제가 나올
     # 때까지 돌린 뒤 답할 수 있다(resume 참고).
-    study.question = {"state": state, "body": body}
+    #
+    # 빈칸 문제의 원문 문장 번호도 같이 둔다. 이어 풀 때 그 문장이 아직
+    # 검수된 상태인지 다시 보려는 것이다(_hidden_reason). 토큰에도 화면에도
+    # 안 나가는 값이라 body 가 아니라 여기에 둔다.
+    study.question = {
+        "state": state,
+        "body": body,
+        "source_sentence_id": question.source_sentence_id,
+    }
     study.save(update_fields=["question"])
 
     return _sign(state), body
