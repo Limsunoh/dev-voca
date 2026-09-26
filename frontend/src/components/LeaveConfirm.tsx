@@ -10,6 +10,9 @@ import { useEffect, useId, useImperativeHandle, useRef } from "react";
  * 갈린다 - 실제로 두 벌이던 때 홈 창만 "새 판이 시작됩니다" 라고 거짓을
  * 말했다.
  *
+ * 내정보도 쓴다. 고른 사진·이름을 저장하지 않고 떠날 때(useUnsavedGuard).
+ * 그래서 되돌아가는 버튼 글자를 받는다(cancelLabel).
+ *
  * **dialog 를 쓴다.** 포커스 가둠, Esc 닫기, 뒤 스크롤 막기, 낭독기에
  * "대화상자" 로 알리는 것까지 브라우저가 해준다. div 로 만들면 그 넷을
  * 직접 짜야 하고 대개 포커스 가둠에서 샌다. 화면 안에 한 줄 띄우는 방식도
@@ -24,6 +27,7 @@ export function LeaveConfirm({
   detail,
   note,
   confirmLabel,
+  cancelLabel = "계속 풀기",
   onConfirm,
   openRef,
 }: {
@@ -35,6 +39,11 @@ export function LeaveConfirm({
   note?: React.ReactNode;
   /** 진행하는 쪽 버튼 글자. */
   confirmLabel: string;
+  /**
+   * 되돌아가는 쪽 버튼 글자. 문제풀기 밖(내정보의 저장 안 한 변경)에서
+   * "계속 풀기" 는 말이 안 돼서 받는다.
+   */
+  cancelLabel?: string;
   /** 사용자가 진행을 고른 뒤 할 일. 창은 이미 닫힌 뒤다. */
   onConfirm: () => void;
   /**
@@ -134,7 +143,7 @@ export function LeaveConfirm({
             } as React.CSSProperties
           }
         >
-          계속 풀기
+          {cancelLabel}
         </button>
         {/* 진행하는 쪽은 흰 알약에 코랄 글자. 채우면 코랄이 둘이 되어
             어느 쪽을 권하는지 사라진다. */}
