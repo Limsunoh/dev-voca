@@ -1,6 +1,6 @@
 "use client";
 
-import { DifficultyBadge } from "@/components/MetaBadge";
+import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { Reading } from "@/components/Reading";
 import { alignParts } from "@/lib/talk-parts";
 import type { TalkPrompt as Prompt } from "@/lib/api/talk";
@@ -60,11 +60,18 @@ export function TalkPromptCard({
           고 알려 왔다. 단어장·목록이 쓰는 DifficultyBadge 가 이미 있었고
           거기에는 난이도별 색(초록·앰버·장미)이 들어 있다. 같은 정보를
           화면마다 다르게 그리지 않는다. */}
-      <p>
+      {/* 상황 배지를 난이도 옆에 둔다. "전체" 에서 읽을 때 지금 것이 어느
+          상황에서 쓰는 말인지 알려준다. 상황이 없는 것(개발 용어, 상황을
+          비운 표현)은 CategoryChip 이 빈 이름에서 아무것도 안 그린다.
+
+          목록 카드가 분류를 그리는 그 칩이다. 이 카드에서는 누를 곳이
+          없어서 링크 없이 쓴다. */}
+      <p className="flex flex-wrap items-center justify-center gap-2">
         <DifficultyBadge
           level={prompt.difficulty}
           label={prompt.difficulty_label}
         />
+        <CategoryChip label={prompt.scene_label} />
       </p>
 
       {/* 읽을 글자. 이 화면에서 가장 큰 것이어야 한다 - 사용자가 보는 것이

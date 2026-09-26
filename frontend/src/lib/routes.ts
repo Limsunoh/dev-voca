@@ -52,6 +52,29 @@ export type TalkKind = "daily" | "dev";
  */
 export type TalkLevel = 0 | 1 | 2 | 3;
 
+/**
+ * 일상 표현의 상황. 서버 PhraseScene 의 값과 같다.
+ *
+ * 목록을 여기 둔다. 서버가 상황 목록 API 를 따로 만들지 않았다 - 다섯 개로
+ * 고정이라 난이도처럼 화면이 들고 있으면 된다(679a205). 주소를 읽는
+ * 페이지와 중계(api/talk)가 같은 목록으로 거른다.
+ */
+export const talkScenes = [
+  "greeting",
+  "shopping",
+  "asking",
+  "trouble",
+  "smalltalk",
+] as const;
+
+/** 고른 상황. 빈 문자열은 "전체" 다(TalkLevel 의 0 과 같은 자리). */
+export type TalkScene = (typeof talkScenes)[number] | "";
+
+/** 아는 상황 값이면 그대로, 아니면 "" (전체). 주소와 중계가 같이 쓴다. */
+export function toTalkScene(value: unknown): TalkScene {
+  return talkScenes.find((scene) => scene === value) ?? "";
+}
+
 export const routes = {
   home: "/",
   words: "/learn/words",
@@ -104,11 +127,15 @@ export const routes = {
    * 기본값(쿼리 없음)이 일상 표현이다. 탭 이름이 그것이라 처음 들어온
    * 사람이 보는 것과 이름이 맞아야 한다.
    */
-  talk: (kind?: TalkKind, level?: TalkLevel) => {
+  talk: (kind?: TalkKind, level?: TalkLevel, scene?: TalkScene) => {
     // 기본값은 아예 안 싣는다. 주소가 짧아야 공유했을 때 읽힌다.
     const query = new URLSearchParams();
     if (kind === "dev") query.set("kind", "dev");
     if (level) query.set("level", String(level));
+    // 상황은 일상 표현에만 있다. 개발 용어로 갈 때 들고 가면 주소에만
+    // 남고(서버도 무시한다) 다시 일상 표현으로 돌아올 때 모르는 새에
+    // 되살아난다.
+    if (scene && kind !== "dev") query.set("scene", scene);
     const rest = query.toString();
     return rest ? `/talk?${rest}` : "/talk";
   },

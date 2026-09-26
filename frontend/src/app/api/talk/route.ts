@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { fetchTalkQuestion, gradeTalk } from "@/lib/api/talk";
-import type { TalkKind } from "@/lib/routes";
+import { toTalkScene, type TalkKind } from "@/lib/routes";
 import { ApiError } from "@/lib/api/client";
 import { getToken } from "@/lib/session";
 
@@ -23,6 +23,8 @@ type Body = {
   kind?: string;
   /** 고른 난이도. 없으면 전체에서 낸다. */
   level?: unknown;
+  /** 고른 상황. 모르는 값이면 전체에서 낸다. */
+  scene?: unknown;
   /** 최근에 낸 것. 같은 것이 연달아 나오지 않게 뺀다. */
   exclude?: unknown;
   token?: string;
@@ -77,8 +79,12 @@ export async function POST(request: Request) {
         typeof body.level === "number" && [1, 2, 3].includes(body.level)
           ? body.level
           : undefined;
+      // 아는 상황만 넘긴다. 서버도 모르는 값은 전체로 보지만, 받은 것을
+      // 그대로 쿼리에 싣지 않는다 - 브라우저가 보낸 아무 문자열이 백엔드
+      // 주소로 흘러가지 않게 여기서 끊는다.
+      const scene = toTalkScene(body.scene) || undefined;
       return NextResponse.json(
-        await fetchTalkQuestion(kind, { exclude, token: auth, level }),
+        await fetchTalkQuestion(kind, { exclude, token: auth, level, scene }),
       );
     }
 

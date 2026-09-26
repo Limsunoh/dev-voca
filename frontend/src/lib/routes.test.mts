@@ -20,6 +20,8 @@ import {
   routes,
   tabHref,
   tabs,
+  talkScenes,
+  toTalkScene,
 } from "./routes";
 
 function tab(key: string) {
@@ -161,5 +163,42 @@ describe("routes.talk", () => {
     assert.equal(routes.talk("dev"), "/talk?kind=dev");
     assert.equal(routes.talk("daily", 3), "/talk?level=3");
     assert.equal(routes.talk("dev", 2), "/talk?kind=dev&level=2");
+  });
+
+  it("상황을 난이도와 함께 싣는다. 전체(빈 값)는 싣지 않는다", () => {
+    assert.equal(routes.talk("daily", 0, "shopping"), "/talk?scene=shopping");
+    assert.equal(routes.talk("daily", 2, "asking"), "/talk?level=2&scene=asking");
+    assert.equal(routes.talk("daily", 2, ""), "/talk?level=2");
+  });
+
+  it("개발 용어로 가는 주소에는 상황을 싣지 않는다", () => {
+    // 개발 용어에는 상황이 없다. 실으면 보이지 않는 조건이 주소에 남아
+    // 일상 표현으로 돌아올 때 모르는 새에 되살아난다.
+    assert.equal(routes.talk("dev", 0, "shopping"), "/talk?kind=dev");
+    assert.equal(routes.talk("dev", 3, "trouble"), "/talk?kind=dev&level=3");
+  });
+});
+
+describe("toTalkScene", () => {
+  it("아는 상황은 그대로 돌려준다", () => {
+    for (const scene of talkScenes) assert.equal(toTalkScene(scene), scene);
+  });
+
+  it("모르는 값은 전체(빈 값)다 - 중계가 아무 문자열이나 백엔드로 넘기지 않는다", () => {
+    for (const bad of [
+      undefined,
+      null,
+      "",
+      "SHOPPING",
+      " shopping",
+      "shopping,asking",
+      "__proto__",
+      "constructor",
+      1,
+      ["shopping"],
+      { scene: "shopping" },
+    ]) {
+      assert.equal(toTalkScene(bad), "", JSON.stringify(bad));
+    }
   });
 });

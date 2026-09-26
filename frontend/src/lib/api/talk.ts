@@ -100,6 +100,15 @@ export type TalkPrompt = {
   difficulty: number;
   /** 난이도 이름. 서버가 만든 것을 그대로 쓴다 - 화면에서 다시 만들면 어긋난다. */
   difficulty_label: string;
+  /**
+   * 상황 값(greeting 등).
+   *
+   * **빌 수 있다.** 개발 용어에는 상황이 없고, 일상 표현도 Admin 에서 상황을
+   * 비운 채 검수를 통과했으면 빈 문자열로 온다. 그때는 배지를 안 그린다.
+   */
+  scene: string;
+  /** 상황 이름("쇼핑·주문"). difficulty_label 과 같은 이유로 서버 것을 쓴다. */
+  scene_label: string;
 };
 
 /** 채점 결과가 무엇 때문인가. */
@@ -162,7 +171,12 @@ export function isDevKind(kind: ServerKind): boolean {
  */
 export function fetchTalkQuestion(
   kind: TalkKind,
-  options: { exclude?: number[]; token?: string; level?: number } = {},
+  options: {
+    exclude?: number[];
+    token?: string;
+    level?: number;
+    scene?: string;
+  } = {},
 ): Promise<TalkPrompt> {
   const query = buildQuery({
     // 일상 표현이 기본이라 그때는 아예 안 보낸다.
@@ -170,6 +184,8 @@ export function fetchTalkQuestion(
     exclude: options.exclude?.length ? options.exclude.join(",") : undefined,
     // 난이도를 안 고르면 안 보낸다. 서버가 없으면 전체에서 낸다.
     level: options.level ? String(options.level) : undefined,
+    // 상황도 같다. 빈 문자열이면 buildQuery 가 뺀다.
+    scene: options.scene,
   });
   return request(`${BASE}question/${query}`, { token: options.token });
 }
