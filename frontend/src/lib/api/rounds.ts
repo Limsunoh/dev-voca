@@ -45,6 +45,15 @@ export type RoundQuestion = {
    * 재는데, 세 화면이 이 타입을 같이 쓴다.
    */
   time_limit_ms?: number;
+  /**
+   * 지문 문장의 종류(error·phrase). 빈칸·상황 문제에서만 뜻이 있다. 에러
+   * 메시지만 고정폭으로 그린다(lib/quiz-text 의 promptIsMono).
+   *
+   * 한 판·복습·일일공부 응답에 늘 실려 오지만 단어 문제에는 빈 값이다. 이
+   * 칸이 생기기 전에 저장된 일일공부 문제에는 칸 자체가 없다. 없거나 비면
+   * 본문체다.
+   */
+  sentence_kind?: string;
 };
 
 /** 답 하나의 채점 결과. */

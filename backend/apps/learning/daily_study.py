@@ -940,6 +940,10 @@ def _next_question(
         "choices": [asdict(c) for c in question.choices],
         "category": question.category,
         "category_label": question.category_label,
+        # 지문이 에러 메시지인지(문장 문제만). 화면이 그것만 고정폭으로 그린다.
+        # 이 칸이 생기기 전에 저장한 문제(study.question)에는 없다 - 화면은
+        # 없으면 본문체로 그린다.
+        "sentence_kind": question.sentence_kind,
         "answered": study.answered,
         "total": study.total_questions,
     }

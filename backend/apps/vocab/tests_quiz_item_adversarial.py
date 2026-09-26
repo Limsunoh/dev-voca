@@ -33,7 +33,7 @@ REPEAT = 12
 
 # 응답에 있어야 하는 키. 여기 없는 것이 붙으면(정답 id, 검수 상태 등) 샌다.
 WORD_KEYS = {"kind", "kind_label", "question", "prompt", "category", "category_label", "choices", "token"}
-SENTENCE_KEYS = WORD_KEYS | {"answer_type", "source_sentence_id"}
+SENTENCE_KEYS = WORD_KEYS | {"answer_type", "source_sentence_id", "sentence_kind"}
 
 
 def make_word(term: str, **extra) -> Word:

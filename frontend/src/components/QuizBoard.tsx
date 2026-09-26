@@ -6,7 +6,13 @@ import { Burst } from "@/components/Burst";
 import { Reaction } from "@/components/Reaction";
 import type { GradeResult, QuizContent, Question } from "@/lib/api/quiz";
 import { clearSolved, markSolved } from "@/lib/quiz-progress";
-import { choicesAreTerms, promptIsTerm } from "@/lib/quiz-text";
+import {
+  choicesAreTerms,
+  isErrorSentence,
+  promptIsMono,
+  promptIsSentence,
+  promptIsTerm,
+} from "@/lib/quiz-text";
 import { Reading } from "./Reading";
 
 /**
@@ -595,7 +601,11 @@ export function QuizBoard({ category, content = "words", item }: Props) {
           {question.question}
         </h2>
 
-        <Prompt kind={question.kind} text={question.prompt} />
+        <Prompt
+          kind={question.kind}
+          sentenceKind={question.sentence_kind}
+          text={question.prompt}
+        />
 
         {/* 틀리면 보기 묶음이 짧게 흔들린다.
             key 로 횟수를 넘겨 매번 다시 마운트시킨다 - 클래스만 토글하면
@@ -880,16 +890,25 @@ function choiceState(
  * 가운데 정렬도 카드를 쓰기 때문이다. 왼쪽 정렬이면 카드 오른쪽이 늘
  * 비어 지문이 짧은 문제에서 카드가 반만 찬 것처럼 보인다.
  */
-function Prompt({ kind, text }: { kind: string; text: string }) {
+function Prompt({
+  kind,
+  sentenceKind,
+  text,
+}: {
+  kind: string;
+  /** 지문 문장의 종류(error·phrase). 에러 메시지만 고정폭이다. */
+  sentenceKind?: string;
+  text: string;
+}) {
   // 유형마다 서체·크기가 다르다. 카드는 하나로 두고 안쪽 글자만 가른다 -
   // 카드까지 유형별로 두면 유형이 늘 때마다 같은 두께를 다시 적게 된다.
   //
   // 설명 문제: 여러 줄 한글이라 본문체로 읽기 좋게. 크기를 키우면 폰에서
   // 다섯 줄이 되어 보기가 첫 화면에서 밀린다.
   //
-  // 문장(빈칸·상황): 에러 메시지와 실무 표현이라 코드에 가깝다. 아래
-  // 해설이 같은 문자열을 이미 고정폭으로 그려서, 지문만 본문체면 한
-  // 화면에서 같은 문장이 두 서체로 나온다. 크기를 --text-3xl 로 두지
+  // 문장(빈칸·상황): 에러 메시지만 고정폭, 실무 표현은 본문체(lib/quiz-text
+  // 의 promptIsMono). 아래 해설 카드도 같은 규칙이라 한 화면에서 같은
+  // 문장이 두 서체로 나오지 않는다. 크기를 --text-3xl 로 두지
   // 않는 이유는 지문이 한 줄짜리 문장이라 단어 하나보다 훨씬 길어서다 -
   // "IndexError: list ____ out of range" 가 390px 에서 세 줄로 감기고,
   // 그러면 보기 넷이 첫 화면에서 밀린다.
@@ -899,6 +918,8 @@ function Prompt({ kind, text }: { kind: string; text: string }) {
   // (가이드 type-mono).
   //
   // lang 은 한글 폰트가 라틴·기호를 잘못 렌더하는 것을 막는다.
+  // 문장 지문을 고정폭으로 그릴지. 아래 가지에서 글꼴과 자간이 같이 쓴다.
+  const mono = promptIsMono(kind, sentenceKind);
   const body: {
     lang?: string;
     className: string;
@@ -914,15 +935,17 @@ function Prompt({ kind, text }: { kind: string; text: string }) {
             color: "var(--text-body)",
           },
         }
-      : kind === "blank" || kind === "situation"
+      : promptIsSentence(kind)
         ? {
             lang: "en",
-            className: "font-mono",
+            className: mono ? "font-mono" : "",
             style: {
               fontSize: "var(--text-xl)",
               fontWeight: "var(--weight-bold)",
               lineHeight: "var(--leading-snug)",
-              letterSpacing: "var(--tracking-tighter)",
+              letterSpacing: mono
+                ? "var(--tracking-tighter)"
+                : "var(--tracking-tight)",
               color: "var(--foreground)",
             },
           }
@@ -1294,11 +1317,12 @@ function SentenceAnswer({
         {sentence.context}
       </h3>
 
-      {/* 문장 본문은 고정폭이다. 에러 메시지와 실무 표현이라 코드에 가깝다.
-          단어 목록·상세가 쓰는 것과 같은 구분이다. */}
+      {/* 에러 메시지만 고정폭, 실무 표현은 본문체. 위 지문(Prompt)과
+          익히기 목록·상세가 쓰는 것과 같은 구분이다. 이 값은 채점 응답의
+          문장에 실려 온다. */}
       <p
         lang="en"
-        className="mt-3 font-mono text-sm"
+        className={`mt-3 text-sm ${isErrorSentence(sentence.kind) ? "font-mono" : ""}`}
         style={{ color: "var(--text-body)" }}
       >
         {sentence.text}

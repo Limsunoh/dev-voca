@@ -51,6 +51,12 @@ export type Question = {
   answer_type?: "word" | "sentence";
   /** 빈칸 문제를 낸 문장. 다음 문제의 exclude 에 쓴다. */
   source_sentence_id?: number | null;
+  /**
+   * 지문 문장의 종류(error·phrase). 문장 문제 응답에만 실린다. 에러
+   * 메시지만 고정폭으로 그린다(lib/quiz-text 의 promptIsMono). 없으면
+   * 본문체다.
+   */
+  sentence_kind?: string;
 };
 
 export type QuizParams = {
