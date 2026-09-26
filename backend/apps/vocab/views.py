@@ -625,6 +625,8 @@ class SentenceViewSet(LearningItemViewSet):
                 # 다음 문제의 exclude 를 어느 쪽 id 로 보낼지 정한다.
                 "answer_type": question.answer_type,
                 "source_sentence_id": question.source_sentence_id,
+                # 지문이 에러 메시지인지. 화면이 그것만 고정폭으로 그린다.
+                "sentence_kind": question.sentence_kind,
                 "token": sign_question(
                     question.answer_id,
                     [c.id for c in question.choices],

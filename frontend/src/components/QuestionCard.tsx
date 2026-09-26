@@ -1,5 +1,10 @@
 import type { RoundQuestion } from "@/lib/api/rounds";
-import { choicesAreTerms, promptIsEnglish, promptIsTerm } from "@/lib/quiz-text";
+import {
+  choicesAreTerms,
+  promptIsEnglish,
+  promptIsMono,
+  promptIsSentence,
+} from "@/lib/quiz-text";
 
 /**
  * 문제 하나와 보기들.
@@ -25,6 +30,9 @@ export function QuestionCard({
   busy: boolean;
   onPick: (id: number) => void;
 }) {
+  const mono = promptIsMono(question.kind, question.sentence_kind);
+  const sentence = promptIsSentence(question.kind);
+
   return (
     <>
       <div
@@ -77,7 +85,9 @@ export function QuestionCard({
         >
           {question.question}
         </p>
-        {/* 용어만 고정폭, 나머지는 본문체(lib/quiz-text 의 표).
+        {/* 용어와 에러 메시지 문장만 고정폭, 나머지는 본문체(lib/quiz-text).
+            문장은 문제풀기(QuizBoard)와 같은 굵기·줄간격으로 한 단계 푼다 -
+            여러 줄로 감기는 문장을 가장 굵게 그리면 글자가 뭉친다.
             전에는 "문장이 아니면 고정폭" 이라 한글 뜻·설명까지 고정폭으로
             나왔다. 고정폭 글꼴에는 한글이 없어 OS 글꼴로 굵고 뭉툭하게
             떨어졌다.
@@ -100,13 +110,17 @@ export function QuestionCard({
         ) : (
           <p
             lang={promptIsEnglish(question.kind) ? "en" : undefined}
-            className={`mt-3 ${promptIsTerm(question.kind) ? "font-mono" : ""}`}
+            className={`mt-3 ${mono ? "font-mono" : ""}`}
             style={{
               fontSize: "var(--text-xl)",
-              fontWeight: "var(--weight-black)",
-              lineHeight: "var(--leading-tight)",
+              fontWeight: sentence
+                ? "var(--weight-bold)"
+                : "var(--weight-black)",
+              lineHeight: sentence
+                ? "var(--leading-snug)"
+                : "var(--leading-tight)",
               // 고정폭 제목은 한 단계 더 좁힌다(가이드 type-mono).
-              letterSpacing: promptIsTerm(question.kind)
+              letterSpacing: mono
                 ? "var(--tracking-tighter)"
                 : "var(--tracking-tight)",
               color: "var(--foreground)",
