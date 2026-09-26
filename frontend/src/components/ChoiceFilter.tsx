@@ -19,6 +19,14 @@ type Props = {
   allLabel?: string;
   /** 이 필터를 바꿔도 유지할 다른 조건들. */
   keep?: Record<string, string | undefined>;
+  /**
+   * 이 줄을 끄는 링크(맨 앞 칩, 켜진 칩 다시 누르기)에만 더 싣는 값.
+   *
+   * 정렬 줄이 쓴다. 정렬을 끄면 목록이 섞이는데, 섞기 시드가 주소에 없으면
+   * 서버가 시드를 붙여 다시 보내고 그 사이 필터 상자가 닫힌다. 켜는 링크에는
+   * 시드가 필요 없어서(정렬이 있으면 섞지 않는다) 끄는 링크에만 싣는다.
+   */
+  keepWhenOff?: Record<string, string | undefined>;
 };
 
 /**
@@ -38,21 +46,26 @@ export function ChoiceFilter({
   selected,
   allLabel = "전체",
   keep,
+  keepWhenOff,
 }: Props) {
   if (options.length === 0) return null;
 
   // 이미 고른 것을 다시 누르면 그 조건을 뺀다. 끄는 방법이 "전체" 뿐이면
   // 방금 누른 자리에서 손을 떼고 줄 맨 앞까지 되돌아가야 한다.
   const href = (value?: string) => {
+    const turnsOff = !value || value === selected;
     const query = new URLSearchParams();
-    for (const [key, kept] of Object.entries(keep ?? {})) {
+    for (const [key, kept] of Object.entries({
+      ...keep,
+      ...(turnsOff ? keepWhenOff : {}),
+    })) {
       if (kept) query.set(key, kept);
     }
     // keep 에 이 필터와 같은 키가 섞여 오면 끄기 링크가 지금 주소와 같아져
     // 눌러도 아무 일이 없다. keep 은 자유형이라 다음 필터를 추가할 때
     // 밟기 쉬우므로 여기서 한 번 지운다.
     query.delete(paramName);
-    if (value && value !== selected) query.set(paramName, value);
+    if (!turnsOff) query.set(paramName, value);
     const qs = query.toString();
     return qs ? `${basePath}?${qs}` : basePath;
   };
