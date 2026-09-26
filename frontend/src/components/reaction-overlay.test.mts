@@ -75,8 +75,11 @@ describe("채점 연출은 조건 가지 밖에 있어야 한다", () => {
       const overlaysAt = fn.indexOf("const overlays = (");
       assert.ok(overlaysAt > -1, "overlays 변수가 없다");
 
-      // 가지는 두 모양 중 하나로 나타난다. 둘 다 overlays 보다 뒤여야 한다.
-      for (const marker of ["const body = (() => {", "\n  if ("]) {
+      // 가지는 이런 모양 중 하나로 나타난다. 다 overlays 보다 뒤여야 한다.
+      // QuizBoard 는 가지를 branch 로 묶고 body 를 "머리 줄 + branch" 로
+      // 만든다 - 이름만 보고 찾으므로 그 이름도 넣는다. 빠지면 이 검사가
+      // QuizBoard 에서 아무것도 안 보고 통과한다.
+      for (const marker of ["const body = (() => {", "const branch = (() => {", "\n  if ("]) {
         const at = fn.indexOf(marker);
         if (at > -1) {
           assert.ok(
