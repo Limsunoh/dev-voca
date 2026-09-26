@@ -3,10 +3,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ReviewBoard } from "@/components/ReviewBoard";
+import type { User } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
-import { fetchDue } from "@/lib/api/review";
+import { fetchDue, type ReviewDue } from "@/lib/api/review";
 import { routes } from "@/lib/routes";
-import { getToken } from "@/lib/session";
+import { getCurrentUser, getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "다시 보기 · devvoca",
@@ -23,9 +24,12 @@ export default async function ReviewPage() {
   const token = await getToken();
   if (!token) redirect(`/login?next=${routes.testReview}`);
 
-  let due;
+  let due: ReviewDue;
+  let user: User | null;
   try {
-    due = await fetchDue(token);
+    // 사용자는 풀던 판을 계정별로 적어 두는 데 쓴다(ReviewBoard). 못 알아내면
+    // null 이라 던지지 않는다 - 이어 풀기만 빠지고 복습은 그대로 된다.
+    [due, user] = await Promise.all([fetchDue(token), getCurrentUser()]);
   } catch (error) {
     const offline = error instanceof ApiError && error.status === 0;
     return (
@@ -67,7 +71,7 @@ export default async function ReviewPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-8">
-      <ReviewBoard due={due} />
+      <ReviewBoard due={due} userId={user?.id ?? null} />
     </main>
   );
 }

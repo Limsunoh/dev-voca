@@ -42,7 +42,13 @@ from apps.vocab import quiz
 from apps.vocab.models import Sentence, Word
 
 from .models import ReviewState
-from .session import SessionError, _describe, _take_step, new_token_id
+from .session import (
+    LONG_ROUND_PREFIX,
+    SessionError,
+    _describe,
+    _take_step,
+    new_token_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +155,9 @@ def start(user) -> tuple[str, dict, int]:
         # "지금은 못 낸다" 를 구분한다.
         raise SessionError("지금은 낼 수 있는 복습 문제가 없습니다.")
 
-    token, body = _pack(user, new_token_id(), targets, at, question)
+    # 앞머리를 붙여야 판 청소가 이 판의 행을 토큰 수명만큼 둔다
+    # (session.LONG_ROUND_PREFIX 주석). 빼면 10분 뒤 되돌리기가 열린다.
+    token, body = _pack(user, LONG_ROUND_PREFIX + new_token_id(), targets, at, question)
     return token, body, len(targets)
 
 
