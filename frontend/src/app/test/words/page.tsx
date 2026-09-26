@@ -9,7 +9,7 @@ import { getCategories } from "@/lib/api/vocab";
 import { contentPath, routes } from "@/lib/routes";
 
 export const metadata: Metadata = {
-  title: "단어 문제풀기 | devvoca",
+  title: "단어 문제풀기 · devvoca",
   description: "외운 단어를 문제로 확인합니다.",
 };
 

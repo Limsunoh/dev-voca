@@ -9,7 +9,7 @@ import { getSentenceCategories } from "@/lib/api/sentences";
 import { contentPath, routes } from "@/lib/routes";
 
 export const metadata: Metadata = {
-  title: "문장 문제풀기 | devvoca",
+  title: "문장 문제풀기 · devvoca",
   description: "에러 메시지와 실무 표현을 문제로 확인합니다.",
 };
 
