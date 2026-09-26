@@ -42,7 +42,7 @@ from datetime import datetime, timedelta
 
 from django.core import signing
 from django.db import IntegrityError, transaction
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 
 from apps.vocab import quiz
@@ -97,8 +97,22 @@ SCORE_SKIP = 0
 _SALT = "learning.session"
 
 # 판 토큰 유효 시간(초). 90초짜리 판이니 10분이면 아주 넉넉하다.
-# 이 값이 곧 되돌리기를 시도할 수 있는 창이고, RoundStep 행이 남는 기간이다.
+# 이 값이 곧 되돌리기를 시도할 수 있는 창이다.
 TOKEN_MAX_AGE = 10 * 60
+
+# 오래 사는 판의 식별자 앞머리와, 그 판의 RoundStep 행을 두는 기간(초).
+#
+# 복습(review.py)이 이 표와 _take_step 을 그대로 쓰는데 그 토큰은 6시간
+# 산다(review.TOKEN_MAX_AGE). 청소가 판 토큰의 10분으로 나이를 재면 10분
+# 지난 복습 표시가 지워져, 옛 복습 토큰을 다시 보낼 때 되돌리기가 통과한다
+# - 보기를 훑어 알아낸 정답으로 연속을 채워 안 외운 단어를 복습에서 뺄 수
+# 있다. 그렇다고 전부 6시간 두면 로그인 없이 푸는 한 판의 행까지 36배로
+# 쌓인다. 그래서 오래 사는 판은 식별자에 앞머리를 붙이고 그 행만 오래 둔다.
+#
+# 10분을 더한 것은 앱 서버끼리 시계가 조금 어긋나도 토큰보다 행이 먼저
+# 사라지지 않게 하는 여유다.
+LONG_ROUND_PREFIX = "long-"
+LONG_STEP_KEEP_SECONDS = 6 * 60 * 60 + 10 * 60
 
 # 최근에 낸 문제를 다시 내지 않으려고 들고 있는 개수.
 # 전부 들고 있으면 토큰이 길어지고, 90초에 30문제를 넘기기 어렵다.
@@ -359,14 +373,21 @@ def _sweep_old_steps() -> None:
     """수명이 다한 진행 표시를 지운다.
 
     토큰이 만료되면 그 판의 표시는 쓸모가 없다 - 토큰 자체가 거부된다.
+    오래 사는 판(LONG_ROUND_PREFIX)의 행은 더 오래 둔다(그 주석).
     매번 지우면 낭비라 가끔만 한다. 놓쳐도 다음 판이 지우므로 정확할
     필요가 없고, 안 지워져도 방어가 열리지는 않는다(캐시와 다른 점이다).
     """
     if random.random() >= _SWEEP_CHANCE:
         return
 
-    cutoff = timezone.now() - timedelta(seconds=TOKEN_MAX_AGE)
-    RoundStep.objects.filter(created_at__lt=cutoff).delete()
+    now = timezone.now()
+    long_rounds = Q(round_id__startswith=LONG_ROUND_PREFIX)
+    RoundStep.objects.filter(
+        ~long_rounds, created_at__lt=now - timedelta(seconds=TOKEN_MAX_AGE)
+    ).delete()
+    RoundStep.objects.filter(
+        long_rounds, created_at__lt=now - timedelta(seconds=LONG_STEP_KEEP_SECONDS)
+    ).delete()
 
 
 def _sign(state: dict) -> str:

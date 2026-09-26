@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import type {
   ReviewAnswered,
@@ -10,6 +10,7 @@ import type {
   ReviewResult,
   ReviewStarted,
 } from "@/lib/api/review";
+import type { RoundChoice } from "@/lib/api/rounds";
 import { routes } from "@/lib/routes";
 
 import { Burst } from "./Burst";
@@ -39,7 +40,157 @@ import { Reaction } from "./Reaction";
 
 type Phase = "idle" | "playing" | "done";
 
-export function ReviewBoard({ due }: { due: ReviewDue }) {
+/**
+ * 풀던 판. **새로고침해도 이어 풀도록 탭에 적어 둔다.**
+ *
+ * 판은 서버에 안 남는다(backend review.py 머리말). 다음 답에 쓸 토큰과
+ * 지금 문제를 화면만 들고 있어서, 새로고침하면 처음부터 다시 시작했다.
+ * 일일공부처럼 DB 에 두지 않은 것은 시작에 제약이 없어서다 - 일일공부는
+ * 하루 한 번이라 못 이으면 그날 판을 잃지만, 복습은 언제든 새로 연다.
+ * 잃는 것이 이번 판의 자리와 맞힌 수뿐이라 탭에 두면 된다. 다른 탭이나
+ * 다른 기기에서는 이어지지 않는다.
+ *
+ * **계정마다 키를 나눈다.** 같은 탭에서 로그아웃하고 다른 계정으로
+ * 들어오면 앞 사람이 틀린 단어가 문제로 뜬다. 답은 서버가 막지만(남의
+ * 토큰) 보이는 것부터 안 된다.
+ */
+type SavedRound = {
+  token: string;
+  question: ReviewQuestion;
+  correct: number;
+  graduated: number;
+};
+
+/**
+ * 적어 둔 판을 이만큼만 믿는다. 토큰 수명(backend review.TOKEN_MAX_AGE,
+ * 6시간)에서 10분을 뺐다 - 토큰은 서버가 응답을 만들 때 서명하고 우리는
+ * 받은 뒤에 적으므로, 적은 시각이 서명보다 조금 늦다.
+ *
+ * 이게 없으면 탭을 켜 둔 채 다음 날 들어와도 "이어서 풀기" 가 뜬다. 누르면
+ * 문제가 나오고, 답을 고른 뒤에야 "만료됐습니다" 를 받는다 - 답 하나를
+ * 버리고 나서야 새로 시작할 수 있었다.
+ */
+const KEEP_MS = (6 * 60 - 10) * 60 * 1000;
+
+/**
+ * 탭 저장소 접근은 전부 try 로 감싼다. 사생활 보호 창이나 사이트 데이터를
+ * 막은 브라우저에서는 접근 자체가 예외를 던진다(StudyCards 의 같은 자리).
+ * 못 적으면 새로고침할 때 처음부터일 뿐이다.
+ */
+function readRound(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function remember(key: string, round: SavedRound): void {
+  try {
+    // 적은 시각을 붙인다. 읽을 때 KEEP_MS 와 견준다.
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({ ...round, savedAt: Date.now() }),
+    );
+  } catch {
+    // 위 머리말.
+  }
+}
+
+function forget(key: string): void {
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // 위 머리말.
+  }
+}
+
+/**
+ * 적어 둔 글을 판으로 읽는다. 모양이 아니면 null.
+ *
+ * 우리가 적은 것이지만 믿지 않는다. 배포로 문제 모양이 바뀌면 옛 탭에는
+ * 옛 모양이 남아 있고, 그대로 그리면 진행이 "5 / undefined" 가 되거나
+ * 보기 하나가 null 이라 문제 화면이 통째로 죽는다. 보기는 하나하나 본다.
+ */
+function parseRound(raw: string | null): SavedRound | null {
+  if (!raw) return null;
+  try {
+    const saved = JSON.parse(raw);
+    const question = saved?.question;
+    // 사람이 풀 수 있는 수만. 1e21 도 정수라 상한을 둔다(counted 와 같다).
+    const whole = (n: unknown) =>
+      Number.isInteger(n) && (n as number) >= 0 && (n as number) <= 1000;
+    const choice = (c: unknown) =>
+      Number.isInteger((c as RoundChoice | null)?.id) &&
+      typeof (c as RoundChoice | null)?.text === "string";
+    const age =
+      typeof saved?.savedAt === "number" ? Date.now() - saved.savedAt : -1;
+    if (
+      typeof saved?.token === "string" &&
+      saved.token &&
+      age >= 0 &&
+      age < KEEP_MS &&
+      Array.isArray(question?.choices) &&
+      question.choices.length > 0 &&
+      question.choices.every(choice) &&
+      whole(question.answered) &&
+      whole(question.total) &&
+      question.answered < question.total &&
+      whole(saved.correct) &&
+      whole(saved.graduated) &&
+      saved.correct <= question.answered &&
+      saved.graduated <= saved.correct
+    ) {
+      return {
+        token: saved.token,
+        question,
+        correct: saved.correct,
+        graduated: saved.graduated,
+      };
+    }
+  } catch {
+    // 깨진 글. 없는 것과 같다.
+  }
+  return null;
+}
+
+/**
+ * 지금 적혀 있는 판의 토큰. 나이와 모양은 안 본다 - "아직 이 판이 적혀
+ * 있나" 만 가른다. 오래된 판이라도 같은 판이면 이어서 적어야 한다.
+ */
+function storedToken(key: string): string | null {
+  try {
+    const token = JSON.parse(readRound(key) ?? "null")?.token;
+    return typeof token === "string" ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 우리가 적고 우리가 읽는 값이라 바뀌었다고 알려줄 바깥 신호가 없다. */
+function noSubscribe(): () => void {
+  return () => {};
+}
+
+/** 중계가 거절한 요청. status 로 "다시 보내도 안 되는 것" 을 가른다. */
+class CallError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+export function ReviewBoard({
+  due,
+  userId = null,
+}: {
+  due: ReviewDue;
+  /** 풀던 판을 적어 둘 계정. 모르면 적지 않는다(새로고침하면 처음부터). */
+  userId?: number | null;
+}) {
+  const memoryKey = userId === null ? null : `review-round-${userId}`;
   const [phase, setPhase] = useState<Phase>("idle");
   const [question, setQuestion] = useState<ReviewQuestion | null>(null);
   const [result, setResult] = useState<ReviewResult | null>(null);
@@ -75,6 +226,23 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
     };
   }, []);
 
+  /** 판을 화면에 편다. 새로 연 판과 적어 둔 판이 같이 쓴다. */
+  const open = (round: SavedRound) => {
+    tokenRef.current = round.token;
+    setQuestion(round.question);
+    setTotal(round.question.total);
+    setAnswered(round.question.answered);
+    setCorrect(round.correct);
+    setGraduated(round.graduated);
+    setResult(null);
+    setError("");
+    // 지난 판의 연출을 끈다. 안 끄면 새 판 첫 화면에 지난 판 마지막
+    // 연출이 그대로 떠 있다(fire 가 0 이 아니라서 그려진다).
+    setReaction({ fire: 0, correct: true });
+    setBurst(0);
+    setPhase("playing");
+  };
+
   const start = async () => {
     if (busyRef.current) return;
     busyRef.current = true;
@@ -85,18 +253,14 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
       const started = await call<ReviewStarted>({ action: "start" });
       if (!aliveRef.current) return;
 
-      tokenRef.current = started.token;
-      setQuestion(started.question);
-      setTotal(started.question.total);
-      setAnswered(started.question.answered);
-      setCorrect(0);
-      setGraduated(0);
-      setResult(null);
-      // 지난 판의 연출을 끈다. 안 끄면 새 판 첫 화면에 지난 판 마지막
-      // 연출이 그대로 떠 있다(fire 가 0 이 아니라서 그려진다).
-      setReaction({ fire: 0, correct: true });
-      setBurst(0);
-      setPhase("playing");
+      const round = {
+        token: started.token,
+        question: started.question,
+        correct: 0,
+        graduated: 0,
+      };
+      if (memoryKey) remember(memoryKey, round);
+      open(round);
     } catch (err) {
       if (!aliveRef.current) return;
       setError(err instanceof Error ? err.message : "시작하지 못했습니다.");
@@ -112,12 +276,40 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
     setBusy(true);
     setError("");
 
+    // 응답이 오면 이 판이 아직 탭에 적혀 있는지 이것으로 본다(아래).
+    const sent = tokenRef.current;
     try {
       const got = await call<ReviewAnswered>({
         action: "answer",
-        token: tokenRef.current,
+        token: sent,
         choice_id: choiceId,
       });
+
+      // 적어 둘 값과 화면의 값이 같아야 해서 한 번 세어 둘 다 쓴다.
+      const nextCorrect = correct + (got.result.correct ? 1 : 0);
+      const nextGraduated = graduated + (got.result.graduated ? 1 : 0);
+
+      // **적는 것은 화면이 떠났는지 보기 전에 한다.** 답을 누르고 응답이
+      // 오기 전에 탭바로 나가면 화면은 사라져도 서버는 이 답을 받았다.
+      // 그때 안 적으면 탭에는 이미 답한 문제의 토큰이 남아, 돌아와서 이어
+      // 풀면 같은 문제를 다시 내고 400 으로 끝난다. 탭 저장소는 화면보다
+      // 오래 산다.
+      //
+      // **단, 이 판이 아직 적혀 있을 때만.** 떠났다 돌아와 "새로 시작" 을
+      // 눌렀으면 탭에는 새 판이 있다. 늦게 온 옛 판의 응답이 그것을 덮으면
+      // 안 된다.
+      if (memoryKey && storedToken(memoryKey) === sent) {
+        if (got.finished || !got.question) {
+          forget(memoryKey);
+        } else {
+          remember(memoryKey, {
+            token: got.token ?? "",
+            question: got.question,
+            correct: nextCorrect,
+            graduated: nextGraduated,
+          });
+        }
+      }
       if (!aliveRef.current) return;
 
       tokenRef.current = got.token ?? "";
@@ -125,8 +317,8 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
       // 다음 문제가 있으면 서버가 센 순번을 쓴다. 마지막이면 그것이
       // 없으므로 하나 올린다 - 끝난 판이라 더 어긋날 자리도 없다.
       setAnswered((n) => got.question?.answered ?? n + 1);
-      if (got.result.correct) setCorrect((n) => n + 1);
-      if (got.result.graduated) setGraduated((n) => n + 1);
+      setCorrect(nextCorrect);
+      setGraduated(nextGraduated);
 
       // 맞혔을 때만 연출한다. 틀렸을 때 아무것도 안 오는 것이 이 화면의
       // 판단이다(위 reaction 주석).
@@ -150,7 +342,31 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
       }
       setQuestion(got.question);
     } catch (err) {
+      // **400 이면 이 판은 더 못 간다.** 토큰이 만료됐거나 이미 답한 문제의
+      // 토큰이다 - 답을 보내고 응답이 오기 전에 새로고침하면 적어 둔 판이
+      // 한 문제 뒤처진다. 같은 답을 다시 보내도 같은 400 이라 문제 화면에
+      // 두면 막다른 길이 된다. 시작 화면으로 돌려 새로 열게 한다.
+      const dead = err instanceof CallError && err.status === 400;
+      // 화면이 떠났어도 지운다. 위에서 적는 것과 같은 이유이고, 같은
+      // 조건이다 - 그 사이 탭에 적힌 다음 토큰이나 새 판은 멀쩡하다.
+      if (dead && memoryKey && storedToken(memoryKey) === sent) {
+        forget(memoryKey);
+      }
       if (!aliveRef.current) return;
+
+      if (dead) {
+        tokenRef.current = "";
+        setQuestion(null);
+        setResult(null);
+        setPhase("idle");
+        // 서버 문구를 그대로 쓰지 않는다. 가장 흔한 경우의 문구가 "최신
+        // 화면에서 다시 풀어주세요" 인데, 시작 버튼 앞에서는 뜻이 안 닿는다.
+        //
+        // 시작 화면의 남은 개수는 이 화면을 연 때의 값이다. 이 길은 거의
+        // 새로고침 직후 이어 풀기에서 나서 그 값이 곧 지금 값이다.
+        setError("이 판은 더 이어갈 수 없습니다. 새로 시작해주세요.");
+        return;
+      }
       setError(err instanceof Error ? err.message : "채점하지 못했습니다.");
     } finally {
       busyRef.current = false;
@@ -197,7 +413,16 @@ export function ReviewBoard({ due }: { due: ReviewDue }) {
       );
     }
 
-    return <IdleCard due={due} busy={busy} error={error} onStart={start} />;
+    return (
+      <IdleCard
+        due={due}
+        memoryKey={memoryKey}
+        busy={busy}
+        error={error}
+        onStart={start}
+        onResume={open}
+      />
+    );
   })();
 
   return (
@@ -226,15 +451,36 @@ function counted(value: number): boolean {
 
 function IdleCard({
   due,
+  memoryKey,
   busy,
   error,
   onStart,
+  onResume,
 }: {
   due: ReviewDue;
+  memoryKey: string | null;
   busy: boolean;
   error: string;
   onStart: () => void;
+  onResume: (round: SavedRound) => void;
 }) {
+  /**
+   * 이 탭에서 풀던 판. **이어 풀지는 누를 때 정한다.**
+   *
+   * 첫 화면은 서버가 그리는데 서버에는 탭 저장소가 없다. 그래서 서버 몫은
+   * null 이고, 화면에 붙은 뒤에 적어 둔 판으로 한 번 바뀐다(StudyCards 의
+   * 같은 자리). 곧장 문제로 넘기지 않고 버튼을 "이어서 풀기" 로 바꾸는 이유:
+   * 붙은 뒤 판을 펴려면 이펙트 안에서 상태를 바꿔야 하는데, 그건 첫 그림을
+   * 한 번 더 그리게 하는 길이라 린트가 막는다. 누르는 한 번이 더 들지만
+   * 무엇이 이어지는지 먼저 보인다.
+   */
+  const raw = useSyncExternalStore(
+    noSubscribe,
+    () => (memoryKey ? readRound(memoryKey) : null),
+    () => null,
+  );
+  const saved = parseRound(raw);
+
   // 복습할 것이 없으면 시작 버튼을 그리지 않는다. 눌러봐야 "없다" 로
   // 막히고, 그건 화면이 이미 아는 사실이다.
   if (due.due === 0) {
@@ -311,16 +557,25 @@ function IdleCard({
       </div>
 
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        {capped
-          ? `이번 판에서 ${capped}개를 봅니다. 점수는 붙지 않고 시간도 재지 않습니다.`
-          : "점수는 붙지 않고 시간도 재지 않습니다."}
+        {saved
+          ? `풀던 판이 있습니다. ${saved.question.total}개 중 ${saved.question.answered}개를 풀었습니다.`
+          : capped
+            ? `이번 판에서 ${capped}개를 봅니다. 점수는 붙지 않고 시간도 재지 않습니다.`
+            : "점수는 붙지 않고 시간도 재지 않습니다."}
       </p>
 
       <div>
         {/* 이 화면의 주된 동작이라 코랄. 한 화면에 코랄 버튼은 하나다. */}
         <button
           type="button"
-          onClick={onStart}
+          onClick={() => {
+            // **누를 때 다시 읽는다.** 이 화면은 그려질 때 한 번 읽는데, 그
+            // 뒤 떠나기 전 화면의 늦은 응답이 다음 토큰을 적을 수 있다. 그린
+            // 때의 판으로 열면 이미 쓴 토큰이라 답하자마자 400 이다.
+            const now = memoryKey ? parseRound(readRound(memoryKey)) : null;
+            if (now) onResume(now);
+            else onStart();
+          }}
           disabled={busy}
           className="dv-btn w-full rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50 sm:w-auto sm:px-10"
           style={
@@ -334,8 +589,32 @@ function IdleCard({
             } as React.CSSProperties
           }
         >
-          {busy ? "여는 중" : "시작"}
+          {busy ? "여는 중" : saved ? "이어서 풀기" : "시작"}
         </button>
+        {/* 적어 둔 판을 버리고 새 판을 연다. 이게 없으면 그 사이 다른 곳에서
+            새로 틀린 것이 생겨도 옛 판을 끝까지 풀어야 새 목록을 받았다.
+            새 판이 적어 둔 것을 덮어쓰므로 따로 지울 것은 없다. 코랄은 위
+            하나라 글자 버튼으로 둔다. block 으로 두는 이유: 데스크톱에서
+            주 버튼이 제 폭(sm:w-auto)으로 줄면 인라인 버튼이 그 옆 같은 줄로
+            붙어 높이가 어긋난다. 폰과 같이 늘 아래 줄에 둔다. */}
+        {saved && (
+          <button
+            type="button"
+            onClick={onStart}
+            disabled={busy}
+            className="mx-auto mt-2 block px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
+            style={{
+              minHeight: "var(--hit-floor)",
+              background: "transparent",
+              border: 0,
+              borderRadius: "var(--radius-md)",
+              color: "var(--text-muted)",
+              fontWeight: "var(--weight-bold)",
+            }}
+          >
+            새로 시작
+          </button>
+        )}
         {/* "여기서" 는 위 빈 화면 문구와 같은 이유로 붙인다.
             라벨이 아니라 설명 문장이라 --text-muted 를 쓴다. 12px 이라
             라벨용 토큰을 쓰면 이 화면에서 제일 알아야 할
@@ -654,7 +933,7 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
 
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new Error(data?.detail ?? "요청이 실패했습니다.");
+    throw new CallError(data?.detail ?? "요청이 실패했습니다.", res.status);
   }
   return res.json() as Promise<T>;
 }

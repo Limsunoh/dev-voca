@@ -10,6 +10,7 @@ import secrets
 from contextlib import contextmanager
 from datetime import timedelta
 from functools import partial
+from unittest import mock
 from uuid import uuid4
 
 from django.conf import settings
@@ -23,8 +24,8 @@ from django.utils import timezone
 from apps.vocab import quiz
 from apps.vocab.models import Sentence, Word
 
-from . import record, review
-from .models import DailyScore, QuizAnswer, QuizSession, ReviewState
+from . import record, review, session
+from .models import DailyScore, QuizAnswer, QuizSession, ReviewState, RoundStep
 from .session import SessionError
 
 PASSWORD = secrets.token_urlsafe(16)
@@ -1026,6 +1027,55 @@ class ReplayTest(TestCase):
             "한 문제를 되돌려 보내는 것만으로 복습 목록에서 졸업했다",
         )
 
+    def test_replay_is_still_refused_after_the_round_steps_are_swept(self):
+        """판 청소가 돌아도 살아 있는 복습 토큰의 되돌리기는 막혀야 한다.
+
+        RoundStep 은 자유 문제풀이와 복습이 같이 쓰는데, 청소가 판 토큰
+        수명(10분)으로 나이를 재서 10분 지난 복습 표시를 지웠다. 복습
+        토큰은 6시간 사므로 그 뒤 옛 토큰을 다시 보내면 통과했다. 복습 판
+        식별자에 앞머리가 빠져도 이 테스트가 깨진다.
+        """
+        body = self.client.post(START_URL).json()
+        token = body["token"]
+        first = body["question"]["choices"][0]["id"]
+        got = self.client.post(
+            ANSWER_URL, {"token": token, "choice_id": first},
+            content_type="application/json",
+        )
+        self.assertEqual(got.status_code, 200)
+
+        # 11분 지났고, 그 사이 누가 판을 열어 청소가 돌았다.
+        old = timezone.now() - timedelta(seconds=session.TOKEN_MAX_AGE + 60)
+        RoundStep.objects.update(created_at=old)
+        with mock.patch.object(session.random, "random", return_value=0.0):
+            session._sweep_old_steps()
+
+        again = self.client.post(
+            ANSWER_URL, {"token": token, "choice_id": first},
+            content_type="application/json",
+        )
+        self.assertEqual(again.status_code, 400, "청소 뒤 옛 복습 토큰이 통과했다")
+
+    def test_round_steps_outlive_every_token_that_uses_them(self):
+        """표시를 두는 기간이 이 표를 쓰는 토큰 수명보다 짧으면 안 된다.
+
+        짧으면 그 차이만큼 되돌리기가 열린다. 복습 토큰 수명을 늘리는
+        사람이 여기서 멈추게 둔다.
+        """
+        self.assertGreater(session.LONG_STEP_KEEP_SECONDS, review.TOKEN_MAX_AGE)
+
+    def test_review_rounds_are_marked_long_lived(self):
+        """복습 판의 표시에는 앞머리가 붙는다. 청소가 그것으로 기간을 가른다."""
+        body = self.client.post(START_URL).json()
+        self.client.post(
+            ANSWER_URL,
+            {"token": body["token"], "choice_id": body["question"]["choices"][0]["id"]},
+            content_type="application/json",
+        )
+        self.assertTrue(
+            RoundStep.objects.get().round_id.startswith(session.LONG_ROUND_PREFIX)
+        )
+
 
 class BrokenPayloadTest(TestCase):
     """문제 정보가 망가진 토큰이 400 인가 500 인가.
@@ -1637,3 +1687,187 @@ class ReviewApiFlowTest(TestCase):
         self.assertEqual((result["streak"], result["graduated"]), (0, False))
         self.assertEqual((row.streak, row.is_wrong), (0, True))
         self.assertEqual(row.last_correct_at, at)
+
+
+class StepSweepClockTest(TestCase):
+    """판 청소와 복습 토큰 수명이 시계 위에서 맞물리는가.
+
+    RoundStep 은 자유 문제풀이(토큰 10분)와 복습(토큰 6시간)이 같이 쓴다.
+    청소가 짧은 쪽에 맞추면 그 사이만큼 복습 되돌리기가 열린다. 행 나이만
+    바꾸는 것으로는 "토큰은 아직 살아 있다" 를 못 보이므로, 서명 시계와
+    청소 시계를 같이 앞으로 돌려 실제로 그 시각에 다시 보낸 것처럼 한다.
+    """
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("청소시계")
+        self.client.force_login(self.user)
+        a_round(self.user, [(Word.objects.first().pk, False)])
+
+    def _answer_once(self) -> tuple[str, int]:
+        """복습을 열고 첫 문제에 답한다. (그 토큰, 고른 보기)"""
+        body = self.client.post(START_URL).json()
+        choice = body["question"]["choices"][0]["id"]
+        got = self.client.post(
+            ANSWER_URL, {"token": body["token"], "choice_id": choice},
+            content_type="application/json",
+        )
+        self.assertEqual(got.status_code, 200)
+        return body["token"], choice
+
+    @contextmanager
+    def _later(self, seconds: float):
+        """서명 검사와 청소가 보는 시각을 seconds 만큼 뒤로 민다."""
+        real_time = signing.time.time
+        real_now = timezone.now
+        wall = real_time() + seconds
+        moment = real_now() + timedelta(seconds=seconds)
+        with mock.patch.object(signing.time, "time", return_value=wall), \
+                mock.patch.object(session.timezone, "now", return_value=moment):
+            yield
+
+    def _sweep(self):
+        with mock.patch.object(session.random, "random", return_value=0.0):
+            session._sweep_old_steps()
+
+    def test_replay_is_refused_at_every_age_the_review_token_still_accepts(self):
+        """토큰이 받아지는 동안 어느 시각에 청소가 돌아도 되돌리기는 400 이다.
+
+        11분(옛 청소 기준 바로 뒤), 1시간, 5시간 59분을 차례로 본다. 표시가
+        남아 있어야 하고, 되돌린 토큰은 거절돼야 한다.
+        """
+        token, choice = self._answer_once()
+        for seconds in (session.TOKEN_MAX_AGE + 60, 60 * 60, review.TOKEN_MAX_AGE - 60):
+            with self.subTest(seconds=seconds), self._later(seconds):
+                self._sweep()
+                self.assertEqual(
+                    RoundStep.objects.count(), 1, f"{seconds}초 뒤 청소가 살아 있는 표시를 지웠다"
+                )
+                again = self.client.post(
+                    ANSWER_URL, {"token": token, "choice_id": choice},
+                    content_type="application/json",
+                )
+                self.assertEqual(again.status_code, 400)
+                self.assertIn("이미 처리한 답", again.json()["detail"])
+
+    def test_after_the_token_dies_the_row_goes_and_replay_is_still_refused(self):
+        """6시간이 넘으면 표시는 지워지고, 그때 다시 보내도 토큰 만료로 막힌다.
+
+        표시가 먼저 사라지고 토큰이 나중에 죽는 틈이 없어야 한다.
+        """
+        token, choice = self._answer_once()
+        with self._later(session.LONG_STEP_KEEP_SECONDS + 60):
+            self._sweep()
+            self.assertEqual(RoundStep.objects.count(), 0, "수명 지난 표시가 남았다")
+            again = self.client.post(
+                ANSWER_URL, {"token": token, "choice_id": choice},
+                content_type="application/json",
+            )
+        self.assertEqual(again.status_code, 400)
+        self.assertIn("만료", again.json()["detail"])
+
+    def test_sweep_boundary_is_strictly_older_than_the_keep_window(self):
+        """경계: 창 끝에서 1초 안쪽과 창 끝은 남고, 1초 바깥은 지워진다.
+
+        창은 판마다 다르다. 복습처럼 앞머리가 붙은 판은 LONG_STEP_KEEP_SECONDS,
+        나머지(90초 한 판)는 판 토큰 수명이다.
+        """
+        long = session.LONG_ROUND_PREFIX
+        ages = {
+            f"{long}inside": session.LONG_STEP_KEEP_SECONDS - 1,
+            f"{long}edge": session.LONG_STEP_KEEP_SECONDS,
+            f"{long}outside": session.LONG_STEP_KEEP_SECONDS + 1,
+            "free-inside": session.TOKEN_MAX_AGE - 1,
+            "free-edge": session.TOKEN_MAX_AGE,
+            "free-outside": session.TOKEN_MAX_AGE + 1,
+        }
+        now = timezone.now()
+        for round_id, age in ages.items():
+            RoundStep.objects.create(round_id=round_id, step=0)
+            RoundStep.objects.filter(round_id=round_id).update(
+                created_at=now - timedelta(seconds=age)
+            )
+
+        with mock.patch.object(session.timezone, "now", return_value=now):
+            self._sweep()
+
+        self.assertEqual(
+            sorted(RoundStep.objects.values_list("round_id", flat=True)),
+            sorted([f"{long}edge", f"{long}inside", "free-edge", "free-inside"]),
+        )
+
+    def test_free_round_replay_is_still_refused_after_a_sweep(self):
+        """자유 문제풀이 되돌리기 방어는 그대로다 - 청소가 돌아도 토큰이 사는 동안 막힌다."""
+        token, question = session.start()
+        _, first, _ = session.answer(token, question["choices"][0]["id"])
+        with self._later(session.TOKEN_MAX_AGE - 5):
+            self._sweep()
+        self.assertEqual(RoundStep.objects.count(), 1)
+        # 시계를 돌린 채 답하면 90초 마감에 먼저 걸려 무엇이 막았는지 모른다.
+        with self.assertRaisesMessage(SessionError, "이미"):
+            session.answer(token, first.answer_id)
+
+    def test_sweep_does_not_run_on_most_calls(self):
+        """확률 문을 지나지 못하면 아무것도 안 지운다(오래된 행도)."""
+        RoundStep.objects.create(round_id="old", step=0)
+        RoundStep.objects.update(
+            created_at=timezone.now() - timedelta(seconds=session.LONG_STEP_KEEP_SECONDS * 2)
+        )
+        with mock.patch.object(session.random, "random", return_value=0.99):
+            session._sweep_old_steps()
+        self.assertEqual(RoundStep.objects.count(), 1)
+
+    # ---- 90초 한 판과 복습이 섞여 있을 때 ----
+    # 위 경계 테스트는 식별자를 손으로 만든다. 아래는 실제로 판을 열고 답해서
+    # 생긴 행으로 보고, 청소도 운영에서 도는 유일한 자리(session.start)로 돌린다.
+
+    def _open_free_and_answer(self) -> tuple[str, int]:
+        """90초 한 판을 열고 첫 문제에 답한다. (그 토큰, 고른 보기)"""
+        token, question = session.start()
+        choice = question["choices"][0]["id"]
+        session.answer(token, choice)
+        return token, choice
+
+    def test_after_ten_minutes_free_rows_go_and_review_rows_stay(self):
+        """11분 뒤 누가 한 판을 열면 한 판 표시만 지워지고 복습 표시는 남는다.
+
+        복습 쪽은 그 시각에 옛 토큰을 다시 보내도 "이미 처리한 답" 으로 막힌다.
+        """
+        review_token, review_choice = self._answer_once()
+        self._open_free_and_answer()
+        self.assertEqual(RoundStep.objects.count(), 2)
+
+        with self._later(session.TOKEN_MAX_AGE + 60):
+            with mock.patch.object(session.random, "random", return_value=0.0):
+                session.start()  # 청소가 이 안에서 돈다
+            left = list(RoundStep.objects.values_list("round_id", flat=True))
+            again = self.client.post(
+                ANSWER_URL, {"token": review_token, "choice_id": review_choice},
+                content_type="application/json",
+            )
+
+        self.assertEqual(len(left), 1, f"남은 표시: {left}")
+        self.assertTrue(left[0].startswith(session.LONG_ROUND_PREFIX))
+        self.assertEqual(again.status_code, 400)
+        self.assertIn("이미 처리한 답", again.json()["detail"])
+
+    def test_free_round_ids_do_not_carry_the_long_prefix(self):
+        """90초 한 판의 식별자에는 앞머리가 없다 - 있으면 6시간씩 쌓인다."""
+        self._open_free_and_answer()
+        self.assertFalse(
+            RoundStep.objects.get().round_id.startswith(session.LONG_ROUND_PREFIX)
+        )
+
+    def test_free_round_replay_after_its_row_is_gone_is_refused_as_expired(self):
+        """한 판 표시가 지워진 뒤에 옛 한 판 토큰을 보내면 만료로 막힌다.
+
+        표시가 먼저 사라지고 토큰이 나중에 죽는 틈이 한 판 쪽에도 없어야 한다.
+        """
+        token, choice = self._open_free_and_answer()
+        with self._later(session.TOKEN_MAX_AGE + 1):
+            self._sweep()
+            self.assertEqual(RoundStep.objects.count(), 0)
+            with self.assertRaises(SessionError) as caught:
+                session.answer(token, choice)
+        self.assertNotIn("이미", str(caught.exception))
