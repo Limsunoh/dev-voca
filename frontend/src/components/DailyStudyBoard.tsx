@@ -165,10 +165,10 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
       // 모아둔 자리라 같은 말을 두 번 하는 셈이 된다.
       //
       // **연출을 기다렸다가 다음 문제를 내지 않는다.** 판 모드는 1초
-      // 멈추는데, 그건 거기서 화면을 어둡게 깔고(dim) 판정이 보기 버튼
-      // 색으로만 남아 다음 문제가 뜨면 사라지기 때문이다(RoundBoard 의 그
-      // 자리 주석). 이 화면은 어둡게 안 깔고, 결과 줄이 문제 카드와 **별개
-      // 요소**라 다음 문제가 떠도 그대로 남는다. 멈출 이유가 없는데 멈추면
+      // 멈추는데, 그건 거기서 화면을 어둡게 깔아(dim) 그동안 문제와 결과
+      // 줄이 가려지기 때문이다(RoundBoard 의 그 자리 주석). 이 화면은
+      // 어둡게 안 깔고, 결과 줄이 문제 카드와 **별개 요소**라 다음 문제가
+      // 떠도 "앞 문제" 로 그대로 남는다. 멈출 이유가 없는데 멈추면
       // "답하면 곧바로 다음 문제" 라는 지금 동작만 바뀐다.
       setReaction((r) => ({ fire: r.fire + 1, correct: answered.result.correct }));
       if (answered.result.correct) setBurst((n) => n + 1);
@@ -260,9 +260,9 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
           busy={busy}
           error={error}
           onPick={send}
-          // 다음 묶음이 시작되면 결과 줄 아래에 "이어서 익히기" 가 뜬다.
-          // 자동으로 넘기지 않는 이유: 이 화면은 채점 결과를 다음 문제
-          // 위에 인라인으로 띄우는데, 곧바로 학습으로 가면 방금 맞았는지
+          // 다음 묶음이 시작되면 다음 문제 대신 "이어서 익히기" 가 뜬다.
+          // 자동으로 넘기지 않는 이유: 이 화면은 채점 결과를 문제 위
+          // 결과 줄로 띄우는데, 곧바로 학습으로 가면 방금 맞았는지
           // 틀렸는지를 못 보고 화면이 튄다.
           onLearn={cards.length > 0 ? () => setPhase("learning") : undefined}
         />
@@ -466,7 +466,10 @@ function PlayCard({
   busy: boolean;
   error: string;
   onPick: (id: number) => void;
-  /** 다음 묶음의 학습이 기다릴 때만 온다. 없으면 버튼을 안 그린다. */
+  /**
+   * 다음 묶음의 학습이 기다릴 때만 온다. 있으면 다음 문제를 가리고
+   * "이어서 익히기" 버튼을 그린다. 없으면 문제를 그린다.
+   */
   onLearn?: () => void;
 }) {
   const answered = study?.answered ?? 0;
@@ -523,45 +526,78 @@ function PlayCard({
         />
       </div>
 
-      {/* 학습이 기다리면 보기를 막는다. 안 막으면 아직 안 배운 단어로
-          답하게 되고, "먼저 익히고 푼다" 는 이 기능의 전제가 깨진다. */}
-      <QuestionCard
-        question={question}
-        busy={busy || onLearn !== undefined}
-        onPick={onPick}
-      />
+      {/* 방금 푼 문제의 결과. 새로 나타나는 영역이라 읽어준다.
 
-      {/* 새로 나타나는 영역이라 읽어준다. */}
-      {/* 높이를 두 줄로 잡아둔다. 오답일 때만 정답과 그 뜻으로 두 줄이
-          되는데, 한 줄 높이로 두면 오답이 뜰 때마다 아래 "이어서 익히기"
-          버튼이 통째로 내려간다. 누르려던 자리가 답한 직후에 움직인다. */}
-      <p aria-live="polite" className="min-h-10 text-sm">
+          **문제 위에 두고 "앞 문제" 라고 붙인다.** 답하면 곧바로 다음 문제가
+          뜨는 화면이라, 문제 아래에 두면 방금 답의 결과가 새 문제의 답처럼
+          읽혔다. 읽는 순서대로 지난 것이 먼저 오게 한다.
+
+          높이를 두 줄로 잡아둔다. 단어를 틀리면 정답과 그 뜻으로 두 줄이
+          되는데, 한 줄 높이로 두면 오답마다 아래 문제와 보기가 내려간다.
+          첫 문제에서 비어 있는 것도 같은 이유다. 문장을 틀리면 해석이 길어
+          서너 줄이 되기도 한다(138자에서 100px). 그만큼은 보기가 내려가지만,
+          결과와 다음 문제가 한 번에 그려져 그려진 뒤에 튀지는 않고, 문제
+          카드 높이 차이(문제마다 100px 안팎)보다 작다.
+
+          aria-atomic: 두 번째 답부터는 바뀐 부분만 읽혀 "앞 문제" 가 빠진다.
+          줄 전체를 읽혀야 지난 문제의 결과라는 것이 들린다. */}
+      <p aria-live="polite" aria-atomic="true" className="min-h-10 text-sm">
         {result && (
-          // 정답은 초록, 오답은 진한 코랄. 오답에 --coral 을 그대로 쓰지
-          // 않는 이유는 --wrong-deep 이 그 자리를 위해 있어서다 - 크림
-          // 위에서 --coral 은 본문 대비에 못 미친다.
-          <span
-            style={{
-              color: result.correct ? "var(--correct)" : "var(--wrong-deep)",
-              fontWeight: "var(--weight-black)",
-            }}
-          >
-            {result.correct ? (
-              "정답"
-            ) : (
-              <WrongAnswer text={result.answer_text} extra={result.answer_extra} />
-            )}
-          </span>
+          <>
+            <span
+              style={{
+                color: "var(--text-muted)",
+                fontWeight: "var(--weight-bold)",
+              }}
+            >
+              앞 문제 ·{" "}
+            </span>
+            {/* 정답은 초록, 오답은 진한 코랄. 오답에 --coral 을 그대로 쓰지
+                않는 이유는 --wrong-deep 이 그 자리를 위해 있어서다 - 크림
+                위에서 --coral 은 본문 대비에 못 미친다. */}
+            <span
+              style={{
+                color: result.correct ? "var(--correct)" : "var(--wrong-deep)",
+                fontWeight: "var(--weight-black)",
+              }}
+            >
+              {result.correct ? (
+                "정답"
+              ) : (
+                <WrongAnswer text={result.answer_text} extra={result.answer_extra} />
+              )}
+            </span>
+          </>
         )}
       </p>
 
-      {/* 다음 묶음이 기다릴 때만. 이 버튼이 없으면 아래 보기를 눌러
-          답하게 되는데, 그 문제는 아직 안 배운 단어로 나온다. */}
+      {/* 학습이 기다리면 다음 문제를 그리지 않는다. 보기만 잠가 두면 아직
+          안 배운 단어의 문제와 보기가 미리 다 보여서, 익히기 전에 답을
+          훑어볼 수 있다 - "먼저 익히고 푼다" 는 이 기능의 전제가 깨진다.
+          문제는 이미 받아둔 상태라 익히기를 마치면 왕복 없이 여기 뜬다. */}
+      {onLearn ? (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          다음 문제는 새 단어를 익힌 뒤에 나옵니다.
+        </p>
+      ) : (
+        <QuestionCard question={question} busy={busy} onPick={onPick} />
+      )}
+
+      {/* 다음 묶음이 기다릴 때만. 문제를 가려 두었으므로 이 버튼이 판을
+          이어 가는 유일한 길이다. */}
       {onLearn && (
-        // 이 화면의 코랄 하나. 이 버튼이 떠 있는 동안 보기는 잠겨 있어서
-        // (위 QuestionCard 의 busy) 지금 누를 수 있는 것은 이것뿐이다.
+        // 이 화면의 코랄 하나. 이 버튼이 떠 있는 동안 문제는 가려져
+        // 있어서(위) 지금 누를 수 있는 것은 이것뿐이다.
+        //
+        // autoFocus: 방금 누른 보기가 문제와 함께 사라져 초점이 문서 처음
+        // 으로 떨어진다. 키보드로 푸는 사람이 Tab 을 처음부터 다시 누르지
+        // 않게 하나뿐인 다음 동작으로 옮긴다. 이 버튼은 답한 직후에만
+        // 나타나므로(새로고침하면 학습 카드부터다) 페이지를 열 때 초점을
+        // 가로채는 일은 없다. 화면낭독기에 따라 초점 이동 안내가 위 결과
+        // 줄(polite)을 밀어낼 수 있다 - 실제 화면낭독기로는 아직 못 봤다.
         <button
           type="button"
+          autoFocus
           onClick={onLearn}
           className="dv-btn flex w-full items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={

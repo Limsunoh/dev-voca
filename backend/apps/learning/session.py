@@ -486,9 +486,19 @@ def make_question(
         # 나간다** - 이 기능이 없애려던 바로 그 경험이다.
         #
         # 같은 묶음에서 같은 단어가 두 번 나오는 것은 손해가 아니다.
-        # 방금 본 것을 다시 묻는 것이라 오히려 학습 의도에 맞고, 애초에
-        # 후보가 2개면 "연달아 같은 문제" 를 피할 여지가 없다.
-        return _word_question(words.filter(pk__in=word_ids), words, [])
+        # 방금 본 것을 다시 묻는 것이라 오히려 학습 의도에 맞다.
+        #
+        # **다만 연달아는 안 된다. 바로 앞 정답 하나만 뺀다.** 화면은
+        # 답하자마자 다음 문제 위에 "앞 문제 · 오답 · SLA" 로 정답을
+        # 보여준다. 다음 문제가 또 SLA 면 그 줄이 답을 알려주는 셈이고,
+        # 일일공부 점수는 순위표에 들어간다. 하나만 빼면 후보가 바닥나는
+        # 것은 묶음에서 보이는 단어가 하나만 남았을 때뿐이다(판 도중에
+        # 검수가 취소되거나 지워진 경우). 그때는 빼지 않고 낸다.
+        # recent_words 의 맨 앞이 가장 최근에 낸 단어다
+        # (daily_study._next_question 이 맨 앞에 넣는다).
+        pool = words.filter(pk__in=word_ids)
+        made = _word_question(pool, words, recent_words[:1])
+        return made or _word_question(pool, words, [])
 
     kind = random.choice(quiz.QuizKind.ALL)
 
