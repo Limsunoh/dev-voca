@@ -46,6 +46,11 @@ import { Boss, Student } from "@/components/ReactionCharacters";
  *     멈추는 화면    문제풀기 · 판 모드      어둡게 깐다
  *     안 멈추는 화면  일일학습 · 복습         안 깐다
  *
+ * 안 멈추는 화면도 **마지막 답에 연출이 돌 때만은** 그것이 끝난 뒤 결과
+ * 화면으로 넘어간다(아래 verdictMs). 결과 화면이 가운데에 서서, 바로
+ * 넘기면 연출이 그 글자 위에 겹친다. 복습의 마지막 오답처럼 연출이 없으면
+ * 기다리지 않는다.
+ *
  * **기본값을 두지 않는다.** 호출부가 매번 고르게 한다 - 이유는 아래 prop
  * 주석에 있다.
  *
@@ -81,6 +86,35 @@ type Props = {
    */
   dim: boolean;
 };
+
+/**
+ * 판정 연출이 도는 시간(ms). 연출을 끝까지 보여 준 뒤 화면을 넘길 때 쓴다.
+ *
+ * 값은 CSS 의 `--duration-verdict` 한 곳에서 읽는다(globals.css). 한 판은
+ * 서버 값으로 그 변수를 덮어쓰므로(RoundBoard) 여기서 숫자를 따로 들고
+ * 있으면 둘이 갈린다. 움직임 줄이기면 0 이다 - 연출 층이 아예 안 그려지고
+ * (.vx 가 display: none) 축포도 곧바로 끝난다.
+ *
+ * 브라우저 밖(서버 렌더, 테스트)에서는 window 가 없어 0 이다.
+ */
+export function verdictMs(): number {
+  try {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return 0;
+    const raw = getComputedStyle(document.documentElement)
+      .getPropertyValue("--duration-verdict")
+      .trim();
+    const value = parseFloat(raw);
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    // 초는 "1s" 처럼 s 로 끝날 때만이다. "ms" 와 단위 없는 값은 ms 로 본다.
+    // CSS 처럼 대소문자를 안 가린다 - "500MS" 를 초로 읽으면 8분을 잠근다.
+    const seconds = /s$/i.test(raw) && !/ms$/i.test(raw);
+    // 상한을 둔다. 이 값만큼 보기를 잠그므로, 변수를 잘못 적어도 화면이
+    // 몇 초 넘게 멈추지 않게 한다. 연출은 1초다.
+    return Math.min(seconds ? value * 1000 : value, 3000);
+  } catch {
+    return 0;
+  }
+}
 
 export function Reaction({ fire, correct, dim }: Props) {
   // 그라디언트 id 를 가르는 값. 같은 화면에 둘이 그려져도 색이 안 섞인다.
