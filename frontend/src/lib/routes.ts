@@ -160,6 +160,29 @@ export function tabHref(tab: Tab, pathname: string): string {
   return tab.segment ? `/${tab.segment}` : routes.home;
 }
 
+/**
+ * 자기 탭이 없는 화면을 어느 탭 아래로 볼지.
+ *
+ * 순위표와 오답 노트는 탭이 없어서, 그대로 두면 탭바에 아무것도 안 켜져
+ * 지금 어디 있는지 알 수 없다. 둘 다 문제풀기 쪽에서 들어오는 화면이라
+ * 문제풀기를 켠다 - 오답 노트는 허브에서만, 순위표는 허브·한 판·일일공부
+ * 결과에서 들어온다. 순위표는 내정보의 "순위표 전체" 로도 들어오지만 나머지
+ * 입구가 전부 문제풀기 쪽이다.
+ *
+ * Map 인 이유: 객체로 두면 `/constructor` 같은 주소가 Object 의 속성을
+ * 꺼내 온다.
+ */
+const tabOwners = new Map<string, string>([
+  ["board", "test"],
+  ["mistakes", "test"],
+]);
+
+/** 지금 경로에서 켜질 탭의 segment. TabBar 가 tab.segment 와 비교한다. */
+export function activeTabSegment(pathname: string): string {
+  const first = pathname.split("/")[1] ?? "";
+  return tabOwners.get(first) ?? first;
+}
+
 /** 지금 보고 있는 콘텐츠. 알 수 없으면 words. */
 export function contentFromPath(pathname: string): string {
   const second = pathname.split("/")[2] ?? "";

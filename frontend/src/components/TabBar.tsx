@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { immersiveRoutes, tabHref, tabs } from "@/lib/routes";
+import {
+  activeTabSegment,
+  immersiveRoutes,
+  tabHref,
+  tabs,
+} from "@/lib/routes";
 
 /**
  * 화면 아래 탭바.
@@ -46,7 +51,8 @@ export function TabBar() {
     return null;
   }
 
-  const current = pathname.split("/")[1] ?? "";
+  // 순위표·오답 노트처럼 탭이 없는 화면은 routes 가 정한 탭을 켠다.
+  const current = activeTabSegment(pathname);
 
   return (
     <>
