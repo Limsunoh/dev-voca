@@ -12,12 +12,14 @@
 """
 
 import re
+from io import StringIO
 
 from django.core.cache import cache
+from django.core.management import call_command
 from django.test import TestCase
 
 from .management.commands.seed_phrases import PHRASES
-from .models import DailyPhrase, Word
+from .models import DailyPhrase, PhraseScene, Word
 from .talk import (
     MAX_ALTERNATIVES,
     MAX_HEARD_LENGTH,
@@ -840,3 +842,352 @@ class SeedStaysContractedTest(TestCase):
         """줄였는데 목록에서 안 빼면 목록이 거짓말을 한다."""
         texts = {text for text, *_ in PHRASES}
         self.assertEqual(self.KEPT_LONG - texts, set())
+
+
+class TalkSceneFilterTest(TestCase):
+    """상황(인사·쇼핑·길찾기 ...)을 골랐을 때 그 상황만 나오는가.
+
+    난이도 필터와 같은 규칙이다. 모르는 값은 전부에서, 비면 그렇다고 말한다.
+    상황은 일상 표현에만 있어서 개발 용어에서는 무시한다.
+    """
+
+    QUESTION_URL = "/api/vocab/talk/question/"
+
+    def setUp(self):
+        cache.clear()
+        Word.objects.all().delete()
+        DailyPhrase.objects.all().delete()
+        for text, scene, level in (
+            ("nice to meet you", PhraseScene.GREETING, DailyPhrase.Difficulty.EASY),
+            ("how much is this", PhraseScene.SHOPPING, DailyPhrase.Difficulty.EASY),
+            ("where is the station", PhraseScene.ASKING, DailyPhrase.Difficulty.HARD),
+        ):
+            DailyPhrase.objects.create(
+                text=text,
+                meaning=f"{scene} 표현",
+                pronunciation="/x/",
+                reading="엑s",
+                is_reviewed=True,
+                scene=scene,
+                difficulty=level,
+            )
+
+    def _ask(self, **params):
+        res = self.client.get(self.QUESTION_URL, params)
+        self.assertEqual(res.status_code, 200, res.content)
+        return res.json()
+
+    def test_고른_상황만_나온다(self):
+        for scene in (PhraseScene.GREETING, PhraseScene.SHOPPING, PhraseScene.ASKING):
+            with self.subTest(scene=scene):
+                # 셋 중 하나라 필터가 새면 12번 안에 거의 확실히 다른 것이 섞인다.
+                for _ in range(12):
+                    self.assertEqual(self._ask(scene=scene)["scene"], scene)
+
+    def test_상황을_안_고르면_전부에서_낸다(self):
+        seen = {self._ask()["scene"] for _ in range(40)}
+        self.assertEqual(
+            seen, {PhraseScene.GREETING, PhraseScene.SHOPPING, PhraseScene.ASKING}
+        )
+
+    def test_상황과_이름을_같이_내린다(self):
+        """배지 글자는 서버 choices 의 이름을 그대로 쓴다. 화면이 다시 만들지 않는다."""
+        body = self._ask(scene=PhraseScene.SHOPPING)
+
+        self.assertEqual(body["scene"], "shopping")
+        self.assertEqual(body["scene_label"], "쇼핑·주문")
+
+    def test_상황을_못_정한_표현은_빈_값이다(self):
+        """scene 은 blank 를 허용한다. 이름을 억지로 만들지 않는다."""
+        DailyPhrase.objects.all().delete()
+        DailyPhrase.objects.create(
+            text="see you later",
+            meaning="나중에 봐",
+            pronunciation="/x/",
+            reading="엑s",
+            is_reviewed=True,
+        )
+
+        body = self._ask()
+
+        self.assertEqual((body["scene"], body["scene_label"]), ("", ""))
+
+    def test_개발_용어에서는_상황을_무시한다(self):
+        """Word 에는 상황 칸이 없다. 주소에 scene 이 남아도 개발 용어가 나와야 한다."""
+        Word.objects.create(
+            term="commit",
+            meaning="커밋",
+            pronunciation="/x/",
+            reading="커밑",
+            reading_reviewed=True,
+            is_reviewed=True,
+        )
+
+        body = self._ask(kind="dev", scene=PhraseScene.GREETING)
+
+        self.assertEqual(body["term"], "commit")
+        self.assertEqual((body["scene"], body["scene_label"]), ("", ""))
+
+    def test_그_상황이_비면_그렇다고_말한다(self):
+        """고른 것 하나만 비었고 바꾸면 계속할 수 있다. 문구가 그것을 말해야 한다."""
+        DailyPhrase.objects.filter(scene=PhraseScene.ASKING).delete()
+
+        res = self.client.get(self.QUESTION_URL, {"scene": PhraseScene.ASKING})
+
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("상황", res.json()["detail"])
+        self.assertNotIn("난이도", res.json()["detail"])
+
+    def test_난이도와_상황이_같이_비면_둘_다_말한다(self):
+        res = self.client.get(
+            self.QUESTION_URL, {"scene": PhraseScene.GREETING, "level": 3}
+        )
+
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("난이도", res.json()["detail"])
+        self.assertIn("상황", res.json()["detail"])
+
+    def test_미검수는_상황을_골라도_안_나온다(self):
+        """상황 필터도 검수 게이트 뒤에 붙어야 한다."""
+        DailyPhrase.objects.filter(scene=PhraseScene.SHOPPING).update(is_reviewed=False)
+
+        res = self.client.get(self.QUESTION_URL, {"scene": PhraseScene.SHOPPING})
+
+        self.assertEqual(res.status_code, 404)
+
+
+class TalkSceneWalkTest(TestCase):
+    """상황 필터를 exclude 로 끝까지 걸어 본다.
+
+    TalkSceneFilterTest 는 무작위로 여러 번 받아 "고른 것만 나오나" 를 본다.
+    그 방식으로는 **모르는 값이 빈 상황("")으로 떨어지는 것**을 못 잡는다 -
+    `_parse_scene` 이 받은 값을 그대로 넘기면 `?scene=` 가 "상황 없는 표현만"
+    이 되는데, 무작위 표본은 그래도 200 이다.
+
+    여기서는 받은 id 를 exclude 에 쌓아 풀이 빌 때까지 받는다. 무엇이 몇 개
+    나왔는지와 마지막 404 문구가 결정적으로 정해진다.
+    """
+
+    QUESTION_URL = "/api/vocab/talk/question/"
+    SCENE_EMPTY = "이 상황은 다 봤습니다. 상황을 바꾸거나 잠시 뒤 다시 해보세요."
+    BOTH_EMPTY = "이 난이도·상황은 다 봤습니다. 다른 것을 고르거나 잠시 뒤 다시 해보세요."
+    LEVEL_EMPTY = "이 난이도는 다 봤습니다. 난이도를 바꾸거나 잠시 뒤 다시 해보세요."
+    ALL_EMPTY = "읽을 것을 다 봤습니다. 잠시 뒤 다시 시작해보세요."
+
+    def setUp(self):
+        cache.clear()
+        Word.objects.all().delete()
+        DailyPhrase.objects.all().delete()
+        # 인사 쉬움·보통, 쇼핑 쉬움·어려움, 상황 없는 보통 하나.
+        self.ids = {
+            ("greeting", 1): self._phrase("nice to meet you", "greeting", 1).pk,
+            ("greeting", 2): self._phrase("long time no see", "greeting", 2).pk,
+            ("shopping", 1): self._phrase("how much is this", "shopping", 1).pk,
+            ("shopping", 3): self._phrase("can I get a receipt", "shopping", 3).pk,
+            ("", 2): self._phrase("see you later", "", 2).pk,
+        }
+        # 걸어도 절대 나오면 안 되는 것: 인사의 미검수, 인사의 소리로 못 읽는 것.
+        self.hidden = {
+            self._phrase("good morning", "greeting", 1, reviewed=False).pk,
+            self._phrase("OK see you", "greeting", 1).pk,
+        }
+        self.word_ids = {
+            level: Word.objects.create(
+                term=term,
+                meaning=f"{term} 뜻",
+                pronunciation="/x/",
+                reading="엑s",
+                reading_reviewed=True,
+                is_reviewed=True,
+                difficulty=level,
+            ).pk
+            for level, term in ((1, "cache"), (2, "commit"), (3, "rollback"))
+        }
+
+    def _phrase(self, text, scene, level, reviewed=True) -> DailyPhrase:
+        return DailyPhrase.objects.create(
+            text=text,
+            meaning=f"{text} 뜻",
+            pronunciation="/x/",
+            reading="엑s",
+            is_reviewed=reviewed,
+            scene=scene,
+            difficulty=level,
+        )
+
+    def _walk(self, **params) -> tuple[list[dict], dict]:
+        """풀이 빌 때까지 받는다. (나온 응답 본문 순서, 마지막 404 본문)."""
+        seen: list[dict] = []
+        for _ in range(15):
+            query = {**params, "exclude": ",".join(str(b["id"]) for b in seen)}
+            res = self.client.get(self.QUESTION_URL, query)
+            if res.status_code == 404:
+                return seen, res.json()
+            self.assertEqual(res.status_code, 200, res.content)
+            seen.append(res.json())
+        self.fail(f"풀이 안 빈다: {[b['id'] for b in seen]}")
+
+    def _ids(self, *keys) -> list[int]:
+        return sorted(self.ids[k] for k in keys)
+
+    def test_고른_상황을_끝까지_걸으면_그것만_나오고_상황_문구로_끝난다(self):
+        for scene, keys in (
+            ("greeting", [("greeting", 1), ("greeting", 2)]),
+            ("shopping", [("shopping", 1), ("shopping", 3)]),
+        ):
+            with self.subTest(scene=scene):
+                seen, body = self._walk(scene=scene)
+                self.assertEqual(sorted(b["id"] for b in seen), self._ids(*keys))
+                self.assertEqual({b["scene"] for b in seen}, {scene})
+                self.assertEqual(body["detail"], self.SCENE_EMPTY)
+
+    def test_표현이_없는_상황은_바로_상황_문구다(self):
+        """아는 값인데 표현이 하나도 없다. 전부로 떨어지지 않는다."""
+        seen, body = self._walk(scene="trouble")
+
+        self.assertEqual(seen, [])
+        self.assertEqual(body["detail"], self.SCENE_EMPTY)
+
+    def test_미검수와_소리로_못_읽는_것은_상황을_골라도_안_나온다(self):
+        for params in ({"scene": "greeting"}, {"scene": "greeting", "level": 1}, {}):
+            with self.subTest(**params):
+                seen, _ = self._walk(**params)
+                self.assertEqual({b["id"] for b in seen} & self.hidden, set())
+
+    def test_상황과_난이도를_같이_걸면_그_칸만_나오고_둘_다_말한다(self):
+        for scene, level in (("greeting", 1), ("greeting", 2), ("shopping", 3)):
+            with self.subTest(scene=scene, level=level):
+                seen, body = self._walk(scene=scene, level=level)
+                self.assertEqual([b["id"] for b in seen], [self.ids[(scene, level)]])
+                self.assertEqual(body["detail"], self.BOTH_EMPTY)
+
+    def test_있는_상황과_있는_난이도라도_칸이_비면_둘_다_말한다(self):
+        """쇼핑도 있고 보통도 있지만 쇼핑·보통은 없다."""
+        seen, body = self._walk(scene="shopping", level=2)
+
+        self.assertEqual(seen, [])
+        self.assertEqual(body["detail"], self.BOTH_EMPTY)
+
+    def test_모르는_값은_상황_없는_표현까지_다_내고_전체_문구로_끝난다(self):
+        """모르는 값이 빈 상황으로 떨어지면 여기서 걸린다.
+
+        빈 값·대소문자·공백·NUL·유니코드·1만 자·필드 조회 문법 전부 같다.
+        마지막 문구가 "이 상황은" 이면 사용자가 고른 적 없는 상황을 말한다.
+        """
+        for raw in (
+            "",
+            " ",
+            "GREETING",
+            "Greeting",
+            " greeting",
+            "greeting ",
+            "greeting\x00",
+            "\x00",
+            "ｇｒｅｅｔｉｎｇ",
+            "인사·소개",
+            "greeting,shopping",
+            "scene__in",
+            "g" * 10000,
+        ):
+            with self.subTest(raw=raw[:12]):
+                seen, body = self._walk(scene=raw)
+                self.assertEqual(sorted(b["id"] for b in seen), sorted(self.ids.values()))
+                self.assertEqual(body["detail"], self.ALL_EMPTY)
+
+    def test_모르는_상황과_난이도는_난이도만_걸린다(self):
+        seen, body = self._walk(scene="restaurant", level=2)
+
+        self.assertEqual(
+            sorted(b["id"] for b in seen), self._ids(("greeting", 2), ("", 2))
+        )
+        self.assertEqual(body["detail"], self.LEVEL_EMPTY)
+
+    def test_같은_이름을_여러_번_주면_마지막_값을_따른다(self):
+        """QueryDict.get 은 마지막 값이다. 어느 쪽이든 500 이 아니어야 한다."""
+        res = self.client.get(self.QUESTION_URL + "?scene=bogus&scene=shopping")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["scene"], "shopping")
+
+        seen, body = self._walk(scene=["shopping", "bogus"])
+        self.assertEqual(len(seen), len(self.ids))
+        self.assertEqual(body["detail"], self.ALL_EMPTY)
+
+    def test_개발_용어는_상황이_있어도_난이도만_걸리고_난이도_문구로_끝난다(self):
+        """상황을 무시하는데 문구가 "난이도·상황" 이면 사용자가 헷갈린다."""
+        for level in (1, 2, 3):
+            with self.subTest(level=level):
+                seen, body = self._walk(kind="dev", scene="greeting", level=level)
+                self.assertEqual([b["id"] for b in seen], [self.word_ids[level]])
+                self.assertEqual(
+                    {(b["scene"], b["scene_label"]) for b in seen}, {("", "")}
+                )
+                self.assertEqual(body["detail"], self.LEVEL_EMPTY)
+
+    def test_개발_용어는_상황만_주면_전부_내고_전체_문구다(self):
+        seen, body = self._walk(kind="dev", scene="shopping")
+
+        self.assertEqual(sorted(b["id"] for b in seen), sorted(self.word_ids.values()))
+        self.assertEqual(body["detail"], self.ALL_EMPTY)
+
+    def test_상황_필터에_이상한_exclude_가_섞여도_500_이_아니다(self):
+        for raw in ("9" * 30, "-1", "abc", ",,,", "1,a,-3"):
+            with self.subTest(exclude=raw):
+                res = self.client.get(
+                    self.QUESTION_URL, {"scene": "greeting", "exclude": raw}
+                )
+                self.assertEqual(res.status_code, 200, res.content)
+                self.assertEqual(res.json()["scene"], "greeting")
+
+
+class TalkSceneSeedTest(TestCase):
+    """실제 씨드(PHRASES)로 다섯 상황을 끝까지 걸어 본다.
+
+    상황 탭을 누르자마자 "다 봤습니다" 가 뜨는 탭이 없어야 한다. 표현이 있어도
+    전부 is_speakable 에 걸리면 그렇게 된다. 상황 x 난이도 칸도 같다 -
+    화면이 두 필터를 같이 걸 수 있으므로 빈 칸이 생기면 여기서 드러난다.
+    """
+
+    QUESTION_URL = "/api/vocab/talk/question/"
+
+    @classmethod
+    def setUpTestData(cls):
+        DailyPhrase.objects.all().delete()
+        call_command("seed_phrases", stdout=StringIO())
+
+    def setUp(self):
+        cache.clear()
+
+    def _walk(self, **params) -> list[dict]:
+        seen: list[dict] = []
+        for _ in range(len(PHRASES) + 1):
+            query = {**params, "exclude": ",".join(str(b["id"]) for b in seen)}
+            res = self.client.get(self.QUESTION_URL, query)
+            if res.status_code == 404:
+                return seen
+            self.assertEqual(res.status_code, 200, res.content)
+            seen.append(res.json())
+        self.fail("풀이 안 빈다")
+
+    def test_다섯_상황_모두_씨드_전부를_낸다(self):
+        expected: dict[str, set[str]] = {}
+        for text, _p, _r, _m, scene, _level in PHRASES:
+            expected.setdefault(scene, set()).add(text)
+        self.assertEqual(set(expected), set(PhraseScene.values))
+
+        for scene in PhraseScene.values:
+            with self.subTest(scene=scene):
+                seen = self._walk(scene=scene)
+                self.assertEqual({b["term"] for b in seen}, expected[scene])
+                self.assertEqual({b["scene"] for b in seen}, {scene})
+
+    def test_상황_x_난이도_칸이_하나도_비지_않는다(self):
+        """칸마다 첫 문제만 받아 본다. 비면 탭 조합이 바로 "다 봤습니다" 다."""
+        empty = []
+        for scene in PhraseScene.values:
+            for level in DailyPhrase.Difficulty.values:
+                res = self.client.get(
+                    self.QUESTION_URL, {"scene": scene, "level": level}
+                )
+                if res.status_code != 200:
+                    empty.append((scene, level, res.status_code))
+        self.assertEqual(empty, [])
