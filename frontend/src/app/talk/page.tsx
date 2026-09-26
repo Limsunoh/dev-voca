@@ -3,7 +3,13 @@ import type { Metadata } from "next";
 import { TalkBoard } from "@/components/TalkBoard";
 import { TalkKindTabs } from "@/components/TalkKindTabs";
 import { TalkLevelTabs } from "@/components/TalkLevelTabs";
-import type { TalkKind, TalkLevel } from "@/lib/routes";
+import { TalkSceneTabs } from "@/components/TalkSceneTabs";
+import {
+  type TalkKind,
+  type TalkLevel,
+  type TalkScene,
+  toTalkScene,
+} from "@/lib/routes";
 
 export const metadata: Metadata = {
   title: "일상영어 · devvoca",
@@ -40,6 +46,11 @@ export default async function TalkPage({ searchParams }: PageProps) {
     const raw = Number(first(params.level));
     return raw === 1 || raw === 2 || raw === 3 ? raw : 0;
   })();
+  // 상황도 같다. 아는 값이 아니면 "전체". 개발 용어에는 상황이 없어서
+  // 주소에 남아 있어도 버린다 - 안 버리면 보이지도 않는 탭이 판의 key 와
+  // 다른 탭의 링크에 섞여 든다.
+  const scene: TalkScene =
+    kind === "daily" ? toTalkScene(first(params.scene)) : "";
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-4 pb-10">
@@ -48,12 +59,15 @@ export default async function TalkPage({ searchParams }: PageProps) {
           이동 수단이지 제목이 아니다(/test/words 와 같은 판단). */}
       <h1 className="sr-only">일상영어</h1>
 
-      {/* 두 축을 세로로 쌓는다. 폰에서 한 줄에 넣으면 "어려움" 이 잘린다.
-          갈래가 위인 이유: 무엇을 읽을지가 먼저이고 난이도는 그 안에서
-          좁히는 것이다. */}
+      {/* 세 축을 세로로 쌓는다. 폰에서 한 줄에 넣으면 "어려움" 이 잘린다.
+          갈래가 위인 이유: 무엇을 읽을지가 먼저이고 난이도·상황은 그
+          안에서 좁히는 것이다. */}
       <div className="mb-4 grid justify-items-start gap-2">
-        <TalkKindTabs current={kind} level={level} />
-        <TalkLevelTabs kind={kind} current={level} />
+        <TalkKindTabs current={kind} level={level} scene={scene} />
+        <TalkLevelTabs kind={kind} current={level} scene={scene} />
+        {/* 상황은 맨 아래다. 난이도처럼 고른 갈래 안에서 좁히는 것이고,
+            일상 표현에만 있다. */}
+        {kind === "daily" && <TalkSceneTabs level={level} current={scene} />}
       </div>
 
       {/* 갈래가 바뀌면 판을 처음부터 다시 시작한다. key 를 안 주면 리액트가
@@ -61,8 +75,13 @@ export default async function TalkPage({ searchParams }: PageProps) {
           일상 표현 화면에 남는다. */}
       {/* 난이도도 key 에 넣는다. 갈래와 같은 이유다 - 안 넣으면 난이도를
           바꿔도 읽던 것이 그대로 남고, 이미 낸 것을 빼는 목록(exclude)이
-          옛 풀 기준으로 쌓인 채 따라온다. */}
-      <TalkBoard key={`${kind}-${level}`} kind={kind} level={level} />
+          옛 풀 기준으로 쌓인 채 따라온다. 상황도 같다. */}
+      <TalkBoard
+        key={`${kind}-${level}-${scene}`}
+        kind={kind}
+        level={level}
+        scene={scene}
+      />
     </main>
   );
 }

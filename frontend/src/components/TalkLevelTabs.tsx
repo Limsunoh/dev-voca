@@ -1,4 +1,9 @@
-import { routes, type TalkKind, type TalkLevel } from "@/lib/routes";
+import {
+  routes,
+  type TalkKind,
+  type TalkLevel,
+  type TalkScene,
+} from "@/lib/routes";
 
 import { TalkTabRow } from "./TalkKindTabs";
 
@@ -29,17 +34,20 @@ import { TalkTabRow } from "./TalkKindTabs";
 export function TalkLevelTabs({
   kind,
   current,
+  scene,
 }: {
   kind: TalkKind;
   /** 지금 고른 난이도. 0 이면 전체다. */
   current: TalkLevel;
+  /** 지금 고른 상황. 난이도를 바꿔도 들고 간다. */
+  scene: TalkScene;
 }) {
   return (
     <TalkTabRow
       label="난이도"
       items={LEVELS.map((level) => ({
         key: level.value,
-        href: routes.talk(kind, level.value),
+        href: routes.talk(kind, level.value, scene),
         label: level.label,
         active: level.value === current,
       }))}

@@ -1,6 +1,11 @@
 import Link from "next/link";
 
-import { routes, type TalkKind, type TalkLevel } from "@/lib/routes";
+import {
+  routes,
+  type TalkKind,
+  type TalkLevel,
+  type TalkScene,
+} from "@/lib/routes";
 
 /**
  * 일상 표현 / 개발 용어를 오가는 탭.
@@ -16,6 +21,7 @@ import { routes, type TalkKind, type TalkLevel } from "@/lib/routes";
 export function TalkKindTabs({
   current,
   level,
+  scene,
 }: {
   current: TalkKind;
   /**
@@ -26,13 +32,18 @@ export function TalkKindTabs({
    * 쪽을 누를 때 무엇이 풀리는지 외워야 한다.
    */
   level: TalkLevel;
+  /**
+   * 지금 고른 상황. 난이도와 같이 넘기지만 개발 용어로 가는 링크에서는
+   * routes.talk 가 뺀다 - 개발 용어에는 상황이 없다.
+   */
+  scene: TalkScene;
 }) {
   return (
     <TalkTabRow
       label="읽을 갈래"
       items={KINDS.map((kind) => ({
         key: kind.slug,
-        href: routes.talk(kind.slug, level),
+        href: routes.talk(kind.slug, level, scene),
         label: kind.label,
         active: kind.slug === current,
       }))}
@@ -41,25 +52,40 @@ export function TalkKindTabs({
 }
 
 /**
- * 말하기 화면의 알약 탭 한 줄. 갈래(여기)와 난이도(TalkLevelTabs)가 같이 쓴다.
+ * 말하기 화면의 알약 탭 한 줄. 갈래(여기)·난이도(TalkLevelTabs)·
+ * 상황(TalkSceneTabs)이 같이 쓴다.
  *
- * 바로 위아래에 붙어 서는 두 줄이라 따로 그리면 한쪽만 고쳤을 때 모양이
- * 어긋난다. 그리는 곳을 하나로 두고 두 탭은 무엇을 늘어놓을지만 정한다.
+ * 바로 위아래에 붙어 서는 세 줄이라 따로 그리면 한쪽만 고쳤을 때 모양이
+ * 어긋난다. 그리는 곳을 하나로 두고 각 탭은 무엇을 늘어놓을지만 정한다.
  */
 export function TalkTabRow({
   label,
   items,
+  wrap = false,
 }: {
   label: string;
   items: { key: string | number; href: string; label: string; active: boolean }[];
+  /**
+   * 폭이 모자라면 줄을 바꾼다. 상황 탭(여섯 개)이 쓴다.
+   *
+   * 모서리를 알약(9999px)이 아니라 "한 줄 높이의 절반" 으로 둔다. 두 줄이
+   * 된 바탕에 알약 모서리를 주면 양 끝이 반원으로 부풀어 첫 칸과 끝 칸이
+   * 둥근 벽에 눌려 보인다. 한 줄 높이는 칸(--hit-floor) + 위아래 p-1 이라
+   * 그 절반이면 한 줄일 때 곧 알약이어서 다른 두 줄과 모양이 같다. 26px
+   * 같은 고정값으로 두면 글자 크기를 키운 브라우저에서 칸만 커지고
+   * 모서리는 그대로라 한 줄인데도 알약이 아니게 된다.
+   */
+  wrap?: boolean;
 }) {
   return (
     <nav
       aria-label={label}
-      className="inline-flex gap-1 p-1"
+      className={`${wrap ? "flex flex-wrap" : "inline-flex"} gap-1 p-1`}
       style={{
         background: "var(--background-deep)",
-        borderRadius: "var(--radius-pill)",
+        borderRadius: wrap
+          ? "calc(var(--hit-floor) / 2 + 0.25rem)"
+          : "var(--radius-pill)",
       }}
     >
       {items.map((item) => (
