@@ -7,16 +7,20 @@
 from __future__ import annotations
 
 import secrets
+from contextlib import contextmanager
 from datetime import timedelta
+from functools import partial
 from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
+from django.db import connection
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
+from apps.vocab import quiz
 from apps.vocab.models import Sentence, Word
 
 from . import record, review
@@ -1302,3 +1306,334 @@ class GraduateStreakContractTest(TestCase):
 
         self.assertEqual(body["due"], 0)
         self.assertIn("graduate_streak", body)
+
+
+@contextmanager
+def before_review_write(action):
+    """복습 표를 고치는 첫 UPDATE 가 DB 에 닿기 바로 앞에 action 을 한 번 끼운다.
+
+    _record 가 파이썬에서 어디서 읽든, 읽은 뒤 쓰기 전까지가 창이다. SQL
+    단에서 걸어 두면 _record 가 save 로 쓰든 update 로 쓰든 같은 자리에
+    끼운다. action 안의 UPDATE 는 그대로 통과한다.
+    """
+    fired = []
+
+    def wrapper(execute, sql, params, many, context):
+        if (
+            not fired
+            and sql.lstrip().upper().startswith("UPDATE")
+            and "learning_reviewstate" in sql
+        ):
+            fired.append(True)
+            action()
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(wrapper):
+        yield fired
+
+
+class RecordRaceTest(TestCase):
+    """복습 답을 쓰기 직전에 같은 단어의 다른 답이 끼어들면.
+
+    일일공부·자유 문제풀이는 bump_review_states 로 같은 줄을 고친다. 복습
+    답이 줄을 읽어 두고 파이썬에서 계산해 쓰면, 그 사이 들어온 답을 옛
+    값으로 덮어쓴다. 스레드 경합에 기대면 가끔만 실패하므로 쓰기 직전에
+    끼워 순서를 고정한다.
+    """
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("복습경합")
+        self.word = Word.objects.first()
+        self.key = ("word", self.word.pk)
+
+    def _row(self) -> ReviewState:
+        return ReviewState.objects.get(
+            user=self.user, target_type="word", target_id=self.word.pk
+        )
+
+    def test_a_miss_just_before_the_second_correct_does_not_graduate(self):
+        """복습 1회 정답 뒤, 두 번째 정답을 쓰기 직전에 일일공부 오답이 끼면.
+
+        오답이 먼저 들어간 것이므로 연속은 0 에서 다시 센다 - 이번 정답이
+        첫 번째다. 옛 코드는 읽어 둔 1 에 +1 해 2 로 덮어써 졸업시켰다.
+        """
+        a_round(self.user, [(self.word.pk, False)])
+        review._record(self.user, "word", self.word.pk, correct=True)
+
+        miss = partial(record.bump_review_states, self.user, {self.key: False})
+        with before_review_write(miss) as fired:
+            streak, graduated = review._record(
+                self.user, "word", self.word.pk, correct=True
+            )
+
+        self.assertTrue(fired, "끼어들기가 안 일어났다")
+        self.assertFalse(graduated, "방금 틀린 단어가 졸업했다")
+        self.assertEqual(streak, 1)
+        self.assertEqual(self._row().streak, 1, "화면에 준 값과 DB 가 다르다")
+        self.assertEqual(review.count_due(self.user), 1, "틀린 단어가 목록에서 빠졌다")
+
+    def test_a_review_miss_keeps_a_correct_time_written_just_before(self):
+        """복습 오답을 쓰기 직전에 다른 곳의 정답이 끼면, 그 정답 시각은 남는다.
+
+        옛 코드는 오답이어도 last_correct_at 을 읽어 둔 값으로 되썼다.
+        """
+        long_ago = timezone.now() - timedelta(days=30)
+        ReviewState.objects.create(
+            user=self.user,
+            target_type="word",
+            target_id=self.word.pk,
+            last_correct_at=long_ago,
+        )
+
+        hit = partial(record.bump_review_states, self.user, {self.key: True})
+        with before_review_write(hit) as fired:
+            streak, graduated = review._record(
+                self.user, "word", self.word.pk, correct=False
+            )
+
+        row = self._row()
+        self.assertTrue(fired, "끼어들기가 안 일어났다")
+        self.assertEqual((streak, graduated), (0, False))
+        self.assertTrue(row.is_wrong, "마지막 답(복습 오답)이 안 남았다")
+        self.assertGreater(
+            row.last_correct_at, long_ago, "방금 맞힌 시각을 옛 값으로 되돌렸다"
+        )
+
+    def test_a_free_miss_keeps_a_review_correct_time_written_just_before(self):
+        """반대 방향: 자유·일일공부 오답을 쓰기 직전에 복습 정답이 끼면.
+
+        오답이 나중이니 연속은 0 이고 틀린 것으로 남는다. 다만 복습에서
+        맞힌 시각은 지우지 않는다 - 옛 코드는 오답 줄에도 last_correct_at
+        을 읽어 둔 값으로 되썼다.
+        """
+        long_ago = timezone.now() - timedelta(days=30)
+        ReviewState.objects.create(
+            user=self.user,
+            target_type="word",
+            target_id=self.word.pk,
+            is_wrong=True,
+            last_correct_at=long_ago,
+        )
+
+        hit = partial(review._record, self.user, "word", self.word.pk, correct=True)
+        with before_review_write(hit) as fired:
+            record.bump_review_states(self.user, {self.key: False})
+
+        row = self._row()
+        self.assertTrue(fired, "끼어들기가 안 일어났다")
+        self.assertEqual(row.streak, 0, "나중에 온 오답이 연속을 안 끊었다")
+        self.assertTrue(row.is_wrong)
+        self.assertGreater(
+            row.last_correct_at, long_ago, "방금 맞힌 시각을 옛 값으로 되돌렸다"
+        )
+
+    def test_another_review_answer_just_before_the_write_is_not_lost(self):
+        """두 탭이 같은 항목을 맞혔는데 한쪽이 다른 쪽 쓰기 직전에 끼면.
+
+        두 번 맞혔으니 연속은 2 이고, 나중 쪽이 졸업을 알린다. 읽어 둔 0 에
+        +1 해 쓰면 끼어든 정답이 사라져 1 에 머문다.
+        """
+        a_round(self.user, [(self.word.pk, False)])
+
+        other_tab = partial(
+            review._record, self.user, "word", self.word.pk, correct=True
+        )
+        with before_review_write(other_tab) as fired:
+            streak, graduated = review._record(
+                self.user, "word", self.word.pk, correct=True
+            )
+
+        self.assertTrue(fired, "끼어들기가 안 일어났다")
+        self.assertEqual((streak, graduated), (2, True), "끼어든 정답이 사라졌다")
+        self.assertEqual(self._row().streak, 2)
+
+    def test_start_keeps_a_streak_rebuilt_just_before_its_reset(self):
+        """판을 열며 연속을 0 으로 되돌리기 직전에 새 사이클 정답이 쌓이면 남긴다.
+
+        start 는 7일 지나 돌아온 졸업 항목(연속 2)의 연속을 지운다. 목록을
+        읽은 뒤 그 사이 오답(0)과 복습 정답(1)이 들어왔으면 그 1 은 새
+        사이클의 정답이라 지우면 안 된다.
+        """
+        ReviewState.objects.create(
+            user=self.user,
+            target_type="word",
+            target_id=self.word.pk,
+            streak=review.GRADUATE_STREAK,
+            last_correct_at=timezone.now() - timedelta(days=review.STALE_DAYS + 1),
+        )
+
+        def miss_then_hit():
+            record.bump_review_states(self.user, {self.key: False})
+            review._record(self.user, "word", self.word.pk, correct=True)
+
+        with before_review_write(miss_then_hit) as fired:
+            review.start(self.user)
+
+        self.assertTrue(fired, "끼어들기가 안 일어났다")
+        self.assertEqual(self._row().streak, 1, "새 사이클의 정답을 지웠다")
+
+
+class RecordReturnContractTest(TestCase):
+    """_record 가 돌려준 (연속, 졸업) 이 DB 에 남은 값과 같은가."""
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("반환계약")
+        self.word = Word.objects.first()
+
+    def _row(self) -> ReviewState:
+        return ReviewState.objects.get(
+            user=self.user, target_type="word", target_id=self.word.pk
+        )
+
+    def test_three_correct_answers_stay_at_the_cap(self):
+        """세 번 맞혀도 연속은 2 에서 멈춘다. 돌려준 값과 DB 가 매번 같다.
+
+        상한이 없으면 첫 사이클에서 3 이 되고, 7일 뒤 돌아와 한 번만 맞혀도
+        재졸업한다.
+        """
+        a_round(self.user, [(self.word.pk, False)])
+
+        for expected in (1, 2, 2):
+            streak, graduated = review._record(
+                self.user, "word", self.word.pk, correct=True
+            )
+            self.assertEqual(streak, expected)
+            self.assertEqual(graduated, expected >= review.GRADUATE_STREAK)
+            self.assertEqual(self._row().streak, streak, "화면에 준 값과 DB 가 다르다")
+
+    def test_an_over_cap_legacy_row_is_pulled_back_to_the_cap(self):
+        """상한 전에 쌓인 큰 값(예: 5)도 다음 정답에서 2 로 내려온다."""
+        ReviewState.objects.create(
+            user=self.user, target_type="word", target_id=self.word.pk, streak=5
+        )
+
+        streak, _graduated = review._record(
+            self.user, "word", self.word.pk, correct=True
+        )
+
+        self.assertEqual(streak, review.GRADUATE_STREAK)
+        self.assertEqual(self._row().streak, review.GRADUATE_STREAK)
+
+    def test_a_correct_answer_on_a_missing_row_creates_it(self):
+        """줄이 없던 항목을 맞히면 연속 1 로 새로 생긴다."""
+        streak, graduated = review._record(
+            self.user, "word", self.word.pk, correct=True
+        )
+
+        row = self._row()
+        self.assertEqual((streak, graduated), (1, False))
+        self.assertEqual((row.streak, row.is_wrong), (1, False))
+        self.assertIsNotNone(row.last_correct_at)
+
+    def test_a_wrong_answer_on_a_missing_row_creates_it_as_wrong(self):
+        """줄이 없던 항목을 틀리면 틀린 것으로 생기고, 맞힌 시각은 비어 있다."""
+        streak, graduated = review._record(
+            self.user, "word", self.word.pk, correct=False
+        )
+
+        row = self._row()
+        self.assertEqual((streak, graduated), (0, False))
+        self.assertEqual((row.streak, row.is_wrong), (0, True))
+        self.assertIsNone(row.last_correct_at)
+
+    def test_a_review_miss_leaves_the_last_correct_time_alone(self):
+        """복습 오답은 마지막 정답 시각을 안 바꾼다."""
+        at = timezone.now() - timedelta(days=3)
+        ReviewState.objects.create(
+            user=self.user,
+            target_type="word",
+            target_id=self.word.pk,
+            streak=1,
+            last_correct_at=at,
+        )
+
+        review._record(self.user, "word", self.word.pk, correct=False)
+
+        row = self._row()
+        self.assertEqual((row.streak, row.is_wrong), (0, True))
+        self.assertEqual(row.last_correct_at, at)
+
+
+def _pick_from_review_token(token: str, correct: bool) -> int:
+    """복습 토큰을 풀어 정답(또는 오답) 보기 id 를 고른다.
+
+    공격자 시점을 재현하는 도구다. 첫 답의 응답이 정답을 알려주므로 이만큼의
+    정보는 누구나 얻는다.
+    """
+    state = signing.loads(token, salt=review._SALT, max_age=review.TOKEN_MAX_AGE)
+    payload = state["q"]
+    _, answer_id = quiz.resolve_answer(payload, -1)
+    if correct:
+        return answer_id
+    return next(cid for cid in payload["c"] if cid != answer_id)
+
+
+class ReviewApiFlowTest(TestCase):
+    """HTTP 끝단으로 판을 돌린다: 시작 -> 답 -> 졸업 -> 7일 뒤 돌아와 다시 두 번."""
+
+    def setUp(self):
+        cache.clear()
+        seed_words()
+        self.user = make_user("끝단흐름")
+        self.client.force_login(self.user)
+        self.word = Word.objects.first()
+
+    def _start(self) -> str:
+        got = self.client.post(START_URL)
+        self.assertEqual(got.status_code, 201, got.content)
+        return got.json()["token"]
+
+    def _answer(self, token: str, correct: bool) -> dict:
+        got = self.client.post(
+            ANSWER_URL,
+            {"token": token, "choice_id": _pick_from_review_token(token, correct)},
+            content_type="application/json",
+        )
+        self.assertEqual(got.status_code, 200, got.content)
+        return got.json()["result"]
+
+    def _row(self) -> ReviewState:
+        return ReviewState.objects.get(
+            user=self.user, target_type="word", target_id=self.word.pk
+        )
+
+    def _due(self) -> int:
+        return self.client.get(START_URL).json()["due"]
+
+    def test_two_rounds_graduate_then_a_stale_return_needs_two_again(self):
+        """틀린 단어는 연속 두 번 맞혀야 빠지고, 7일 뒤 돌아오면 다시 두 번이다."""
+        a_round(self.user, [(self.word.pk, False)])
+
+        first = self._answer(self._start(), correct=True)
+        self.assertEqual((first["streak"], first["graduated"]), (1, False))
+        second = self._answer(self._start(), correct=True)
+        self.assertEqual((second["streak"], second["graduated"]), (2, True))
+        self.assertEqual(self._due(), 0)
+
+        ReviewState.objects.filter(pk=self._row().pk).update(
+            last_correct_at=timezone.now() - timedelta(days=review.STALE_DAYS + 1)
+        )
+        self.assertEqual(self._due(), 1)
+
+        token = self._start()
+        self.assertEqual(self._row().streak, 0, "돌아온 항목의 연속을 안 지웠다")
+        again = self._answer(token, correct=True)
+        self.assertEqual((again["streak"], again["graduated"]), (1, False))
+        self.assertEqual(self._due(), 1, "두 번째 사이클에서 한 번에 빠졌다")
+
+    def test_a_wrong_answer_resets_and_keeps_the_correct_time(self):
+        """API 로 틀리면 연속 0, 틀린 것으로 남고, 마지막 정답 시각은 그대로다."""
+        a_round(self.user, [(self.word.pk, False)])
+        self._answer(self._start(), correct=True)
+        at = self._row().last_correct_at
+
+        result = self._answer(self._start(), correct=False)
+
+        row = self._row()
+        self.assertEqual((result["streak"], result["graduated"]), (0, False))
+        self.assertEqual((row.streak, row.is_wrong), (0, True))
+        self.assertEqual(row.last_correct_at, at)

@@ -27,7 +27,7 @@ import {
 import { detailWithBack, listUrl, routes } from "@/lib/routes";
 
 export const metadata = {
-  title: "단어장 | devvoca",
+  title: "단어장 · devvoca",
   description: "개발할 때 마주치는 영어 단어를 모아 봅니다.",
   // 주소에 섞은 순서가 붙으면서 같은 내용이 매번 다른 주소가 된다. 검색엔진에
   // 정본이 어느 것인지 알려주지 않으면 같은 목록을 수백 개 주소로 색인한다.

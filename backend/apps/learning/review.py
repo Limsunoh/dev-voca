@@ -33,7 +33,9 @@ from dataclasses import asdict, dataclass
 from datetime import timedelta
 
 from django.core import signing
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import F, Q
+from django.db.models.functions import Least
 from django.utils import timezone
 
 from apps.vocab import quiz
@@ -128,9 +130,14 @@ def start(user) -> tuple[str, dict, int]:
     # **오래돼서 돌아온 것은 연속을 처음부터 센다.** 첫 사이클에서 이미
     # 2 를 채운 항목이 그 값을 들고 돌아오면 한 번만 맞혀도 곧장 재졸업해,
     # 두 번째 사이클부터 "연속 두 번" 이 사라진다.
+    #
+    # 조건을 UPDATE 에도 다시 건다. 목록을 읽은 뒤 다른 탭의 복습 답이
+    # 연속을 1 로 다시 쌓았으면 그건 새 사이클의 정답이라 지우면 안 된다.
     returning = [row.pk for row in due if row.streak >= GRADUATE_STREAK]
     if returning:
-        ReviewState.objects.filter(pk__in=returning).update(streak=0)
+        ReviewState.objects.filter(
+            pk__in=returning, streak__gte=GRADUATE_STREAK
+        ).update(streak=0)
 
     targets = [(row.target_type, row.target_id) for row in due]
     question, at = _question_at(targets, 0)
@@ -208,24 +215,40 @@ def _record(user, target_type: str, target_id: int, correct: bool) -> tuple[int,
     정답을 안 보고 맞힌 것과 보고 맞힌 것이 섞인다 - 여기는 정답을 이미
     본 문제가 나오는 자리라 그 둘을 갈라야 목록이 의미를 갖는다.
     """
-    row, _ = ReviewState.objects.get_or_create(
+    ReviewState.objects.get_or_create(
         user=user, target_type=target_type, target_id=target_id
     )
+    rows = ReviewState.objects.filter(
+        user=user, target_type=target_type, target_id=target_id
+    )
+    now = timezone.now()
 
-    if correct:
-        # 상한을 둔다. 넘어가면 7일 뒤 돌아왔을 때 streak 이 이미 2 라
-        # 한 번만 맞혀도 곧장 재졸업한다 - 두 번째 사이클부터 규칙이
-        # 무너진다. 부호 없는 정수 상한(32767)도 같이 막힌다.
-        row.streak = min(row.streak + 1, GRADUATE_STREAK)
-        row.is_wrong = False
-        row.last_correct_at = timezone.now()
-    else:
-        # 찍어서 한 번 맞힌 것이 졸업하지 않게, 틀리면 처음부터.
-        row.streak = 0
-        row.is_wrong = True
+    # **연속 횟수를 UPDATE 안에서, 행의 지금 값으로 계산한다.** 파이썬에서
+    # 읽어 두고 쓰면, 그 사이 일일공부·자유 문제풀이의 오답(streak=0)이
+    # 끼어들어도 읽어 둔 1 에 +1 한 2 로 덮어써 방금 틀린 단어가 졸업한다.
+    # daily_study._finish 가 최종 점수를 UPDATE 안에서 계산하는 것과 같은 이유다.
+    #
+    # 한 트랜잭션에 묶는 이유: UPDATE 가 잡은 행 잠금이 커밋까지 가므로,
+    # 뒤따르는 읽기가 남의 쓰기가 아니라 방금 쓴 값을 돌려준다.
+    with transaction.atomic():
+        if correct:
+            # 상한을 둔다. 넘어가면 7일 뒤 돌아왔을 때 streak 이 이미 2 라
+            # 한 번만 맞혀도 곧장 재졸업한다 - 두 번째 사이클부터 규칙이
+            # 무너진다. 부호 없는 정수 상한(32767)도 같이 막힌다.
+            rows.update(
+                streak=Least(F("streak") + 1, GRADUATE_STREAK),
+                is_wrong=False,
+                last_correct_at=now,
+                updated_at=now,
+            )
+        else:
+            # 찍어서 한 번 맞힌 것이 졸업하지 않게, 틀리면 처음부터.
+            # last_correct_at 은 안 쓴다 - 읽어 둔 값을 되쓰면 그 사이
+            # 다른 곳에서 맞힌 시각을 옛 값으로 되돌린다.
+            rows.update(streak=0, is_wrong=True, updated_at=now)
+        streak = rows.values_list("streak", flat=True).get()
 
-    row.save(update_fields=["streak", "is_wrong", "last_correct_at", "updated_at"])
-    return row.streak, correct and row.streak >= GRADUATE_STREAK
+    return streak, correct and streak >= GRADUATE_STREAK
 
 
 def _question_at(targets: list, index: int) -> tuple[quiz.Question | None, int]:
