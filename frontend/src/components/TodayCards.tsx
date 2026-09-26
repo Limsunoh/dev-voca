@@ -1,4 +1,5 @@
 import { ProgressDots, StatCard } from "@/components/StatCard";
+import { ApiError } from "@/lib/api/client";
 import { fetchDailyStatus, type StudyProgress } from "@/lib/api/daily";
 import { fetchDue, type ReviewDue } from "@/lib/api/review";
 import { routes } from "@/lib/routes";
@@ -16,22 +17,31 @@ export type Today = {
  *
  * 실패해도 화면을 막지 않는다. 카드 하나가 안 뜰 뿐이다. 조용히 삼키지는
  * 않는다 - 로그가 없으면 백엔드가 죽은 것과 이 코드의 버그를 가를 수 없다.
+ *
+ * 단 서버가 토큰을 거절한 것(401)은 로그에 안 남긴다. 쿠키에 죽은 토큰이
+ * 남은 사람(다른 기기에서 로그아웃 등)이라 오류가 아니다 - 그 사람은 로그인
+ * 확인에서 이미 게스트로 그려지고, 카드는 로그인한 사람에게만 보인다. 남기면
+ * 홈·허브를 열 때마다 두 줄씩 쌓여 진짜 오류가 묻힌다.
  */
 export async function loadToday(token: string | null): Promise<Today> {
   if (!token) return { daily: null, due: null };
   const [daily, due] = await Promise.all([
     fetchDailyStatus(token)
       .then((s) => s.today)
-      .catch((error: unknown) => {
-        console.error("일일공부 상태를 불러오지 못했습니다.", error);
-        return null;
-      }),
-    fetchDue(token).catch((error: unknown) => {
-      console.error("복습 개수를 불러오지 못했습니다.", error);
-      return null;
-    }),
+      .catch(logUnlessRejected("일일공부 상태를 불러오지 못했습니다.")),
+    fetchDue(token).catch(logUnlessRejected("복습 개수를 불러오지 못했습니다.")),
   ]);
   return { daily, due };
+}
+
+/** 실패를 null 로 바꾸되, 토큰 거절(401)이 아니면 로그에 남긴다. */
+function logUnlessRejected(message: string) {
+  return (error: unknown): null => {
+    if (!(error instanceof ApiError && error.status === 401)) {
+      console.error(message, error);
+    }
+    return null;
+  };
 }
 
 /**

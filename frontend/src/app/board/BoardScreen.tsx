@@ -2,7 +2,7 @@ import { Leaderboard } from "@/components/Leaderboard";
 import type { BoardKind } from "@/lib/api/leaderboards";
 import { fetchBoard } from "@/lib/api/leaderboards";
 import { ApiError } from "@/lib/api/client";
-import { getToken } from "@/lib/session";
+import { getToken, withTokenOrGuest } from "@/lib/session";
 
 /**
  * 순위표 화면 본체.
@@ -12,11 +12,22 @@ import { getToken } from "@/lib/session";
  */
 export async function BoardScreen({ kind }: { kind: BoardKind }) {
   // 로그인 안 해도 볼 수 있다. 토큰이 없으면 내 줄만 안 온다.
-  const token = await getToken();
-
+  //
+  // 서버가 쿠키의 토큰을 거절하면 토큰 없이 다시 받는다(withTokenOrGuest).
+  // 그대로 두면 백엔드가 공개 순위표라도 401 을 내서, 로그인이 풀린
+  // 사람에게 "순위표를 불러오지 못했습니다" 가 떴다. 화면을 그리는 중이라
+  // 쿠키는 못 지운다(forget: false).
+  //
+  // 쿠키는 try 밖에서 읽는다. 안에서 읽으면 빌드 때 Next 가 쿠키 접근으로
+  // 던지는 신호(DynamicServerError)까지 아래 catch 가 잡는다(홈의 같은 주석).
+  let token = await getToken();
   let board;
   try {
-    board = await fetchBoard(kind, token ?? undefined);
+    ({ value: board, token } = await withTokenOrGuest(
+      token,
+      (t) => fetchBoard(kind, t),
+      { forget: false },
+    ));
   } catch (error) {
     // 순위표가 안 뜨는 것과 백엔드가 죽은 것을 사용자가 구분할 수는
     // 없지만, 다시 시도해볼 수 있는지는 알려준다.

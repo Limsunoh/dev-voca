@@ -30,7 +30,14 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 mock.module("@/lib/session", {
-  namedExports: { getToken: async () => null },
+  namedExports: {
+    getToken: async () => null,
+    // 토큰이 없으니 그대로 게스트로 부른다(실제 구현과 같다).
+    withTokenOrGuest: async <T,>(
+      token: string | null,
+      call: (token?: string) => Promise<T>,
+    ) => ({ value: await call(token ?? undefined), token }),
+  },
 });
 
 type LinkProps = { href: string; children?: ReactNode };

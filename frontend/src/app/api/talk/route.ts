@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { fetchTalkQuestion, gradeTalk } from "@/lib/api/talk";
 import { toTalkScene, type TalkKind } from "@/lib/routes";
 import { ApiError } from "@/lib/api/client";
-import { getToken } from "@/lib/session";
+import { getToken, withTokenOrGuest } from "@/lib/session";
 
 /**
  * 소리내어 읽기 중계.
@@ -83,9 +83,15 @@ export async function POST(request: Request) {
       // 그대로 쿼리에 싣지 않는다 - 브라우저가 보낸 아무 문자열이 백엔드
       // 주소로 흘러가지 않게 여기서 끊는다.
       const scene = toTalkScene(body.scene) || undefined;
-      return NextResponse.json(
-        await fetchTalkQuestion(kind, { exclude, token: auth, level, scene }),
+      // 서버가 쿠키의 토큰을 거절하면 쿠키를 지우고 게스트로 받는다(한 판
+      // 중계와 같다). 그대로 실으면 로그인 없이도 되는 이 화면이 401 로
+      // 막혔다. 문장마다 오는 요청이라 로그인 확인을 먼저 하지 않는다.
+      const { value } = await withTokenOrGuest(
+        auth ?? null,
+        (token) => fetchTalkQuestion(kind, { exclude, token, level, scene }),
+        { forget: true },
       );
+      return NextResponse.json(value);
     }
 
     if (typeof body.token !== "string" || !body.token) {
@@ -110,9 +116,14 @@ export async function POST(request: Request) {
           .slice(0, MAX_HEARD)
       : [];
 
-    return NextResponse.json(
-      await gradeTalk({ token: body.token, heard }, auth),
+    // 읽는 사이 토큰이 죽었으면(다른 기기에서 로그아웃) 채점도 401 이 난다.
+    // 시작과 같이 쿠키를 지우고 게스트로 채점한다.
+    const { value } = await withTokenOrGuest(
+      auth ?? null,
+      (token) => gradeTalk({ token: body.token as string, heard }, token),
+      { forget: true },
     );
+    return NextResponse.json(value);
   } catch (error) {
     if (error instanceof ApiError) {
       return NextResponse.json(

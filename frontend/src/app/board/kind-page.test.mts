@@ -34,7 +34,13 @@ mock.module("next/navigation", {
 });
 
 mock.module("@/lib/session", {
-  namedExports: { getToken: async () => null },
+  namedExports: {
+    getToken: async () => null,
+    withTokenOrGuest: async <T,>(
+      token: string | null,
+      call: (token?: string) => Promise<T>,
+    ) => ({ value: await call(token ?? undefined), token }),
+  },
 });
 
 const page = await import("./[kind]/page");

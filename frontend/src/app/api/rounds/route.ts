@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { relayError } from "@/lib/api/relay";
 import { answerRound, finishRound, startRound } from "@/lib/api/rounds";
-import { getToken } from "@/lib/session";
+import { getToken, withTokenOrGuest } from "@/lib/session";
 
 /**
  * 문제풀이 한 판 중계.
@@ -46,11 +46,19 @@ export async function POST(request: Request) {
   }
 
   // 로그인 안 해도 풀 수 있다. 없으면 기록만 안 된다.
-  const auth = (await getToken()) ?? undefined;
+  const cookieToken = await getToken();
+  const auth = cookieToken ?? undefined;
 
   try {
+    // 서버가 쿠키의 토큰을 거절하면(다른 기기에서 로그아웃 등) 쿠키를 지우고
+    // 게스트 판으로 연다(withTokenOrGuest) - 그대로 두면 "시작" 이 "토큰이
+    // 유효하지 않습니다" 로 막혔다. 여기서 지워야 뒤이은 답 요청에 그 토큰이
+    // 안 실린다.
     if (body.action === "start") {
-      return NextResponse.json(await startRound(auth));
+      const { value } = await withTokenOrGuest(cookieToken, startRound, {
+        forget: true,
+      });
+      return NextResponse.json(value);
     }
 
     // 아래 둘은 판 토큰이 있어야 한다. 없으면 백엔드까지 갈 것도 없다.

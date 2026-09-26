@@ -404,6 +404,11 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     }
 
     if (phase === "done") {
+      // 게스트였는지는 서버가 판을 닫으며 알려준 값을 먼저 쓴다. 페이지를
+      // 열 때의 isGuest 는 쿠키가 있는지만 본 것이라, 서버가 그 토큰을
+      // 거절해 판이 게스트로 열렸으면(중계의 withTokenOrGuest) 틀린다 - 기록
+      // 안 된 판에 "내 기록" 이 떴다. 판을 못 닫아 요약이 없을 때만 쓴다.
+      const guest = summary?.guest ?? isGuest;
       return (
         // 결과 카드도 하나뿐이라 가운데가 맞다.
         <div className="flex flex-1 flex-col justify-center">
@@ -414,7 +419,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
               닿는다. 로그인 권유는 아래 결과 카드의 "로그인" 링크가 이미
               한다. 게스트는 들어온 쪽인 문제풀기 허브로 나간다. */}
           <div className="mb-5 flex items-center gap-3">
-            {isGuest ? (
+            {guest ? (
               <ExitGuard to={routes.test} label="문제풀기" ariaLabel="문제풀기로 나가기" />
             ) : (
               <ExitGuard to={routes.profile} label="내 기록" />
@@ -423,7 +428,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
           <RoundResultCard
             summary={summary}
             error={error}
-            isGuest={isGuest}
+            isGuest={guest}
             onAgain={start}
             busy={busy}
             late={tally.late}

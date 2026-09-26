@@ -31,6 +31,11 @@ export default async function ReviewPage() {
     // null 이라 던지지 않는다 - 이어 풀기만 빠지고 복습은 그대로 된다.
     [due, user] = await Promise.all([fetchDue(token), getCurrentUser()]);
   } catch (error) {
+    // 서버가 쿠키의 토큰을 거절했으면 로그인 화면으로(일일공부 화면과 같은
+    // 이유 - 실패 화면은 다시 해도 안 풀리는 막다른 곳이었다).
+    if (error instanceof ApiError && error.status === 401) {
+      redirect(`/login?next=${routes.testReview}`);
+    }
     const offline = error instanceof ApiError && error.status === 0;
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-8 text-center">
