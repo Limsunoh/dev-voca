@@ -193,7 +193,13 @@ describe("/learn/words 정렬", () => {
     assert.equal(listQueries[0].get("shuffle"), null);
     assert.equal(listQueries[0].get("ordering"), "difficulty,term");
     for (const link of links) {
-      assert.equal(query(link.href).get("shuffle"), null, link.href);
+      const seed = query(link.href).get("shuffle");
+      // 옛 시드("abc")는 어느 링크에도 새지 않는다. 시드가 붙는 것은 정렬을
+      // 끄는 링크뿐이고, 그것은 새로 만든 시드다(섞인 목록으로 가니까).
+      assert.notEqual(seed, "abc", link.href);
+      if (query(link.href).get("sort") === "easy") {
+        assert.equal(seed, null, link.href);
+      }
     }
   });
 
@@ -280,10 +286,44 @@ describe("/learn/words 정렬", () => {
     );
     for (const chip of row) {
       assert.equal(query(chip.href).get("category"), "git", chip.href);
-      assert.equal(query(chip.href).get("shuffle"), null, chip.href);
     }
     assert.equal(query(row[0].href).get("sort"), null);
     assert.equal(query(row[1].href).get("sort"), null, "켜진 칩은 끄는 링크다");
+    // 정렬을 끄는 두 링크는 섞인 목록으로 가므로 새 시드를 미리 싣는다.
+    // 없으면 서버가 시드를 붙여 한 번 더 보내고 그 사이 필터 상자가 닫힌다.
+    assert.ok(query(row[0].href).get("shuffle"), row[0].href);
+    assert.ok(query(row[1].href).get("shuffle"), row[1].href);
+  });
+
+  it("필터 칩 링크는 새 시드를 미리 싣는다 - 서버가 한 번 더 보내며 필터 상자를 닫지 않게", async () => {
+    // 되돌리면 칩을 누를 때마다 서버가 시드를 붙여 다시 보내고, 그 사이 화면이
+    // 새로 그려져 펼쳐 둔 필터 상자가 닫힌다(실측: 정렬 없는 목록에서 칩을
+    // 누르면 닫히고, 정렬 중에는 안 닫혔다).
+    const links = await renderedLinks(WordsPage, { shuffle: "now", category: "git" });
+    const chips = links.filter((l) =>
+      /aria-label="(정처기|난이도|분류) /.test(l.html),
+    );
+    assert.ok(chips.length >= 5, `칩이 너무 적다: ${chips.length}`);
+    for (const chip of chips) {
+      const seed = query(chip.href).get("shuffle");
+      assert.ok(seed, chip.href);
+      // 지금 보는 시드를 물려주지 않는다 - 조건을 바꾸면 새 순서여야 한다.
+      assert.notEqual(seed, "now", chip.href);
+    }
+  });
+
+  it("검색 중에는 칩 링크에 시드를 싣지 않는다(검색 중엔 섞지 않는다)", async () => {
+    const links = await renderedLinks(WordsPage, { search: "git" });
+    for (const link of links) {
+      assert.equal(query(link.href).get("shuffle"), null, link.href);
+    }
+  });
+
+  it("공백만 있는 검색어는 검색이 아니다 - 섞은 목록으로 보낸다", async () => {
+    // 되돌리면 "  " 을 검색 중으로 보고 섞지 않은 채 '"  " 검색 결과' 를 띄운다.
+    const to = await redirectedTo(WordsPage, { search: "   " });
+    assert.ok(to.searchParams.get("shuffle"), to.href);
+    assert.equal(to.searchParams.get("search"), null, to.href);
   });
 
   it("정렬을 안 골랐으면 섞어서가 켜진다", async () => {
@@ -359,3 +399,113 @@ describe("/learn/sentences 정렬", () => {
     );
   });
 });
+
+// ---- 필터 칩의 섞기 시드 (두 목록 공통) ----------------------------------
+//
+// 칩 링크에 시드가 없으면 서버가 시드를 붙여 한 번 더 보내고, 그 사이 화면이
+// 다시 그려져 펼쳐 둔 필터 상자가 닫힌다. 그래서 칩은 새 시드를 미리 싣고,
+// 페이지 넘기기·카드의 되돌아올 주소는 지금 시드를 그대로 싣는다.
+
+const lists = [
+  { name: "words", page: WordsPage, rows: /aria-label="(정처기|과목|난이도|분류) / },
+  { name: "sentences", page: SentencesPage, rows: /aria-label="(종류|난이도|분류) / },
+] as const;
+
+for (const { name, page, rows } of lists) {
+  describe(`/learn/${name} 칩의 시드`, () => {
+    const shuffled = { shuffle: "now", category: "git", difficulty: "1" };
+
+    it("거르는 칩은 전부 새 시드를, 페이지 넘기기·카드는 지금 시드를 싣는다", async () => {
+      const links = await renderedLinks(page, { ...shuffled, page: "2" });
+
+      const chips = links.filter((l) => rows.test(l.html));
+      assert.ok(chips.length >= 6, `칩이 너무 적다: ${chips.length}`);
+      for (const chip of chips) {
+        const seed = query(chip.href).get("shuffle");
+        assert.ok(seed, chip.href);
+        assert.notEqual(seed, "now", chip.href);
+        // 칩은 page 를 떼고 간다(조건이 바뀌면 1페이지부터).
+        assert.equal(query(chip.href).get("page"), null, chip.href);
+      }
+
+      const pages = links.filter((l) => l.text === "이전" || l.text === "다음");
+      assert.equal(pages.length, 2);
+      for (const l of pages) assert.equal(query(l.href).get("shuffle"), "now", l.href);
+
+      const cards = links.filter((l) => new RegExp(`^/learn/${name}/\\d+\\?`).test(l.href));
+      assert.ok(cards.length > 0);
+      for (const l of cards) {
+        const back = new URL(query(l.href).get("from") ?? "", "http://x");
+        assert.equal(back.searchParams.get("shuffle"), "now", l.href);
+      }
+    });
+
+    it("칩 시드는 그릴 때마다 새로 만든다(고정값이면 칩을 눌러도 늘 같은 순서)", async () => {
+      const seedOf = async () => {
+        const links = await renderedLinks(page, shuffled);
+        return query(links.find((l) => rows.test(l.html))!.href).get("shuffle");
+      };
+      assert.notEqual(await seedOf(), await seedOf());
+    });
+
+    it("정렬 줄: 끄는 칩(섞어서)만 시드를 싣고, 켜는 칩은 안 싣는다", async () => {
+      const row = await sortRow(page, shuffled);
+      const off = row.find((c) => c.text === "섞어서")!;
+      const on = row.find((c) => c.text === "쉬운 것부터")!;
+      assert.ok(query(off.href).get("shuffle"), off.href);
+      assert.notEqual(query(off.href).get("shuffle"), "now", off.href);
+      assert.equal(query(on.href).get("shuffle"), null, on.href);
+      assert.equal(query(on.href).get("sort"), "easy", on.href);
+    });
+
+    it("정렬 중: 거르는 칩은 시드 없이 정렬을, 정렬을 끄는 칩은 새 시드를 싣는다", async () => {
+      const links = await renderedLinks(page, { sort: "easy", category: "git" });
+      for (const chip of links.filter((l) => rows.test(l.html))) {
+        assert.equal(query(chip.href).get("shuffle"), null, chip.href);
+        assert.equal(query(chip.href).get("sort"), "easy", chip.href);
+      }
+      for (const chip of await sortRow(page, { sort: "easy", category: "git" })) {
+        assert.equal(query(chip.href).get("sort"), null, chip.href);
+        assert.ok(query(chip.href).get("shuffle"), chip.href);
+      }
+    });
+
+    it("검색 + 정렬 중에는 어느 링크에도 시드가 없다(정렬을 꺼도 검색 중이라 안 섞는다)", async () => {
+      const links = await renderedLinks(page, { search: "git", sort: "easy" });
+      for (const link of links) {
+        assert.equal(query(link.href).get("shuffle"), null, link.href);
+      }
+      assert.equal(listQueries[0].get("shuffle"), null);
+    });
+
+    for (const blank of [" ", "\t", "\n", "　", " 　\t "]) {
+      it(`검색어 ${JSON.stringify(blank)} 는 검색이 아니다 - 다른 조건은 둔 채 섞은 목록으로 보낸다`, async () => {
+        const to = await redirectedTo(page, { search: blank, difficulty: "1" });
+        assert.equal(to.pathname, `/learn/${name}`);
+        assert.ok(to.searchParams.get("shuffle"), to.href);
+        assert.equal(to.searchParams.get("search"), null, to.href);
+        assert.equal(to.searchParams.get("difficulty"), "1", to.href);
+        assert.equal(listQueries.length, 0, "보내기 전에 목록을 부르지 않는다");
+      });
+    }
+
+    it("공백 검색어 + 정렬이면 보내지 않고, 백엔드에도 search 를 안 보낸다", async () => {
+      await visit(page, { search: "  ", sort: "easy" });
+      assert.equal(listQueries.length, 1);
+      assert.equal(listQueries[0].get("search"), null);
+      assert.equal(listQueries[0].get("shuffle"), null);
+    });
+
+    it("앞뒤 공백이 있는 검색어는 털어서 검색하고, 링크에도 털린 값이 간다", async () => {
+      const links = await renderedLinks(page, { search: "　 git\t" });
+      assert.equal(listQueries[0].get("search"), "git");
+      assert.equal(listQueries[0].get("shuffle"), null);
+      const chips = links.filter((l) => rows.test(l.html));
+      assert.ok(chips.length > 0);
+      for (const chip of chips) {
+        assert.equal(query(chip.href).get("search"), "git", chip.href);
+        assert.equal(query(chip.href).get("shuffle"), null, chip.href);
+      }
+    });
+  });
+}
