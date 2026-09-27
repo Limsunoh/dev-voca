@@ -5,6 +5,7 @@ import {
   promptIsMono,
   promptIsSentence,
 } from "@/lib/quiz-text";
+import { withWrapPoints } from "@/lib/wrap-points";
 
 /**
  * 문제 하나와 보기들.
@@ -105,7 +106,7 @@ export function QuestionCard({
               color: "var(--text-body)",
             }}
           >
-            {question.prompt}
+            {withWrapPoints(question.prompt)}
           </p>
         ) : (
           <p
@@ -126,7 +127,7 @@ export function QuestionCard({
               color: "var(--foreground)",
             }}
           >
-            {question.prompt}
+            {withWrapPoints(question.prompt)}
           </p>
         )}
       </div>
@@ -142,7 +143,8 @@ export function QuestionCard({
               lang={choicesAreTerms(question.kind) ? "en" : undefined}
               // dv-card dv-card-press: 누르면 두께가 0 이 되고 그만큼
               // 내려앉는다. :active 는 인라인 style 로 못 써서 공통 클래스가 맡는다.
-              className={`dv-card dv-card-press w-full px-4 py-3 text-left ${choicesAreTerms(question.kind) ? "font-mono" : ""} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default`}
+              // text-pretty: 마지막 줄에 글자 하나만 남지 않게 한다("… 실행 / 시").
+              className={`dv-card dv-card-press w-full px-4 py-3 text-left text-pretty ${choicesAreTerms(question.kind) ? "font-mono" : ""} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default`}
               style={
                 {
                   // 보기는 56px(가이드 shape-hit). 터치로 연달아 누르는
