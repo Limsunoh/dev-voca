@@ -13,6 +13,7 @@ import {
   promptIsSentence,
   promptIsTerm,
 } from "@/lib/quiz-text";
+import { withWrapPoints } from "@/lib/wrap-points";
 import { Reading } from "./Reading";
 
 /**
@@ -981,8 +982,14 @@ function Prompt({
         boxShadow: "var(--lift-card)",
       }}
     >
-      <p lang={body.lang} className={body.className} style={body.style}>
-        {text}
+      {/* text-balance: 가운데 정렬이라 여러 줄이면 마지막 줄만 짧게 떠
+          들쭉날쭉했다("refs to" 한 줄). 줄 길이를 고르게 나눈다. */}
+      <p
+        lang={body.lang}
+        className={`${body.className} text-balance`}
+        style={body.style}
+      >
+        {withWrapPoints(text)}
       </p>
     </div>
   );
@@ -1120,9 +1127,10 @@ function ChoiceButton({
       {/* min-w-0 이 있어야 flex 항목이 내용보다 작아진다. 글자를 끊는 쪽은
           globals.css 의 base 규칙(body 상속)이 맡는다. 둘 중 하나만 있으면
           보기 문구가 길 때 버튼이 화면 밖으로 밀린다. */}
+      {/* text-pretty: 마지막 줄에 글자 하나만 남지 않게 한다("… 실행 / 시"). */}
       <span
         lang={mono ? "en" : undefined}
-        className={`min-w-0 flex-1 ${mono ? "font-mono" : ""}`}
+        className={`min-w-0 flex-1 text-pretty ${mono ? "font-mono" : ""}`}
       >
         {text}
       </span>
@@ -1325,7 +1333,7 @@ function SentenceAnswer({
         className={`mt-3 text-sm ${isErrorSentence(sentence.kind) ? "font-mono" : ""}`}
         style={{ color: "var(--text-body)" }}
       >
-        {sentence.text}
+        {withWrapPoints(sentence.text)}
       </p>
       {sentence.reading && (
         <Reading
