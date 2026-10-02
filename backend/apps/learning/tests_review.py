@@ -327,7 +327,7 @@ class RoundTest(TestCase):
         self.assertEqual(
             QuizSession.objects.filter(user=self.user).count(),
             1,
-            "복습이 판을 기록했다 - 순위표에 들어간다",
+            "복습이 판을 기록했다. 그러면 순위표에 들어간다",
         )
 
 
@@ -1256,7 +1256,7 @@ class ProgressContractTest(TestCase):
         self.assertEqual(
             body["question"]["answered"],
             2,
-            "건너뛴 만큼 진행이 안 올랐다 - 다음 요청이 같은 자리를 또 낸다",
+            "건너뛴 만큼 진행이 안 올라 다음 요청이 같은 자리를 또 낸다",
         )
         self.assertEqual(body["question"]["total"], total, "판 크기가 도중에 바뀌었다")
         self.assertEqual(

@@ -260,7 +260,7 @@ def _visible_users() -> Q:
 
 
 def _rounds(*, this_week: bool) -> QuerySet:
-    """순위표가 세는 판. 일일공부는 빼고 자유 문제풀이만 본다(3-3 에서 다시 볼 것)."""
+    """순위표가 세는 판. 일일공부는 빼고 자유 문제풀이만 본다(이유는 models.SessionKind)."""
     rounds = QuizSession.objects.filter(_visible_users(), kind=SessionKind.FREE)
 
     if this_week:
