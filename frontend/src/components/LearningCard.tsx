@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { withWrapPoints } from "@/lib/wrap-points";
+
 import { Reading } from "./Reading";
 
 /**
@@ -132,7 +134,11 @@ export function LearningCard({
               lineHeight: "var(--leading-tight)",
             }}
           >
-            {title}
+            {/* 에러 문장 속 긴 URL·이름이 낱말 가운데서 잘리지 않게 끊을
+                자리를 넣는다(lib/wrap-points). 21자 이상인 덩어리에만 넣어서
+                짧은 단어 제목은 그대로다. 아래 뜻(문장의 해석)도 같은 URL 을
+                옮겨 적어서 같이 넣는다. */}
+            {withWrapPoints(title)}
           </h2>
 
           {/* 발음 줄. compact 에서는 이 줄을 뺀다. 홈에 여러 장이 들어가는
@@ -168,7 +174,7 @@ export function LearningCard({
                 : "var(--weight-bold)",
             }}
           >
-            {subtitle}
+            {withWrapPoints(subtitle)}
           </p>
         </div>
         {badge}

@@ -69,6 +69,7 @@ globalThis.fetch = (async (input: string | URL | Request) => {
       id: 7,
       term: "commit",
       text: "It works on my machine.",
+      translation: "내 컴퓨터에서는 된다.",
       pronunciation: "",
       reading: "",
       meaning: "m",
