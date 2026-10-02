@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { withWrapPoints } from "@/lib/wrap-points";
+
 import { Highlight } from "./Highlight";
 import { Reading } from "./Reading";
 
@@ -160,7 +162,10 @@ export function DetailHero({
               : { fontSize: "clamp(1.375rem,6vw,1.75rem)", lineHeight: 1.25 }),
         }}
       >
-        {title}
+        {/* 끊을 자리는 LearningCard 제목과 같다(lib/wrap-points). 이
+            제목은 글자가 커서 낱말 가운데서 잘리는 것이 가장 잘 보인다.
+            아래 뜻(해석)도 같이 넣는다. */}
+        {withWrapPoints(title)}
       </h1>
 
       {aside && (
@@ -199,7 +204,7 @@ export function DetailHero({
             color: "var(--foreground)",
           }}
         >
-          <Highlight>{meaning}</Highlight>
+          <Highlight>{withWrapPoints(meaning)}</Highlight>
         </p>
       )}
     </header>

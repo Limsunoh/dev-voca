@@ -24,7 +24,7 @@ import {
   getWords,
   WORD_SORTS,
 } from "@/lib/api/vocab";
-import { detailWithBack, listUrl, routes } from "@/lib/routes";
+import { detailWithBack, listUrl, routes, searchText } from "@/lib/routes";
 
 export const metadata = {
   title: "단어장 · devvoca",
@@ -56,11 +56,11 @@ function toPageNumber(value: string | undefined): number {
 
 export default async function VocabPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  // 공백만 있으면 검색이 아니다. 검색창은 제출할 때 공백을 털지만 주소를
-  // 손으로 고치거나 옛 링크로 오면 "  " 이 그대로 온다. 털지 않으면 검색
-  // 중으로 보고 섞지 않은 채 `"  " 검색 결과 566개` 를 띄운다(백엔드는
-  // 공백을 검색어로 안 봐서 전부 준다).
-  const search = first(params.search)?.trim() || undefined;
+  // 공백·쉼표만 있으면 검색이 아니다(searchText 참고). 검색창은 제출할 때
+  // 걸러 내지만 주소를 손으로 고치거나 옛 링크로 오면 "  " 이 그대로 온다.
+  // 거르지 않으면 검색 중으로 보고 섞지 않은 채 `"  " 검색 결과 566개` 를
+  // 띄운다(백엔드는 그것을 검색어로 안 봐서 전부 준다).
+  const search = searchText(first(params.search));
   const category = first(params.category);
   const difficulty = first(params.difficulty);
   // 정처기 범위만 보기. 값은 "true" 하나뿐이라 그것만 통과시킨다 -
@@ -131,10 +131,10 @@ export default async function VocabPage({ searchParams }: PageProps) {
 
   if (!search && !shuffle && !sort) {
     // 목록을 부르기 전에 보낸다. 시드 없이 들어올 때마다 왕복이 한 번
-    // 늘어난다. 탭바로 들어올 때, 검색어를 지울 때, 상세의 분류 링크로
-    // 올 때가 그렇다. 필터 칩은 새 시드를 미리 실어 여기를 안 지난다(아래
-    // chipSeed. 지나면 그 사이 펼쳐 둔 필터 상자가 닫힌다). 그 뒤로는 이
-    // 주소가 순서를 기억한다.
+    // 늘어난다. 탭바로 들어올 때, 상세의 분류 링크로 올 때가 그렇다. 필터
+    // 칩과 검색어 비우기는 새 시드를 미리 실어 여기를 안 지난다(아래
+    // chipSeed·clearSeed. 지나면 그 사이 펼쳐 둔 필터 상자가 닫힌다). 그
+    // 뒤로는 이 주소가 순서를 기억한다.
     //
     // 기록을 밀지 않고 대체한다. 서버 컴포넌트에서 부른 redirect 는
     // replace 로 동작하므로(액션에서 부를 때만 push 다) 뒤로가기 한 번에
@@ -170,6 +170,9 @@ export default async function VocabPage({ searchParams }: PageProps) {
   // (unsortSeed).
   const chipSeed = search || sort ? undefined : newShuffleSeed();
   const unsortSeed = search ? undefined : newShuffleSeed();
+  // 검색창이 검색어를 비울 때 싣는 시드. 검색 중이어도 만든다. 비우면 섞인
+  // 목록으로 돌아가기 때문이다. 정렬 중이면 비워도 안 섞으니 없다.
+  const clearSeed = sort ? undefined : newShuffleSeed();
 
   // 두 요청을 동시에 띄운다. 순서대로 기다리면 두 번의 왕복이 그대로
   // 대기 시간이 된다.
@@ -267,7 +270,11 @@ export default async function VocabPage({ searchParams }: PageProps) {
         <Suspense fallback={<div className="h-[46px]" />}>
           {/* key 가 바뀌면 입력창이 새로 만들어진다 - 뒤로가기로 검색어가
               달라졌을 때 입력창이 URL 을 따라가게 하는 방법. */}
-          <SearchInput key={search ?? ""} basePath={routes.words} />
+          <SearchInput
+            key={search ?? ""}
+            basePath={routes.words}
+            seed={clearSeed}
+          />
         </Suspense>
       </div>
 
