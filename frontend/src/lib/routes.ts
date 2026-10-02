@@ -350,6 +350,27 @@ export function detailWithBack(detailPath: string, backTo: string): string {
 }
 
 /**
+ * 검색어로 볼 값. 검색어가 없으면 undefined.
+ *
+ * 공백을 털고, 공백·쉼표만 남으면 검색이 아니다. 백엔드(DRF SearchFilter)가
+ * 검색어를 공백과 쉼표로 쪼개 빈 조각을 버리므로 `?search=,` 는 검색어가
+ * 하나도 없는 것이 되어 전체를 준다. 화면이 그것을 검색 중으로 보면 섞지 않은
+ * 채 '"," 검색 결과 566개' 를 띄운다.
+ *
+ * 따옴표만 있는 검색어(`"`, `''`)는 맞추지 않았다. 백엔드는 이것도 빈 검색어로
+ * 보지만, 따옴표로 감싼 `','`·`" "` 는 실제로 그 글자를 찾는다. 정규식에
+ * 따옴표를 넣으면 그쪽이 틀어진다.
+ *
+ * 목록 화면과 검색창(SearchInput)이 같이 쓴다. 검색창이 "검색어를 비웠다" 고
+ * 보는 기준이 화면과 다르면 시드 없이 보내게 되고, 화면이 시드를 붙여 한 번
+ * 더 보내는 사이 펼쳐 둔 필터 상자가 닫힌다.
+ */
+export function searchText(value: string | undefined): string | undefined {
+  const text = value?.trim();
+  return text && /[^\s,]/.test(text) ? text : undefined;
+}
+
+/**
  * 목록 주소를 만든다. 빈 값은 빼고, 1페이지는 page 를 안 적는다.
  *
  * 쓰는 자리가 셋이다. 섞은 순서를 주소에 적으려 보낼 때(목록 진입),

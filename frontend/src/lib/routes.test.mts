@@ -18,6 +18,7 @@ import {
   activeTabSegment,
   immersiveRoutes,
   routes,
+  searchText,
   tabHref,
   tabs,
   talkScenes,
@@ -200,5 +201,19 @@ describe("toTalkScene", () => {
     ]) {
       assert.equal(toTalkScene(bad), "", JSON.stringify(bad));
     }
+  });
+});
+
+describe("searchText", () => {
+  it("공백·쉼표만 있으면 검색어가 없다(백엔드도 그렇게 보고 전체를 준다)", () => {
+    for (const blank of [undefined, "", " ", ",", " , ,", "\t,\n", "　,"]) {
+      assert.equal(searchText(blank), undefined, JSON.stringify(blank));
+    }
+  });
+
+  it("검색어가 하나라도 있으면 앞뒤 공백만 털고 그대로 둔다", () => {
+    assert.equal(searchText("  git "), "git");
+    assert.equal(searchText(",git,"), ",git,");
+    assert.equal(searchText("a, b"), "a, b");
   });
 });
