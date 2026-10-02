@@ -10,7 +10,7 @@ import { getToken, withTokenOrGuest } from "@/lib/session";
  * 이유는 /api/quiz/route.ts 첫머리와 같다 - 백엔드 주소는 서버 전용
  * 환경변수라 브라우저에 노출하지 않는다.
  *
- * 여기서 한 가지가 더 있다. **인증 토큰도 서버에서만 붙인다.** 토큰은
+ * 여기서 한 가지가 더 있다. 인증 토큰도 서버에서만 붙인다. 토큰은
  * httpOnly 쿠키에 있어 브라우저 스크립트가 읽을 수 없고, 그것을 꺼내
  * Authorization 헤더에 넣는 일은 이 라우트에서만 일어난다.
  *
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  // **먼저 action 을 본다.** 뒤로 미루면 오타 난 action 이 아래 토큰
+  // 먼저 action 을 본다. 뒤로 미루면 오타 난 action 이 아래 토큰
   // 검사에 먼저 걸려 "판 정보가 없습니다" 라는 엉뚱한 문구를 받는다.
   if (!["start", "answer", "finish"].includes(body.action ?? "")) {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });
@@ -51,8 +51,8 @@ export async function POST(request: Request) {
 
   try {
     // 서버가 쿠키의 토큰을 거절하면(다른 기기에서 로그아웃 등) 쿠키를 지우고
-    // 게스트 판으로 연다(withTokenOrGuest) - 그대로 두면 "시작" 이 "토큰이
-    // 유효하지 않습니다" 로 막혔다. 여기서 지워야 뒤이은 답 요청에 그 토큰이
+    // 게스트 판으로 연다(withTokenOrGuest). 그대로 두면 "시작" 이 "토큰이
+    // 유효하지 않습니다" 로 막힌다. 여기서 지워야 뒤이은 답 요청에 그 토큰이
     // 안 실린다.
     if (body.action === "start") {
       const { value } = await withTokenOrGuest(cookieToken, startRound, {

@@ -106,7 +106,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
   // 세 요청을 동시에 띄운다. 순서대로 기다리면 세 번의 왕복이 그대로
   // 대기 시간이 된다.
   //
-  // 선택지 목록은 실패해도 빈 배열이라 절대 throw 하지 않으므로 그냥 await
+  // 선택지 목록은 실패해도 빈 배열이라 throw 하지 않으므로 그냥 await
   // 한다. 목록만 try 로 감싸면 catch 안에서도 선택지를 그대로 쓸 수 있다
   // (백엔드가 죽어서 들어온 자리에서 백엔드를 다시 부르지 않는다).
   const listPromise = getSentences({

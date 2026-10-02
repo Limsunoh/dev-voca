@@ -184,7 +184,7 @@ class DailySentenceKindTest(KindCheckMixin, TestCase):
         return res.json()
 
     def force_situation(self, sentence: Sentence):
-        """출제를 이 문장의 상황 고르기로 못박는다. 판 길이·학습 범위와 무관하게."""
+        """출제를 이 문장의 상황 고르기로 고정한다. 판 길이·학습 범위와 무관하게."""
 
         def made(*_args, **_kwargs):
             return quiz.make_situation_question(Sentence.objects.visible(), answer=sentence)

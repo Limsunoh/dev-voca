@@ -1,8 +1,8 @@
 """일일공부 학습 단계를 HTTP 로 직접 친다.
 
 기존 테스트는 daily_study 함수를 직접 부른다. 그것으로는 안 보이는
-자리가 있다 - 화면이 실제로 받는 것은 view 가 조립한 응답이고, 거기서
-학습 카드(learning)와 문제(question)가 **같은 응답에** 실린다. 둘이
+자리가 있다. 화면이 실제로 받는 것은 view 가 조립한 응답이고, 거기서
+학습 카드(learning)와 문제(question)가 같은 응답에 실린다. 둘이
 어긋나면 함수 단위로는 다 통과하는데 화면만 깨진다.
 
 여기서 확인하는 것은 넷이다.
@@ -13,7 +13,7 @@
     - 세 길이를 끝까지 다 풀었을 때 점수·보너스·묶음이 약속대로인가
 
 `learning` 이 비어 있는 응답은 "문제를 풀 차례" 라는 뜻이라, 카드가
-비었는지만 보면 안 되고 **카드가 있을 때 그 안에 정답이 있는지**를 봐야
+비었는지만 보면 안 되고 카드가 있을 때 그 안에 정답이 있는지를 봐야
 한다. 그게 이 기능의 존재 이유다.
 """
 
@@ -80,7 +80,7 @@ class HttpFlowTest(TestCase):
     def test_every_chunk_boundary_response_keeps_the_pair(self):
         """묶음이 넘어가는 답의 응답에서도 카드와 문제가 맞물린다.
 
-        시작 응답만 맞고 그 뒤가 어긋나는 것이 있을 수 있다 - 답하기는
+        시작 응답만 맞고 그 뒤가 어긋나는 것이 있을 수 있다. 답하기는
         카드와 문제를 다른 함수로 만든다(learn_targets vs _next_question).
         """
         body = self.start()
@@ -151,9 +151,9 @@ class HttpFlowTest(TestCase):
         self.assertEqual(study.issued_chunks, 1, "묶음 수가 늘었다")
 
     def test_an_unreviewed_chunk_does_not_grow_the_list_on_refresh(self):
-        """뽑아둔 묶음이 통째로 미검수로 내려가도 GET 이 새 묶음을 안 붙인다.
+        """뽑아둔 묶음 전체가 미검수로 내려가도 GET 이 새 묶음을 안 붙인다.
 
-        **위 테스트만으로는 못 잡는다.** "이미 뽑았나" 를 카드가 보이는지로
+        위 테스트만으로는 못 잡는다. "이미 뽑았나" 를 카드가 보이는지로
         판정하면 미검수일 때만 오판하므로, 검수가 살아 있는 판에서는 스무
         번을 쳐도 안 늘어난다. 이 게이트를 지키려면 미검수 조건을 함께
         걸어야 한다.
@@ -177,7 +177,7 @@ class HttpFlowTest(TestCase):
     def test_the_cards_never_include_an_unreviewed_word(self):
         """검수 안 된 단어는 학습 카드로 안 나간다.
 
-        학습 카드는 뜻과 설명을 통째로 보여주는 자리라, 미검수가 새면
+        학습 카드는 뜻과 설명을 그대로 보여주는 자리라, 미검수가 새면
         아무도 확인하지 않은 내용을 "배우세요" 라고 내미는 꼴이다.
         목록·검색보다 노출이 더 직접적이다.
         """
@@ -485,7 +485,7 @@ class FullRunTest(TestCase):
     def test_all_chunks_were_actually_issued(self):
         """완주하면 계획한 묶음을 다 뽑았다.
 
-        중간에 발급이 조용히 실패하면 그 뒤 문제가 전체에서 나온다.
+        중간에 발급이 에러 없이 실패하면 그 뒤 문제가 전체에서 나온다.
         점수만 보면 안 드러난다.
         """
         self.run_to_the_end(StudyLength.LONG)
@@ -516,7 +516,7 @@ class ThinContentTest(TestCase):
     def test_a_single_word_does_not_500(self):
         """단어 하나뿐이어도 시작이 400 이지 500 이 아니다.
 
-        보기 넷을 못 채우면 문제를 못 만든다. 그때 조용히 터지면 화면이
+        보기 넷을 못 채우면 문제를 못 만든다. 그때 500 이 나면 화면이
         빈 채로 멈춘다.
         """
         self.make_words(1)
@@ -570,7 +570,7 @@ class ThinContentTest(TestCase):
         """단어 12개로 30분 코스를 끝까지 밀어도 500 이 안 난다.
 
         후보가 도중에 바닥난다. 그때 판을 닫아주지 않으면 사용자는 오늘
-        판을 영영 못 끝낸다.
+        판을 끝낼 수 없다.
         """
         self.make_words(12)
         user = make_user("얇은통")
@@ -631,8 +631,8 @@ class PromisedCountTest(TestCase):
     """약속한 문제 수를 실제로 내는가.
 
     _answerable() 이 "낼 수 있는 문제 수" 를 단어+문장 개수로 세는데,
-    **셀 수 있는 것과 낼 수 있는 것이 다르다.** 그 차이가 벌어지면
-    사용자는 25문제를 약속받고 8문제만 풀고 끝난다 - 왜 일찍 끝났는지
+    셀 수 있는 것과 낼 수 있는 것이 다르다. 그 차이가 벌어지면
+    사용자는 25문제를 약속받고 8문제만 풀고 끝난다. 왜 일찍 끝났는지
     화면에 설명이 없고, 완주 보너스도 못 받는다.
     """
 
@@ -642,17 +642,16 @@ class PromisedCountTest(TestCase):
     def test_a_word_thin_sentence_heavy_corpus_keeps_its_promise(self):
         """단어가 적고 문장이 많아도 약속한 문제 수를 다 낸다.
 
-        **여기가 실제로 터졌던 자리다.** _answerable() 이 단어와 문장을
-        그냥 더해서, 단어 6개 + 문장 100개인 DB 를 106 으로 세고 25문제를
-        약속했다. 실제로는 8문제에서 끊겼다 - 화면에 왜 일찍 끝났는지
-        설명이 없고 완주 보너스도 안 나갔다.
+        _answerable() 이 단어와 문장을 그냥 더해 세면, 단어 6개 + 문장
+        100개인 DB 를 106 으로 세어 25문제를 약속하고 실제로는 8문제에서
+        끊긴다. 화면에 왜 일찍 끝났는지 설명이 없고 완주 보너스도 안 나간다.
 
         두 종류는 서로를 못 채운다. 출제가 종류를 매번 무작위로 고르는데
         단어 차례에 단어 후보가 비어 있으면 거기서 판이 닫히고, 한 종류로
         낼 수 있는 수는 최근 창(RECENT_KEEP) 때문에 그 종류의 개수를 못
         넘는다. 문장이 100개여도 단어 6개가 병목이다.
 
-        지금은 적은 쪽 개수로 약속하므로 6문제를 약속하고 6문제를 낸다.
+        그래서 적은 쪽 개수로 약속한다. 6문제를 약속하고 6문제를 낸다.
         """
         seed_words(6)
         for i in range(100):
@@ -700,8 +699,8 @@ class PromisedCountTest(TestCase):
     def test_a_words_only_corpus_keeps_its_promise(self):
         """단어만 있으면 약속한 문제 수를 다 낸다.
 
-        위 결함이 "콘텐츠가 적으면 원래 그렇다" 가 아니라 **문장이 섞일
-        때만** 생기는 것임을 못 박는다. 단어 30개는 30문제를 다 낸다.
+        위 문제가 "콘텐츠가 적으면 원래 그렇다" 가 아니라 문장이 섞일
+        때만 생긴다는 것을 확인한다. 단어 30개는 30문제를 다 낸다.
         """
         seed_words(30)
         user = make_user("단어만")
@@ -768,7 +767,7 @@ class MidnightTest(TestCase):
         """어제 못 끝낸 판이 있어도 오늘 새로 시작할 수 있다.
 
         정산이 안 돌면 (user, day) 제약이 아니라 "이미 시작했다" 판정에
-        걸려 오늘 판을 아예 못 연다.
+        걸려 오늘 판을 못 연다.
         """
         self.client.post(START_URL, {"length": StudyLength.SHORT}, "application/json")
         study = daily_study.today_of(self.user)

@@ -110,7 +110,7 @@ export function Avatar({ shown, size = 40, className = "" }: Props) {
   if (usePhoto) {
     return (
       // next/image 를 쓰지 않는다. 구글 도메인을 next.config 에 등록해야
-      // 하고, 그 목록이 바뀌면 사진이 통째로 안 뜬다. 프로필 사진 한 장에
+      // 하고, 그 목록이 바뀌면 사진이 전부 안 뜬다. 프로필 사진 한 장에
       // 그 위험을 지지 않는다.
       // eslint-disable-next-line @next/next/no-img-element
       <img

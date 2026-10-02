@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   store.delete(STATE_COOKIE);
   store.delete(NEXT_COOKIE);
 
-  // 사용자가 동의 화면에서 취소한 경우. 오류가 아니므로 조용히 돌려보낸다.
+  // 사용자가 동의 화면에서 취소한 경우. 오류가 아니므로 안내 없이 돌려보낸다.
   if (url.searchParams.get("error")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }

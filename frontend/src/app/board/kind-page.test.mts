@@ -3,10 +3,9 @@
  *
  * 실행: cd frontend && npm test
  *
- * weekly 는 /board 가 맡으므로 /board/weekly 는 /board 로 보낸다. 전에는
- * 404 였는데 generateMetadata 는 weekly 를 정상으로 받아서 탭 제목은
- * "이번 주 최고점" 인 채 본문만 "없는 순위표" 가 됐다. 모르는 종류는
- * 그대로 404 다.
+ * weekly 는 /board 가 맡으므로 /board/weekly 는 /board 로 보낸다. 404 로
+ * 두면 generateMetadata 는 weekly 를 정상으로 받아서, 탭 제목은 "이번 주
+ * 최고점" 인데 본문만 "없는 순위표" 가 된다. 모르는 종류는 그대로 404 다.
  *
  * notFound·redirect 는 실제 Next 에서도 던진다. 같은 방식으로 던지는 대역을
  * 두어 어느 쪽으로 빠졌는지 잡는다. BoardScreen 이 끌고 오는 세션 모듈은

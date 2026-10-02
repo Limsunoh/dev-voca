@@ -12,7 +12,7 @@ generate_readings 와 짝이다. 저쪽은 Claude API 로 만들고 이쪽은 �
 
 파일 형식은 `[{"pk": 1, "reading": "**캐**sh", "note": "..."}]`.
 
-**pk 로 짝을 맞춘다.** 단어로 맞추면 같은 철자가 둘 있을 때 엉뚱한 곳에
+pk 로 짝을 맞춘다. 단어로 맞추면 같은 철자가 둘 있을 때 엉뚱한 곳에
 들어가고, 순서로 맞추면 하나만 빠져도 그 뒤가 전부 밀린다.
 """
 
@@ -93,10 +93,9 @@ class Command(BaseCommand):
             return
 
         if options["reviewed"]:
-            # **검수 단계를 건너뛴 것을 알린다.** 지금까지는 --reviewed 가
-            # 아닐 때만 안내가 나가서, 게이트를 뚫는 쪽이 더 조용했다.
-            # 방향이 반대다 - 나중에 이 593건을 보고 "사람이 봤나 밀었나"
-            # 를 되짚을 때 이 줄이 유일한 단서다.
+            # 검수 단계를 건너뛴 것을 알린다. 게이트를 여는 쪽이 오히려 더
+            # 분명하게 알려야 한다. 나중에 이렇게 넣은 행을 보고 "사람이
+            # 봤나 밀었나" 를 되짚을 때 이 출력이 유일한 단서다.
             self.stdout.write(
                 self.style.WARNING(
                     f"{filled}개를 검수 완료로 표시했습니다. Admin 검수를 "
@@ -111,13 +110,13 @@ class Command(BaseCommand):
     ) -> tuple[int, int, list[str]]:
         """(채운 수, 건너뛴 수, 문제 목록)
 
-        **검수된 것은 덮지 않는다.** 사람이 확인한 것을 배치가 덮으면 검수라는
+        검수된 것은 덮지 않는다. 사람이 확인한 것을 배치가 덮으면 검수라는
         절차가 의미를 잃는다. --reviewed 로 다시 돌려도 마찬가지다.
         """
         filled = skipped = 0
         problems: list[str] = []
 
-        # **행 하나하나를 믿지 않는다.** 이 파일은 사람이나 모델이 손으로
+        # 행 하나하나를 믿지 않는다. 이 파일은 사람이나 모델이 손으로
         # 만든 것이라 원소가 dict 가 아니거나(null, 문자열), 값의 타입이
         # 어긋나는 일이 흔하다. 파일 최상위가 list 인지만 보고 넘어가면
         # 한 항목의 오타가 AttributeError 로 명령 전체를 죽여, 앞서 정상
@@ -133,7 +132,7 @@ class Command(BaseCommand):
         # isinstance 가 아니라 type() 을 쓰는 이유: 파이썬에서 bool 은 int 의
         # 하위라 isinstance(True, int) 가 참이고, dict 에서도 True 가 1 과
         # 같은 자리를 집는다. 그대로 두면 {"pk": true} 가 pk=1 인 단어에
-        # 엉뚱한 발음을 조용히 심는다 - 에러도 경고도 안 뜬다.
+        # 엉뚱한 발음을 심고, 에러도 경고도 안 뜬다.
         wanted = [r["pk"] for r in usable if type(r.get("pk")) is int]
         found = {o.pk: o for o in model.objects.filter(pk__in=wanted)}
 
@@ -154,7 +153,7 @@ class Command(BaseCommand):
 
             if not text:
                 # 발음을 비워둔 것은 의도일 수 있다(갈리는 용어). 문제로 세지
-                # 않고 조용히 건너뛴다.
+                # 않고 건너뛴다.
                 skipped += 1
                 continue
 

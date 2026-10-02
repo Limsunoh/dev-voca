@@ -27,9 +27,9 @@ function first(value: string | string[] | undefined): string | undefined {
  * 단어 쪽(test/words)과 같은 구조다. 다른 것은 QuizBoard 에 넘기는
  * content 하나뿐이고, 그걸로 백엔드의 문장 quiz/grade 를 부른다.
  *
- * 문제 유형은 둘이다 - 빈칸 채우기(문장에서 용어를 가림)와 상황 고르기
+ * 문제 유형은 둘이다. 빈칸 채우기(문장에서 용어를 가림)와 상황 고르기
  * (문장을 보여주고 언제 나오는 말인지 고름). 어느 것을 낼지는 서버가
- * 정한다. 문장마다 낼 수 있는 유형이 달라서다 - 단어가 안 들어 있는
+ * 정한다. 문장마다 낼 수 있는 유형이 달라서다. 단어가 안 들어 있는
  * 문장은 빈칸을 못 만들고, 상황이 비어 있으면 상황 고르기를 못 낸다.
  */
 export default async function TestSentencesPage({ searchParams }: PageProps) {

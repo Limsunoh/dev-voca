@@ -13,8 +13,8 @@
  *   복습 판을 늦게 지움       기다리는 사이 떠나면 끝난 판이 탭에 남는다
  *   연출 길이를 잘못 읽음      "1s" 를 1ms 로, 움직임 줄이기에서도 1초 멈춤
  *
- * 방식은 review-resume.test.mts 와 같다 - react 훅만 대역으로 바꾸고 보드가
- * 넘긴 onPick 을 진짜로 부른다. 여기에 더해 **setTimeout 을 가로채** 0 보다
+ * 방식은 review-resume.test.mts 와 같다. react 훅만 대역으로 바꾸고 보드가
+ * 넘긴 onPick 을 진짜로 부른다. 여기에 더해 setTimeout 을 가로채 0 보다
  * 긴 타이머는 붙들어 둔다. 그래야 "기다리는 중" 을 멈춰 놓고 들여다볼 수
  * 있다. 연출 길이는 window.matchMedia 와 getComputedStyle 대역으로 정한다.
  */
@@ -364,7 +364,7 @@ describe("일일공부 - 마지막 답은 연출이 끝난 뒤 결과로", () =>
 
   /**
    * 답하고, 그 순간 붙든 타이머 길이들을 돌려준다. 돌려주기 전에 붙든 것을
-   * 풀어 끝까지 흘린다 - 안 풀면 기다리면 안 되는 자리에서 기다리게 만든
+   * 풀어 끝까지 흘린다. 안 풀면 기다리면 안 되는 자리에서 기다리게 만든
    * 변경이 실패가 아니라 멈춤(무한 대기)으로 나타난다.
    */
   async function answerFirst(reply: DailyAnswered): Promise<number[]> {

@@ -6,8 +6,8 @@
  * 실행: cd frontend && npm test
  *
  * 계약.
- *   1. getLiveToken·takeLiveToken·checkLogin 은 없다 - 로그인 확인(/me)을 먼저
- *      해서 토큰을 고르는 설계를 버렸다(로그인한 사람의 요청마다 왕복이 는다).
+ *   1. getLiveToken·takeLiveToken·checkLogin 은 없다. 로그인 확인(/me)을 먼저
+ *      해서 토큰을 고르면 로그인한 사람의 요청마다 왕복이 늘어서 쓰지 않는다.
  *   2. getCurrentUser: 쿠키에 토큰이 없으면 null 이고 백엔드에 묻지 않는다.
  *      /me 가 200 이면 사용자, 실패면 null. 401 은 로그를 안 남기고 그 밖의
  *      실패(5xx·연결 실패)만 남긴다. 어느 경우에도 쿠키는 안 지운다(화면을

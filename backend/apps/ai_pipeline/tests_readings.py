@@ -2,11 +2,11 @@
 
 generate_words 와 같은 이유로 실제 API 를 안 부른다 - 개발기 .env 에 진짜
 키가 있어서 mock 없이 짜면 그 자리에서 과금된다. 이 명령은 특히 그렇다:
-한 번에 최대 50개를 보내고 프롬프트에 규칙 문서가 통째로 들어간다.
+한 번에 최대 50개를 보내고 프롬프트에 규칙 문서가 전부 들어간다.
 
-**짝짓기를 집중해서 본다.** 이 명령은 응답을 term 으로 짝짓는데(AI 는 pk 를
+짝짓기를 집중해서 본다. 이 명령은 응답을 term 으로 짝짓는데(AI 는 pk 를
 모른다), 잘못 짝지으면 엉뚱한 단어에 엉뚱한 발음이 붙는다. 그건 화면에서
-티가 안 나서 검수도 통과한다 - save() 주석이 경고하는 자리다.
+티가 안 나서 검수도 통과한다(save() 주석 참고).
 """
 
 from __future__ import annotations
@@ -157,7 +157,7 @@ class GenerateReadingsTest(TestCase):
         """이름이 겹치면 건너뛰고 그 사실을 알린다.
 
         term 으로 짝을 찾으므로 같은 이름이 둘이면 어느 쪽인지 알 수 없다.
-        조용히 하나만 채우면 나머지가 어디 갔는지 모른 채 넘어간다.
+        알리지 않고 하나만 채우면 나머지가 어디 갔는지 모른 채 넘어간다.
 
         Word.term 은 unique 라 문장에서만 일어난다.
         """
@@ -225,7 +225,7 @@ class GenerateReadingsTest(TestCase):
             run(FakeGenerator(error="한도 초과"), "--count", "1")
 
     def test_nothing_to_fill_is_not_an_error(self):
-        """다 채워져 있으면 조용히 끝난다."""
+        """다 채워져 있으면 에러 없이 끝난다."""
         Word.objects.update(reading="이미 있음")
 
         out = run(FakeGenerator([]), "--count", "10")

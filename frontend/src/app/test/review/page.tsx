@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 /**
  * 복습.
  *
- * **로그인이 필요하다.** 무엇을 틀렸는지가 계정에 쌓여야 하는 기능이라
+ * 로그인이 필요하다. 무엇을 틀렸는지가 계정에 쌓여야 하는 기능이라
  * 게스트에게는 목록이 만들어질 자리가 없다.
  */
 export default async function ReviewPage() {
@@ -32,7 +32,7 @@ export default async function ReviewPage() {
     [due, user] = await Promise.all([fetchDue(token), getCurrentUser()]);
   } catch (error) {
     // 서버가 쿠키의 토큰을 거절했으면 로그인 화면으로(일일공부 화면과 같은
-    // 이유 - 실패 화면은 다시 해도 안 풀리는 막다른 곳이었다).
+    // 이유. 실패 화면은 다시 해도 안 풀리는 막다른 곳이 된다).
     if (error instanceof ApiError && error.status === 401) {
       redirect(`/login?next=${routes.testReview}`);
     }

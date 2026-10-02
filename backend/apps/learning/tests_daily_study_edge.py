@@ -1,7 +1,7 @@
 """일일공부 경계 - 깨뜨리려고 쓴 테스트.
 
 tests_daily_study.py 가 규칙이 지켜지는지를 본다면, 여기는 규칙이
-**어디서 갈리는지**를 본다. 겹치는 시나리오는 안 쓴다.
+어디서 갈리는지를 본다. 겹치는 시나리오는 안 쓴다.
 
     - 점수 부풀리기: 같은 순번을 동시에 가져가기, 보기 넷을 한꺼번에,
       마지막 문제에 두 답, 끝난 뒤 답, 남의 토큰으로 내 줄에 답하기
@@ -53,15 +53,15 @@ def make_user(name: str) -> User:
 def seed_words(count: int = 120) -> None:
     """문제를 만들 수 있을 만큼 단어를 채운다.
 
-    **RECENT_KEEP(40) 보다 넉넉해야 한다.** 출제가 최근 낸 정답을 후보에서
+    RECENT_KEEP(40) 보다 넉넉해야 한다. 출제가 최근 낸 정답을 후보에서
     빼므로, 단어가 40개 이하면 30분 코스(40문제)가 중간에 후보 고갈로
-    끊긴다 - 판은 서버가 닫아주지만 40문제를 약속하고 30문제만 낸다.
+    끊긴다. 판은 서버가 닫아주지만 40문제를 약속하고 30문제만 낸다.
     운영 DB 는 검수된 단어가 그보다 훨씬 많다.
 
-    **term 을 호출마다 다르게 짓는다.** Word.term 은 unique 인데,
+    term 을 호출마다 다르게 짓는다. Word.term 은 unique 인데,
     TransactionTestCase 는 트랜잭션이 아니라 실제 커밋을 하므로 그 뒤에
-    도는 TestCase 가 같은 term 을 또 넣으면 유니크 충돌이다. Postgres 로
-    옮기고 나서야 드러났다 - SQLite 에서는 정리 순서가 달라 안 겹쳤다.
+    도는 TestCase 가 같은 term 을 또 넣으면 유니크 충돌이다. Postgres
+    에서만 걸리고, SQLite 에서는 정리 순서가 달라 안 겹친다.
     """
     tag = uuid4().hex[:6]
     Word.objects.bulk_create(
@@ -161,10 +161,10 @@ class ReplayTest(TestCase):
     def test_the_user_condition_is_what_stops_a_pointed_token(self):
         """토큰이 내 판을 가리켜도 남의 것이면 못 쓴다.
 
-        **user 조건이 실제로 막는 것을 고정한다.** 남의 토큰을 그대로
+        user 조건이 실제로 막는 것을 고정한다. 남의 토큰을 그대로
         쓰는 테스트는 sid 가 남을 가리켜 조회가 빈손이 되므로, user
-        조건을 지워도 통과한다 - 그 테스트는 이 가드를 검사하지 않는다.
-        여기서는 sid 가 **요청자 판을 정확히 가리키는** 토큰을 만들어,
+        조건을 지워도 통과한다. 그 테스트는 이 가드를 검사하지 않는다.
+        여기서는 sid 가 요청자 판을 정확히 가리키는 토큰을 만들어,
         남는 방어가 user 하나뿐인 상황을 만든다.
 
         서명 키가 있어야 만들 수 있는 토큰이라 실제 공격자는 이 자리에
@@ -363,8 +363,8 @@ class ScoreRuleTest(TestCase):
     def test_running_out_of_questions_closes_without_the_bonus(self):
         """낼 문제가 떨어지면 닫되 보너스는 안 준다.
 
-        여기서 안 닫으면 오늘 줄이 영영 열린 채 남아 사용자가 다시는
-        못 끝낸다. 반대로 보너스를 주면 콘텐츠를 지워 완주를 사는 길이 된다.
+        여기서 안 닫으면 오늘 줄이 열린 채 남아 사용자가 끝낼 수 없다.
+        반대로 보너스를 주면 콘텐츠를 지워 완주를 사는 길이 된다.
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
@@ -473,8 +473,8 @@ class SecondAccountTest(TestCase):
             if question is None:
                 break
 
-        # **0 이어야 한다.** 토큰이 노새의 판을 가리키므로 공격자 판은
-        # 아예 안 건드려진다. `< total` 로 두면 9/10 을 맞혀도 통과한다.
+        # 0 이어야 한다. 토큰이 노새의 판을 가리키므로 공격자 판은
+        # 건드려지지 않는다. `< total` 로 두면 9/10 을 맞혀도 통과한다.
         row = DailyStudy.objects.get(user=self.attacker)
         self.assertEqual(
             row.answered,
@@ -502,10 +502,10 @@ class MidnightTest(TestCase):
         return daily_study.start(self.user, StudyLength.SHORT)
 
     def test_a_study_started_yesterday_can_still_be_answered(self):
-        """23:50 에 시작한 판이 자정에 죽으면 안 된다.
+        """23:50 에 시작한 판은 자정을 넘겨도 답할 수 있어야 한다.
 
-        날짜로 찾으면 토큰이 통째로 무효가 되고, 그 판은 열린 채 남아
-        점수가 DailyScore 에 영영 안 닿는다.
+        날짜로 찾으면 그 판의 토큰이 전부 무효가 되고, 그 판은 열린 채
+        남아 점수가 DailyScore 에 닿지 않는다.
         """
         study, token, question = self._open_yesterday()
 
@@ -517,7 +517,7 @@ class MidnightTest(TestCase):
         self.assertEqual(study.answered, 1, "자정을 넘기니 답이 안 쌓인다")
 
     def test_the_score_lands_on_the_day_it_started(self):
-        """자정을 넘겨 끝내도 점수는 **시작한 날**에 붙는다.
+        """자정을 넘겨 끝내도 점수는 시작한 날에 붙는다.
 
         끝낸 날로 세면 어제 안 한 사람이 오늘 이틀치를 받는다.
         """
@@ -557,8 +557,8 @@ class MidnightTest(TestCase):
     def test_starting_today_does_not_let_yesterdays_token_score_today(self):
         """어제 토큰으로 오늘 판을 채울 수 없다.
 
-        **순번만으로는 못 막는다.** 오늘 판을 막 시작하면 순번이 0 이고
-        어제 토큰의 순번도 0 이라 그대로 통과한다 - 어제 문제의 답이
+        순번만으로는 못 막는다. 오늘 판을 막 시작하면 순번이 0 이고
+        어제 토큰의 순번도 0 이라 그대로 통과한다. 그러면 어제 문제의 답이
         오늘 판에 세어진다. 어제 토큰을 저장해뒀다가 정답을 아는 문제로
         넣을 수 있다.
 
@@ -772,23 +772,23 @@ class StreakLinkTest(TestCase):
 class _KeepsCacheTable:
     """TransactionTestCase 뒤에도 캐시 표가 남게 한다.
 
-    **Postgres 에서만 드러난다.** TransactionTestCase 는 테스트가 끝날
+    Postgres 에서만 드러난다. TransactionTestCase 는 테스트가 끝날
     때 flush 를 부르고, flush 는 post_migrate 를 쏜다. 그 신호를 받은
-    쪽이 throttle_cache 를 없앤다 - 이 표는 마이그레이션이 아니라
+    쪽이 throttle_cache 를 없앤다. 이 표는 마이그레이션이 아니라
     createcachetable 로 만들어지므로 아무도 다시 만들지 않는다.
 
-    그러면 뒤따르는 테스트가 setUp 의 cache.clear() 에서 통째로 죽는다.
-    SQLite 에서는 안 났고 운영은 Postgres 라, 여기 맞춘다.
+    그러면 뒤따르는 테스트가 setUp 의 cache.clear() 에서 전부 실패한다.
+    SQLite 에서는 안 나지만 운영은 Postgres 라 여기 맞춘다.
 
-    **복구를 _fixture_teardown 에 건다.** 파괴가 테스트 메서드마다
-    일어나므로 tearDownClass 로는 늦다 - 같은 클래스의 두 번째 테스트가
-    이미 죽은 뒤다. accounts.ThrottleCacheTableTest 가 tearDown 에서
+    복구를 _fixture_teardown 에 건다. 파괴가 테스트 메서드마다
+    일어나므로 tearDownClass 로는 늦다. 같은 클래스의 두 번째 테스트가
+    이미 실패한 뒤다. accounts.ThrottleCacheTableTest 가 tearDown 에서
     같은 일을 하고 있어 단위를 그쪽에 맞췄다.
     """
 
     def _fixture_teardown(self):
         super()._fixture_teardown()
-        # 이미 있으면 조용히 넘어간다.
+        # 이미 있으면 아무것도 하지 않는다.
         call_command("createcachetable", verbosity=0)
 
 
@@ -1002,7 +1002,7 @@ class SkippedDaysTest(TestCase):
         """열린 판이 여럿이면 전부 닫는다.
 
         "가장 최근 하나" 만 집으면 며칠 연속 열어두고 안 끝낸 사람의
-        오래된 판이 영영 열린 채 남아 그날 점수가 순위표에 안 간다.
+        오래된 판이 계속 열린 채 남아 그날 점수가 순위표에 안 간다.
         """
         recent, _earned = answer_n(self.user, StudyLength.SHORT, 2)
         older = DailyStudy.objects.create(
@@ -1562,7 +1562,7 @@ class ThinContentTest(TestCase):
 
         출제가 최근 낸 정답을 후보에서 빼므로(RECENT_KEEP=40), 단어가
         30개면 30문제째에 후보가 바닥난다. 상한이 없으면 40문제를
-        약속해놓고 30문제에서 조용히 끝나 - 사용자는 이유를 모른다.
+        약속해놓고 30문제에서 안내 없이 끝나, 사용자는 이유를 모른다.
 
         보너스는 줄이지 않는다. 콘텐츠가 적은 것은 사용자 잘못이 아니다.
         """
@@ -1609,8 +1609,8 @@ class ThinContentTest(TestCase):
 class ResumeTest(TestCase):
     """중간에 나갔다 돌아온 사람.
 
-    이 기능이 없으면 25문제짜리를 3문제 풀고 나간 사람은 오늘 판을 영영
-    못 끝낸다 - 답하려면 토큰이 필요한데 시작은 하루 한 번 제약에 막힌다.
+    이 기능이 없으면 25문제짜리를 3문제 풀고 나간 사람은 오늘 판을 끝낼
+    수 없다. 답하려면 토큰이 필요한데 시작은 하루 한 번 제약에 막힌다.
     열어준 만큼 새는 곳이 없는지를 본다.
     """
 
@@ -1646,8 +1646,8 @@ class ResumeTest(TestCase):
     def test_a_resumed_study_can_be_finished_and_still_gets_the_bonus(self):
         """중간에 나간 사람이 이어 풀어 완주하면 보너스를 받는다.
 
-        이 기능을 만든 이유 그 자체다 - 25문제짜리를 3문제 풀고 나가면
-        완주 보너스를 영영 못 받는 것이 원래 문제였다.
+        이 기능을 만든 이유다. 이어 풀기가 없으면 25문제짜리를 3문제 풀고
+        나간 사람은 완주 보너스를 받을 수 없다.
         """
         _plan = STUDY_PLANS[StudyLength.SHORT]
         total = _plan.total
@@ -1670,7 +1670,7 @@ class ResumeTest(TestCase):
         )
 
     def test_resume_on_a_finished_study_is_none(self):
-        """끝난 판은 이어 풀 수 없다. 안 막으면 하루 한 번이 무너진다."""
+        """끝난 판은 이어 풀 수 없다. 안 막으면 하루 한 번 규칙이 깨진다."""
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
         while question is not None:
             picked = question["choices"][0]["id"]
@@ -1843,10 +1843,9 @@ class ResumeTest(TestCase):
     def test_resume_replays_the_saved_question_instead_of_rerolling(self):
         """이어 풀 때 문제가 매번 바뀌지 않는다.
 
-        새로 뽑아주면 순번을 소비하지 않고 문제만 갈아탈 수 있다 - 아는
-        것이 나올 때까지 화면을 다시 열면 되므로 사실상 만점이다.
-        _take_step 은 "한 순번은 한 번만 소비된다" 만 지키지 이것까지
-        막지 못하므로, 발급한 문제를 저장해두고 그대로 다시 내려준다.
+        새로 뽑아주면 순번을 소비하지 않고 문제만 갈아탈 수 있다
+        (daily_study.resume 참고). 그래서 발급한 문제를 저장해두고 그대로
+        다시 내려준다.
         """
         study, _earned = answer_n(self.user, StudyLength.SHORT, 1)
 
@@ -1985,8 +1984,8 @@ class ResumeApiTest(TestCase):
         """어제 받아둔 재개 토큰으로 오늘 판을 채울 수 없다.
 
         자정을 넘기면 어제 판은 정산되어 닫힌다. 그 전에 받아둔 토큰은
-        닫힌 판을 가리키므로 거절되어야 한다 - 오늘 판으로 흘러들면
-        하루 한 번이 무너진다.
+        닫힌 판을 가리키므로 거절되어야 한다. 오늘 판으로 흘러들면
+        하루 한 번 규칙이 깨진다.
         """
         data = self._start()
         self._answer(
@@ -2091,7 +2090,7 @@ class ResumeConcurrencyTest(_KeepsCacheTable, TransactionTestCase):
         """재개 토큰 넷을 한꺼번에 보내도 순번은 하나만 소비된다.
 
         각 토큰이 다른 문제를 담으므로 넷 다 통과하면 정답을 몰라도
-        하나는 맞는다 - 문제 하나에 네 번의 기회가 생긴다.
+        하나는 맞는다. 문제 하나에 네 번의 기회가 생긴다.
         """
         study, _token, _question = daily_study.start(self.user, StudyLength.SHORT)
 

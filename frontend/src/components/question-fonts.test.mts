@@ -41,7 +41,7 @@ function card(
     category: "git",
     category_label: "Git",
     choices: choices.map((text, i) => ({ id: i + 1, text })),
-    // 칸이 아예 없는 것(옛 저장분)과 값이 있는 것을 가른다.
+    // 칸이 없는 것(옛 저장분)과 값이 있는 것을 가른다.
     ...(sentenceKind === undefined ? {} : { sentence_kind: sentenceKind as string }),
   };
   return renderToStaticMarkup(

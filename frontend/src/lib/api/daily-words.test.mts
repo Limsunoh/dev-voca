@@ -6,9 +6,9 @@
  * 러너를 새로 들이지 않으려고 node 내장 test 러너를 쓴다. tsx 는 확장자 없는
  * 임포트("./client")를 풀어주기 위해서만 필요하다.
  *
- * 가짜 백엔드는 DRF PageNumberPagination 을 그대로 흉내낸다. 범위 밖 페이지에
- * 404 를 주는 것이 핵심이다 - 실제 백엔드가 그렇고(page=30 -> 404), 그걸
- * 안 흉내내면 페이지 계산 실수가 조용히 묻힌다.
+ * 가짜 백엔드는 DRF PageNumberPagination 을 그대로 흉내낸다. 중요한 것은
+ * 범위 밖 페이지에 실제 백엔드처럼 404 를 주는 것이다(page=30 -> 404). 이걸
+ * 흉내내지 않으면 페이지 계산 실수가 테스트에서 드러나지 않는다.
  */
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, it } from "node:test";

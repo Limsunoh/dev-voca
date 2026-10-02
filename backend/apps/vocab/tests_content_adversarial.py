@@ -5,7 +5,7 @@
 성립한다고 가정할 수 없다. 그래서 같은 질문(멱등·롤백·건너뜀·검수 게이트)을
 새 명령에 직접 다시 던진다.
 
-여기서 관심 있는 것은 리스트 내용이 아니라 **통로**다. 리스트 자체의 전수
+여기서 관심 있는 것은 리스트 내용이 아니라 통로다. 리스트 자체의 전수
 검사는 tests.py 의 ALL_SEEDED / tests_sentences.py 의 ALL_SEEDED_SENTENCES 가
 맡는다.
 """
@@ -114,7 +114,7 @@ class SeedWordsMoreCommandTest(TestCase):
         self.assertEqual(word.meaning, "AI 가 만든 뜻")
 
     def test_rejects_unknown_option(self):
-        """원래 명령에 있는 --reset 을 습관적으로 붙이면 조용히 무시되면 안 된다."""
+        """원래 명령에 있는 --reset 을 습관적으로 붙이면 무시하지 않고 에러를 낸다."""
         with self.assertRaises(CommandError):
             run("seed_words_more", "--reset")
 
@@ -233,7 +233,7 @@ class SeedOrderIndependenceTest(TestCase):
         """seed_sentences 는 RETIRED_SLUGS 를 지운다. 새 묶음이 걸리면 안 된다.
 
         나중에 은퇴 목록에 slug 를 넣을 때 새 묶음의 것을 실수로 적으면,
-        두 명령을 순서대로 돌리는 것만으로 문장이 조용히 사라진다.
+        두 명령을 순서대로 돌리는 것만으로 문장이 에러 없이 사라진다.
         """
         run("seed_sentences_more")
         count = Sentence.objects.count()
@@ -410,7 +410,7 @@ class NewContentReachesQuizTest(TestCase):
     def test_new_words_can_be_the_answer(self):
         """새 단어만 남겨도 문제가 만들어진다.
 
-        분류가 새 단어만으로 4개를 못 채우면 보기를 못 만들어 조용히
+        분류가 새 단어만으로 4개를 못 채우면 보기를 못 만들어 에러 없이
         빈 문제 목록이 돌아온다.
         """
         Word.objects.exclude(term__in=[w[0] for w in MORE_WORDS]).delete()
@@ -523,10 +523,10 @@ class NewContentReadingGapTest(TestCase):
 
 
 class SeedListShapeTest(TestCase):
-    """리스트 자체의 모양. 전수 검사가 못 보는 자리를 메운다."""
+    """리스트 자체의 모양. 전수 검사가 못 보는 자리를 본다."""
 
     def test_word_rows_have_exactly_eight_columns(self):
-        """칸이 남거나 모자라면 위치 언패킹이 조용히 어긋난다."""
+        """칸이 남거나 모자라면 위치 언패킹이 에러 없이 어긋난다."""
         for row in MORE_WORDS:
             with self.subTest(term=row[0]):
                 self.assertEqual(len(row), 8)
@@ -607,15 +607,15 @@ class PronunciationConsistencyTest(TestCase):
 
     "latency" 와 "tail latency" 처럼 구(句)가 낱말을 품는 경우가 있다.
     두 곳의 모음이 다르면 학습자는 같은 말을 두 가지로 외운다. 어느 쪽이
-    맞는지는 사람이 정해야 하지만, **갈렸다는 사실**은 기계가 잡을 수 있다.
+    맞는지는 사람이 정해야 하지만, 갈렸다는 사실은 기계가 잡을 수 있다.
 
     강세 기호는 뺀다 - 구에서는 뒷말의 주강세를 2강세로 내리는 것이
     정상이라(`/ˈmɜrdʒ ˌkɑmɪt/`) 그것까지 같기를 요구할 수 없다.
 
-    **모음까지 정당하게 갈리는 경우가 있다.** commit 은 동사 /kəˈmɪt/,
+    모음까지 정당하게 갈리는 경우가 있다. commit 은 동사 /kəˈmɪt/,
     명사 /ˈkɑmɪt/ 로 강세가 옮기며 첫 모음이 준다. 그런 것은 아래
-    목록에 적어 통과시킨다 - 목록에 한 줄 넣는 것이 "사람이 봤다" 는
-    신호다. 기계가 못 가르는 자리라 목록 말고는 방법이 없다.
+    목록에 적어 통과시킨다. 목록에 한 줄 넣는 것이 "사람이 봤다" 는
+    표시다. 기계가 못 가르는 자리라 목록 말고는 방법이 없다.
     """
 
     # (구, 낱말) - 갈리는 것이 맞다고 확인한 짝

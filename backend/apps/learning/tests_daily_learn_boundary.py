@@ -6,19 +6,19 @@
     tests_daily_learn_abuse  우회·되돌리기·경합 (함수 단위)
     tests_daily_learn_http   화면이 받는 응답 (HTTP)
 
-여기서 보는 것은 **산수와 복구**다. 위 셋이 "정상 구성에서 규칙이 서나"
-를 보는 동안, 이쪽은 구성 자체를 흔든다 - 묶음이 안 나뉘는 문제 수,
+여기서 보는 것은 산수와 복구다. 위 셋이 "정상 구성에서 규칙이 서나"
+를 보는 동안, 이쪽은 구성 자체를 흔든다. 묶음이 안 나뉘는 문제 수,
 단어가 묶음보다 적은 DB, 점수판이 계속 터지는 상태, 다 풀었는데 안 닫힌 판.
 
-**왜 산수를 따로 보나.** _fit_chunks 와 _answerable 은 판이 열릴 때 딱
+산수를 따로 보는 이유: _fit_chunks 와 _answerable 은 판이 열릴 때 딱
 한 번 돌고 그 결과가 total_questions 로 굳는다. 틀려도 예외가 안 나고
 "40문제라더니 31문제에서 끝났다" 로만 드러나는데, 그때는 이미 사용자가
 겪은 뒤다. 그래서 함수를 직접 불러 값을 고정한다.
 
-**왜 복구를 따로 보나.** _publish 는 트랜잭션 밖이라 터질 수 있고, 터진
+복구를 따로 보는 이유: _publish 는 트랜잭션 밖이라 터질 수 있고, 터진
 뒤에도 판은 끝낼 수 있어야 한다. 한 번 터지는 것은 기존 테스트가 보지만
-(StuckSessionTest), 계속 터지는 동안 끝까지 푸는 것은 아무도 안 본다 -
-점수판이 죽은 동안에도 사용자의 하루는 끝나야 한다.
+(StuckSessionTest), 계속 터지는 동안 끝까지 푸는 것은 다른 곳에서 안
+본다. 점수판이 안 되는 동안에도 사용자의 하루는 끝나야 한다.
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ class FitChunksTest(TestCase):
     """_fit_chunks 의 산수.
 
     묶음 구성이 틀리면 학습 카드를 보여준 묶음이 문제 범위로 안 쓰인다.
-    예외가 안 나고 조용히 어긋나므로 값을 직접 고정한다.
+    예외 없이 어긋나므로 값을 직접 고정한다.
     """
 
     def test_a_full_corpus_keeps_the_planned_shape(self):
@@ -107,7 +107,7 @@ class FitChunksTest(TestCase):
 
         total 은 문장을 포함하는데 학습은 단어만 뽑는다. 단어로 자르지
         않으면 2묶음째부터 발급이 실패하고, 실패하면 issued_chunks 가
-        안 올라 그 뒤 슬라이스가 실제 발급분과 영영 어긋난다.
+        안 올라 그 뒤 슬라이스가 실제 발급분과 계속 어긋난다.
         """
         plan = STUDY_PLANS[StudyLength.MEDIUM]  # 5*4
 
@@ -205,7 +205,7 @@ class AnswerableTest(TestCase):
     def test_the_learning_part_does_not_pay_the_sentence_bottleneck(self):
         """학습분은 문장 병목을 안 탄다.
 
-        그 구간은 문장을 아예 안 쓴다. 병목을 판 전체에 걸면 문장
+        그 구간은 문장을 쓰지 않는다. 병목을 판 전체에 걸면 문장
         하나짜리 DB 가 40문제를 1문제로 줄인다.
         """
         seed_words(200)
@@ -250,9 +250,8 @@ class AnswerableTest(TestCase):
 class PublishFailureTest(TestCase):
     """점수판 반영이 계속 터지는 동안에도 판을 끝낼 수 있나.
 
-    _publish 는 트랜잭션 밖이라 터질 수 있다. 한 번 터지는 것은 기존
-    테스트가 보지만, **계속** 터지는 동안 끝까지 푸는 것은 아무도 안
-    본다 - 점수판이 죽어도 사용자의 하루는 끝나야 한다.
+    _publish 는 트랜잭션 밖이라 터질 수 있다. 계속 터지는 경우를 따로
+    보는 이유는 모듈 docstring 참고.
     """
 
     def setUp(self):
@@ -347,7 +346,7 @@ class SettleStaleTest(TestCase):
     """어제 판 정산.
 
     정산은 완주 보너스를 주는 마지막 관문이라, 여기서 판정을 틀리면
-    점수가 조용히 새거나 조용히 사라진다.
+    점수가 에러 없이 새거나 사라진다.
     """
 
     def setUp(self):
@@ -545,13 +544,13 @@ class ResumeLoopTest(TestCase):
     def test_a_lagging_saved_question_does_not_trap_the_day(self):
         """뒤처진 저장 문제를 받아도 실제로 답을 이어갈 수 있다.
 
-        **기계가 아니라 결과를 본다.** 기존 테스트는 새로 낸 토큰의
+        중간 값이 아니라 결과를 본다. 기존 테스트는 새로 낸 토큰의
         순번이 DB 와 같은지만 확인하는데, 그것만으로는 "그 토큰으로
-        정말 답이 되나" 를 안 본다 - 순번만 맞고 다른 이유로 거절되면
+        정말 답이 되나" 를 안 본다. 순번만 맞고 다른 이유로 거절되면
         사용자는 똑같이 갇힌다.
 
-        갇히면 하루 한 번 제약이라 다시 시작할 수도 없어 그 사람의
-        오늘이 끝난다. 그래서 판이 실제로 끝까지 가는지까지 본다.
+        갇히면 하루 한 번 제약이라 다시 시작할 수도 없다. 그래서 실제로
+        답이 세어지는지까지 본다.
         """
         study, _t, _q = daily_study.start(self.user, StudyLength.SHORT)
         study.refresh_from_db()
@@ -622,7 +621,7 @@ class FinishedStudyTest(TestCase):
     def test_every_length_pays_exactly_what_it_promised(self):
         """세 길이 모두 약속한 문제 수를 내고 보너스를 정확히 준다.
 
-        **셋을 한 테스트에서 본다.** 길이마다 묶음 구성이 달라서
+        셋을 한 테스트에서 본다. 길이마다 묶음 구성이 달라서
         (4묶음/4묶음/6묶음) 하나만 보면 나머지 구성의 산수 실수를 놓친다.
         """
         for length in (StudyLength.SHORT, StudyLength.MEDIUM, StudyLength.LONG):
@@ -712,7 +711,7 @@ class ReviewSideEffectTest(TestCase):
     """일일공부가 복습 상태에 남기는 것.
 
     복습 연동은 답마다 돌아서(자유 문제풀이는 판 끝에 한 번) 실수의
-    창이 25배 넓다. 여기서 보는 것은 셋이다 - 연속을 안 올리나, 틀린
+    창이 25배 넓다. 여기서 보는 것은 셋이다. 연속을 안 올리나, 틀린
     것이 복습에 뜨나, 판 전체를 풀어도 그 둘이 유지되나.
     """
 
@@ -727,20 +726,20 @@ class ReviewSideEffectTest(TestCase):
         연속은 복습 화면에서 확인한 것만 센다. 일일공부에서 맞힌 것으로
         졸업하면 "복습했다" 가 아니라 "우연히 나왔다" 가 된다.
 
-        **되쓰기 경합은 여기서 안 잡힌다.** bulk_update 가 낡은 streak 을
+        되쓰기 경합은 여기서 안 잡힌다. bulk_update 가 낡은 streak 을
         되쓰는 버그는 "함수가 읽은 뒤 복습이 끼어드는" 순간에만 나는데,
-        순차 실행으로는 그 지점을 못 맞힌다 - 그쪽은 bulk_update 를 감싸
+        순차 실행으로는 그 지점을 못 맞힌다. 그쪽은 bulk_update 를 감싸
         직접 끼워 넣는 ReviewStateWriteTest 가 본다.
 
-        여기서 못박는 것은 그것과 다르다. **일일공부가 정상 경로로
-        연속을 올리지 않는가** 다. 판 전체를 다 맞히고도 값이 그대로여야
-        한다 - 어느 코드가 실수로 streak 을 +1 하면 여기서 걸린다.
+        여기서 보는 것은 그것과 다르다. 일일공부가 정상 경로로 연속을
+        올리지 않는가다. 판 전체를 다 맞히고도 값이 그대로여야 한다.
+        어느 코드가 실수로 streak 을 +1 하면 여기서 걸린다.
         """
         study, token, _q = daily_study.start(self.user, StudyLength.SHORT)
         study.refresh_from_db()
 
-        # **모든 단어에 미리 연속을 쌓는다.** 일부만 심으면 그 판에서
-        # 실제로 나온 단어가 심어둔 것과 겹치는지가 뽑기 운에 달린다 -
+        # 모든 단어에 미리 연속을 쌓는다. 일부만 심으면 그 판에서
+        # 실제로 나온 단어가 심어둔 것과 겹치는지가 뽑기 운에 달린다.
         # 겹치는 게 하나도 없는 실행에서는 아무것도 검사하지 않고
         # 통과한다. 전부 심으면 어느 것이 나오든 반드시 걸린다.
         now = timezone.now()
@@ -911,7 +910,7 @@ class ThinCorpusPlaythroughTest(TestCase):
     def test_one_word_short_of_a_chunk_still_finishes(self):
         """묶음보다 하나 적어도 판이 끝난다.
 
-        학습분이 통째로 빠지는 자리다(_fit_chunks 가 (0,0)). 학습 없이
+        학습분이 전부 빠지는 자리다(_fit_chunks 가 (0,0)). 학습 없이
         옛 흐름으로 도는데, 그 경로가 살아 있는지 본다.
         """
         seed_words(4)  # MEDIUM chunk_size=5 보다 하나 적다
@@ -927,7 +926,7 @@ class ThinCorpusPlaythroughTest(TestCase):
     def test_a_single_word_finishes_without_a_crash(self):
         """단어 하나짜리 DB 에서도 안 터진다.
 
-        보기를 넷 못 채우므로 문제가 아예 안 나올 수 있다. 그때는 판이
+        보기를 넷 못 채우므로 문제가 하나도 안 나올 수 있다. 그때는 판이
         닫혀야지 예외가 나면 안 된다.
         """
         seed_words(1)
@@ -965,7 +964,7 @@ class MidRunReviewChangeTest(TestCase):
         self.user = make_user("검수취소")
 
     def test_the_whole_corpus_going_unreviewed_closes_the_study(self):
-        """콘텐츠가 통째로 사라지면 판을 닫는다.
+        """콘텐츠가 전부 사라지면 판을 닫는다.
 
         안 닫으면 화면이 길이 고르기로 떨어지는데, 하다 만 판이 있으면
         거기서 길이 버튼도 막혀 아무것도 못 하는 상태가 된다.
@@ -992,7 +991,7 @@ class MidRunReviewChangeTest(TestCase):
         study.refresh_from_db()
 
         saved_ids = [c["id"] for c in study.question["body"]["choices"]]
-        # 보기 하나만 미검수로 내린다. 문제가 통째로 버려져야 한다.
+        # 보기 하나만 미검수로 내린다. 문제 전체가 버려져야 한다.
         Word.objects.filter(pk=saved_ids[0]).update(is_reviewed=False)
 
         resumed = daily_study.resume(study)

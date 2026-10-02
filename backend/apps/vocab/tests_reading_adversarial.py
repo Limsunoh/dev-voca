@@ -1,6 +1,6 @@
 """한글 발음 기능을 깨뜨려보는 테스트.
 
-구현자의 테스트와 별개로 작성했다. 목적은 통과 확인이 아니라 새는 곳 찾기다.
+목적은 통과 확인이 아니라 새는 곳 찾기다.
 
 세 갈래로 본다:
     1. 검수 게이트 - reading_reviewed=False 인 발음이 사용자 경로로 새는가
@@ -607,7 +607,7 @@ class LoadReadingsTest(TestCase):
         """파이썬에서 True 는 int 1 이다. isinstance(True, int) 가 True 라
         pk__in 에 그대로 들어가고, pk=1 인 단어가 있으면 엉뚱한 곳이 채워진다.
         """
-        # pk=1 이 실제로 있어야 이 구멍이 드러난다. 테스트 DB 는 시퀀스가
+        # pk=1 이 실제로 있어야 이 문제가 드러난다. 테스트 DB 는 시퀀스가
         # 높은 값에서 시작해 우연히 비어 있을 뿐이고, 운영 DB 에는 있다.
         Word.objects.create(pk=1, term="pkonevictim", meaning="희생양")
 
@@ -913,7 +913,7 @@ class ReviewActionPermissionTest(TestCase):
         self.assertAllowed(self.superuser)
 
     def test_view_only_staff_does_not_see_the_actions(self):
-        """보기만 하는 계정의 목록에는 동작 이름이 아예 안 나온다.
+        """보기만 하는 계정의 목록에는 동작 이름이 나오지 않는다.
 
         목록이 비면 Django 가 동작 칸 자체를 안 그려 이 검사가 헛돈다.
         그래서 줄을 하나씩 만들어 둔다.
@@ -961,7 +961,7 @@ class AdminIdInFilterTest(TestCase):
     """README 의 거르기 주소(?id__in=)에 이상한 값을 줬을 때.
 
     이 주소로 거른 뒤 "전체 선택" 하고 검수를 푸는 것이 절차다. 값이
-    이상해서 거르기가 조용히 빠지면 전체 선택이 모든 줄을 잡는다.
+    이상해서 거르기가 에러 없이 빠지면 전체 선택이 모든 줄을 잡는다.
     """
 
     @classmethod

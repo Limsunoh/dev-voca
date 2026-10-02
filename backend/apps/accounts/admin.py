@@ -16,7 +16,7 @@ class UserCreateForm(AdminUserCreationForm):
 
     UserCreationForm 이 아니라 AdminUserCreationForm 을 상속해야 한다.
     아래 add_fieldsets 가 쓰는 usable_password 필드가 Admin 전용 폼에만
-    있어서, 일반 폼을 상속하면 추가 화면이 통째로 500 이 된다.
+    있어서, 일반 폼을 상속하면 추가 화면이 500 이 된다.
     """
 
     class Meta(AdminUserCreationForm.Meta):

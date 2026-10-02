@@ -12,8 +12,8 @@ import { getToken, withTokenOrGuest } from "@/lib/session";
  * 환경변수이고, 인증 토큰은 httpOnly 쿠키에 있어 브라우저 스크립트가
  * 읽을 수 없다. 그것을 꺼내 헤더에 붙이는 일은 여기서만 일어난다.
  *
- * **로그인을 요구하지 않는다.** 점수가 안 남는 연습이라 계정에 쌓일 것이
- * 없다. 게스트도 발음을 연습할 수 있어야 한다 - 이 기능은 처음 온 사람의
+ * 로그인을 요구하지 않는다. 점수가 안 남는 연습이라 계정에 쌓일 것이
+ * 없다. 게스트도 발음을 연습할 수 있어야 한다. 이 기능은 처음 온 사람의
  * 두려움을 줄이려는 것이라 로그인 뒤로 숨기면 정작 필요한 사람이 못 만난다.
  * 토큰이 있으면 실어 보내고, 없으면 없는 대로 부른다.
  */
@@ -37,9 +37,9 @@ const MAX_HEARD = 5;
 /**
  * 후보 하나의 글자 상한.
  *
- * 서버가 100자를 넘으면 400 을 주고 **자르지 않는다**. 인식기가 긴 문장을
- * 통째로 뱉는 경우가 있어서(사용자가 계속 말하면) 여기서 걸러야 원인 모를
- * 400 이 안 난다. 넘는 것은 자르지 말고 버린다 - 잘라 보내면 사용자가
+ * 서버는 100자를 넘으면 자르지 않고 400 을 준다. 사용자가 계속 말하면
+ * 인식기가 긴 문장을 한 번에 뱉는 경우가 있어서, 여기서 걸러야 원인 모를
+ * 400 이 안 난다. 넘는 것은 자르지 말고 버린다. 잘라 보내면 사용자가
  * 말하지 않은 것으로 채점된다.
  */
 const MAX_HEARD_CHARS = 100;
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  // **먼저 action 을 본다.** 뒤로 미루면 오타 난 action 이 아래 검사에
+  // 먼저 action 을 본다. 뒤로 미루면 오타 난 action 이 아래 검사에
   // 걸려 원인과 무관한 문구를 받는다(/api/daily 와 같은 판단).
   if (!["start", "grade"].includes(body.action ?? "")) {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       const scene = toTalkScene(body.scene) || undefined;
       // 서버가 쿠키의 토큰을 거절하면 쿠키를 지우고 게스트로 받는다(한 판
       // 중계와 같다). 그대로 실으면 로그인 없이도 되는 이 화면이 401 로
-      // 막혔다. 문장마다 오는 요청이라 로그인 확인을 먼저 하지 않는다.
+      // 막힌다. 문장마다 오는 요청이라 로그인 확인을 먼저 하지 않는다.
       const { value } = await withTokenOrGuest(
         auth ?? null,
         (token) => fetchTalkQuestion(kind, { exclude, token, level, scene }),

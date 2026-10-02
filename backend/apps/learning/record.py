@@ -1,19 +1,19 @@
 """끝난 판을 기록한다.
 
 로그인한 사람만 남긴다. 게스트는 화면에서 점수를 보고, 그 값은 브라우저에만
-남는다 - 서버가 채점했더라도 계정이 없으면 순위표에 넣을 자리가 없다.
+남는다. 서버가 채점했더라도 계정이 없으면 순위표에 넣을 자리가 없다.
 
 같은 판을 두 번 보내도 한 번만 남는다. 판 상태가 서명 토큰으로 오가서
 끝낸 토큰을 그대로 다시 보낼 수 있기 때문이다. 판 식별자에 걸린 유일성
 제약이 그것을 막는다.
 
-**끝내기를 안 부르고 나가면 그 판은 안 남는다.** 자유 문제풀이에서는
-문제가 안 된다 - 그날 점수가 최고 한 판이라 나쁜 판은 남겨도 어차피
+끝내기를 안 부르고 나가면 그 판은 안 남는다. 자유 문제풀이에서는
+문제가 안 된다. 그날 점수가 최고 한 판이라 나쁜 판은 남겨도 어차피
 안 세기 때문이다. 버리는 것과 남기는 것의 결과가 같다.
 
-일일공부는 다르다. 그쪽은 **더하기**라서, 점수가 깎이는 판을 중간에
+일일공부는 다르다. 그쪽은 점수를 더하므로, 점수가 깎이는 판을 중간에
 버리는 것이 이득이 된다. 그래서 daily_study.py 는 이 모듈을 안 쓰고
-답할 때마다 DailyStudy 에 쌓는다 - 끝내기를 클라이언트에 맡기지 않는다.
+답할 때마다 DailyStudy 에 쌓는다. 끝내기를 클라이언트에 맡기지 않는다.
 """
 
 from __future__ import annotations
@@ -64,9 +64,9 @@ def save_round(user, summary: dict) -> QuizSession | None:
 
             _bump_daily(session)
 
-            # **자기 savepoint 안에서 부른다.** 여기서 IntegrityError 가
+            # 자기 savepoint 안에서 부른다. 여기서 IntegrityError 가
             # 바깥으로 나가면 save_round 가 그걸 "이미 기록된 판" 으로
-            # 오인해 판 전체를 롤백한다 - 점수가 조용히 사라진다.
+            # 오인해 판 전체를 롤백하고, 점수가 에러 없이 사라진다.
             # 복습 목록이 한 판 밀리는 것이 판을 잃는 것보다 낫다.
             try:
                 with transaction.atomic():
@@ -89,7 +89,7 @@ def save_round(user, summary: dict) -> QuizSession | None:
 def _answer_rows(session: QuizSession, answers) -> list[QuizAnswer]:
     """답 목록을 행으로 바꾼다. 모양이 안 맞는 줄은 버린다.
 
-    판 상태가 토큰으로 오가서, 칸 수를 늘린 배포 직후에는 **옛 모양**의
+    판 상태가 토큰으로 오가서, 칸 수를 늘린 배포 직후에는 옛 모양의
     토큰이 토큰 유효 시간만큼 들어온다. 그대로 풀면 ValueError 로 500 이 난다.
     그 판 전체를 잃느니 이상한 줄만 버리고 나머지를 남긴다.
     """
@@ -123,11 +123,11 @@ def _answer_rows(session: QuizSession, answers) -> list[QuizAnswer]:
 def _bump_review(user, answers) -> None:
     """푼 항목들의 복습 상태를 채운다.
 
-    **복습 목록이 여기서 생긴다.** 이 쓰기가 없으면 review 화면은 표만
-    있고 행이 없어 영원히 빈 목록이 된다.
+    복습 목록이 여기서 생긴다. 이 쓰기가 없으면 review 화면은 표만
+    있고 행이 없어 늘 빈 목록이 된다.
 
-    맞은 것도 남긴다 - "언제 마지막으로 맞혔나" 가 있어야 오래된 것을
-    고를 수 있다. 다만 **연속 횟수는 안 올린다.** 그건 복습에서 확인한
+    맞은 것도 남긴다. "언제 마지막으로 맞혔나" 가 있어야 오래된 것을
+    고를 수 있다. 다만 연속 횟수는 안 올린다. 그건 복습에서 확인한
     것만 세야 의미가 있다(review._record 참고).
 
     넘긴 답은 건너뛴다. 모르는 것일 수도 있지만 시간이 없어 넘긴 것일
@@ -161,17 +161,17 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
     """(종류, id) -> 맞았나 를 복습 상태에 반영한다.
 
     자유 문제풀이(_bump_review)와 일일공부(daily_study)가 같이 쓴다.
-    **두 곳이 규칙을 따로 구현하면 한쪽만 고쳐지고, 그 차이는 복습
-    목록에서만 드러나 알아채기 어렵다.**
+    두 곳이 규칙을 따로 구현하면 한쪽만 고쳐지고, 그 차이는 복습
+    목록에서만 드러나 알아채기 어렵다.
 
-    규칙은 위 _bump_review docstring 에 있다 - 맞히면 last_correct_at 만,
+    규칙은 위 _bump_review docstring 참고. 맞히면 last_correct_at 만,
     틀리면 is_wrong 과 streak=0. 어느 쪽도 streak 을 올리지 않는다.
     """
     if not seen:
         return
 
     now = timezone.now()
-    # **종류까지 걸어 조회한다.** id 만으로 좁히면 단어 5번과 문장 5번이
+    # 종류까지 걸어 조회한다. id 만으로 좁히면 단어 5번과 문장 5번이
     # 같이 걸려, 하나를 고치려다 다른 하나를 덮는다.
     lookup = Q()
     for target_type, target_id in seen:
@@ -204,7 +204,7 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
             row.last_correct_at = now
             hit.append(row)
         else:
-            # **틀리면 연속을 끊는다.** 자유 문제풀이에서 맞힌 것은 연속을
+            # 틀리면 연속을 끊는다. 자유 문제풀이에서 맞힌 것은 연속을
             # 올리지 않지만(그건 복습에서 확인한 것만 센다), 틀린 것은
             # 끊어야 한다. 안 그러면 복습 1회 + 자유 오답 + 복습 1회 로
             # "연속" 아닌 두 번에 졸업한다.
@@ -216,14 +216,13 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
         # 있는 것이니 버린다.
         ReviewState.objects.bulk_create(new_rows, ignore_conflicts=True)
 
-    # **맞은 줄에는 streak 을 쓰지 않는다.** bulk_update 는 필드 목록에
+    # 맞은 줄에는 streak 을 쓰지 않는다. bulk_update 는 필드 목록에
     # 있는 값을 읽은 시점 그대로 되쓴다. 맞았을 때는 streak 을 안 바꾸므로
     # "읽은 값을 그대로" 인데, 그 사이 복습이 올린 값이 있으면 그것을
-    # 0 으로 되돌린다 - 사용자는 복습에서 맞힌 것이 사라져 졸업에 영영
-    # 못 닿는다.
+    # 0 으로 되돌린다. 그러면 복습에서 맞힌 것이 사라져 졸업하지 못한다.
     #
-    # 일일공부가 이 함수를 답 하나마다 부르면서 그 창이 25배로 넓어졌다.
-    # 자유 문제풀이는 판이 끝날 때 한 번이라 눈에 안 띄었다.
+    # 일일공부는 이 함수를 답 하나마다 불러, 판이 끝날 때 한 번 부르는
+    # 자유 문제풀이보다 이 창이 25배 넓다.
     #
     # 같은 이유로 틀린 줄에는 last_correct_at 을 쓰지 않는다. 안 바꾼 값을
     # 되쓰면 그 사이 복습에서 맞힌 시각을 옛 값으로 되돌린다.
@@ -236,7 +235,7 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
 def _bump_daily(session: QuizSession) -> None:
     """그날 한 줄을 갱신한다.
 
-    자유 문제풀이는 **가장 높은 판 하나만** 남긴다. 이것이 하루 상한이다 -
+    자유 문제풀이는 가장 높은 판 하나만 남긴다. 이것이 하루 상한이다.
     90초짜리를 네 시간 돌려도 그날 점수는 가장 잘한 한 판이 전부다.
 
     읽고-고치고-쓰지 않고 UPDATE 한 문장으로 끝내는 이유: 한 사람이 탭
@@ -245,11 +244,11 @@ def _bump_daily(session: QuizSession) -> None:
     줄을 서므로 이 경합은 잠금이 먼저 막고, 조건부 UPDATE 는 두 번째 방어로
     남겨 둔 것이다.
 
-    **트랜잭션 안에서만 부른다**(select_for_update). 지금은 save_round 의
+    트랜잭션 안에서만 부른다(select_for_update). 지금은 save_round 의
     atomic 안 한 곳뿐이다.
     """
     day = calendar_kst.day_of(session.finished_at)
-    # **그날 줄을 잠근다.** 아래 UPDATE 는 조건(최고점보다 높나)이 거짓이면
+    # 그날 줄을 잠근다. 아래 UPDATE 는 조건(최고점보다 높나)이 거짓이면
     # 줄을 건드리지도 잠그지도 않는다. 그러면 Admin 이 판을 지우고 다시 세는
     # recount_best_free 와 순서가 정해지지 않아, 저쪽이 아직 커밋 안 된 이
     # 판을 못 보고 그보다 낮은 값을 써 버릴 수 있다. 줄 하나를 둘 다 잠그면
@@ -263,13 +262,13 @@ def _bump_daily(session: QuizSession) -> None:
     if session.kind == SessionKind.DAILY:
         # 일일공부는 하루 한 번이라 최고를 고를 것이 없다. 그대로 쌓는다.
         #
-        # **지금은 이 경로로 안 온다.** 3-3 의 일일공부는 QuizSession 을
+        # 지금은 이 경로로 안 온다. 3-3 의 일일공부는 QuizSession 을
         # 만들지 않고 DailyStudy 로 진행해, 끝낼 때 add_daily_study 가
         # 그날 줄을 덮어쓴다. 여기는 그 이전 설계의 흔적이다.
         #
         # 지우지 않는 이유: QuizSession.kind 에 DAILY 가 여전히 있고,
         # 그것으로 save_round 를 부르는 옛 코드가 남아 있을 수 있다.
-        # 그때 조용히 아무 일도 안 하는 것보다 예전 규칙대로 도는 편이 낫다.
+        # 그때 아무 일도 안 하는 것보다 예전 규칙대로 도는 편이 낫다.
         rows.update(daily_study_score=F("daily_study_score") + session.score)
         return
 
@@ -277,7 +276,7 @@ def _bump_daily(session: QuizSession) -> None:
     # 마이너스만 낸 날이 "안 한 날" 과 구분되지 않는다.
     #
     # 날짜를 DB 에 묻지 않는 이유: finished_at__date 는 DB 가 settings 의
-    # 시간대로 변환한 값이라, calendar_kst 와 설정이 갈리면 조용히 어긋난다.
+    # 시간대로 변환한 값이라, calendar_kst 와 설정이 갈리면 에러 없이 어긋난다.
     # 필드가 비었는지만 보면 그 의존이 사라진다.
     rows.filter(
         Q(best_free_score__isnull=True) | Q(best_free_score__lt=session.score)
@@ -291,13 +290,13 @@ def recount_best_free(user_id: int, day: date) -> None:
     "그날 최고 판의 점수" 를 복사해 둔 값이라, 판만 지우면 이번 주·전체
     순위표에서는 빠지는데 꾸준함에는 그 점수가 남는다.
 
-    **날짜를 세는 규칙이 _bump_daily 와 같아야 한다**(끝낸 시각, 한국 날짜).
-    그래서 이 모듈에 둔다 - Admin 쪽에 따로 쓰면 두 벌이 되고 한쪽만 고쳐진다.
+    날짜를 세는 규칙이 _bump_daily 와 같아야 한다(끝낸 시각, 한국 날짜).
+    그래서 이 모듈에 둔다. Admin 쪽에 따로 쓰면 두 벌이 되고 한쪽만 고쳐진다.
 
-    남은 판이 없으면 null 로 되돌린다. **줄은 지우지 않는다.** 같은 사람이
+    남은 판이 없으면 null 로 되돌린다. 줄은 지우지 않는다. 같은 사람이
     그 순간 일일공부 답을 내면 add_daily_study 는 잠그지 않고 읽어 둔 줄
     번호로 UPDATE 하는데, 그 줄이 지워져 있으면 0 줄을 고치고 그 점수가
-    조용히 사라진다(_bump_daily 는 줄을 잠그므로 이 경우가 아니다).
+    에러 없이 사라진다(_bump_daily 는 줄을 잠그므로 이 경우가 아니다).
     대가로 그날은 학습 기록에 "안 함" 이 아니라 "0점" 으로 남는다. 꾸준함의
     "며칠" 은 점수가 0 보다 큰 날만 세므로 거기에는 안 잡힌다.
 
@@ -329,11 +328,11 @@ def add_daily_study(user, day, score: int) -> None:
     daily_study.py 가 공부를 닫을 때 한 번 부른다. 하루 한 번이라 최고를
     고를 것이 없고 그대로 쌓는다.
 
-    **더하기가 아니라 덮어쓰기다.** 일일공부는 하루에 한 줄뿐이고 그 줄의
+    더하기가 아니라 덮어쓰기다. 일일공부는 하루에 한 줄뿐이고 그 줄의
     최종 점수가 곧 그날 값이라, 더하면 한 번 더 불릴 때 점수가 두 배가 된다.
 
-    **다만 낮아지지는 않는다.** 답할 때마다 불리므로 요청이 겹치면 늦게
-    도착한 옛 값이 새 값을 덮을 수 있다 - 9번째 답이 9점을 쓰는 사이
+    다만 낮아지지는 않는다. 답할 때마다 불리므로 요청이 겹치면 늦게
+    도착한 옛 값이 새 값을 덮을 수 있다. 9번째 답이 9점을 쓰는 사이
     10번째가 끝내며 14점(보너스 포함)을 쓰면, 순서에 따라 9점이 남는다.
     일일공부 점수는 줄어들 일이 없으므로 조건 하나로 그 창을 닫는다.
     """

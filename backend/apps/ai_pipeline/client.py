@@ -1,6 +1,6 @@
 """Claude API 클라이언트.
 
-**이 모듈은 관리자 배치에서만 호출한다.** View·Serializer·시그널에서 부르면
+이 모듈은 관리자 배치에서만 호출한다. View·Serializer·시그널에서 부르면
 사용자 요청마다 API 비용이 나가고 응답이 수십 초로 늘어난다(CLAUDE.md 금지사항).
 
 테스트가 실제 API 를 때리지 않도록 클라이언트를 주입 가능하게 만들었다.
@@ -74,8 +74,8 @@ class ClaudeGenerator:
         그 실패가 다음 날 아침에야 드러난다.
 
         result_key 는 스키마에서 항목 배열이 들어있는 키다. 여기에 "words" 를
-        박아두면 나중에 문장 생성이 {"sentences": [...]} 를 돌려줄 때 조용히
-        빈 결과가 되어 "생성된 것이 없습니다" 로 끝난다.
+        고정해 두면 나중에 문장 생성이 {"sentences": [...]} 를 돌려줄 때 에러
+        없이 빈 결과가 되어 "생성된 것이 없습니다" 로 끝난다.
         """
         try:
             response = self._client.messages.create(

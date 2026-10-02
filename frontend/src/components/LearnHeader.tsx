@@ -28,8 +28,8 @@ export function LearnHeader({
     <header>
       <ContentTabs mode={mode} current={content} />
 
-      {/* 크림에서 제목 굵기가 900 으로 올라갔다. 카드가 3px 두께를 갖고
-          서 있어서 700 짜리 제목은 그 옆에서 가벼워 보인다. */}
+      {/* 제목 굵기는 900 이다. 카드가 3px 두께를 갖고 서 있어서 700 짜리
+          제목은 그 옆에서 가벼워 보인다. */}
       <h1
         className="mt-5"
         style={{

@@ -49,7 +49,7 @@ export const viewport: Viewport = {
   themeColor: "#fff6e9",
   colorScheme: "light",
   // 이게 없으면 iOS 가 safe-area env() 를 전부 0 으로 준다. 아래 탭바가
-  // safe-area 만큼 띄우도록 짜여 있는데 그 방어가 통째로 무효가 되어,
+  // safe-area 만큼 띄우도록 짜여 있는데 그 여백이 전부 0 이 되어,
   // 아이폰 홈 인디케이터가 탭 라벨 위에 겹친다.
   viewportFit: "cover",
 };

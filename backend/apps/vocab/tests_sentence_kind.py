@@ -1,7 +1,7 @@
 """문장 문제 응답의 sentence_kind.
 
-화면은 이 값이 "error" 일 때만 지문을 고정폭으로 그린다. 그래서 틀리면
-글꼴이 조용히 바뀔 뿐 아무것도 안 깨진다 - 여기서 못 박는다.
+화면은 이 값이 "error" 일 때만 지문을 고정폭으로 그린다. 그래서 값이
+틀려도 글꼴만 바뀌고 아무것도 안 깨진다. 눈에 띄지 않으니 여기서 검사한다.
 
     빈칸 채우기   지문 문장(source_sentence_id)의 kind
     상황 고르기   정답 문장(지문이 그 문장이다)의 kind
@@ -103,7 +103,7 @@ class SentenceKindOnQuizTest(TestCase):
         self.assertEqual(seen, {SentenceKind.ERROR, SentenceKind.PHRASE})
 
     def test_value_is_a_known_kind_string(self):
-        """화면은 문자열 "error" 와만 비교한다. None·라벨이 오면 조용히 본문체다."""
+        """화면은 문자열 "error" 와만 비교한다. None·라벨이 오면 에러 없이 본문체로 그린다."""
         for kind in ("blank", "situation"):
             body = self.ask(kind=kind)
             self.assertIsInstance(body["sentence_kind"], str)

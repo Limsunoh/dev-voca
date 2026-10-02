@@ -414,8 +414,8 @@ class ExamScopeWriteValidationTest(TestCase):
     500 이 된다. 검수자가 Admin 이 아니라 API 로 고칠 때 밟는 자리라
     400 으로 돌려주는지 확인한다.
 
-    실제로 이 자리에서 500 이 났었다 - 과목만 보내는 요청(아래
-    subject_only)은 검수자가 가장 자연스럽게 할 법한 것인데도 터졌다.
+    과목만 보내는 요청(아래 subject_only)은 검수자가 가장 자연스럽게 할
+    법한 것이라 따로 본다.
     """
 
     def setUp(self):
@@ -503,7 +503,7 @@ class ExamScopeWriteValidationTest(TestCase):
         self.assertEqual(w.exam_subject, "")
 
     def test_sentence_subject_only_is_rejected(self):
-        """문장도 같은 규칙이다. 한쪽만 막으면 조용히 어긋난다."""
+        """문장도 같은 규칙이다. 한쪽만 막으면 어긋난다."""
         s = Sentence.objects.create(text="sv a", translation="t",
                                     is_reviewed=True)
         res = self.client.patch(

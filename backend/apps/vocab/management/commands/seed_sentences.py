@@ -3437,7 +3437,7 @@ class Command(BaseCommand):
         )
 
     # 시드는 전부-아니면-전무로 넣는다. 재실행 비용이 0 이라, 절반만 들어간
-    # 상태로 남기느니 통째로 롤백하고 다시 돌리는 편이 낫다.
+    # 상태로 남기느니 전부 롤백하고 다시 돌리는 편이 낫다.
     @transaction.atomic
     def handle(self, *args: Any, **options: Any) -> None:
         reset: bool = options["reset"]

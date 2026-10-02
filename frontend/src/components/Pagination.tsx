@@ -7,7 +7,7 @@ import { listUrl } from "@/lib/routes";
  *
  * 백엔드가 준 next/previous 절대 URL 을 그대로 쓰지 않는다 - 그러면 API 주소가
  * 화면에 노출된다. 우리가 아는 필터만 유지한 채 page 만 바꿔 붙인다.
- * (searchParams 를 통째로 넘기면 URL 에 낀 임의의 키까지 링크마다 따라다닌다.)
+ * (searchParams 를 전부 넘기면 URL 에 낀 임의의 키까지 링크마다 따라다닌다.)
  */
 export function Pagination({
   basePath,
@@ -32,8 +32,8 @@ export function Pagination({
   // 흰 알약 + 두께. 목록 맨 아래에 홀로 놓이는 버튼이라 코랄을 쓰지 않는다 -
   // 한 화면에 코랄은 하나뿐이고, 그 자리는 검색 버튼이 갖는다.
   //
-  // 최소 높이 44px(--hit-floor). 다크에서는 py-1.5(30px)라 터치 대상에
-  // 못 미쳤는데, 목록 맨 아래에서 엄지로 누르는 자리라 이번에 맞춘다.
+  // 최소 높이 44px(--hit-floor). py-1.5(30px)면 터치 대상에 못 미친다.
+  // 목록 맨 아래에서 엄지로 누르는 자리라 맞춘다.
   const linkClass =
     "dv-btn inline-flex items-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 

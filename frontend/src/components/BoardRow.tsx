@@ -37,7 +37,7 @@ type Props = {
    *
    * 지연을 인라인 스타일로 주는 이유: 줄 수가 가변(최대 TOP_SIZE)이라
    * 다른 화면처럼 [animation-delay:NNms] 클래스를 못 쓴다. 스무 개를
-   * 나열해두면 TOP_SIZE 가 바뀔 때 조용히 어긋난다.
+   * 나열해 두면 TOP_SIZE 가 바뀔 때 목록과 어긋나도 알려 주는 곳이 없다.
    */
   index?: number;
   /** 하단 고정 줄로 쓸 때. 순서 애니메이션을 끈다. */
@@ -65,8 +65,8 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
           background: mine ? "var(--coral-soft)" : "var(--paper)",
           borderRadius: "var(--radius-xl)",
           // 누를 수 없는 줄이라 dv-card-press 를 안 건다. 그래도 두께는
-          // --lift 로 넘긴다 - .dv-card 가 box-shadow: var(--lift) 를
-          // 그리므로 변수를 안 주면 그림자가 통째로 사라진다.
+          // --lift 로 넘긴다. .dv-card 가 box-shadow: var(--lift) 를
+          // 그리므로 변수를 안 주면 그림자가 사라진다.
           "--lift": mine ? "0 3px 0 rgb(193 62 34 / 0.25)" : "var(--lift-card)",
           // 스무 줄이 동시에 뜨면 화면이 한 번 번쩍인다. 40ms 씩 밀어 위에서
           // 아래로 흐르게 한다. 마지막 줄이 0.8초라 기다린다는 느낌은 없다.
@@ -126,7 +126,7 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
         >
           {row.score.toLocaleString()}
           {/* 단위를 붙인다. 꾸준함은 큰 숫자가 날 수이고 작은 줄이 점수라,
-              단위가 없으면 "3" 을 3점으로 읽는다. 한글이라 본문 글꼴로 -
+              단위가 없으면 "3" 을 3점으로 읽는다. 한글이라 본문 글꼴로 쓴다.
               고정폭 글꼴에는 한글이 없어 OS 글꼴로 떨어진다. */}
           <span
             className="ml-0.5 text-xs"

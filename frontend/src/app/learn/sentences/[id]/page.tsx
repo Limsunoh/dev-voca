@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: PageProps) {
   const sentence = await getSentence(id);
   if (!sentence) return { title: "문장을 찾을 수 없습니다 · devvoca" };
 
-  // 문장은 길어서 제목에 통째로 넣으면 탭 이름이 잘린다.
+  // 문장은 길어서 제목에 전부 넣으면 탭 이름이 잘린다.
   const head =
     sentence.text.length <= 40
       ? sentence.text

@@ -26,9 +26,9 @@ def env_bool(key: str, default: bool = False) -> bool:
 # 로컬 개발은 .env 의 DJANGO_DEBUG=1 로 켠다.
 DEBUG = env_bool("DJANGO_DEBUG", False)
 
-# 운영에서는 폴백을 두지 않는다. 키를 깜빡하면 서버가 기동에 실패해야 한다 —
-# 커밋된 기본 키로 조용히 뜨면 세션 쿠키·CSRF 토큰·비밀번호 재설정 링크가
-# 전부 공개된 문자열로 서명되어 누구나 세션을 위조할 수 있다.
+# 운영에서는 폴백을 두지 않는다. 키를 깜빡하면 서버가 기동에 실패해야 한다.
+# 커밋된 기본 키로 뜨면 세션 쿠키·CSRF 토큰·비밀번호 재설정 링크가 전부
+# 공개된 문자열로 서명되어 누구나 세션을 위조할 수 있다.
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
 if not SECRET_KEY:
     if DEBUG:
@@ -41,7 +41,7 @@ if not SECRET_KEY:
 
 # 로컬 기본값은 DEBUG 일 때만 준다. 운영에서 이 폴백을 두면 도메인을 깜빡했을 때
 # 프로세스는 멀쩡히 뜨고 헬스체크도 통과하지만 실제 도메인으로 온 요청은 전부
-# DisallowedHost(400) 이 된다 - 표면은 정상이고 사용자 경로만 죽는 조용한 다운.
+# DisallowedHost(400) 이 된다. 겉으로는 정상인데 사용자 요청만 전부 실패한다.
 _allowed_default = "localhost,127.0.0.1" if DEBUG else ""
 ALLOWED_HOSTS = [
     h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", _allowed_default).split(",") if h.strip()
@@ -68,7 +68,7 @@ if not DEBUG and not ALLOWED_HOSTS:
 # Django 4.0+ 는 POST 요청에 Origin 검사를 한다. https 도메인은 여기에도 있어야
 # Admin 로그인이 CSRF 오류로 막히지 않는다.
 #
-# ALLOWED_HOSTS 전체가 아니라 **플랫폼이 준 도메인만** 신뢰한다. 전체를 훑으면
+# ALLOWED_HOSTS 전체가 아니라 플랫폼이 준 도메인만 신뢰한다. 전체를 훑으면
 # ALLOWED_HOSTS=* 를 쓸 때 이 목록이 비어 Admin 로그인이 막히고, 사설 IP 가
 # 섞여 있으면 의도치 않은 origin 을 신뢰하게 된다.
 CSRF_TRUSTED_ORIGINS = [
@@ -100,7 +100,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
 
 
-# 확인 링크가 가리킬 곳. 백엔드가 아니라 **화면(Next)** 주소다.
+# 확인 링크가 가리킬 곳. 백엔드가 아니라 화면(Next) 주소다.
 #
 # 요청 헤더(Host)에서 뽑지 않는다. 그 값은 보내는 쪽이 지어낼 수 있어서,
 # 남의 주소가 박힌 확인 링크를 우리 이름으로 발송하는 통로가 된다. 받는
@@ -111,7 +111,7 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstr
 #
 # 이메일 변경이 본인 확인을 메일로 하기 때문에 필요하다. 없으면 그 기능만
 # 못 쓰는 것이 아니라, 확인 링크가 안 가는데 화면은 "보냈습니다" 라고
-# 말하는 상태가 된다 - 사용자는 스팸함만 뒤지게 된다.
+# 말하는 상태가 되어, 사용자는 스팸함만 뒤지게 된다.
 #
 # 서비스를 코드에 박지 않고 환경변수로 갈아끼우게 둔다. 지금은 Gmail SMTP
 # 지만 하루 500통 제한이 있어, 사용자가 늘면 전용 서비스로 옮겨야 한다.
@@ -134,15 +134,15 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 # 계정이 설정돼 있으면 SMTP 로 보내고, 없으면 콘솔에 찍는다. 개발할 때
 # 앱 비밀번호 없이도 확인 링크를 볼 수 있어야 하기 때문이다.
 #
-# **여기서 기동을 막지 않는다.** SECRET_KEY 처럼 없으면 죽게 만들고 싶지만,
+# 여기서 기동을 막지 않는다. SECRET_KEY 처럼 없으면 죽게 만들고 싶지만,
 # CI 는 운영과 같은 조건(DEBUG=False)으로 `manage.py check` 와
 # `makemigrations --check` 를 돌린다. 기동에서 막으면 메일과 무관한 그
-# 두 단계가 먼저 깨져, 앱 비밀번호를 CI 비밀값에 넣어야만 초록이 된다.
-# 테스트에 쓰지도 않는 실제 발송 계정을 CI 에 두는 것은 맞바꿀 것이 아니다.
+# 두 단계가 먼저 깨져, 앱 비밀번호를 CI 비밀값에 넣어야만 통과한다.
+# 테스트에 쓰지도 않는 실제 발송 계정을 CI 에 둘 수는 없다.
 #
-# 대신 **보내는 자리에서 막는다**(apps/accounts/mail.py). 운영에서 계정이
+# 대신 보내는 자리에서 막는다(apps/accounts/mail.py). 운영에서 계정이
 # 비어 있으면 메일을 보내려는 순간 오류가 나고, 화면은 "메일을 보낼 수 없다"
-# 고 정확히 말한다. 조용히 콘솔로 떨어져 사용자가 스팸함을 뒤지는 상황만
+# 고 정확히 말한다. 메일이 콘솔로 빠져 사용자가 스팸함을 뒤지는 상황만
 # 막으면 되고, 그것은 발송 시점에 막는 것으로 충분하다.
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -243,7 +243,7 @@ else:
             "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
             # 5433 인 이유: 이 PC 는 호스트에 PostgreSQL 이 이미 5432 를 쓰고 있어
             # 컨테이너를 5433 으로 내보냈다. 기본값을 5432 로 두면 .env 없이 돌릴 때
-            # 조용히 엉뚱한 DB(호스트의 것)에 붙는다.
+            # 에러 없이 엉뚱한 DB(호스트의 것)에 붙는다.
             "PORT": os.getenv("POSTGRES_PORT", "5433"),
         }
     }
@@ -326,16 +326,16 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "throttle_cache",
         # 기본값 300 을 넘으면 일부를 지워 자리를 만든다. 그때 노리던
-        # 계정의 카운터가 함께 밀려나면 제한이 풀린다. 올려도 그 길은
-        # 닫히지 않고 비용만 오른다 - 제대로 막으려면 아래 주석대로
-        # Next 중계에 제한을 둬야 한다.
+        # 계정의 카운터가 함께 밀려나면 제한이 풀린다. 값을 올려도 그 길은
+        # 닫히지 않고 비용만 오른다. 제대로 막으려면 아래 REST_FRAMEWORK
+        # 주석대로 Next 중계에 제한을 둬야 한다.
         #
         # 여기 들어오는 것은 요청 제한 카운터뿐이고 1분이면 만료되므로
         # 거의 쌓이지 않는다. 넉넉히 잡아도 된다.
         #
-        # 되돌리기 방어는 여기 두지 않는다. 한때 뒀다가 옮겼는데, 이유는
-        # cull 이다 - 캐시는 넘치면 스스로 지우므로 공격자가 항목을 채우면
-        # 방어가 열린다. 지금은 apps.learning.models.RoundStep 표에 있다.
+        # 되돌리기 방어는 캐시에 두지 않는다. 캐시는 넘치면 스스로 지우므로
+        # (cull) 공격자가 항목을 채우면 방어가 열린다. 그래서
+        # apps.learning.models.RoundStep 표에 둔다.
         "OPTIONS": {"MAX_ENTRIES": 20000},
     }
 }
@@ -345,17 +345,16 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 20,
     # 토큰이 먼저다. API 요청은 Next 서버가 Authorization 헤더로 보낸다.
     #
-    # 순서를 지킬 것. DRF 는 첫 번째 클래스의 인증 방식으로 401/403 을
-    # 가르는데, 세션을 앞에 두면 로그인 안 한 요청이 401 대신 403 이 된다.
-    # 프론트는 401 을 보고 "로그아웃 상태로 그리기" 를 판단하므로 그 분기가
-    # 조용히 깨진다.
+    # DRF 는 첫 번째 클래스의 인증 방식으로 401/403 을 가른다. 세션을 앞에
+    # 두면 로그인 안 한 요청이 401 대신 403 이 되고, 401 을 보고 "로그아웃
+    # 상태로 그리기" 를 판단하는 프론트의 분기가 깨진다.
     #
     # 세션도 남겨두는 이유: Admin 화면과 DRF 의 브라우저 화면이 세션으로
     # 동작한다. 빼면 브라우저에서 API 를 눌러볼 수 없다.
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        # 기본 TokenAuthentication 이 아니다. 그건 사용자 행을 통째로 읽어
-        # 프로필 사진 바이트까지 딸려오는데, 그러면 로그인한 사람의 모든
-        # 요청이 그 무게를 진다. 이유는 그 클래스 주석에 적어뒀다.
+        # 기본 TokenAuthentication 은 사용자 행 전체를 읽어 프로필 사진
+        # 바이트까지 가져오고, 로그인한 사람의 모든 요청이 그 비용을 낸다.
+        # 자세한 것은 SlimTokenAuthentication 주석 참고.
         "apps.accounts.authentication.SlimTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
@@ -375,14 +374,16 @@ REST_FRAMEWORK = {
     # 비밀번호를 무한히 추측할 수 있다.
     #
     # 이 제한이 막는 것은 거기까지다. 이메일마다 한 번씩 던져 가입 여부를
-    # 훑는 것은 못 막는다 - 카운터가 이메일별이라 한 번씩은 다 통과한다.
+    # 훑는 것은 못 막는다(카운터가 이메일별이라 한 번씩은 다 통과한다).
     # 그건 실제 클라이언트를 아는 Next 중계에서 IP 로 막아야 한다.
+    #
     # 테스트에서는 넉넉하게 둔다. 테스트는 사람보다 훨씬 빠르게 요청해서
     # 운영 값이면 관계없는 테스트까지 429 로 막힌다.
     #
-    # 설정을 아예 None 으로 끄지 않는 이유: DRF 는 스로틀 인스턴스를 만들
-    # 때 이 값을 한 번 읽고 굳혀서, 나중에 override_settings 로 켜도 안
-    # 돌아온다. 제한 자체를 검증하는 테스트가 조용히 무력해진다.
+    # 설정을 None 으로 끄지 않는 이유: DRF 는 스로틀 인스턴스를 만들 때
+    # 이 값을 한 번 읽고 굳혀서, 나중에 override_settings 로 켜도 안
+    # 돌아온다. 제한 자체를 확인하는 테스트가 아무것도 확인하지 못한 채
+    # 통과한다.
     "DEFAULT_THROTTLE_RATES": {
         "auth_email": "1000/min" if sys.argv[1:2] == ["test"] else "10/min",
         # 구글은 통을 하나만 둔다(apps.accounts.throttles 참고). 사이트
@@ -416,7 +417,7 @@ REST_FRAMEWORK = {
         # 요청마다 RoundStep 표에 쓰고 order_by("?") 로 표를 훑기 때문이다.
         "round_answer": "5000/min" if sys.argv[1:2] == ["test"] else "600/min",
         # 순위표는 읽기만 한다. 막는 것은 데이터가 아니라 집계 비용이다.
-        # 이 값은 **순위표 하나당**이다 - 통을 셋으로 나눠 쓴다
+        # 이 값은 순위표 하나당이다. 통을 셋으로 나눠 쓴다
         # (apps/learning/throttles.py 의 LeaderboardThrottle).
         "leaderboard": "5000/min" if sys.argv[1:2] == ["test"] else "60/min",
         # 일일공부. 하루 최대 40문제라 분당 30이면 손으로 닿지 않는다.
@@ -425,8 +426,8 @@ REST_FRAMEWORK = {
         # 소리내어 읽기. 로그인 없이도 쓸 수 있어 게스트는 한 통에 담긴다
         # (apps/vocab/throttles.py 에 그 한계를 적어뒀다).
         "talk_question": "5000/min" if sys.argv[1:2] == ["test"] else "60/min",
-        # 채점을 출제보다 넉넉하게 둔다. **한 항목을 여러 번 읽어보는 것이
-        # 정상 사용이라** 같은 값으로 두면 정상 사용자가 막힌다.
+        # 채점을 출제보다 넉넉하게 둔다. 한 항목을 여러 번 읽어 보는 것이
+        # 정상 사용이라 같은 값으로 두면 정상 사용자가 막힌다.
         "talk_grade": "5000/min" if sys.argv[1:2] == ["test"] else "180/min",
         # 답하기는 시작과 통을 나눈다. 40문제를 빠르게 푸는 것이 정상
         # 사용이라 조회·시작과 같은 통을 쓰면 판 중간에 막힌다.

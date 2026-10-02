@@ -1,7 +1,7 @@
 """계정 입출력 규칙.
 
 비밀번호는 어느 응답에도 담기지 않는다(write_only). 그리고 저장 경로가
-set_password 를 거치도록 강제한다 - ModelSerializer 의 기본 create 는
+set_password 를 거치도록 강제한다. ModelSerializer 의 기본 create 는
 평문을 그대로 필드에 넣어 저장하므로, 이 클래스를 거치지 않으면 비밀번호가
 해시 없이 DB 에 들어간다.
 """
@@ -33,13 +33,12 @@ User = get_user_model()
 def validate_display_name(value: str, *, instance=None) -> str:
     """이름을 다듬고, 이미 쓰는 이름인지 본다.
 
-    가입과 프로필 수정이 같은 함수를 쓴다. 한쪽에만 두면 그쪽만 안내를
-    받고 다른 쪽은 DB 제약에 걸려 엉뚱한 문구가 나간다 - 실제로 가입에서
-    이름이 겹치면 "이미 가입된 이메일입니다" 가 떴다. 이메일은 멀쩡한데
-    사용자는 이메일을 바꿔가며 계속 실패한다.
+    가입과 프로필 수정이 같은 함수를 쓴다. 한쪽에만 두면 다른 쪽은 DB
+    제약에 걸려 엉뚱한 문구가 나간다. 가입에서 이름이 겹치면 "이미 가입된
+    이메일입니다" 가 떠서, 사용자가 멀쩡한 이메일을 바꿔가며 계속 실패한다.
 
     모델의 save() 도 같은 규칙으로 다듬는다. 여기서 또 하는 이유는 다듬은
-    뒤의 값으로 중복과 길이를 봐야 하기 때문이다 - 다듬기 전 값으로 보면
+    뒤의 값으로 중복과 길이를 봐야 하기 때문이다. 다듬기 전 값으로 보면
     "임선오 " 가 "임선오" 와 다르다고 판정돼 통과하고, "  임선오  " 는
     실제보다 길게 세어져 억울하게 막힌다.
     """
@@ -88,7 +87,7 @@ class UserSerializer(serializers.ModelSerializer):
     # 비밀번호를 쓸 수 있는 계정인지. 구글로만 가입하면 없다.
     #
     # 화면이 직접 판정할 수 없어서 서버가 내려준다. google_picture 가 있는지
-    # 로는 못 가른다 - 이메일로 가입한 뒤 구글로도 로그인한 사람은 사진이
+    # 로는 못 가른다. 이메일로 가입한 뒤 구글로도 로그인한 사람은 사진이
     # 있으면서 비밀번호도 있다. 그걸로 가르면 그 사람에게 비밀번호 변경
     # 화면이 안 뜬다.
     has_password = serializers.BooleanField(
@@ -97,7 +96,7 @@ class UserSerializer(serializers.ModelSerializer):
     # 내가 올린 사진의 주소. 없으면 빈 문자열.
     #
     # google_picture 와 같은 이유로 따로 내려준다. avatar_display 로
-    # 대신할 수 없다 - 그건 "지금 무엇을 그릴지" 라서 아바타를 한 번
+    # 대신할 수 없다. 그건 "지금 무엇을 그릴지" 라서 아바타를 한 번
     # 고르면 사진이 남아 있어도 preset 으로 나오고, 그것만 보면 올린
     # 사진으로 되돌아갈 방법이 화면에서 사라진다.
     #
@@ -145,7 +144,7 @@ class UserSerializer(serializers.ModelSerializer):
     def validate_avatar(self, value: str) -> str:
         """올린 사진이 없는데 "올린 사진" 을 고르는 것을 막는다.
 
-        막지 않아도 화면이 깨지지는 않는다 - avatar_display 가 아바타로
+        막지 않아도 화면이 깨지지는 않는다. avatar_display 가 아바타로
         떨어진다. 다만 그러면 프로필 화면의 선택 링이 있지도 않은 칸을
         가리키는 상태가 되고, 사용자는 무엇이 골라진 것인지 알 수 없다.
 
@@ -209,7 +208,7 @@ class SignUpSerializer(serializers.ModelSerializer):
 
         필드 단위(validate_password)가 아니라 여기서 하는 이유: 검사기 중
         하나가 "이메일과 비슷한 비밀번호" 를 막는데, 그 검사는 사용자 정보를
-        받아야 동작한다. 안 넘기면 그 검사만 조용히 건너뛰어, 이메일을
+        받아야 동작한다. 안 넘기면 그 검사만 에러 없이 건너뛰어, 이메일을
         그대로 비밀번호로 쓴 가입이 통과한다.
 
         저장하지 않은 인스턴스를 넘긴다. 아직 계정이 없는 시점이고,
@@ -293,7 +292,7 @@ class EmailChangeRequestSerializer(serializers.Serializer):
     여기서 통과해도 주소는 아직 안 바뀐다. 새 주소로 간 링크를 눌러야 끝난다.
     """
 
-    # max_length 를 직접 주는 이유는 SignUpSerializer 쪽에 적어뒀다 -
+    # max_length 를 직접 주는 이유는 SignUpSerializer 참고.
     # 이메일 검사기는 320자까지 통과시키는데 DB 는 254자라 그 사이 길이가
     # 들어오면 검증을 지나가고 저장에서 500 이 난다.
     new_email = serializers.EmailField(max_length=254)
@@ -346,10 +345,10 @@ class PasswordChangeSerializer(serializers.Serializer):
     set_password 다. 나누면 뷰가 어느 쪽인지 먼저 판정해 시리얼라이저를
     골라야 하는데, 그 판정이 뷰와 시리얼라이저 두 곳에 생긴다.
 
-    **구글로만 가입한 사람은 비밀번호가 없다.** 계정을 만들 때
+    구글로만 가입한 사람은 비밀번호가 없다. 계정을 만들 때
     make_password(None) 로 못 쓰는 값이 들어가서 has_usable_password() 가
     False 다. 그 사람에게 현재 비밀번호를 물으면 댈 수 있는 값이 없어
-    영영 비밀번호를 만들지 못한다. 그래서 현재 비밀번호는 이미 가진
+    비밀번호를 만들 수 없다. 그래서 현재 비밀번호는 이미 가진
     사람에게만 요구한다.
 
     반대로 비밀번호가 있는 사람에게 현재 비밀번호를 안 물으면, 로그인된
@@ -381,14 +380,14 @@ class PasswordChangeSerializer(serializers.Serializer):
                 )
             # check_password 를 쓴다. authenticate 를 쓰면 이메일까지
             # 넘겨야 하고, 비활성 계정이면 None 이 와서 "비밀번호가 틀렸다"
-            # 로 보인다 - 이 경로는 이미 인증을 통과해 들어온 자리다.
+            # 로 보인다. 이 경로는 이미 인증을 통과해 들어온 자리다.
             if not user.check_password(current):
                 raise serializers.ValidationError(
                     {"current_password": ["현재 비밀번호가 올바르지 않습니다."]}
                 )
         elif attrs.get("current_password"):
             # 비밀번호가 없는 계정인데 현재 비밀번호가 왔다. 대조할 값이
-            # 없으므로 통과시키면 안 되고, 조용히 무시하면 화면이 잘못된
+            # 없으므로 통과시키면 안 되고, 무시하면 화면이 잘못된
             # 칸을 계속 보여준다.
             raise serializers.ValidationError(
                 {
@@ -413,8 +412,8 @@ class PasswordChangeSerializer(serializers.Serializer):
             )
 
         # 가입과 같은 검사기를 태운다. 여기서 user 를 넘기는 이유는
-        # SignUpSerializer 와 같다 - 사용자 정보를 안 넘기면 "이메일과
-        # 비슷한 비밀번호" 검사가 조용히 건너뛰어진다. 가입 때는 저장 전
+        # SignUpSerializer 와 같다. 사용자 정보를 안 넘기면 "이메일과
+        # 비슷한 비밀번호" 검사를 에러 없이 건너뛴다. 가입 때는 저장 전
         # 인스턴스를 만들어 넘겼지만 여기는 이미 있는 계정을 그대로 쓴다.
         try:
             validate_password(new_password, user=user)
@@ -438,8 +437,8 @@ class PasswordChangeSerializer(serializers.Serializer):
         """
         user = self.context["user"]
         user.set_password(self.validated_data["new_password"])
-        # update_fields 로 좁힌다. 통째로 저장하면 이 요청이 들고 있던
-        # 옛 값이 다른 칸을 덮어쓴다 - 사진 담당이 같은 시각에 아바타를
+        # update_fields 로 좁힌다. 모든 칸을 저장하면 이 요청이 들고 있던
+        # 옛 값이 다른 칸을 덮어쓴다. 같은 시각에 사진 요청이 아바타를
         # 바꾸는 중이면 그 변경이 사라진다.
         user.save(update_fields=["password"])
 

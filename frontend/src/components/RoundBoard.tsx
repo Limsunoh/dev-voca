@@ -21,10 +21,10 @@ import { routes } from "@/lib/routes";
  * 90초 한 판.
  *
  * 낱개 문제를 계속 내던 옛 화면과 다르다. 판이 서버에 있고, 점수와
- * 남은 시간도 서버가 정한다 - 클라이언트가 잰 시간을 보내면 0 을 보내
- * 항상 만점이 된다.
+ * 남은 시간도 서버가 정한다. 서버가 클라이언트가 잰 시간을 받으면, 0 을
+ * 보내 항상 만점을 받을 수 있다.
  *
- * 화면이 타이머를 그리긴 하지만 그건 **표시용**이다. 실제 마감은 서버가
+ * 화면이 타이머를 그리긴 하지만 그건 표시용이다. 실제 마감은 서버가
  * 판 토큰 안의 시작 시각으로 판정한다. 그래서 화면 시계가 느려도 빨라도
  * 점수는 안 흔들린다.
  *
@@ -91,12 +91,12 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
   const closingRef = useRef(false);
 
   /**
-   * 아래 셋이 **state 가 아니라 ref 인 이유.**
+   * 아래 셋이 state 가 아니라 ref 인 이유.
    *
    * 타이머 콜백과 클릭 핸들러는 자기가 만들어진 렌더의 값을 붙들고 있다.
    * 답을 보내는 중에 90초가 지나면, 타이머는 아직 옛 토큰을 들고 있어
-   * 그것으로 판을 닫으려 한다 - 서버는 이미 지나간 순번이라 거절하고,
-   * 90초를 다 푼 사람이 점수를 통째로 잃는다. 마감 직전에 답하는 것은
+   * 그것으로 판을 닫으려 한다. 서버는 이미 지나간 순번이라 거절하고,
+   * 90초를 다 푼 사람이 점수를 전부 잃는다. 마감 직전에 답하는 것은
    * 예외가 아니라 이 판의 가장 흔한 끝맺음이다.
    *
    * 같은 이유로 이중 클릭도 state 로는 못 막는다. 두 클릭이 한 틱 안에
@@ -133,7 +133,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       setPhase("done");
     } catch (err) {
       if (!aliveRef.current) return;
-      // **다시 시도할 수 있게 열어둔다.** 서버의 끝내기는 여러 번 와도
+      // 다시 시도할 수 있게 열어둔다. 서버의 끝내기는 여러 번 와도
       // 같은 결과라(session.finish 주석) 재시도가 안전하다. 닫아버리면
       // 한 번 실패한 판은 점수를 영영 못 남긴다.
       closingRef.current = false;
@@ -147,14 +147,14 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     if (phase !== "playing") return;
 
     const tick = () => {
-      // **답이 오가는 동안은 숫자를 건드리지 않는다.** 채점이 끝나면
+      // 답이 오가는 동안은 숫자를 건드리지 않는다. 채점이 끝나면
       // 연출 시간만큼 마감이 뒤로 밀리는데, 그 사이 다시 그리면 남은
-      // 시간이 61 에서 62 로 **올라간다**. 90초 판에 "91" 이 뜨기도 한다.
+      // 시간이 61 에서 62 로 올라간다. 90초 판에 "91" 이 뜨기도 한다.
       if (busyRef.current) return;
 
       const remain = Math.max(0, deadlineRef.current - Date.now());
       setLeft(remain);
-      // **답이 오가는 중이면 미룬다.** 지금 닫으면 서버가 방금 태운
+      // 답이 오가는 중이면 미룬다. 지금 닫으면 서버가 방금 태운
       // 순번 때문에 옛 토큰을 거절한다. send 가 끝나며 마감을 다시 본다.
       if (remain === 0 && !busyRef.current) finish(tokenRef.current);
     };
@@ -189,7 +189,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
 
       closingRef.current = false;
       deadlineRef.current = Date.now() + started.round_seconds * 1000;
-      // 서버가 정한 값을 그대로 쓴다. 없으면 0 이라 예전처럼 안 멈춘다 -
+      // 서버가 정한 값을 그대로 쓴다. 없으면 0 이라 멈추지 않으므로
       // 서버가 옛 버전이어도 판이 깨지지 않는다.
       pauseRef.current = started.reaction_pause_ms ?? 0;
       // 연출 길이도 같은 값으로 맞춘다. 서버가 이만큼 멈추는데 CSS 가 다른
@@ -254,7 +254,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       tokenRef.current = answered.token;
       setResult(answered.result);
       setTally((prev) => ({
-        // **넘긴 것도 센다.** 서버가 그렇게 집계하므로(session.finish),
+        // 넘긴 것도 센다. 서버가 그렇게 집계하므로(session.finish),
         // 여기서 빼면 진행 중 "3/3" 이던 것이 결과에서 "5문제 중 3개"
         // 로 뛴다. 같은 판인데 분모가 달라 보인다.
         answered: prev.answered + 1,
@@ -280,7 +280,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       // 아니라 "모르겠다" 라서 칭찬할 것도 나무랄 것도 없고, 넘길 때까지
       // 기다리게 하면 넘기는 의미가 없다.
       //
-      // **서버도 넘긴 것은 보상하지 않는다**(session._deadline_ms). 여기서만
+      // 서버도 넘긴 것은 보상하지 않는다(session._deadline_ms). 여기서만
       // 빼면 화면은 안 멈추는데 마감은 밀려 판이 길어진다.
       const pausing = !answered.result.skipped;
       if (pausing) {
@@ -291,7 +291,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         deadlineRef.current += pauseRef.current;
       }
 
-      // 연출이 끝날 때까지 기다린다. **판을 닫는 길보다 위에 둔다.**
+      // 연출이 끝날 때까지 기다린다. 판을 닫는 길보다 위에 둔다.
       // 아래로 내려두면 마지막 문제만 finish() 왕복(로컬에서 30ms) 직후
       // 결과 카드가 떠서, 맞았는지 틀렸는지를 결과 카드 위에서 보게 된다.
       // 연출 층은 화면이 바뀌어도 그대로 붙어 있으니(맨 아래 overlays)
@@ -316,9 +316,9 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         return;
       }
 
-      // **마감을 다시 본다.** 답하는 사이에도, 연출을 기다리는 사이에도
+      // 마감을 다시 본다. 답하는 사이에도, 연출을 기다리는 사이에도
       // 지날 수 있다. 안 보면 타이머가 0 인 채로 다음 문제가 떠서, 누르면
-      // 닫으려는 요청과 답이 같은 토큰으로 겹쳐 나가 판이 통째로
+      // 닫으려는 요청과 답이 같은 토큰으로 겹쳐 나가 판 전체가
       // 기록되지 않는다. 타이머는 진행 중이라 넘겼고, 그 사이 토큰이 새로
       // 왔으므로 이제 거절되지 않는다.
       if (Date.now() >= deadlineRef.current) {
@@ -331,9 +331,9 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       if (!aliveRef.current) return;
       setError(err instanceof Error ? err.message : "채점하지 못했습니다.");
 
-      // **여기서도 마감을 본다.** 답이 실패한 사이 90초가 끝났으면,
+      // 여기서도 마감을 본다. 답이 실패한 사이 90초가 끝났으면,
       // 그냥 두면 타이머가 갱신 안 된 옛 토큰으로 판을 닫으려 하고
-      // 서버가 거절한다 - 다 푼 판이 통째로 기록되지 않는다.
+      // 서버가 거절해 다 푼 판 전체가 기록되지 않는다.
       // 토큰은 실패했으므로 아직 안 태워졌고, 그래서 이걸로 닫을 수 있다.
       // busyRef 를 여기서 풀지 않는다. finish 를 기다리는 동안 풀어두면
       // 그 사이 보기 버튼이 다시 눌려 같은 토큰으로 답이 한 번 더 나간다.
@@ -348,13 +348,12 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     }
   };
 
-  /* 채점 연출 둘. **어느 가지에도 넣지 않는다.**
+  /* 채점 연출 둘. 어느 가지에도 넣지 않는다.
 
      아래는 phase 마다 다른 트리를 돌려준다. 연출을 그중 한 가지 안에 두면
      가지가 바뀔 때 React 가 언마운트했다가 돌아올 때 다시 마운트하는데,
-     reaction.fire 가 상태에 남아 있으므로 key 가 새로 붙어 **답도 안 한
-     사람에게 지난 판정이 다시 재생된다.** 문제풀기에서 실제로 그랬다 -
-     "다음 문제" 가 loading 가지를 거치면서 연출이 한 번 더 돌았다.
+     reaction.fire 가 상태에 남아 있으므로 key 가 새로 붙어 답도 안 한
+     사람에게 지난 판정이 다시 재생된다(QuizBoard 의 같은 자리 주석).
 
      가지마다 끼워 넣는 방식으로는 못 막는다. 출구를 하나로 두고 그 바깥에
      세운다. 둘 다 fixed 라 자리를 안 차지하고 fire 가 0 이면 안 그린다. */
@@ -371,7 +370,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
   const body = (() => {
     if (phase === "idle") {
       return (
-        // 세로 가운데. 시작 카드 하나뿐이라 위에 붙이면 아래가 통째로 빈다.
+        // 세로 가운데. 시작 카드 하나뿐이라 위에 붙이면 아래가 전부 빈다.
         // 판이 시작되면(아래 playing) 위에 붙는다 - 그때는 타이머가 화면
         // 맨 위에 있어야 한다.
         <div className="flex flex-1 flex-col justify-center">
@@ -406,16 +405,16 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     if (phase === "done") {
       // 게스트였는지는 서버가 판을 닫으며 알려준 값을 먼저 쓴다. 페이지를
       // 열 때의 isGuest 는 쿠키가 있는지만 본 것이라, 서버가 그 토큰을
-      // 거절해 판이 게스트로 열렸으면(중계의 withTokenOrGuest) 틀린다 - 기록
-      // 안 된 판에 "내 기록" 이 떴다. 판을 못 닫아 요약이 없을 때만 쓴다.
+      // 거절해 판이 게스트로 열렸으면(중계의 withTokenOrGuest) 틀려서, 기록
+      // 안 된 판에 "내 기록" 이 뜬다. 판을 못 닫아 요약이 없을 때만 쓴다.
       const guest = summary?.guest ?? isGuest;
       return (
         // 결과 카드도 하나뿐이라 가운데가 맞다.
         <div className="flex flex-1 flex-col justify-center">
           {/* 판이 끝났다. 점수는 이미 서버에 올라갔으니 경고할 것이 없다.
 
-              **게스트에게는 "내 기록" 을 주지 않는다.** 게스트는 기록이
-              없어서 내정보가 로그인 화면으로 보낸다 - 이름과 다른 곳에
+              게스트에게는 "내 기록" 을 주지 않는다. 게스트는 기록이
+              없어서 내정보가 로그인 화면으로 보내므로, 이름과 다른 곳에
               닿는다. 로그인 권유는 아래 결과 카드의 "로그인" 링크가 이미
               한다. 게스트는 들어온 쪽인 문제풀기 허브로 나간다. */}
           <div className="mb-5 flex items-center gap-3">
@@ -654,7 +653,7 @@ function PlayCard({
         aria-label="남은 시간"
         aria-valuemin={0}
         aria-valuemax={total}
-        // **경과분을 넣는다.** 남은 초를 그대로 주면 90 에서 0 으로
+        // 경과분을 넣는다. 남은 초를 그대로 주면 90 에서 0 으로
         // 줄어들어, 스크린리더가 진행이 되돌아간다고 읽는다.
         aria-valuenow={total - seconds}
         style={{
@@ -662,9 +661,9 @@ function PlayCard({
           borderRadius: "var(--radius-pill)",
         }}
       >
-        {/* 여기는 복습·일일공부의 진행 막대와 **뜻이 반대다.** 그쪽은
-            채운 만큼이 지나온 것(초록)이고, 여기 채움은 **남은 시간**이라
-            줄어든다. 그래서 초록을 안 쓴다 - 같은 초록이 한쪽에서는
+        {/* 여기는 복습·일일공부의 진행 막대와 뜻이 반대다. 그쪽은
+            채운 만큼이 지나온 것(초록)이고, 여기 채움은 남은 시간이라
+            줄어든다. 그래서 초록을 안 쓴다. 같은 초록이 한쪽에서는
             "해낸 것", 다른 쪽에서는 "남은 것" 이 되면 훑을 때 헷갈린다.
             평소는 잉크, 10초 아래로는 위 숫자와 함께 코랄로 넘어간다. */}
         <div
@@ -677,29 +676,26 @@ function PlayCard({
         />
       </div>
 
-      {/* 문제와 보기는 QuestionCard 가 그린다.
-          여기 한 벌을 따로 들고 있었는데(복습·일일공부는 이미 공용을 쓴다),
-          같은 것을 두 벌 두면 보기의 터치 높이나 발음기호 서체를 한쪽만
-          고치게 된다 - QuestionCard 주석이 경고하던 바로 그 자리다. 크림에서
-          두 벌의 보기 버튼이 실제로 갈라졌다(공용은 56px·--radius-xl 인데
-          여기는 48px·rounded-xl 이었다). 화면 셋이 같은 문제를 내므로 같은
-          모양이어야 한다. */}
+      {/* 문제와 보기는 QuestionCard 가 그린다(복습·일일공부도 같은 것을
+          쓴다). 같은 것을 두 벌 두면 보기의 터치 높이나 발음기호 서체를
+          한쪽만 고치게 된다(QuestionCard 머리말). 화면 셋이 같은 문제를
+          내므로 같은 모양이어야 한다. */}
       <QuestionCard question={question} busy={busy} onPick={onPick} />
 
-      {/* **행 높이를 버튼 높이로 고정한다.** 오답일 때 옆의 결과가 두
+      {/* 행 높이를 버튼 높이로 고정한다. 오답일 때 옆의 결과가 두
           줄(정답과 그 뜻)이 되는데, 높이를 내용에 맡기면 90초가 흐르는
           동안 "넘기기" 버튼이 위아래로 움직인다. 시간에 쫓기는 사람이
           누를 자리가 움직이면 헛손질한다. 아래 주석이 "사라지면 버튼 줄이
           움직인다" 로 경계하는 것과 같은 이유다. */}
       <div className="flex min-h-11 items-center justify-between gap-3">
         {/* 흰 알약으로 물러난다. 코랄은 보기를 고르는 쪽에 있어야 하고,
-            넘기기는 세 번뿐인 도피구다 - 눈에 띄게 두면 그걸 먼저 쓴다.
-            횟수를 다 쓰면 흐려지지만 사라지지는 않는다. 사라지면 버튼 줄이
-            통째로 움직여 옆의 채점 결과가 다른 자리로 뛴다.
+            넘기기는 세 번뿐인 도피구다. 눈에 띄게 두면 그걸 먼저 쓴다.
+            횟수를 다 쓰면 흐려지지만 사라지지는 않는다. 사라지면 버튼 줄
+            전체가 움직여 옆의 채점 결과가 다른 자리로 뛴다.
 
             줄지 않게 한다(shrink-0 whitespace-nowrap). 옆의 오답 결과가 길면
             flex 가 이 버튼을 밀어, 폰에서 "넘기 / 기 / (3)" 세 줄이 되고 행
-            높이도 따라 커졌다 - 위에서 고정하려던 바로 그 높이다. */}
+            높이도 따라 커진다. 위에서 고정하려던 바로 그 높이다. */}
         <button
           type="button"
           onClick={onSkip}
@@ -721,9 +717,8 @@ function PlayCard({
 
         {/* 직전 채점 결과. 새로 나타나는 영역이라 읽어준다.
 
-            **넘긴 것도 정답을 보여준다.** 전에는 넘기면 이 줄이 통째로
-            비었는데, 서버는 넘긴 답에도 정답과 뜻을 실어 보낸다
-            (session._skip_result - "넘긴 것도 학습이 되어야 한다").
+            넘긴 것도 정답을 보여준다. 서버는 넘긴 답에도 정답과 뜻을 실어
+            보낸다(session._skip_result, "넘긴 것도 학습이 되어야 한다").
             모르는 문제를 넘긴 사람이야말로 정답이 필요하다. */}
         <p aria-live="polite" className="text-sm">
           {result && (
@@ -744,7 +739,7 @@ function PlayCard({
                 fontWeight: "var(--weight-black)",
               }}
             >
-              {/* **시간 초과로 맞힌 것은 0점이다.** 그냥 "정답" 으로 두면
+              {/* 시간 초과로 맞힌 것은 0점이다. 그냥 "정답" 으로 두면
                   맞혔는데 점수가 안 오르는 이유를 알 방법이 없다. */}
               {result.skipped ? (
                 <WrongAnswer
@@ -839,9 +834,8 @@ function RoundResultCard({
             {summary.answered}문제 중 {summary.correct}개 정답
             {summary.skipped > 0 && ` · ${summary.skipped}개 넘김`}
             {/* 시간 지나 맞힌 것은 0 점이다. 이 줄이 없으면 "2개 맞혔는데
-                왜 0점?" 이 되어 버그로 읽힌다(실측: 3문제 중 2개 정답인데
-                0점이었다). 푸는 중에는 "정답 · 시간 초과" 로 알려주면서
-                결과에서만 빠뜨리면 앞뒤가 안 맞는다. */}
+                왜 0점?" 이 되어 버그로 읽힌다. 푸는 중에는 "정답 · 시간
+                초과" 로 알려주면서 결과에서만 빠뜨리면 앞뒤가 안 맞는다. */}
             {late > 0 && ` · ${late}개는 시간이 지나 0점`}
           </p>
 

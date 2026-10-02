@@ -19,7 +19,7 @@ AI 생성물(generate_words)과 달리 is_reviewed=True 로 들어간다. 근거
 
 즉 "PR 에서 diff 를 한 줄씩 읽었다" 가 아니라 "전수 기계 검증 + 분담 내용
 검수" 다. 다음에 데이터를 크게 늘릴 때도 같은 수준을 거쳐야 이 True 가
-정당하다 - 검수 없이 붓는 통로로 쓰지 말 것.
+정당하다. 검수 없이 붓는 통로로 쓰면 안 된다.
 
 검수 게이트를 우회해도 된다는 뜻이 아니다. 사용자 조회 경로(views.py)는
 여전히 is_reviewed=True 만 내보내고, 런타임에 외부로 들어오는 데이터는
@@ -42,7 +42,7 @@ N = Word.Difficulty.NORMAL
 H = Word.Difficulty.HARD
 
 # 분류도 상수로 받는다. 문자열을 그대로 쓰면 "devpos" 같은 오타가 나도
-# 저장은 되고, 화면에서 라벨만 조용히 빈칸으로 나온다.
+# 저장은 되고, 화면에서 라벨만 빈칸으로 나온다.
 GIT = Word.Category.GIT
 REVIEW = Word.Category.REVIEW
 API = Word.Category.API
@@ -4637,7 +4637,7 @@ class Command(BaseCommand):
         )
 
     # 시드는 전부-아니면-전무로 넣는다. 재실행 비용이 0 이라, 절반만 들어간
-    # 상태로 남기느니 통째로 롤백하고 다시 돌리는 편이 낫다.
+    # 상태로 남기느니 전부 롤백하고 다시 돌리는 편이 낫다.
     # (generate_words 는 반대로 항목별 savepoint 를 쓴다. 거기서는 항목마다
     #  API 비용이 나가서, 하나가 실패했다고 나머지를 버리면 그 돈을 버린다.)
     @transaction.atomic
@@ -4646,8 +4646,8 @@ class Command(BaseCommand):
         force_pending: bool = options["force_pending"]
 
         # --force-pending 은 --reset 의 동작을 바꾸는 옵션이라 혼자서는 뜻이
-        # 없다. 조용히 무시하면 "덮어썼겠지" 하고 넘어가는데, 검수 게이트를
-        # 여는 플래그가 의도대로 안 먹었다는 걸 모르는 게 제일 위험하다.
+        # 없다. 알리지 않고 무시하면 "덮어썼겠지" 하고 넘어가는데, 검수
+        # 게이트를 여는 플래그가 의도대로 안 먹었다는 것을 모르게 된다.
         if force_pending and not reset:
             raise CommandError("--force-pending 은 --reset 과 함께 써야 합니다.")
 

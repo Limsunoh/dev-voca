@@ -4,11 +4,11 @@
     python manage.py seed_sentences_more --dry-run
     python manage.py seed_sentences_more
 
-**파일을 나눈 이유**: seed_sentences.py 가 이미 1,400줄이 넘는다. 한 파일에
+파일을 나눈 이유: seed_sentences.py 가 이미 1,400줄이 넘는다. 한 파일에
 계속 쌓으면 어느 묶음을 언제 넣었는지가 diff 로만 남고, 분류별 균형을 다시
 셀 때 전체를 훑어야 한다. 여기는 "무엇이 모자라서 넣었나" 를 위에 적어둔다.
 
-**무엇이 모자랐나** (2026-09-08 실측, 문장 380개 기준)
+무엇이 모자랐나 (2026-09-08, 문장 380개 기준)
 
     실무 표현(phrase)  database 7 · api 10 · debug 12 · frontend 13 · git 13
     에러 메시지(error) review 0

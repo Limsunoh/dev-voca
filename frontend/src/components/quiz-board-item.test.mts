@@ -1,5 +1,5 @@
 /**
- * QuizBoard 가 item(상세의 "이 단어로 문제 풀기")을 **첫 요청에만** 싣는지 본다.
+ * QuizBoard 가 item(상세의 "이 단어로 문제 풀기")을 첫 요청에만 싣는지 본다.
  *
  * 실행: cd frontend && npm test
  *

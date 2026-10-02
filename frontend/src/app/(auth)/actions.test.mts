@@ -9,14 +9,14 @@
  * Next 런타임 밖에서는 던진다. 그 둘만 mock.module 로 갈아끼우고 나머지
  * (요청·에러 해석·되살릴 값 구성)는 실제 코드를 그대로 돌린다.
  *
- * **`--experimental-test-module-mocks` 가 필요하다.** package.json 의 test
+ * `--experimental-test-module-mocks` 가 필요하다. package.json 의 test
  * 스크립트가 이 플래그를 붙인다. 플래그는 프로세스가 뜰 때 읽히므로 파일
- * 안에서 켤 수 없다 - 없이 돌리면 `mock.module is not a function` 이다.
+ * 안에서 켤 수 없다. 없이 돌리면 `mock.module is not a function` 이다.
  *
  *   cd frontend
  *   npx tsx --test --experimental-test-module-mocks "src/app/(auth)/actions.test.mts"
  *
- * 여기서 못 박으려는 계약은 셋이다.
+ * 여기서 확인하는 계약은 셋이다.
  *   1. 실패하면 친 값이 values 로 돌아온다(연속 실패·값을 고친 실패 포함)
  *   2. 비밀번호는 어떤 경로로도 안 돌아온다
  *   3. 성공하면 redirect 하고 아무 값도 안 남긴다
@@ -49,7 +49,7 @@ mock.module("next/navigation", {
 /**
  * 쿠키 보관을 맡는 lib/session 대역.
  *
- * next/headers 만 갈아끼우면 될 것 같지만 안 된다 - lib/session.ts 맨 위의
+ * next/headers 만 갈아끼우면 될 것 같지만 안 된다. lib/session.ts 맨 위의
  * `import "server-only"` 가 Next 번들러 밖에서는 해석되지 않는다(그 패키지는
  * next 안에만 있고 node_modules 최상위에 없다). 이건 코드 결함이 아니라
  * 하네스 제약이라 세션 모듈 자체를 대역으로 둔다.

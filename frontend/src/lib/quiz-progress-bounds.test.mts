@@ -1,5 +1,5 @@
 /**
- * quiz-progress 의 경계값. 기본 동작은 형제 quiz-progress.test.mts 가 본다.
+ * quiz-progress 의 경계값. 기본 동작은 quiz-progress.test.mts 가 본다.
  *
  * 실행: cd frontend && npm test
  */
@@ -27,7 +27,7 @@ beforeEach(() => clearSolved());
 
 describe("푼 수 경계", () => {
   it("더하지 않고 덮어쓴다", () => {
-    // 판은 누적한 값을 통째로 넘긴다. 여기서 더하면 두 배로 부푼다.
+    // 판은 누적한 값을 그대로 넘긴다. 여기서 더하면 두 배로 부푼다.
     markSolved(5);
     markSolved(2);
     assert.equal(solvedNow(), 2);

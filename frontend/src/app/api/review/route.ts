@@ -11,8 +11,8 @@ import { getToken } from "@/lib/session";
  * 환경변수이고, 인증 토큰은 httpOnly 쿠키에 있어 브라우저 스크립트가
  * 읽을 수 없다. 그것을 꺼내 헤더에 붙이는 일은 여기서만 일어난다.
  *
- * 일일공부와 달리 시작에 딸린 값이 없다. 무엇을 낼지는 서버가 정한다 -
- * 무엇을 틀렸는지가 서버에 있기 때문이다.
+ * 일일공부와 달리 시작에 딸린 값이 없다. 무엇을 틀렸는지가 서버에 있어서
+ * 무엇을 낼지도 서버가 정한다.
  */
 
 type Body = {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  // **먼저 action 을 본다.** 뒤로 미루면 오타 난 action 이 아래 검사에
+  // 먼저 action 을 본다. 뒤로 미루면 오타 난 action 이 아래 검사에
   // 걸려 원인과 무관한 문구를 받는다.
   if (!["start", "answer"].includes(body.action ?? "")) {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });

@@ -1,13 +1,13 @@
 """소리내어 읽기 채점·출제 필터 테스트.
 
-**이 파일의 표본은 장식이 아니다.** 출제 필터가 세 번 고쳐졌고 두 번은
-규칙을 읽어서가 아니라 통과 목록을 눈으로 봐서 잡혔다. 구현에 들어가면
-눈으로 볼 기회가 사라지므로, 놓쳤던 것을 여기 박아둔다.
+이 파일의 표본은 단순한 예시가 아니다. 출제 필터의 더 단순한 규칙이
+놓치는 것들이고, 규칙을 읽어서는 안 보이고 통과 목록을 눈으로 봐야
+보인다. 구현에 들어가면 눈으로 볼 기회가 없으므로 여기 적어 둔다.
 
-    1차에 놓친 것   API key · SQL injection · detached HEAD  (일부 낱말만 약어)
-    2차에 놓친 것   I/O · big O                              (구분자로 쪼갠 1글자)
+    일부 낱말만 약어      API key · SQL injection · detached HEAD
+    구분자로 쪼갠 1글자   I/O · big O
 
-규칙을 고칠 일이 생기면 이 테스트를 먼저 보라. 셋 다 "제대로 읽었는데
+규칙을 고칠 일이 생기면 이 테스트부터 본다. 셋 다 "제대로 읽었는데
 인식 결과가 제각각이라 채점이 안 되는" 부류다.
 """
 
@@ -103,7 +103,7 @@ class GradeWordTest(TestCase):
         """짧은 낱말은 한 글자만 달라도 실패한다.
 
         유사도가 비율이라 3~6글자에서는 한 글자 차이가 0.85 를 못 넘는다.
-        **의도한 것이다** - git/get, log/lag 처럼 짧을수록 한 글자가 다른
+        의도한 것이다. git/get, log/lag 처럼 짧을수록 한 글자가 다른
         낱말이 되므로 봐주면 틀린 발음이 통과한다.
         """
         self.assertFalse(grade_one("get", "git")[0])
@@ -113,8 +113,8 @@ class GradeWordTest(TestCase):
 class GradePhraseTest(TestCase):
     """표현(여러 낱말) 채점.
 
-    **낱말 수를 먼저 본다.** 통째로 비교하면 낱말이 빠져도 통과한다 -
-    "Hows your weekend" 가 0.94 다.
+    낱말 수를 먼저 본다. 문장 전체를 한 번에 비교하면 낱말이 빠져도
+    통과한다("Hows your weekend" 가 0.94).
     """
 
     ANSWER = "how was your weekend"
@@ -155,8 +155,8 @@ class GradePhraseTest(TestCase):
 class WordBoundaryTest(TestCase):
     """인식기가 낱말 경계를 다르게 잡은 경우.
 
-    사용자 실수가 아니므로 살려야 한다. 다만 **완전 일치만** 인정한다 -
-    유사도 문턱(0.95)을 두었더니 관사가 빠진 것이 통과했다.
+    사용자 실수가 아니므로 살려야 한다. 다만 완전 일치만 인정한다.
+    유사도 문턱(0.95)을 두면 관사가 빠진 것이 통과한다.
     """
 
     def test_a_split_word_passes(self):
@@ -172,9 +172,9 @@ class WordBoundaryTest(TestCase):
     def test_a_dropped_article_fails(self):
         """관사가 빠지면 실패한다.
 
-        **여기가 0.95 문턱을 버린 이유다.** 공백을 없앤 뒤에는 한 글자짜리
+        0.95 문턱을 쓰지 않는 이유가 이것이다. 공백을 없앤 뒤에는 한 글자짜리
         낱말이 비율을 거의 안 깎아서, "can I get refill" 이 0.963,
-        "have nice day" 가 0.957 로 통과했다. 완전 일치로 바꾸니 막힌다.
+        "have nice day" 가 0.957 로 통과한다. 완전 일치면 막힌다.
         """
         self.assertFalse(grade_one("can I get refill", "can I get a refill")[0])
         self.assertFalse(grade_one("have nice day", "have a nice day")[0])
@@ -189,8 +189,8 @@ class WordBoundaryTest(TestCase):
         """알려진 한계.
 
         낱말 경계가 어긋나면서 동시에 오인식이 난 경우는 어느 경로로도
-        안 걸린다. **의도한 것이다** - 놓치는 편이 관사 빠진 것을
-        통과시키는 것보다 낫다. 버그로 보고 고치려 들지 말 것.
+        안 걸린다. 의도한 것이다. 놓치는 편이 관사 빠진 것을
+        통과시키는 것보다 낫다. 버그가 아니라 받아들인 한계다.
         """
         ok, _ = grade_one("where is the rest rooms", "where is the restroom")
         self.assertFalse(ok)
@@ -199,8 +199,7 @@ class WordBoundaryTest(TestCase):
 class SpeakableFilterTest(TestCase):
     """출제 대상 판정.
 
-    **아래 표본이 이 파일의 핵심이다.** 규칙이 세 번 고쳐지며 실제로
-    놓쳤던 것들이다.
+    아래 표본이 이 파일의 핵심이다. 더 단순한 규칙이 놓치는 것들이다.
     """
 
     def test_plain_words_are_speakable(self):
@@ -228,7 +227,7 @@ class SpeakableFilterTest(TestCase):
                 self.assertFalse(is_speakable(term))
 
     def test_terms_with_an_acronym_inside_are_excluded(self):
-        """1차 정정에서 놓쳤던 것들.
+        """일부 낱말만 약어인 것.
 
         낱말 전체가 대문자인지만 보면 이것들이 통과한다. "에이피아이 키" 로
         읽는데 인식 결과가 제각각이라 채점이 안 된다.
@@ -246,10 +245,9 @@ class SpeakableFilterTest(TestCase):
                 self.assertFalse(is_speakable(term))
 
     def test_single_letter_acronyms_are_excluded(self):
-        """2차 정정에서 놓쳤던 것들.
+        """구분자로 쪼개면 낱개 대문자 한 글자가 되는 것.
 
-        구분자로 쪼개면 낱개 대문자 한 글자가 된다. "2글자 이상" 조건만
-        두면 통과한다.
+        "2글자 이상" 조건만 두면 통과한다.
         """
         self.assertFalse(is_speakable("I/O"))
         self.assertFalse(is_speakable("big O"))
@@ -260,11 +258,11 @@ class SpeakableFilterTest(TestCase):
                 self.assertFalse(is_speakable(term))
 
     def test_the_pronoun_i_is_not_an_acronym(self):
-        """3차 정정에서 놓쳤던 것.
+        """대명사 I 는 약어가 아니다.
 
         "낱말이 여러 개면 1글자 대문자도 약어" 조건은 big O·I/O 를 잡으려고
-        넣었는데, **대명사 I 가 같은 모양이라 함께 걸렸다** - 일상 표현
-        60개 중 10개가 출제에서 조용히 빠졌다.
+        넣은 것인데, 대명사 I 가 같은 모양이라 함께 걸린다. 그러면 "I am
+        lost" 같은 일상 표현이 에러 없이 출제에서 빠진다.
 
         I 는 철자가 아니라 낱말로 읽으므로 인식 결과가 흔들리지 않는다.
         """
@@ -283,7 +281,7 @@ class SpeakableFilterTest(TestCase):
         """예외가 잡아야 할 것을 되살리지 않는가.
 
         I·A 만 넘기므로 O 는 여전히 걸린다. 이 테스트가 없으면 예외를
-        넓힐 때(예: 알파벳 한 글자 전부) big O 가 조용히 통과한다.
+        넓힐 때(예: 알파벳 한 글자 전부) big O 가 에러 없이 통과한다.
         """
         self.assertFalse(is_speakable("big O"))
         self.assertFalse(is_speakable("plan B"))
@@ -292,11 +290,11 @@ class SpeakableFilterTest(TestCase):
 class ArticleAIsNotExemptTest(TestCase):
     """홀로 선 A 는 예외가 아니다.
 
-    대명사 I 를 살리면서 관사 A 도 함께 넣을 뻔했다. 같은 모양이지만
-    **지금 쓰는 표현 중에 홀로 선 A 가 하나도 없고**, 넣으면 plan A 나
-    A record 처럼 plan B·big O 와 같은 부류가 통과한다.
+    대명사 I 와 같은 모양이지만 지금 쓰는 표현 중에 홀로 선 A 가 하나도
+    없고, 넣으면 plan A 나 A record 처럼 plan B·big O 와 같은 부류가
+    통과한다.
 
-    위쪽 test_the_i_exception_does_not_revive_big_o 는 목록에 **없는** 글자만
+    위쪽 test_the_i_exception_does_not_revive_big_o 는 목록에 없는 글자만
     보므로 이것을 못 잡는다.
     """
 
@@ -331,7 +329,7 @@ class CleanHeardTest(TestCase):
     """화면이 보낸 후보를 다듬는 단계."""
 
     def test_empty_strings_do_not_push_out_real_candidates(self):
-        """**빈 값을 먼저 걷어내고 상한을 적용한다.**
+        """빈 값을 먼저 걷어내고 상한을 적용한다.
 
         순서가 뒤바뀌면 앞에 온 빈 값이 실제 후보를 밀어낸다. 인식기가
         빈 결과를 배열에 담는 경우가 있어서 실재하는 입력이고, 그때
@@ -402,10 +400,9 @@ class ContractionTest(TestCase):
 class TalkEndpointTest(TestCase):
     """엔드포인트를 실제로 불러본다.
 
-    **이 클래스가 없어서 구멍이 하나 새고 있었다.** 위쪽 테스트가 전부
-    순수 함수를 직접 부르는 것이라, 뷰가 응답 dict 를 손으로 만들면서
-    검수 게이트를 빠뜨린 것을 아무도 못 봤다. 함수 단위로 아무리 촘촘해도
-    뷰의 결함은 구조적으로 안 보인다.
+    위쪽 테스트는 전부 순수 함수를 직접 부른다. 그래서 뷰가 응답 dict 를
+    손으로 만들면서 검수 게이트를 빠뜨려도 안 보인다. 함수 단위로 아무리
+    촘촘해도 뷰의 결함은 구조적으로 안 보이므로 여기서 엔드포인트를 부른다.
     """
 
     QUESTION_URL = "/api/vocab/talk/question/"
@@ -429,7 +426,7 @@ class TalkEndpointTest(TestCase):
     def test_미검수_발음은_안_나간다(self):
         """검수된 단어라도 발음만 미검수일 수 있다.
 
-        이 화면은 그 표기를 **본보기로 제시하고 따라 읽으라고 시킨다.**
+        이 화면은 그 표기를 본보기로 제시하고 따라 읽으라고 시킨다.
         아무도 확인 안 한 표기를 그렇게 쓰면 잘못 외우고, 영어가 약한
         사람일수록 되돌리기 어렵다.
         """
@@ -442,7 +439,7 @@ class TalkEndpointTest(TestCase):
         self.assertEqual(res.json()["reading"], "")
 
     def test_검수된_발음은_나간다(self):
-        """게이트가 멀쩡한 것까지 지우면 본보기가 통째로 사라진다."""
+        """게이트가 멀쩡한 것까지 지우면 본보기가 전부 사라진다."""
         Word.objects.all().delete()
         self._word(reading="캐시", reading_reviewed=True)
 
@@ -515,9 +512,9 @@ class TalkEndpointTest(TestCase):
 class TalkLevelFilterTest(TestCase):
     """난이도를 골랐을 때 그 난이도만 나오는가.
 
-    사용자가 고른 값이 실제로 WHERE 까지 가는지는 **응답을 여러 번 받아
-    봐야** 안다. 필터가 통째로 빠져도 한 번만 보면 우연히 맞는 것이 나온다
-    - 보통이 가장 많아서 아무것도 안 걸러도 절반은 보통이 뜬다.
+    사용자가 고른 값이 실제로 WHERE 까지 가는지는 응답을 여러 번 받아
+    봐야 안다. 필터가 빠져도 한 번만 보면 우연히 맞는 것이 나온다. 보통이
+    가장 많아서 아무것도 안 걸러도 절반은 보통이 뜬다.
     """
 
     QUESTION_URL = "/api/vocab/talk/question/"
@@ -563,7 +560,7 @@ class TalkLevelFilterTest(TestCase):
         """주소를 손으로 고친 경우다.
 
         400 을 주지 않는 이유: 연습 화면이라 잘못된 값 하나로 읽을 것을
-        통째로 막을 이유가 없다. 다만 **빈 결과로 떨어뜨리지도 않는다** -
+        전부 막을 이유가 없다. 다만 빈 결과로 떨어뜨리지도 않는다.
         difficulty=9 가 그대로 WHERE 에 실리면 "다 봤습니다" 가 뜨는데,
         데이터가 없는 것과 고를 수 없는 값을 고른 것이 같은 화면이 된다.
         """
@@ -635,12 +632,12 @@ class TalkLevelFilterTest(TestCase):
             self.assertEqual(res.json()["term"], "I appreciate it")
 
     def test_미검수는_난이도를_골라도_안_나온다(self):
-        """난이도 필터가 검수 게이트 **뒤에** 붙어야 한다.
+        """난이도 필터가 검수 게이트 뒤에 붙어야 한다.
 
         지금은 visible() 로 시작해 그 뒤에 체이닝하므로 AND 다. 그런데
         이 순서는 코드를 읽어야만 보이고, 필터를 Model.objects 로 다시
-        시작하는 리팩터 한 번이면 게이트가 통째로 빠진다 - 그때 화면에는
-        아무 이상이 없고 미검수만 조용히 나간다.
+        시작하는 리팩터 한 번이면 게이트가 빠진다. 그때 화면에는 아무
+        이상이 없고 미검수만 에러 없이 나간다.
         """
         Word.objects.all().delete()
         Word.objects.create(
@@ -662,9 +659,9 @@ class TalkLevelWalkTest(TestCase):
     """난이도 필터를 exclude 로 끝까지 걸어 본다.
 
     위 TalkLevelFilterTest 는 무작위로 여러 번 받아 "고른 것만 나오나" 를
-    본다. 그 방식으로는 **모르는 값이 한 난이도로 떨어지는 것**을 못 잡는다 -
+    본다. 그 방식으로는 모르는 값이 한 난이도로 떨어지는 것을 못 잡는다.
     `_parse_level` 이 모르는 값에 1 을 돌려줘도 응답의 difficulty 가 {1,2,3}
-    안이라 초록불이다.
+    안이라 통과한다.
 
     여기서는 받은 id 를 exclude 에 쌓아 풀이 빌 때까지 받는다. 그러면 무엇이
     몇 개 나왔는지와 마지막 404 문구가 결정적으로 정해진다. 두 모델(Word,
@@ -777,8 +774,8 @@ class TalkLevelWalkTest(TestCase):
 class SeedContractionGradingTest(TestCase):
     """씨드 표현을 채점기에 실제로 넣어 본다.
 
-    ContractionTest 는 표본 몇 개만 본다. 여기서는 207개 전부를 **적힌 대로
-    읽은 경우**와, 인식기가 모양만 바꿔 적은 경우(아포스트로피 누락·둥근
+    ContractionTest 는 표본 몇 개만 본다. 여기서는 207개 전부를 적힌 대로
+    읽은 경우와, 인식기가 모양만 바꿔 적은 경우(아포스트로피 누락·둥근
     따옴표·첫 글자 대문자와 마침표)로 넣는다. 하나라도 떨어지면 제대로
     읽은 사람이 오답을 받는다.
     """
@@ -811,19 +808,18 @@ _UNCONTRACTED = re.compile(
 class SeedStaysContractedTest(TestCase):
     """씨드 표현이 풀어 쓴 형태로 되돌아가지 않는가.
 
-    **풀어 쓴 형태는 제대로 읽어도 떨어진다.** "where is the fitting room"
-    을 사람이 where's 로 읽으면 낱말 수가 어긋나 통째로 오답이 되고 틀린
-    자리 표시도 안 나온다. 그래서 표현을 더할 때 여섯 개를 축약형으로
-    바꿨다(seed_phrases 머리말).
+    풀어 쓴 형태는 제대로 읽어도 떨어진다. "where is the fitting room"
+    을 사람이 where's 로 읽으면 낱말 수가 어긋나 오답이 되고 틀린 자리
+    표시도 안 나온다. 그래서 그런 표현은 축약형으로 적는다(seed_phrases
+    머리말).
 
-    그런데 되돌리는 것을 막는 테스트가 없었다 - 낱말 수·강세·표기 검사는
-    풀어 쓴 형태로도 전부 통과한다.
+    낱말 수·강세·표기 검사는 풀어 쓴 형태로도 전부 통과하므로, 되돌리는
+    것은 이 테스트가 막는다.
 
-    KEPT_LONG 은 일부러 풀어 둔 것의 목록이다. **지금은 비어 있다.** 이
-    테스트가 처음 생겼을 때 넷이 남아 있었는데("I am lost" 는 두 형태를 다
-    만나라고 일부러 둔 것이었다), 그 의도가 채점 비대칭 때문에 "맞게 읽어도
-    틀린다" 가 되어 전부 축약했다. 다시 풀어 둘 이유가 생기면 여기 넣고
-    이유를 seed_phrases 머리말에 적는다.
+    KEPT_LONG 은 일부러 풀어 둔 것의 목록이고 지금은 비어 있다. 두 형태를
+    다 만나게 하려고 풀어 두면 채점 비대칭 때문에 "맞게 읽어도 틀린다" 가
+    된다. 다시 풀어 둘 이유가 생기면 여기 넣고 이유를 seed_phrases 머리말에
+    적는다.
     """
 
     KEPT_LONG: frozenset[str] = frozenset()
@@ -960,7 +956,7 @@ class TalkSceneWalkTest(TestCase):
     """상황 필터를 exclude 로 끝까지 걸어 본다.
 
     TalkSceneFilterTest 는 무작위로 여러 번 받아 "고른 것만 나오나" 를 본다.
-    그 방식으로는 **모르는 값이 빈 상황("")으로 떨어지는 것**을 못 잡는다 -
+    그 방식으로는 모르는 값이 빈 상황("")으로 떨어지는 것을 못 잡는다.
     `_parse_scene` 이 받은 값을 그대로 넘기면 `?scene=` 가 "상황 없는 표현만"
     이 되는데, 무작위 표본은 그래도 200 이다.
 
@@ -986,7 +982,7 @@ class TalkSceneWalkTest(TestCase):
             ("shopping", 3): self._phrase("can I get a receipt", "shopping", 3).pk,
             ("", 2): self._phrase("see you later", "", 2).pk,
         }
-        # 걸어도 절대 나오면 안 되는 것: 인사의 미검수, 인사의 소리로 못 읽는 것.
+        # 걸어도 나오면 안 되는 것: 인사의 미검수, 인사의 소리로 못 읽는 것.
         self.hidden = {
             self._phrase("good morning", "greeting", 1, reviewed=False).pk,
             self._phrase("OK see you", "greeting", 1).pk,
