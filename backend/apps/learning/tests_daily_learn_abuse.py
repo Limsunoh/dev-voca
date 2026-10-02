@@ -405,7 +405,7 @@ class ScoreboardLockTest(TestCase):
             daily_study._take_step(study, study.step, 1, True)
 
         self.assertEqual(
-            seen, [], "_take_step 이 점수판을 썼다 - 유일 인덱스 락이 트랜잭션에 들어간다"
+            seen, [], "_take_step 이 점수판을 썼다. 유일 인덱스 락이 트랜잭션에 들어간다"
         )
 
     def test_answering_still_publishes_the_score(self):
@@ -477,11 +477,11 @@ class StuckSessionTest(TestCase):
                 daily_study.answer(self.user, token, question["choices"][0]["id"])
 
         study.refresh_from_db()
-        self.assertEqual(study.answered, 1, "채점이 안 남았다 - 전제가 틀렸다")
+        self.assertEqual(study.answered, 1, "전제 확인: 채점이 안 남았다")
 
         # 이어 풀기가 살아 있어야 한다.
         resumed = daily_study.resume(study)
-        self.assertIsNotNone(resumed, "이어 풀 문제를 못 냈다 - 갇혔다")
+        self.assertIsNotNone(resumed, "이어 풀 문제를 못 내 판을 진행할 수 없다")
 
         # 그 문제로 실제로 답이 되어야 한다.
         next_token, _body = resumed
@@ -581,7 +581,7 @@ class QuestionSwapRaceTest(TestCase):
             self.assertEqual(
                 study.question["state"]["n"],
                 study.step,
-                f"{i}번째 답 뒤에 저장 문제가 순번보다 뒤처졌다 - 창이 열렸다",
+                f"{i}번째 답 뒤에 저장 문제가 순번보다 뒤처졌다(같은 순번에서 문제를 바꿀 수 있다)",
             )
 
         self.assertGreater(i, 1, "판이 너무 일찍 끝나 아무것도 못 봤다")

@@ -204,8 +204,8 @@ class ReplayTest(TestCase):
         # 남이 먼저 그 문제를 풀어 정답을 알아냈다고 하자.
         leaked = _correct_id_of(their_token)
 
-        # 그 토큰을 내 줄에 그대로 쓴다. 순번(0)이 같아 조건부 UPDATE 를
-        # 통과한다 - 토큰에 누구 것인지가 안 들어 있기 때문이다.
+        # 그 토큰을 내 줄에 그대로 쓴다. 순번(0)만 보면 조건부 UPDATE 를
+        # 통과하지만, 토큰의 sid 가 남의 판을 가리켜 조회 단계에서 막힌다.
         with self.assertRaises(SessionError):
             daily_study.answer(self.user, their_token, leaked)
 
@@ -486,7 +486,7 @@ class SecondAccountTest(TestCase):
 
 
 class MidnightTest(TestCase):
-    """자정을 넘긴 판. open_of 가 날짜가 아니라 '안 끝난 것' 으로 찾는다."""
+    """자정을 넘긴 판. 답하기는 날짜가 아니라 토큰이 가리키는 판(_study_of_token)으로 찾는다."""
 
     def setUp(self):
         cache.clear()
@@ -2089,8 +2089,9 @@ class ResumeConcurrencyTest(_KeepsCacheTable, TransactionTestCase):
     def test_four_resume_tokens_sent_at_once_consume_one_step(self):
         """재개 토큰 넷을 한꺼번에 보내도 순번은 하나만 소비된다.
 
-        각 토큰이 다른 문제를 담으므로 넷 다 통과하면 정답을 몰라도
-        하나는 맞는다. 문제 하나에 네 번의 기회가 생긴다.
+        재개가 문제를 새로 뽑는다면 토큰마다 문제가 달라, 넷 다 통과할 때
+        정답을 몰라도 하나는 맞는다. 지금은 저장한 문제를 다시 서명해
+        내주지만(resume), 순번이 하나만 소비되는지는 그와 별개로 본다.
         """
         study, _token, _question = daily_study.start(self.user, StudyLength.SHORT)
 

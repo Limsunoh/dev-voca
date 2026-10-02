@@ -336,7 +336,7 @@ class HugeTieGroupTest(BoardConsistencyMixin, TestCase):
         self.assertEqual(
             board.rows[0].display_name,
             people[-1].display_name,
-            "가장 먼저 달성한 사람이 1등이 아니다 - 동점 무리가 잘렸다",
+            "가장 먼저 달성한 사람이 1등이 아니다. 동점 무리가 잘렸다",
         )
 
 

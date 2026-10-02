@@ -821,7 +821,10 @@ class SmallCorpusTest(TestCase):
 
 
 class KnownDefectTest(TestCase):
-    """아직 안 고쳐진 것들. 고치면 표시를 지운다."""
+    """결함이던 자리를 지키는 회귀 테스트. 두 결함 모두 고쳐졌다.
+
+    클래스 이름은 결함을 찾았을 때 붙인 것이다.
+    """
 
     def setUp(self):
         cache.clear()

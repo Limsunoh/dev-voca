@@ -44,8 +44,8 @@ _GUEST_MULTIPLIER = 20
 class _PerUserOrShared(SimpleRateThrottle):
     """로그인했으면 계정별, 아니면 게스트끼리 한 통."""
 
-    # 게스트 통을 이만큼 키운다. 통이 큰 곳에서는 1 로 되돌린다
-    # (아래 RoundAnswerThrottle 참고).
+    # 게스트 통을 이만큼 키운다. 통이 큰 곳에서는 배수를 줄인다
+    # (아래 RoundAnswerThrottle 은 5).
     guest_multiplier = _GUEST_MULTIPLIER
 
     def get_cache_key(self, request, view) -> str:
