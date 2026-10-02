@@ -18,7 +18,7 @@ import {
   getSentences,
   SENTENCE_SORTS,
 } from "@/lib/api/sentences";
-import { detailWithBack, listUrl, routes } from "@/lib/routes";
+import { detailWithBack, listUrl, routes, searchText } from "@/lib/routes";
 
 export const metadata = {
   title: "문장 · devvoca",
@@ -46,8 +46,8 @@ function toPageNumber(value: string | undefined): number {
 
 export default async function SentencesPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  // 공백만 있으면 검색이 아니다(이유는 learn/words/page.tsx).
-  const search = first(params.search)?.trim() || undefined;
+  // 공백·쉼표만 있으면 검색이 아니다(이유는 learn/words/page.tsx).
+  const search = searchText(first(params.search));
   const category = first(params.category);
   const kind = first(params.kind);
   const difficulty = first(params.difficulty);
@@ -102,6 +102,8 @@ export default async function SentencesPage({ searchParams }: PageProps) {
   // learn/words/page.tsx 의 같은 자리).
   const chipSeed = search || sort ? undefined : newShuffleSeed();
   const unsortSeed = search ? undefined : newShuffleSeed();
+  // 검색창이 검색어를 비울 때 싣는 시드(learn/words/page.tsx 의 clearSeed).
+  const clearSeed = sort ? undefined : newShuffleSeed();
 
   // 세 요청을 동시에 띄운다. 순서대로 기다리면 세 번의 왕복이 그대로
   // 대기 시간이 된다.
@@ -194,6 +196,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           <SearchInput
             key={search ?? ""}
             basePath={routes.sentences}
+            seed={clearSeed}
             label="문장 검색"
             placeholder="문장, 해석, 에러 원문으로 검색"
           />
