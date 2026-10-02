@@ -25,7 +25,7 @@ PASSWORD_URL = "/api/accounts/password/"
 #
 # 비밀 스캐너(GitGuardian)가 대소문자와 숫자와 기호를 섞은 문자열을
 # 비밀번호 자리에서 보면 진짜 자격증명으로
-# 보고 CI 를 막는다. 실제로 이 파일 때문에 PR 한 번이 빨개졌다. 값 자체는
+# 보고 CI 를 막는다. 값 자체는
 # 테스트에서 만든 계정의 것이라 새어도 잃을 것이 없지만, 스캐너가 매번
 # 걸면 진짜 유출이 왔을 때 그 경고를 무시하게 된다.
 #
@@ -127,7 +127,7 @@ class PasswordChangeTest(TestCase):
     def test_password_similar_to_email_is_refused(self):
         """사용자 정보를 검사기에 넘기고 있는가.
 
-        안 넘기면 이 검사만 조용히 건너뛴다. SignUpSerializer 가 같은
+        안 넘기면 이 검사만 에러 없이 건너뛴다. SignUpSerializer 가 같은
         이유로 validate() 에서 user 를 넘긴다.
         """
         res = self.client.post(
@@ -167,7 +167,7 @@ class PasswordChangeTest(TestCase):
         바꾸자마자 로그인 화면으로 튕겨 성공했는지 알 수 없다.
 
         DRF 토큰은 사용자당 하나라 다른 기기 몫을 따로 만들 수 없다.
-        그래서 "지금 토큰이 무효가 되었는가" 로 확인한다 - 다른 기기가
+        그래서 "지금 토큰이 무효가 되었는가" 로 확인한다. 다른 기기가
         들고 있는 것이 바로 이 값이다.
         """
         old_key = self.token.key
@@ -238,7 +238,7 @@ class PasswordChangeTest(TestCase):
 class PasswordFirstTimeTest(TestCase):
     """구글로만 가입한 사람이 비밀번호를 처음 설정한다.
 
-    이 분기가 없으면 구글 사용자는 영영 비밀번호를 만들 수 없다. 현재
+    이 분기가 없으면 구글 사용자는 비밀번호를 만들 수 없다. 현재
     비밀번호를 요구받는데 댈 수 있는 값이 없기 때문이다.
     """
 
@@ -302,7 +302,7 @@ class PasswordFirstTimeTest(TestCase):
     def test_sending_a_current_password_is_refused(self):
         """없는 비밀번호를 확인해달라고 오면 막는다.
 
-        조용히 무시하면 화면이 잘못된 칸을 계속 보여주고, 통과시키면
+        무시하면 화면이 잘못된 칸을 계속 보여주고, 통과시키면
         아무 값이나 적어도 되는 칸이 된다.
         """
         res = self.client.post(

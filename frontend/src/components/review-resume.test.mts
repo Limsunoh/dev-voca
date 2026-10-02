@@ -16,12 +16,12 @@
  *   오래된 저장값           토큰이 만료된 판을 이어 풀라고 한다
  *   떠난 뒤 온 응답         화면이 사라졌다고 새 토큰을 안 적는다
  *
- * 방식은 result-line-placement.test.mts 와 같다 - react 의 훅만 작은 대역으로
+ * 방식은 result-line-placement.test.mts 와 같다. react 의 훅만 작은 대역으로
  * 바꾸고 보드가 넘긴 onStart·onPick 을 진짜로 부른다. 다른 점 하나:
  * renderToStaticMarkup 안의 useSyncExternalStore 는 서버 몫(null)만 쓰므로
- * 대역이 **브라우저 몫(getSnapshot)** 을 부르게 한다. 그래야 "이어서 풀기"
+ * 대역이 브라우저 몫(getSnapshot)을 부르게 한다. 그래야 "이어서 풀기"
  * 가 그려지는지 볼 수 있다. 시작 화면의 버튼은 IdleCard 를 직접 불러 받은
- * 트리에서 꺼내 onClick 을 누른다 - 저장값을 읽고 고르는 길을 건너뛰지
+ * 트리에서 꺼내 onClick 을 누른다. 저장값을 읽고 고르는 길을 건너뛰지
  * 않으려고 onResume 을 직접 부르지 않는다.
  */
 import assert from "node:assert/strict";

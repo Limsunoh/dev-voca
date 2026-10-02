@@ -7,7 +7,7 @@ import { apiBase } from "@/lib/api/client";
  * 환경변수라 브라우저가 알 수 없고, 안다 해도 다른 오리진이라 CORS 에
  * 묶인다. 그래서 같은 오리진의 이 자리를 거친다.
  *
- * 다른 중계(/api/daily 등)와 달리 **토큰을 붙이지 않는다.** 순위표가 남의
+ * 다른 중계(/api/daily 등)와 달리 토큰을 붙이지 않는다. 순위표가 남의
  * 아바타를 그리는 화면이고, 백엔드도 이 경로만은 로그인 없이 연다.
  * 여기서 내 토큰을 붙이면 남의 사진을 볼 때 쓸데없이 내 인증이 나간다.
  *
@@ -38,7 +38,7 @@ export async function GET(
     upstream = await fetch(`${apiBase()}/api/accounts/photo/${id}/`, {
       headers: {
         // 브라우저가 "이 판은 이미 있다" 고 하면 그대로 백엔드에 묻는다.
-        // 안 넘기면 304 가 날 자리에서 매번 그림이 통째로 온다.
+        // 안 넘기면 304 가 날 자리에서 매번 그림 전체가 온다.
         ...(request.headers.get("if-none-match")
           ? { "If-None-Match": request.headers.get("if-none-match")! }
           : {}),

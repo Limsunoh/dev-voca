@@ -21,16 +21,16 @@ class WordAdmin(admin.ModelAdmin):
         "difficulty",
         "category",
         # 정처기 범위인데 과목이 안 붙은 것을 찾는 데 쓴다. 그 상태는
-        # 허용되지만(아직 안 정한 것) 과목 필터로는 영영 안 나온다.
+        # 허용되지만(아직 안 정한 것) 과목 필터로는 찾을 수 없다.
         "is_exam",
         "exam_subject",
     )
     search_fields = ("term", "meaning", "description")
     list_editable = ("is_reviewed", "reading_reviewed")
     readonly_fields = ("created_at", "updated_at")
-    # **발음을 별도 묶음으로 둔다.** fieldsets 가 명시적이라 여기 없는
-    # 필드는 폼에 아예 안 나온다 - 칸을 만들어놓고 이 목록에 안 넣으면
-    # 관리자가 발음을 검수할 방법이 없어 화면에 영영 안 뜬다.
+    # 발음을 별도 묶음으로 둔다. fieldsets 를 명시했으므로 여기 없는 필드는
+    # 폼에 나오지 않는다. 칸을 만들고 이 목록에 안 넣으면 관리자가 발음을
+    # 검수할 수 없어 화면에도 안 나온다.
     fieldsets = (
         (None, {"fields": ("term", "pronunciation", "meaning", "description")}),
         (
@@ -62,7 +62,7 @@ class WordAdmin(admin.ModelAdmin):
     )
 
     # 동작마다 permissions=["change"] 를 붙인다(문장 쪽도 같다). 안 붙이면
-    # Django 는 보기 권한만 있는 staff 에게도 동작을 보여 주고 실행해 준다 -
+    # Django 는 보기 권한만 있는 staff 에게도 동작을 보여 주고 실행해 준다.
     # 그러면 보기만 하라고 준 계정이 "검수 완료로 표시" 로 미검수 콘텐츠를
     # 공개할 수 있다. 검수 게이트가 그 한 칸에 걸려 있다.
     @admin.action(description="선택한 단어를 검수 완료로 표시", permissions=["change"])
@@ -155,7 +155,7 @@ class SentenceAdmin(admin.ModelAdmin):
 
     @admin.display(description="문장")
     def short_text(self, obj: Sentence) -> str:
-        """목록에서는 앞부분만. 문장을 통째로 찍으면 표가 읽기 어려워진다."""
+        """목록에서는 앞부분만. 문장을 다 찍으면 표가 읽기 어려워진다."""
         return obj.text if len(obj.text) <= 60 else f"{obj.text[:60]}..."
 
     @admin.action(description="선택한 문장을 검수 완료로 표시", permissions=["change"])
@@ -202,14 +202,14 @@ class DailyPhraseAdmin(admin.ModelAdmin):
     list_editable = ("is_reviewed",)
     readonly_fields = ("created_at", "updated_at")
 
-    # **fieldsets 가 명시적이라 여기 없는 필드는 폼에 아예 안 나온다.**
-    # WordAdmin 쪽 주석과 같은 함정이다 - 칸을 만들어놓고 이 목록에서
-    # 빠뜨리면 관리자가 그 값을 고칠 방법이 없다.
+    # fieldsets 를 명시했으므로 여기 없는 필드는 폼에 나오지 않는다(WordAdmin
+    # 쪽 주석과 같다). 칸을 만들고 이 목록에서 빠뜨리면 관리자가 그 값을
+    # 고칠 수 없다.
     #
-    # **일부러 뺀 것 셋**: category·is_exam·exam_subject 다. LearningItem
-    # 에서 물려받았지만 이 표에서는 안 쓰고, DB 제약이 값이 들어오는 것을
+    # 일부러 뺀 것은 category·is_exam·exam_subject 셋이다. LearningItem 에서
+    # 물려받았지만 이 표에서는 안 쓰고, DB 제약이 값이 들어오는 것을
     # 막는다(not_exam). 폼에 두면 관리자가 채울 수 있는 것처럼 보이는데
-    # 저장하면 거절당한다 - 그게 더 나쁘다.
+    # 저장하면 거절된다.
     #
     # 상황(scene)이 category 를 대신한다. 이유는 PhraseScene 주석에 있다.
     fieldsets = (

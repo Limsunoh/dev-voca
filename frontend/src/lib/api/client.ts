@@ -5,15 +5,15 @@
  * 백엔드 주소가 번들에 노출되므로, 데이터는 서버에서 받아 내려보낸다.
  *
  * 단어·문장이 같은 규칙을 쓴다. 도메인마다 복사해두면 캐시 설정이나 에러
- * 처리가 한쪽만 바뀌어 조용히 어긋난다.
+ * 처리가 한쪽만 바뀌어 서로 어긋난다.
  */
 
 /**
  * 백엔드 주소를 요청 시점에 읽는다.
  *
  * 모듈 최상위에서 읽으면 빌드 시점 값이 그대로 굳어, 배포 플랫폼이 런타임에
- * 넣어주는 값을 못 받는다. 그러면 프로덕션에서 조용히 127.0.0.1 을 치고
- * "서버에 연결할 수 없습니다"만 뜬다.
+ * 넣어주는 값을 못 받는다. 그러면 프로덕션에서 에러 없이 127.0.0.1 로
+ * 요청하고 "서버에 연결할 수 없습니다"만 뜬다.
  *
  * export 인 이유: 파일 업로드(lib/api/accounts.ts)는 multipart 경계를
  * fetch 가 지어야 해서 아래 request() 를 못 쓴다. 그쪽에서 주소만
@@ -55,7 +55,7 @@ export class ApiError extends Error {
      * 칸별 오류였다면 그 칸 이름(예: "current_password"). 아니면 없다.
      *
      * 폼이 어느 칸을 비울지 고를 때 쓴다. 문구로 가르면 백엔드가 문구만
-     * 다듬어도 조용히 틀린 칸을 비운다.
+     * 다듬어도 엉뚱한 칸을 비운다.
      */
     readonly field?: string,
   ) {
@@ -115,8 +115,8 @@ type RequestOptions = {
  *   {"non_field_errors": ["..."]}      폼 전체에 걸린 오류
  *   {"email": ["..."], "password": [...]}  칸별 오류
  *
- * 칸별 오류면 그 칸 이름도 같이 돌려준다(ApiError.field). 칸이 아닌 것 -
- * 폼 전체 오류(non_field_errors), 목록 모양 본문, detail - 은 뺀다.
+ * 칸별 오류면 그 칸 이름도 같이 돌려준다(ApiError.field). 칸이 아닌 것(폼
+ * 전체 오류 non_field_errors, 목록 모양 본문, detail)은 이름을 싣지 않는다.
  */
 async function errorDetail(
   res: Response,
@@ -226,7 +226,7 @@ export async function fetchChoices(path: string): Promise<ChoiceOption[]> {
   try {
     return await request<ChoiceOption[]>(path);
   } catch (error) {
-    // 조용히 삼키면 필터 칩이 사라진 이유를 알 방법이 없다. 화면은 그대로
+    // 로그 없이 삼키면 필터 칩이 사라진 이유를 알 방법이 없다. 화면은 그대로
     // 두되 서버 로그에는 남긴다.
     console.error(`선택지 목록을 불러오지 못했습니다: ${path}`, error);
     return [];

@@ -6,24 +6,24 @@ from .models import LearningItem, Sentence, Word
 def visible_reading(instance, field_name: str = "reading") -> str:
     """검수된 한글 발음만 돌려준다. 아니면 빈 문자열.
 
-    **이 규칙이 사는 유일한 자리다.** 아래 ReviewedReadingField 도 이것을
-    부르고, 시리얼라이저를 안 쓰는 곳(apps.vocab.views 의 TalkViewSet 처럼
-    응답 dict 를 손으로 만드는 자리)도 이것을 부른다.
+    이 규칙은 여기에만 있다. 아래 ReviewedReadingField 도 이것을 부르고,
+    시리얼라이저를 안 쓰는 곳(apps.vocab.views 의 TalkViewSet 처럼 응답
+    dict 를 손으로 만드는 자리)도 이것을 부른다.
 
-    함수로 뺀 이유: 예전에는 규칙이 필드 클래스 안에만 있어서, 시리얼라이저를
-    거치지 않는 응답이 생기면 그 자리만 게이트를 통째로 빠져나갔다. 실제로
-    말하기 API 가 그렇게 새어 있었다 - 검수된 단어에 AI 가 채운 미검수 발음이
-    붙어 있으면 그것을 본보기로 제시하며 따라 읽으라고 시킨다.
+    함수로 뺀 이유: 규칙이 필드 클래스 안에만 있으면 시리얼라이저를 거치지
+    않는 응답이 게이트를 건너뛴다. 말하기 API 가 그런 자리다. 검수된 단어에
+    AI 가 채운 미검수 발음이 붙어 있으면 그것을 본보기로 제시하며 따라
+    읽으라고 시키게 된다.
 
     reading_reviewed 가 없는 모델(DailyPhrase 처럼 사람이 손으로 쓴 것)은
-    검수된 것으로 본다. 없는 칸을 False 로 읽으면 발음이 통째로 사라진다.
+    검수된 것으로 본다. 없는 칸을 False 로 읽으면 발음이 전부 사라진다.
     """
     if not getattr(instance, "reading_reviewed", True):
         return ""
 
-    # 칸 이름에는 기본값을 두지 않는다. 오타가 나면 그 자리에서 터져야
-    # 한다 - 기본값을 주면 빈 문자열이 돌아가는데, 그것은 "미검수라 가렸다"
-    # 와 화면에서 구분이 안 된다. 발음이 조용히 사라지고 아무도 모른다.
+    # 칸 이름에는 기본값을 두지 않는다. 오타가 나면 그 자리에서 에러가 나야
+    # 한다. 기본값을 주면 빈 문자열이 돌아가는데, 그것은 "미검수라 가렸다"
+    # 와 화면에서 구분이 안 돼 발음이 사라진 것을 아무도 모른다.
     #
     # reading_reviewed 쪽 기본값 True 는 다르다. 그 칸이 없는 모델
     # (DailyPhrase)이 실제로 있고, 없으면 검수된 것으로 보는 것이 맞다.
@@ -33,10 +33,8 @@ def visible_reading(instance, field_name: str = "reading") -> str:
 class ReviewedReadingField(serializers.CharField):
     """검수된 한글 발음만 내보낸다. 아니면 빈 문자열.
 
-    is_reviewed 는 항목 단위라 이 자리를 못 지킨다 - 이미 검수가 끝난
-    단어에 AI 가 발음을 채우면 아무도 확인하지 않은 표기가 그대로 나간다.
-    단어 자체는 멀쩡한데 발음만 미검수인 상태라 항목 플래그로는 표현할
-    수 없는 구멍이다.
+    is_reviewed 는 항목 단위라 이 자리를 지키지 못한다(models.Word 의
+    reading_reviewed 주석 참고).
 
     설명(reading_note)도 같은 플래그를 따른다. 필드 이름을 인자로 받아
     한 클래스가 둘을 다 맡는다 - 하위 클래스로 나누면 그 클래스가 어느
@@ -67,15 +65,15 @@ class UnreviewOnContentChangeMixin:
     검수는 "사람이 이 내용을 확인했다"는 뜻이다. 뜻·예문을 갈아끼웠는데
     플래그가 True 로 남으면, 아무도 확인한 적 없는 내용이 검수 완료
     상태로 사용자에게 나간다. AI 파이프라인이 기존 항목을 갱신하게 되면
-    그대로 노출 사고가 된다.
+    미검수 내용이 그대로 노출된다.
 
     쓰는 쪽에서 CONTENT_FIELDS 를 정의한다. 난이도·분류·출처처럼 분류
     정보에 해당하는 필드는 빼둔다 - 바뀌어도 "확인한 내용" 이 달라지지 않는다.
     """
 
     # 기본값을 주지 않는다. 빈 튜플을 기본으로 두면 정의를 빠뜨렸을 때
-    # any() 가 항상 False 라 검수 되돌리기가 조용히 꺼진다 - 에러 없이,
-    # 아무도 확인 안 한 내용이 검수 완료 상태로 나간다.
+    # any() 가 항상 False 라 검수 되돌리기가 에러 없이 꺼지고, 아무도 확인
+    # 안 한 내용이 검수 완료 상태로 나간다.
     # 선언만 남겨 미정의 시 AttributeError 로 즉시 터지게 한다.
     CONTENT_FIELDS: tuple[str, ...]
 
@@ -99,13 +97,13 @@ class UnreviewOnContentChangeMixin:
         )
         if content_changed:
             instance.is_reviewed = False
-            # **발음 검수도 함께 되돌린다.** 단어나 발음기호가 바뀌면 그
-            # 한글 발음은 더는 확인된 것이 아니다 - "deploy" 를 "deploys"
-            # 로 고쳤는데 "드플로이" 가 검수 완료로 남아 있으면, 다시
-            # 검수를 통과시킨 순간 아무도 확인 안 한 발음이 나간다.
+            # 발음 검수도 함께 되돌린다. 단어나 발음기호가 바뀌면 그 한글
+            # 발음은 더는 확인된 것이 아니다. "deploy" 를 "deploys" 로
+            # 고쳤는데 "드플로이" 가 검수 완료로 남아 있으면, 다시 검수를
+            # 통과시킨 순간 아무도 확인 안 한 발음이 나간다.
             #
-            # 이 믹스인이 막으려던 사고와 같은 형태이고, 발음은 IPA 보다
-            # 더 그대로 외우는 값이라 더 위험하다.
+            # 이 믹스인이 막으려는 것과 같은 문제이고, 발음은 IPA 보다 더
+            # 그대로 외우는 값이라 더 위험하다.
             instance.reading_reviewed = False
         return super().update(instance, validated_data)
 
@@ -244,7 +242,7 @@ class WordDetailSerializer(
     )
     # 읽기 전용이다. API 로 고치게 하면 고쳤을 때 reading_reviewed 를
     # 되돌리는 처리가 또 필요한데, 발음은 Admin 에서만 손보므로 그 경로를
-    # 아예 안 만든다.
+    # 만들지 않는다.
     reading = ReviewedReadingField()
     reading_note = ReviewedReadingField("reading_note")
 
@@ -302,7 +300,7 @@ class WordDetailSerializer(
 class SentenceListSerializer(serializers.ModelSerializer):
     """목록용.
 
-    문장은 단어와 달리 본문(text)이 곧 제목이라 목록에서도 통째로 보여준다.
+    문장은 단어와 달리 본문(text)이 곧 제목이라 목록에서도 전부 보여준다.
     대신 설명은 뺀다.
     """
 

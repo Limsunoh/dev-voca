@@ -40,7 +40,7 @@ class ReadingFixtureTest(SimpleTestCase):
         pk 가 겹치면 load_readings 에서 뒤 줄이 앞 줄을 경고 없이 덮는다.
         별표 짝이 안 맞으면 화면에서 엉뚱한 곳이 굵어진다(korean-reading.md
         확인 목록 7). 건수는 보지 않는다 - 발음을 새로 적을 때마다 늘어나는
-        값이라 못 박으면 멀쩡한 추가가 실패한다.
+        값이라 고정하면 멀쩡한 추가가 실패한다.
         """
         for name in ("readings_sentence.json", "readings_word.json"):
             rows = self.rows(name)

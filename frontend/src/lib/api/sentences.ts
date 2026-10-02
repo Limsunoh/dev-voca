@@ -15,7 +15,7 @@ const BASE = "/api/vocab/sentences/";
 /** 목록용. 백엔드 SentenceListSerializer 와 짝. */
 export type SentenceListItem = {
   id: number;
-  /** 문장은 본문이 곧 제목이라 목록에서도 통째로 보여준다. */
+  /** 문장은 본문이 곧 제목이라 목록에서도 자르지 않고 보여준다. */
   text: string;
   /**
    * 한글만 읽어도 통하게 적은 발음. 검수 안 됐으면 빈 문자열이다.

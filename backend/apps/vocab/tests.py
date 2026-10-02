@@ -14,15 +14,13 @@ from .management.commands.seed_words import WORDS
 from .management.commands.seed_words_more import WORDS as MORE_WORDS
 from .models import Word
 
-# 저장소에 박힌 단어 **전부**. 전수 검사는 이걸 돈다.
+# 저장소에 들어 있는 단어 전부. 전수 검사는 이걸 돈다.
 #
-# **seed 명령이 늘면 여기에 한 덩이를 더한다.** 명령마다 자기 리스트를
-# 갖고 있어서, 안 넣으면 그 명령의 단어는 검사를 통째로 건너뛴다 -
-# is_reviewed=True 로 바로 들어가는 통로라 아무도 안 본 데이터가 그대로
-# 화면에 뜬다. 2026-09-07 에 실제로 그랬고, 합쳐서 돌리자 발음 7개가
-# 잡혔다.
+# seed 명령이 늘면 여기에 한 덩이를 더한다. 명령마다 자기 리스트를 갖고
+# 있어서, 안 넣으면 그 명령의 단어는 검사를 받지 않는다. is_reviewed=True
+# 로 바로 들어가는 통로라 아무도 안 본 데이터가 그대로 화면에 뜬다.
 #
-# **dict 로 맞추는 이유**: 두 리스트의 열 순서가 3번째부터 갈린다.
+# dict 로 맞추는 이유: 두 리스트의 열 순서가 3번째부터 갈린다.
 #
 #     seed_words       (term, pron, meaning, category,    difficulty, desc, ex, ex_ko)
 #     seed_exam_words  (term, pron, meaning, description, ex, ex_ko, difficulty, category)
@@ -52,8 +50,8 @@ ALL_SEEDED: list[dict] = [
         "example_translation": r[5],
         "difficulty": r[6],
         "category": r[7],
-        # 9번째 칸이다. 안 담으면 조용히 빠지는데, 아래 주석이 "어긋난 열은
-        # KeyError 로 드러난다" 고 약속하므로 여기서 그 약속을 지킨다 -
+        # 9번째 칸이다. 안 담으면 에러 없이 빠지는데, 아래 주석이 "어긋난
+        # 열은 KeyError 로 드러난다" 고 약속하므로 여기서 그 약속을 지킨다.
         # 인덱스 접근은 칸이 남아도 예외가 안 난다.
         "exam_subject": r[8],
     }
@@ -193,7 +191,7 @@ class SeedWordsTest(TestCase):
         self.assertNotEqual(word.meaning, "AI 가 만든 뜻")
 
     def test_force_pending_alone_is_rejected(self):
-        """--reset 없는 --force-pending 은 뜻이 없으므로 조용히 넘어가지 않는다."""
+        """--reset 없는 --force-pending 은 뜻이 없으므로 거부한다."""
         with self.assertRaises(CommandError):
             self.run_seed("--force-pending")
 
@@ -247,7 +245,7 @@ class SeedWordsTest(TestCase):
                 self.assertTrue(ex_ko.strip(), "예문 해석이 비었다")
                 self.assertIn(difficulty, (1, 2, 3))
                 # 길이 제한은 모델에서 읽는다. 숫자를 다시 적으면 모델을
-                # 고쳤을 때 조용히 어긋난다.
+                # 고쳤을 때 어긋난다.
                 self.assertLessEqual(
                     len(term), Word._meta.get_field("term").max_length
                 )
@@ -288,8 +286,8 @@ class SeedWordsTest(TestCase):
                 # ASCII 만으로 되어 있다고 로마자로 단정할 수는 없다. 아래
                 # SHORT_IPA_OK 의 여덟 개는 실제 IPA 인데 짧아서 로마자와
                 # 모양이 같다. 길이로 열어두면(len <= 5) /kaesi/ 같은 진짜
-                # 로마자까지 함께 통과하므로 목록으로 박아둔다 - 새 항목을
-                # 추가할 때 목록에 한 줄 넣는 것이 "사람이 봤다" 는 신호다.
+                # 로마자까지 함께 통과하므로 목록으로 적어 둔다. 새 항목을
+                # 추가할 때 목록에 한 줄 넣는 것이 "사람이 봤다" 는 표시가 된다.
                 body = pron.strip("/").replace(" ", "")
                 looks_like_ipa = (
                     re.search(r"[æðŋʃʒθʌɑɔəɚɜɛɪʊɡ]", body)

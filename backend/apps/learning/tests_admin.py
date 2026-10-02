@@ -2,9 +2,9 @@
 
 지키는 것 둘.
 
-1. **판을 지우면 그날 하루 점수가 남은 판으로 다시 세진다.** 안 그러면
+1. 판을 지우면 그날 하루 점수가 남은 판으로 다시 세진다. 안 그러면
    지운 판의 점수가 꾸준함 순위표에만 남는다.
-2. **보기 전용이다.** 추가·수정은 막고, 지우기는 판만 된다.
+2. 보기 전용이다. 추가·수정은 막고, 지우기는 판만 된다.
 """
 
 from __future__ import annotations
@@ -322,8 +322,8 @@ class AdminIsViewOnlyTest(TestCase):
 
     def test_a_user_with_records_can_still_be_deleted(self):
         # Django 는 사용자를 지울 때 함께 지워질 모델마다 그 Admin 의 지우기
-        # 권한을 묻는다. 보기 전용 표가 거기서 False 를 돌려주면 사용자 삭제가
-        # 통째로 403 이 된다.
+        # 권한을 묻는다. 보기 전용 표가 거기서 False 를 돌려주면 사용자 삭제
+        # 전체가 403 이 된다.
         url = reverse("admin:accounts_user_delete", args=[self.user.pk])
 
         response = self.client.post(url, {"post": "yes"})
@@ -521,7 +521,7 @@ class AdminDeleteRaceTest(_KeepsCacheTable, TransactionTestCase):
 
     순서는 먼저 가는 쪽이 줄을 잡은 뒤 알리고 트랜잭션을 HOLD 초 붙잡아
     두는 것으로 강제한다. 그 사이에 다른 쪽이 출발한다. _bump_daily 가
-    줄을 잠그지 않으면 **두 순서 모두** 10 이 남는다. 판 쪽의 조건부
+    줄을 잠그지 않으면 두 순서 모두 10 이 남는다. 판 쪽의 조건부
     UPDATE 가 옛 값 30 을 보고 그 줄을 대상에서 빼 버려, Admin 이 먼저여도
     기다리지 않고, 판 쪽이 먼저여도 Admin 이 커밋 전의 20 을 못 본다.
 

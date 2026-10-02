@@ -82,25 +82,25 @@ const RECENT_LIMIT = 100;
 /**
  * 아래 탭바가 덮는 높이(px).
  *
- * **지금은 항상 0 이다.** 이 컴포넌트를 쓰는 /test/words 가 탭바를 숨기는
- * 화면이기 때문이다(routes 의 immersiveRoutes 참고). 탭바 높이를 재고 있는
- * 것으로 읽고 값을 믿지 마라 - 재는 대상이 화면에 없다.
+ * 지금은 항상 0 이다. 이 컴포넌트를 쓰는 /test/words 가 탭바를 숨기는
+ * 화면이기 때문이다(routes 의 immersiveRoutes 참고). 탭바 높이를 재는
+ * 것처럼 보여도 재는 대상이 화면에 없다.
  *
  * 그래도 남겨두는 이유: 이 컴포넌트가 탭바 있는 화면에서 쓰일 여지가 있다.
  * 문장 문제가 열리면 그 화면이 판이 아니라 연습이라 탭바를 둘 수 있고,
  * 그때 이 계산이 없으면 채점 뒤 "다음 문제" 버튼이 탭바 뒤로 들어간다.
  * 판단을 호출부에 흩지 않고 여기가 한다.
  *
- * 상수로 두지 않고 실측하는 이유: 탭바는 `pb-[env(safe-area-inset-bottom)]`
+ * 상수로 두지 않고 재는 이유: 탭바는 `pb-[env(safe-area-inset-bottom)]`
  * 로 기기마다 두꺼워진다(layout.tsx 가 viewportFit: "cover" 를 켜서 아이폰
  * 에서 이 값이 0 이 아니다). 5rem 만 박아두면 그 차이만큼 버튼이 물린다.
  */
 function tabBarHeight(): number {
   // aria-label 이 아니라 data 속성으로 찾는다. 라벨 문구는 접근성을 다듬다
-  // 바뀌기 쉬운데, 그때 조용히 못 찾게 되고 스크롤만 탭바 높이만큼 어긋난다.
+  // 바뀌기 쉬운데, 그때 에러 없이 못 찾게 되고 스크롤만 탭바 높이만큼 어긋난다.
   const bar = document.querySelector("[data-tabbar]");
-  // 못 찾으면 0. 예전에는 5rem 으로 물러섰는데, 탭바를 없앤 뒤로는 그것이
-  // 없는 탭바만큼 더 스크롤해서 문제를 화면 위로 밀어 올렸다.
+  // 못 찾으면 0. 5rem 같은 기본값으로 물러서면 없는 탭바만큼 더 스크롤해서
+  // 문제를 화면 위로 밀어 올린다.
   return bar ? bar.getBoundingClientRect().height : 0;
 }
 
@@ -122,7 +122,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
   const [score, setScore] = useState({ solved: 0, correct: 0 });
 
   /**
-   * 푼 문제 수를 적어 둔다. **판을 끝내는 출구들이 읽는다.**
+   * 푼 문제 수를 적어 둔다. 판을 끝내는 출구들이 읽는다.
    *
    * 이 화면의 출구 넷(홈·"한 판 풀기"·분류·탭)을 누르면 이 판이 사라져
    * 점수가 없어지는데, 점수는 서버에 안 남아 되돌릴 수 없다. 그래서 푼 것이
@@ -152,8 +152,8 @@ export function QuizBoard({ category, content = "words", item }: Props) {
    * 나왔을 때 값이 안 바뀌어 다시 안 뛴다. 횟수만 두면 쓰다듬는지 콩 때리는지
    * 모른다.
    *
-   * 한 덩이로 묶은 것은 **둘이 한 사건이기 때문**이다. 따로 두면 나중에
-   * 누군가 한쪽만 갱신할 여지가 생긴다 - key 로 쓰는 fire 와 색을 정하는
+   * 한 덩이로 묶은 것은 둘이 한 사건이기 때문이다. 따로 두면 나중에
+   * 누군가 한쪽만 갱신할 여지가 생긴다. key 로 쓰는 fire 와 색을 정하는
    * correct 가 어긋나면 지난 연출이 새 색으로 뜬다.
    */
   const [reaction, setReaction] = useState({ fire: 0, correct: false });
@@ -234,7 +234,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
 
       try {
         let q = await ask();
-        // **받는 도중에 유형을 바꿨으면 그 자리에서 다시 받는다.** 겹치는
+        // 받는 도중에 유형을 바꿨으면 그 자리에서 다시 받는다. 겹치는
         // 요청은 위에서 막으므로 changeKind 가 새로 부를 수 없다. Windows
         // 크롬은 닫힌 select 에서 화살표를 누를 때마다 change 를 보내서,
         // 키보드로 고르면 거의 매번 이 경우다. 안 하면 고르개는 "설명" 인데
@@ -258,7 +258,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
         // 때는 남겨 둬서, 다시 누르면 원래 청한 항목이 나온다.
         const itemRejected = Boolean(wanted) && (notFound || status === "400");
         if (itemRejected) itemRef.current = undefined;
-        // **유형을 골랐으면 그것을 문구에 적는다.** 설명 문제는 설명이
+        // 유형을 골랐으면 그것을 문구에 적는다. 설명 문제는 설명이
         // 있는 단어로만, 빈칸 문제는 용어가 든 문장으로만 낼 수 있어서
         // 유형 하나로는 금방 바닥난다. "다 풀었습니다" 만 뜨면 분류만
         // 넓히려 하는데, 유형을 섞어서로 돌리는 편이 먼저다.
@@ -339,18 +339,17 @@ export function QuizBoard({ category, content = "words", item }: Props) {
     // 버튼 아래 모서리가 탭바 위에 오도록 목표를 직접 계산한다.
     // scrollIntoView 를 쓰지 않는 이유: 대상이 화면보다 크면 block 설정과
     // 무관하게 시작 모서리를 맞춰서, 고치려던 상황이 그대로 돌아온다.
-    // 탭바와 버튼 사이 숨 쉴 틈. tabBarHeight() 가 safe-area 를 포함한
-    // 실측값이라 이건 순수한 여백이고, 기기가 달라져도 줄어들지 않는다.
+    // 탭바와 버튼 사이 숨 쉴 틈. tabBarHeight() 가 safe-area 를 포함해 잰
+    // 값이라 이건 순수한 여백이고, 기기가 달라져도 줄어들지 않는다.
     const gap = 16;
 
     // 맞혔으면 축포가 먼저다.
     //
     // 둘을 같은 순간에 하면 서로를 지운다. 폭죽은 화면 한가운데에서 터지는데
     // 그 순간 화면이 300px 튀어서, 눈이 새 위치를 찾는 사이에 조각이 다
-    // 사라진다(실측: scrollY 0 -> 301, 조각은 화면 밖으로). 요청받아 만든
-    // 연출이 스스로 만든 스크롤에 묻히는 셈이었다.
+    // 사라진다(scrollY 0 -> 301, 조각은 화면 밖으로).
     //
-    // 그래서 순서를 준다 - 터지는 것을 보고, 그 다음 화면이 움직인다.
+    // 그래서 순서를 준다. 터지는 것을 보고, 그 다음 화면이 움직인다.
     // 480ms 는 폭죽(900ms)의 절반쯤이다. 다 끝날 때까지 기다리면 다음
     // 문제로 넘어가려는 손이 먼저 움직여 답답하다.
     //
@@ -374,11 +373,11 @@ export function QuizBoard({ category, content = "words", item }: Props) {
       // 보기를 눈으로 다시 찾아야 한다. 데스크톱처럼 화면이 길면 대개 여기다.
       if (fresh > window.scrollY) {
         // behavior 를 "auto" 로 둔다. smooth 를 쓰면 이 화면에서는 아무 일도
-        // 일어나지 않는다 - 채점 직후의 리렌더와 겹치면 브라우저가 진행 중인
-        // 부드러운 이동을 버린다(실측: scrollTo({top:156}) 가 불렸는데
-        // scrollY 가 0 이었고, 같은 시점에 수동 scrollTo 는 정상이었다).
+        // 일어나지 않는다. 채점 직후의 리렌더와 겹치면 브라우저가 진행 중인
+        // 부드러운 이동을 버린다(scrollTo({top:156}) 를 불러도 scrollY 가 0 에
+        // 남고, 같은 시점의 수동 scrollTo 는 된다).
         //
-        // 움직임을 줄이겠다고 한 설정을 따로 보지 않는 이유: auto 는 애초에
+        // 움직임을 줄이겠다고 한 설정을 따로 보지 않는 이유: auto 는
         // 애니메이션이 없어서 그 설정과 무관하게 같은 결과다.
         window.scrollTo({ top: fresh, behavior: "auto" });
       }
@@ -441,7 +440,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
       // 맞힌 것만 제외 목록에 넣는다. 틀린 단어야말로 다시 봐야 하는데
       // 여기에 넣으면 그 세션에서 가장 확실하게 안 나오는 단어가 된다.
       //
-      // **무엇의 id 를 넣느냐가 유형마다 다르다.** 백엔드의 exclude 는
+      // 무엇의 id 를 넣느냐가 유형마다 다르다. 백엔드의 exclude 는
       // 그 콘텐츠의 id 를 기대하는데, 정답의 종류가 늘 그것과 같지는 않다.
       //
       //   단어 문제      answer_id 가 단어 id      -> 그대로
@@ -450,7 +449,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
       //                  걸러야 할 것은 문장이다
       //
       // 마지막 줄이 핵심이다. 그대로 넣으면 문장이 안 걸러져 같은 문장이
-      // 다시 나오고, 어쩌다 그 번호의 다른 문장이 조용히 빠진다.
+      // 다시 나오고, 어쩌다 그 번호의 다른 문장이 에러 없이 빠진다.
       if (graded.correct) {
         const excludeId =
           question.answer_type === "word" && question.source_sentence_id
@@ -468,18 +467,16 @@ export function QuizBoard({ category, content = "words", item }: Props) {
     }
   }
 
-  /* 채점 연출 둘. **어느 가지에도 넣지 않는다.**
+  /* 채점 연출 둘. 어느 가지에도 넣지 않는다.
 
      아래는 상태에 따라 서로 다른 트리를 돌려준다(가져오는 중 · 못 가져옴 ·
      문제 없음 · 본문). 연출을 그중 한 가지 안에 두면, 가지가 바뀌는 순간
      React 가 그것을 언마운트했다가 돌아올 때 다시 마운트한다. reaction.fire
-     는 상태에 남아 있으므로 key 가 새로 붙어 **답도 안 한 사람에게 지난
-     판정이 처음부터 다시 재생된다.**
+     는 상태에 남아 있으므로 key 가 새로 붙어 답도 안 한 사람에게 지난
+     판정이 처음부터 다시 재생된다. "다음 문제" 를 누르면 loading 가지로
+     빠지고, 새 문제가 오면 본문으로 돌아오면서 연출이 한 번 더 도는 식이다.
 
-     실제로 그랬다. "다음 문제" 를 누르면 loading 가지로 빠지고, 새 문제가
-     오면 본문으로 돌아오면서 연출이 한 번 더 돌았다. 사용자가 찾았다.
-
-     가지마다 끼워 넣는 방식으로는 못 막는다 - 가지는 계속 늘어나고, 하나만
+     가지마다 끼워 넣는 방식으로는 못 막는다. 가지는 계속 늘어나고, 하나만
      빠뜨려도 같은 일이 난다. 그래서 출구를 하나로 두고 연출을 그 바깥에
      세운다. 둘 다 fixed 오버레이라 어느 화면 위에 얹혀도 자리를 안 차지하고,
      fire 가 0 이면 아무것도 안 그린다. */
@@ -592,10 +589,8 @@ export function QuizBoard({ category, content = "words", item }: Props) {
             letterSpacing: "var(--tracking-wide)",
             // 본문이라 --text-muted. --text-dim 은 작은 라벨용이다.
             //
-            // 한때 "카드 안이면 --text-dim 도 4.2:1 이라 괜찮다" 고 적혀
-            // 있었는데 그 숫자가 실측이 아니었다. 대비 값은 여기 적지 않고
-            // globals.css 의 토큰 주석 한 곳에만 둔다 - 값이 움직일 때
-            // 호출부마다 거짓말이 되기 때문이다.
+            // 대비 값은 여기 적지 않고 globals.css 의 토큰 주석 한 곳에만
+            // 둔다. 값이 움직이면 호출부마다 적어 둔 숫자가 틀린 말이 된다.
             color: "var(--text-muted)",
           }}
         >
@@ -614,14 +609,14 @@ export function QuizBoard({ category, content = "words", item }: Props) {
 
             조건이 `shake > 0` 이 아니라 `result 가 오답` 인 이유: 누적값은
             한 번 틀리면 계속 참이라, 그 뒤로는 맞혀도 새 문제로 넘어가도
-            클래스가 붙은 채 남는다(실측으로 14번 중 14번 붙어 있었다).
+            클래스가 붙은 채 남는다.
             지금 문제의 판정을 봐야 이번에 틀렸을 때만 흔들린다.
 
             움직임을 줄인 사용자에게는 globals.css 의 reduced-motion 블록이
             시간을 0 으로 만들어 흔들리지 않는다. */}
         {/* 흔들림에 key 를 쓰지 않는다. 요소를 다시 마운트시키면 그 사이에
-            스크롤 effect 가 버튼 좌표를 읽어 목표가 어긋난다(실측: 버튼이
-            993px 인데 목표가 214px 로 계산돼 화면이 제자리였다).
+            스크롤 effect 가 버튼 좌표를 읽어 목표가 어긋난다(버튼이
+            993px 인데 목표가 214px 로 계산돼 화면이 제자리에 남는다).
 
             대신 animationName 을 짝수/홀수로 번갈아 준다. 같은 이름이면
             두 번째 오답부터 애니메이션이 안 뛰는데, 이름이 바뀌면 브라우저가
@@ -646,8 +641,8 @@ export function QuizBoard({ category, content = "words", item }: Props) {
             <li key={choice.id}>
               <ChoiceButton
                 text={choice.text}
-                // 보기가 용어일 때만 고정폭(lib/quiz-text). 전에는 "뜻 고르기가
-                // 아니면 고정폭" 이라 상황 고르기의 한글 보기까지 고정폭이었다.
+                // 보기가 용어일 때만 고정폭(lib/quiz-text). 상황 고르기의
+                // 한글 보기는 고정폭으로 두지 않는다.
                 mono={choicesAreTerms(question.kind)}
                 state={choiceState(choice.id, picked, result)}
                 disabled={picked !== null}
@@ -712,7 +707,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
   // 자식이라 가지가 바뀌어도 같은 자리에 남는다(다시 마운트되지 않는다).
   const body = (
     <>
-      {/* 유형 고르개와 점수 줄. **문제 가지 밖에 둔다.** 유형을 바꾸면
+      {/* 유형 고르개와 점수 줄. 문제 가지 밖에 둔다. 유형을 바꾸면
           "가져오는 중" 가지를 거치는데, 고르개가 문제 가지 안에 있으면 그때
           사라졌다가 다시 생겨 키보드 초점을 잃는다. 문제를 못 낸 안내 가지
           에서도 유형을 바꿀 수 있어야 한다 - 그 안내가 "유형을 바꿔보라" 고
@@ -731,7 +726,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
               <span
                 key={combo}
                 // 연속은 초록이다. 코랄로 두면 "지금 여기"·오답과 같은 색이
-                // 되어, 잘 가고 있다는 신호가 경고처럼 보인다(가이드
+                // 되어, 잘 가고 있다는 표시가 경고처럼 보인다(가이드
                 // color-accent).
                 className="pop inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
                 style={{
@@ -796,17 +791,17 @@ const KINDS: Record<QuizContent, { value: string; label: string }[]> = {
 };
 
 /**
- * 유형 고르개. 전에는 지금 문제의 유형을 보여주기만 하던 알약이었다.
+ * 유형 고르개.
  *
- * **보이는 알약은 바로 위 분류 고르개(CategoryPicker)와 같은 모양이다.**
+ * 보이는 알약은 바로 위 분류 고르개(CategoryPicker)와 같은 모양이다.
  * 흰 종이, "유형" 라벨, 고른 값, ▼. 한 화면에 고르개 둘이 다르게 생기면
  * 하나는 누르는 것이 아닌 줄 안다.
  *
  * 그 위에 브라우저 기본 select 를 투명하게 덮는다. 목록이 서너 개뿐이라
  * CategoryPicker 같은 메뉴를 새로 만들 이유가 없고, 기본 select 는 폰에서
  * 운영체제의 고르기 창이 떠서 누르기 쉽다. 누르는 영역이 알약 전체가 된다.
- * 알약이 보여주던 "지금 문제의 유형" 은 바로 아래 질문("이 단어의 뜻은?")이
- * 이미 말한다.
+ * "지금 문제의 유형" 은 바로 아래 질문("이 단어의 뜻은?")이 이미 말하므로
+ * 알약에 따로 적지 않는다.
  */
 function KindPicker({
   content,
@@ -883,7 +878,7 @@ function choiceState(
 /**
  * 문제 지문.
  *
- * 크림에서 지문이 **카드 안으로 들어왔다.** 다크였을 때는 배경 그라디언트가
+ * 크림에서는 지문을 카드 안에 둔다. 다크였을 때는 배경 그라디언트가
  * 영역을 갈랐지만 그것을 걷어냈고(globals.css 의 "영역별 배경" 절), 이제
  * 층을 만드는 것은 카드의 두께 하나다. 지문이 맨 바탕에 놓이면 아래 보기
  * 넷만 종이로 떠 있어서, 화면에서 가장 중요한 것이 유일하게 평평해진다.
@@ -901,7 +896,7 @@ function Prompt({
   sentenceKind?: string;
   text: string;
 }) {
-  // 유형마다 서체·크기가 다르다. 카드는 하나로 두고 안쪽 글자만 가른다 -
+  // 유형마다 서체·크기가 다르다. 카드는 하나로 두고 안쪽 글자만 가른다.
   // 카드까지 유형별로 두면 유형이 늘 때마다 같은 두께를 다시 적게 된다.
   //
   // 설명 문제: 여러 줄 한글이라 본문체로 읽기 좋게. 크기를 키우면 폰에서
@@ -910,7 +905,7 @@ function Prompt({
   // 문장(빈칸·상황): 에러 메시지만 고정폭, 실무 표현은 본문체(lib/quiz-text
   // 의 promptIsMono). 아래 해설 카드도 같은 규칙이라 한 화면에서 같은
   // 문장이 두 서체로 나오지 않는다. 크기를 --text-3xl 로 두지
-  // 않는 이유는 지문이 한 줄짜리 문장이라 단어 하나보다 훨씬 길어서다 -
+  // 않는 이유는 지문이 한 줄짜리 문장이라 단어 하나보다 훨씬 길어서다.
   // "IndexError: list ____ out of range" 가 390px 에서 세 줄로 감기고,
   // 그러면 보기 넷이 첫 화면에서 밀린다.
   //
@@ -983,7 +978,7 @@ function Prompt({
       }}
     >
       {/* text-balance: 가운데 정렬이라 여러 줄이면 마지막 줄만 짧게 떠
-          들쭉날쭉했다("refs to" 한 줄). 줄 길이를 고르게 나눈다. */}
+          들쭉날쭉하다("refs to" 한 줄). 줄 길이를 고르게 나눈다. */}
       <p
         lang={body.lang}
         className={`${body.className} text-balance`}
@@ -998,7 +993,7 @@ function Prompt({
 /**
  * 오답 보기의 두께. inset 테두리와 아래 3px 를 한 값으로 묶는다.
  *
- * 쉬는 두께와 hover 두께가 **같아야 해서** 상수로 뺐다. globals.css 의
+ * 쉬는 두께와 hover 두께가 같아야 해서 상수로 뺐다. globals.css 의
  * .dv-card-press:hover 는 disabled 와 무관하게 걸려서, --lift-hover 를
  * 안 주면 채점이 끝난 뒤 마우스를 올리는 순간 코랄 테두리가 기본 회색
  * 두께로 덮인다. 두 자리에 같은 문자열을 적어두면 한쪽만 고쳐진다.
@@ -1014,7 +1009,7 @@ const WRONG_LIFT =
  *   idle     흰 종이 + 두께
  *   picked   같은 종이에 잉크 테두리(안쪽 2px). 채점을 기다리는 짧은 구간
  *   correct  초록 채움 + 초록 두께
- *   wrong    **채움이 아니라 코랄 테두리**
+ *   wrong    채움이 아니라 코랄 테두리
  *
  * 마지막 줄이 이 시스템의 규칙이다(가이드 color-accent). 코랄이 "지금
  * 여기"(주요 버튼)와 "틀림" 을 겸하기 때문에, 오답까지 코랄로 채우면
@@ -1051,7 +1046,7 @@ function ChoiceButton({
 
   // 표면·글자·두께를 한 자리에서 정한다.
   //
-  // **boxShadow 를 인라인으로 적지 않는다.** 인라인 선언은 클래스를 항상
+  // boxShadow 를 인라인으로 적지 않는다. 인라인 선언은 클래스를 항상
   // 이겨서 globals.css 의 :active(두께 0)가 무시되고, 그러면 transform 만
   // 걸려 버튼이 두께를 단 채 내려가 바닥을 뚫은 모양이 된다. 두께는 --lift
   // 변수로 넘긴다.
@@ -1072,7 +1067,7 @@ function ChoiceButton({
     //
     // 두께를 0 으로 둬서 눌린 채로 머문다. 서버 왕복을 기다리는 그 구간이
     // 이 화면에서 피드백이 가장 필요한 자리인데, 손을 뗀 순간 두께가
-    // 돌아오면 "눌렀다" 는 신호가 꺼진다.
+    // 돌아오면 "눌렀다" 는 표시가 꺼진다.
     picked: {
       background: "var(--paper)",
       color: "var(--foreground)",
@@ -1109,7 +1104,7 @@ function ChoiceButton({
       onClick={onClick}
       disabled={disabled}
       // dv-card dv-card-press: 누르면 두께가 0 이 되고 그만큼(3px) 내려앉는다.
-      // 크림에서 누름이 축소에서 내려앉음으로 바뀌었다(globals.css 의
+      // 크림의 누름은 축소가 아니라 내려앉음이다(globals.css 의
       // "누름 피드백" 절). :active 는 인라인 style 로 못 써서 클래스가 맡고,
       // 채점 뒤에는 disabled 라 브라우저가 :active 를 주지 않는다.
       className="dv-card dv-card-press flex w-full items-center gap-3 px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default"
@@ -1136,7 +1131,7 @@ function ChoiceButton({
       </span>
       {mark && (
         // 정답·오답 글자도 테두리·채움과 같은 톤으로 둔다. 회색으로 두면
-        // 방금 무슨 일이 일어났는지 눈이 먼저 읽는 신호가 하나뿐이다.
+        // 방금 무슨 일이 일어났는지 눈이 먼저 읽는 단서가 하나뿐이다.
         //
         // 색 전환을 여기 두는 이유: 지금은 이 span 이 채점된 뒤에야 처음
         // 생겨 전환할 이전 값이 없지만, picked 에 문구가 붙으면 계속 살아
@@ -1187,7 +1182,7 @@ function Explanation({ result }: { result: GradeResult }) {
       }}
     >
       {/* 맞았는지 틀렸는지가 이 카드에서 가장 먼저 읽혀야 한다. 회색으로
-          두면 보기 버튼의 테두리 색이 유일한 신호가 된다. */}
+          두면 보기 버튼의 테두리 색이 유일한 단서가 된다. */}
       {/* 판정은 옅은 채움 + 진한 글자의 알약으로 둔다. 글자만 색을 입히면
           흰 종이 위에서 이 줄이 본문과 같은 무게로 읽힌다.
 
@@ -1302,7 +1297,7 @@ function WordAnswer({ word }: { word: NonNullable<GradeResult["word"]> }) {
 /**
  * 정답이 문장일 때. 상황 고르기가 쓴다.
  *
- * 단어와 순서가 다르다. 상황 고르기는 **상황이 정답 보기**라 그걸 먼저
+ * 단어와 순서가 다르다. 상황 고르기는 상황이 정답 보기라 그걸 먼저
  * 크게 보여주고, 그 아래에 무슨 문장이었는지를 둔다. 문장을 위에 두면
  * 방금 지문에서 읽은 것을 한 번 더 읽게 된다.
  */

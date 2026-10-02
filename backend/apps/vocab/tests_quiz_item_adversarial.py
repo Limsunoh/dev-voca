@@ -2,8 +2,8 @@
 
 tests_quiz_item.py 가 "그 항목이 정답인가" 를 본다면, 여기는 그 항목이
 문제를 낼 수 없는 모양일 때(설명 없음, 단어가 안 든 문장, 상황 빈칸),
-분류와 겹칠 때, 풀이 모자랄 때, 그리고 **검수 안 된 것이 보기나 정답으로
-끼어드는지**를 본다.
+분류와 겹칠 때, 풀이 모자랄 때, 그리고 검수 안 된 것이 보기나 정답으로
+끼어드는지를 본다.
 
 무작위 출제라 한 번 통과는 우연일 수 있다. 결과가 갈릴 수 있는 곳은
 여러 번 부른다.
@@ -233,7 +233,7 @@ class SentenceItemKindTest(ItemQuizMixin, TestCase):
         ]
 
     def test_blank_on_sentence_without_word_is_404(self):
-        """빈칸을 청했는데 못 뚫으면 404 다. 조용히 상황 문제를 내면 고른 것과
+        """빈칸을 청했는데 못 뚫으면 404 다. 대신 상황 문제를 내면 고른 것과
         다른 문제가 나온다."""
         res = self.quiz(SENTENCE_QUIZ_URL, item=self.no_word.pk, kind="blank")
         self.assertEqual(res.status_code, 404)

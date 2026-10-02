@@ -2,7 +2,7 @@
 
 지키려는 것은 셋이다.
 
-    - 학습분 문제의 정답은 **방금 본 묶음 안에서만** 나온다
+    - 학습분 문제의 정답은 방금 본 묶음 안에서만 나온다
     - 학습 대상은 틀린 것 > 안 본 것 > 오래된 것 순으로 고른다
     - 일일공부에서 틀린 것이 복습 목록에 뜬다
 
@@ -93,8 +93,8 @@ class ScopeTest(TestCase):
     def test_choices_come_from_everywhere_not_just_the_chunk(self):
         """오답 보기는 묶음 밖에서도 온다.
 
-        묶음이 두 개뿐인데 보기까지 좁히면 넷을 못 채워 문제를 아예 못
-        만든다. 채운다 해도 넷이 전부 방금 본 단어라 소거법으로 풀린다.
+        묶음이 두 개뿐인데 보기까지 좁히면 넷을 못 채워 문제를 만들 수
+        없다. 채운다 해도 넷이 전부 방금 본 단어라 소거법으로 풀린다.
         """
         study, token, _q = daily_study.start(self.user, StudyLength.SHORT)
 
@@ -222,8 +222,8 @@ class ReviewLinkTest(TestCase):
     def test_a_correct_answer_does_not_graduate_it_from_review(self):
         """맞혀도 streak 은 안 오른다.
 
-        **streak 은 "복습에서 맞힌 횟수" 다.** 일일공부가 이걸 올리면
-        복습을 한 번도 안 한 단어가 졸업해버려, 복습 목록이 조용히 빈다.
+        streak 은 "복습에서 맞힌 횟수" 다. 일일공부가 이걸 올리면
+        복습을 한 번도 안 한 단어가 졸업해버려, 복습 목록이 모르는 새 빈다.
         """
         _study, token, question = daily_study.start(self.user, StudyLength.SHORT)
         target_id = answer_id_of(token)
@@ -474,7 +474,7 @@ class NoBackToBackPlayTest(TestCase):
         """빼는 것은 바로 앞 정답 하나뿐이다. 그 전 것은 다시 나올 수 있다.
 
         다섯 단어 묶음에서 셋이 검수 취소되면 남은 둘로 다섯 문제를 낸다.
-        최근 목록을 통째로 빼면 셋째 문제에서 둘 다 빠져 빼지 않는 쪽으로
+        최근 목록을 전부 빼면 셋째 문제에서 둘 다 빠져 빼지 않는 쪽으로
         떨어지고, 반반으로 연달아 같은 단어가 나온다. 하나만 빼면 둘이
         번갈아 나온다.
         """

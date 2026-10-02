@@ -6,8 +6,8 @@
     POST /api/learning/rounds/answer/   답하거나 넘긴다. 다음 문제가 같이 온다
     POST /api/learning/rounds/finish/   판을 닫는다. 로그인했으면 기록된다
 
-판 상태는 응답의 token 에 담겨 오간다. 서버는 판을 저장하지 않는다 -
-이유는 session.py 첫머리에 적어뒀다.
+판 상태는 응답의 token 에 담겨 오간다. 서버는 판을 저장하지 않는다
+(이유는 session.py 첫머리 참고).
 
 로그인하지 않아도 풀 수 있다. 다만 기록되지 않으므로 순위표에 안 들어간다.
 """
@@ -174,8 +174,8 @@ class LeaderboardView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [LeaderboardThrottle]
 
-    # URL 마다 다른 값을 넣는다. 기본값을 두지 않는다 - 빈 문자열이
-    # 기본이면 서브클래스가 빠뜨렸을 때 조용히 build() 까지 흘러간다.
+    # URL 마다 다른 값을 넣는다. 기본값을 두지 않는다. 빈 문자열이
+    # 기본이면 서브클래스가 빠뜨렸을 때 에러 없이 build() 까지 흘러간다.
     board_kind: str
 
     def get(self, request: Request) -> Response:
@@ -211,7 +211,7 @@ class StreakView(LeaderboardView):
 class DailyStudyStartView(APIView):
     """오늘 일일공부를 연다.
 
-    **로그인이 필요하다.** 진행이 DB 에 남아야 하는 기능이라 계정이 없으면
+    로그인이 필요하다. 진행이 DB 에 남아야 하는 기능이라 계정이 없으면
     이어서 볼 자리가 없다. 자유 문제풀이가 게스트를 받는 것과 다르다.
     """
 
@@ -220,14 +220,14 @@ class DailyStudyStartView(APIView):
 
     def get(self, request: Request) -> Response:
         """오늘 상태를 본다. 화면이 시작 전에 무엇을 그릴지 정한다."""
-        # **어제 판을 여기서도 정산한다.** 시작할 때만 정산하면, 며칠 안
+        # 어제 판을 여기서도 정산한다. 시작할 때만 정산하면, 며칠 안
         # 들어온 사람의 판이 열린 채 남는다. 그리고 어제 판을 "오늘" 로
-        # 내려주면 화면이 "이어서 풀기" 를 그리는데 이어 풀 토큰이 없다 -
+        # 내려주면 화면이 "이어서 풀기" 를 그리는데 이어 풀 토큰이 없다.
         # 서버가 약속하지 않은 것을 화면이 약속하게 된다.
         # 정산이 실패해도 조회는 살린다. 화면 진입 경로라 여기서 500 이
-        # 나면 일일공부를 아예 못 연다. 정산은 다음 조회나 시작에서 다시
-        # 시도되는 성격이라 조회를 막을 만큼 급하지 않다 - 시작할 때는
-        # 반대로 삼키지 않는다(열린 판이 둘이 되면 안 된다).
+        # 나면 일일공부를 못 연다. 정산은 다음 조회나 시작에서 다시
+        # 시도되므로 조회를 막을 만큼 급하지 않다. 시작할 때는 반대로
+        # 삼키지 않는다(열린 판이 둘이 되면 안 된다).
         try:
             daily_study.settle_stale(request.user)
         except Exception:
@@ -235,24 +235,24 @@ class DailyStudyStartView(APIView):
 
         study = daily_study.today_of(request.user)
 
-        # **이어 풀 토큰을 함께 내려준다.** 없으면 하다 만 사람이 오늘 판을
-        # 영영 못 끝낸다 - 답하려면 토큰이 필요한데 시작은 하루 한 번
-        # 제약에 막히기 때문이다. 제한 시간이 없는 기능이라 중간에 나가는
+        # 이어 풀 토큰을 함께 내려준다. 없으면 하다 만 사람이 오늘 판을
+        # 끝낼 수 없다. 답하려면 토큰이 필요한데 시작은 하루 한 번
+        # 제약에 막힌다. 제한 시간이 없는 기능이라 중간에 나가는
         # 것이 예외가 아니다.
         token, question = None, None
         learning: list[dict] = []
         if study is not None and not study.is_done:
-            # **학습과 문제를 함께 내려준다.** 이번 묶음의 카드와, 그
+            # 학습과 문제를 함께 내려준다. 이번 묶음의 카드와, 그
             # 묶음에서 낸 문제를 한 번에 준다. 화면은 카드를 다 넘긴 뒤
-            # 문제로 넘어간다 - 서버에 "봤다" 를 알릴 필요가 없다.
+            # 문제로 넘어가므로 서버에 "봤다" 를 알릴 필요가 없다.
             #
-            # 나눠서 주면 그 신호가 필요해지는데, 그건 점수와 무관한
+            # 나눠서 주면 그 알림이 필요해지는데, 그건 점수와 무관한
             # 요청이라 되돌리기를 막을 이유가 없고 막지 않으면 왕복만
             # 늘어난다. 카드 몇 장은 그냥 같이 보내는 편이 싸다.
             #
-            # **묶음 뽑기는 resume 에 맡긴다.** 여기서 먼저 부르면 그
+            # 묶음 뽑기는 resume 에 맡긴다. 여기서 먼저 부르면 그
             # 사이에 검수가 취소됐을 때 카드는 나가고 범위는 비는 조합이
-            # 생긴다 - 화면이 보여준 카드와 무관한 단어로 문제가 나간다.
+            # 생긴다. 화면이 보여준 카드와 무관한 단어로 문제가 나간다.
             resumed = daily_study.resume(study)
             if resumed is not None:
                 token, question = resumed
@@ -262,9 +262,9 @@ class DailyStudyStartView(APIView):
                         _word_body(w) for w in daily_study.learn_targets(study)
                     ]
             else:
-                # **문제가 없으면 카드도 안 보낸다.** 화면은 카드를 다
+                # 문제가 없으면 카드도 안 보낸다. 화면은 카드를 다
                 # 넘긴 뒤 문제로 넘어가는데, 넘어갈 문제가 없으면 길이
-                # 고르기로 떨어진다 - 하다 만 판이 있으면 거기서 길이
+                # 고르기로 떨어진다. 하다 만 판이 있으면 거기서 길이
                 # 버튼도 막혀 있어 아무것도 못 하는 화면에 갇힌다.
                 #
                 # 이어 풀 문제를 못 만드는 판은 드물지만(묶음이 좁아
@@ -272,7 +272,7 @@ class DailyStudyStartView(APIView):
                 # 애초에 안 주는 편이 화면에서 막는 것보다 확실하다.
                 learning = []
 
-        # **캐시하지 않는다.** 응답에 매번 다른 서명 토큰이 실리므로,
+        # 캐시하지 않는다. 응답에 매번 다른 서명 토큰이 실리므로,
         # 어디든 캐시가 붙으면 여러 사용자가 같은 토큰을 받는다. GET 은
         # 기본적으로 캐시 가능한 메서드라 프록시·중계 어디서든 붙을 수 있다.
         body = Response(
@@ -366,11 +366,11 @@ class DailyStudyAnswerView(APIView):
                 },
                 "token": next_token,
                 "question": question,
-                # **끝났는지는 판이 정한다.** question 이 없는 것만 보면
+                # 끝났는지는 판이 정한다. question 이 없는 것만 보면
                 # 다음이 학습 차례일 때도 "끝" 으로 읽힌다.
                 "finished": studied.is_done,
                 "study": _study_body(studied),
-                # **묶음이 넘어가는 답에만 카드가 실린다.** 묶음 안에서
+                # 묶음이 넘어가는 답에만 카드가 실린다. 묶음 안에서
                 # 이어 푸는 답에는 빈 목록이라, 화면은 learning 이 오면
                 # 학습을 보여주고 아니면 바로 다음 문제로 간다.
                 "learning": (
@@ -408,7 +408,7 @@ def _study_body(study) -> dict:
 class StudyCardSerializer(QuizWordSerializer):
     """학습 카드 하나. 출제용 직렬화에 분류 이름만 더한다.
 
-    **발음 게이트를 여기서 다시 쓰지 않는다.** reading 은 항목 검수와
+    발음 게이트를 여기서 다시 쓰지 않는다. reading 은 항목 검수와
     별개인 reading_reviewed 를 따르는데, 그 규칙은 ReviewedReadingField
     한 곳에만 두기로 한 것이다(vocab/models.py 의 visible() docstring 이
     "노출 게이트가 둘인 이유" 로 적어뒀다). 손으로 한 줄 더 쓰면 규칙이
@@ -417,8 +417,8 @@ class StudyCardSerializer(QuizWordSerializer):
     상세 화면(WordDetailSerializer)이 아니라 출제용을 물려받는 이유는
     저기가 created_at 같은 관리용 칸까지 내려주기 때문이다.
 
-    **description 은 물려받은 그대로 들어간다.** 카드에서는 접어두지만
-    펼칠 때 왕복을 한 번 더 하면 그 순간 화면이 멈춘다 - 학습은 넘기는
+    description 은 물려받은 그대로 들어간다. 카드에서는 접어두지만
+    펼칠 때 왕복을 한 번 더 하면 그 순간 화면이 멈춘다. 학습은 넘기는
     속도가 중요한 화면이다.
     """
 
@@ -442,7 +442,7 @@ def _word_body(word: Word) -> dict:
 class ReviewStartView(APIView):
     """복습을 연다. GET 은 남은 개수만 본다.
 
-    **로그인이 필요하다.** 무엇을 틀렸는지가 계정에 쌓여야 하는 기능이다.
+    로그인이 필요하다. 무엇을 틀렸는지가 계정에 쌓여야 하는 기능이다.
     """
 
     permission_classes = [IsAuthenticated]
@@ -451,10 +451,10 @@ class ReviewStartView(APIView):
     def get(self, request: Request) -> Response:
         """복습할 것이 몇 개인가. 화면이 시작 버튼을 그릴지 정한다.
 
-        **졸업 기준도 함께 내려준다.** 화면이 "한 번 더 맞히면 끝" 을
+        졸업 기준도 함께 내려준다. 화면이 "한 번 더 맞히면 끝" 을
         띄우는데, 그 문구가 2 라는 숫자에 묶여 있다. 여기서 안 주면
-        화면이 그 값을 따로 들고 있게 되고, 기준을 3 으로 올린 날
-        화면만 옛말을 계속한다 - 틀렸다는 신호가 어디에도 안 뜬다.
+        화면이 그 값을 따로 들고 있게 되고, 기준을 3 으로 올리면 화면만
+        옛 문구를 계속 띄운다. 그래도 어디서도 에러가 나지 않는다.
         """
         return Response(
             {

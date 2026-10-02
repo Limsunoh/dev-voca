@@ -23,7 +23,7 @@ from apps.ai_pipeline.prompts import vocab
 from apps.vocab.models import Word
 
 # 모델이 아는 길이 제한을 그대로 쓴다. 여기에 숫자를 다시 적으면 모델을
-# 고쳤을 때 조용히 어긋난다.
+# 고쳤을 때 어긋난다.
 TERM_MAX = Word._meta.get_field("term").max_length
 MEANING_MAX = Word._meta.get_field("meaning").max_length
 

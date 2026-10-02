@@ -169,7 +169,7 @@ class ConstraintBypassTest(TestCase):
             )
 
     def test_oversized_subject_rejected(self):
-        """max_length=20 초과. 제약이든 길이든 조용히 잘리면 안 된다."""
+        """max_length=20 초과. 제약이든 길이든 값이 잘린 채 저장되면 안 된다."""
         with self.assertRaises(Exception), transaction.atomic():
             Word.objects.create(
                 term="os", meaning="m", is_exam=True, exam_subject="d" * 200

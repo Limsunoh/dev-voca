@@ -4,7 +4,7 @@
     python manage.py seed_exam_words --dry-run
     python manage.py seed_exam_words
 
-**AI 로 만들지 않았다.** mark_exam_scope 가 "DB 에 없다" 고 알려준 15개를
+AI 로 만들지 않았다. mark_exam_scope 가 "DB 에 없다" 고 알려준 15개를
 손으로 썼다. 정처기 용어는 교재마다 쓰는 말이 정해져 있어서(예: 4정규형이
 아니라 BCNF), 생성한 뒤 그걸 검수하는 것보다 처음부터 맞게 쓰는 편이 빠르다.
 

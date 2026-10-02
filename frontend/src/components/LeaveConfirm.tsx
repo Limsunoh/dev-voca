@@ -7,18 +7,17 @@ import { useEffect, useId, useImperativeHandle, useRef } from "react";
  *
  * 문제풀기의 네 출구(나가기·"한 판 풀기"·분류 고르개·단어/문장 탭)와 한 판
  * 모드의 나가기가 모두 이 창을 쓴다. 창을 여러 벌 두면 문구와 동작이
- * 갈린다 - 실제로 두 벌이던 때 홈 창만 "새 판이 시작됩니다" 라고 거짓을
- * 말했다.
+ * 갈린다(한쪽 창만 "새 판이 시작됩니다" 처럼 사실과 다른 말을 하게 된다).
  *
  * 내정보도 쓴다. 고른 사진·이름을 저장하지 않고 떠날 때(useUnsavedGuard).
  * 그래서 되돌아가는 버튼 글자를 받는다(cancelLabel).
  *
- * **dialog 를 쓴다.** 포커스 가둠, Esc 닫기, 뒤 스크롤 막기, 낭독기에
+ * dialog 를 쓴다. 포커스 가둠, Esc 닫기, 뒤 스크롤 막기, 낭독기에
  * "대화상자" 로 알리는 것까지 브라우저가 해준다. div 로 만들면 그 넷을
  * 직접 짜야 하고 대개 포커스 가둠에서 샌다. 화면 안에 한 줄 띄우는 방식도
- * 안 쓴다 - 포커스가 누른 자리에 남아서 낭독기에는 아무 일도 안 일어난
+ * 안 쓴다. 포커스가 누른 자리에 남아서 낭독기에는 아무 일도 안 일어난
  * 것이 되고, 글이 끼어들며 아래 항목이 밀려 두 번째 누름이 엉뚱한 곳에
- * 떨어진다(한 번 그렇게 만들었다가 걷어냈다).
+ * 떨어진다.
  *
  * window.confirm 은 쓰지 않는다. 문구를 다듬을 수 없고 화면 밖에 뜬다.
  */
@@ -70,8 +69,8 @@ export function LeaveConfirm({
   useImperativeHandle(openRef, () => () => dialogRef.current?.showModal(), []);
 
   // 열린 채로 사라지면 닫는다. 안 닫으면 모달이 걸어둔 inert 가 풀리지 않은
-  // 것처럼 보이고 포커스가 body 로 떨어진다 - 창을 연 채 뒤로가기를 누르면
-  // 그렇게 된다(ExitGuard 가 먼저 겪고 고친 것을 여기로 옮겼다).
+  // 것처럼 보이고 포커스가 body 로 떨어진다. 창을 연 채 뒤로가기를 누르면
+  // 그렇게 된다.
   useEffect(() => {
     const dialog = dialogRef.current;
     return () => dialog?.close();
@@ -82,11 +81,11 @@ export function LeaveConfirm({
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-describedby={detailId}
-      // 폭을 정해 둔다. 최대 폭만 주면 본문이 짧을 때 창이 좁아져 "계속
-      // 풀기" 가 두 줄로 꺾인다(실측: 239px).
+      // 폭을 정해 둔다. 최대 폭만 주면 본문이 짧을 때 창이 239px 까지
+      // 좁아져 "계속 풀기" 가 두 줄로 꺾인다.
       //
-      // m-auto 를 반드시 준다. dialog 의 기본값(margin: auto)을 Tailwind
-      // 리셋이 지워서, 안 주면 화면 왼쪽 위에 붙는다(실측: top 0, left 0).
+      // m-auto 가 필요하다. dialog 의 기본값(margin: auto)을 Tailwind
+      // 리셋이 지워서, 안 주면 화면 왼쪽 위(top 0, left 0)에 붙는다.
       //
       // backdrop 은 잉크(#191512) 72%. 크림 화면에 순검정이 한 번도 안
       // 나와서, 순검정을 깔면 다른 앱이 덮은 것처럼 보인다.

@@ -1,5 +1,5 @@
 /**
- * 문제풀기(QuizBoard)가 유형별로 지문과 보기를 **실제로** 어떤 글꼴로
+ * 문제풀기(QuizBoard)가 유형별로 지문과 보기를 실제로 어떤 글꼴로
  * 그리는지 본다.
  *
  * 실행: cd frontend && npm test
@@ -8,13 +8,13 @@
  * 글꼴로 굵고 뭉툭하게 떨어진다. 그래서 용어만 고정폭 + lang="en" 이고,
  * 한글(뜻·설명·상황)은 본문체다(lib/quiz-text 의 표).
  *
- * **원문을 정규식으로 보지 않는다.** "choicesAreTerms 를 부르는가" 만 보면
+ * 원문을 정규식으로 보지 않는다. "choicesAreTerms 를 부르는가" 만 보면
  * ChoiceButton 이 mono 를 받고도 안 쓰거나, lang 을 빼먹거나, Prompt 가
  * 다른 가지로 새는 것을 못 잡는다. 여기서는 판을 한 번 그려 HTML 에서
  * 글자를 감싼 태그를 뽑는다.
  *
  * QuizBoard 는 첫 문제를 effect 에서 받아온다. 브라우저가 없어 effect 가
- * 돌지 않으므로 quiz-board-item.test.mts 와 같은 방법을 쓴다 - react 의 훅
+ * 돌지 않으므로 quiz-board-item.test.mts 와 같은 방법을 쓴다. react 의 훅
  * 넷만 작은 대역으로 바꿔 QuizBoard 를 함수로 부르고, 첫 문제 effect 를
  * 손으로 돌린 뒤 한 번 더 그려 돌려받은 트리를 renderToStaticMarkup 한다.
  *
@@ -248,7 +248,7 @@ describe("QuizBoard 보기", () => {
 
   it("상황 고르기: 한글·영어가 섞인 보기도 본문체", async () => {
     // 실제 상황 보기 380개 중 172개가 "git push 할 때" 처럼 영어가 섞였다.
-    // 글자가 아니라 유형으로 가른다 - 영어가 끼었다고 고정폭으로 가면
+    // 글자가 아니라 유형으로 가른다. 영어가 끼었다고 고정폭으로 가면
     // 한글이 뭉개진다.
     const texts = ["git push 할 때", "PR 리뷰에서", "CI 로그"];
     const html = await board("situation", "It's up to date.", texts);

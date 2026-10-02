@@ -19,12 +19,12 @@ from .management.commands.seed_sentences import RETIRED_SLUGS, SENTENCES
 from .management.commands.seed_sentences_more import SENTENCES as MORE_SENTENCES
 from .models import Sentence, SentenceKind, Word
 
-# 저장소에 박힌 문장 전부. 전수 검사는 이걸 돈다.
+# 저장소에 들어 있는 문장 전부. 전수 검사는 이걸 돈다.
 #
-# **seed 명령이 늘면 여기에 한 덩이를 더한다.** 단어 쪽 tests.py 의
-# ALL_SEEDED 와 같은 이유다 - 명령마다 자기 리스트를 갖고 있어서, 안 넣으면
-# 그 명령의 문장은 검사를 통째로 건너뛴다. is_reviewed=True 로 바로 들어가는
-# 통로라 아무도 안 본 데이터가 그대로 화면에 뜬다.
+# seed 명령이 늘면 여기에 한 덩이를 더한다(단어 쪽 tests.py 의 ALL_SEEDED 와
+# 같은 이유). 명령마다 자기 리스트를 갖고 있어서, 안 넣으면 그 명령의
+# 문장은 검사를 받지 않는다. is_reviewed=True 로 바로 들어가는 통로라
+# 아무도 안 본 데이터가 그대로 화면에 뜬다.
 #
 # 두 리스트의 열 순서는 같다(slug, text, translation, kind, category,
 # difficulty, context, description). 그래도 위치로 쓰지 않고 이름을 붙이는
@@ -180,7 +180,7 @@ class SeedSentencesTest(TestCase):
         self.assertEqual(Sentence.objects.filter(text=text).count(), 2)
 
     def test_force_pending_alone_is_rejected(self):
-        """--reset 없는 --force-pending 은 뜻이 없으므로 조용히 넘어가지 않는다."""
+        """--reset 없는 --force-pending 은 뜻이 없으므로 거부한다."""
         with self.assertRaises(CommandError):
             self.run_seed("--force-pending")
 
@@ -229,7 +229,7 @@ class SeedSentencesTest(TestCase):
                 self.assertLessEqual(len(context), context_max)
 
     def test_slugs_are_unique(self):
-        """중복되면 뒤 항목이 앞 항목을 덮어써 문장이 조용히 사라진다."""
+        """중복되면 뒤 항목이 앞 항목을 덮어써 문장이 에러 없이 사라진다."""
         slugs = [row["slug"] for row in ALL_SEEDED_SENTENCES]
 
         self.assertEqual(len(slugs), len(set(slugs)))
@@ -300,7 +300,7 @@ class SentenceAPITest(TestCase):
         """검수 대기가 앞에 온다. 섞여 나오면 무엇이 검수 전인지 찾아야 한다.
 
         get_queryset 에서 order_by 를 걸면 OrderingFilter 가 뒤에 돌면서
-        통째로 갈아끼운다. filter_queryset 에서 붙여야 살아남는다.
+        새로 갈아끼운다. filter_queryset 에서 붙여야 살아남는다.
         """
         self.client.force_login(self.staff)
 
@@ -338,7 +338,7 @@ class SentenceAPITest(TestCase):
         self.assertEqual(self.client.get(LIST_URL, {"kind": "error"}).json()["count"], 0)
 
     def test_unknown_kind_is_rejected(self):
-        """목록에 없는 종류로 거르면 400. 조용히 전체를 주면 필터가 안 먹은 걸 모른다."""
+        """목록에 없는 종류로 거르면 400. 에러 없이 전체를 주면 필터가 안 먹은 걸 모른다."""
         self.assertEqual(
             self.client.get(LIST_URL, {"kind": "nonexistent"}).status_code, 400
         )

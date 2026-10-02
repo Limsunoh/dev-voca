@@ -28,9 +28,9 @@ export default async function BoardKindPage({ params }: PageProps) {
   // weekly 는 /board 가 맡는다. 여기서 같은 화면을 그리면 한 화면이 주소
   // 두 개를 갖고, 탭의 aria-current 와 주소가 어긋난다.
   //
-  // 막지 않고 보낸다. 전에는 notFound() 였는데, 위 generateMetadata 는
-  // weekly 를 정상으로 받아 탭 제목이 "이번 주 최고점" 인 채 본문만 "없는
-  // 순위표" 가 됐다. 주소를 손으로 친 사람이 찾던 것은 이번 주 순위다.
+  // notFound() 로 막지 않고 보낸다. 위 generateMetadata 는 weekly 를 정상으로
+  // 받으므로, 막으면 탭 제목은 "이번 주 최고점" 인데 본문만 "없는 순위표" 가
+  // 된다. 주소를 손으로 친 사람이 찾던 것은 이번 주 순위다.
   if (kind === "weekly") redirect(routes.board());
 
   return <BoardScreen kind={kind} />;

@@ -10,7 +10,7 @@ const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 /**
  * 구글에서 돌아올 주소.
  *
- * 구글 콘솔에 등록한 것과 **글자 하나까지 같아야** 한다. 다르면
+ * 구글 콘솔에 등록한 것과 글자 하나까지 같아야 한다. 다르면
  * redirect_uri_mismatch 로 거절당한다.
  */
 export function callbackUrl(origin: string): string {

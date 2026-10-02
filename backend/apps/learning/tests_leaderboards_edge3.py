@@ -1,18 +1,18 @@
-"""순위표 4차 - user_id 를 is_me 로 바꾼 뒤 생긴 자리.
+"""순위표 - "이 줄이 나인가" 표시(is_me).
 
-앞의 세 파일은 **등수와 정렬**을 본다. 여기는 "이 줄이 나인가" 라는
-새 표시 하나만 판다. 지키려는 것은 둘이다.
+앞의 세 파일은 등수와 정렬을 본다. 여기는 "이 줄이 나인가" 라는
+표시 하나만 본다. 지키려는 것은 둘이다.
 
     1. 표시가 정확한가 - 로그인한 사람에게 정확히 한 줄, 게스트에게 0 줄
-    2. pk 가 정말 안 나가는가 - 키 이름뿐 아니라 **값으로도**
+    2. pk 가 정말 안 나가는가 - 키 이름뿐 아니라 값으로도
 
 둘째가 특히 놓치기 쉽다. `assertNotIn("user_id", row)` 는 키만 본다.
 pk 를 다른 이름으로 담거나 rank/score 자리에 섞어 내보내도 통과한다.
-가입자 수를 숨기려고 한 변경이므로 **본문 어디에도 그 숫자가 없어야**
-의미가 있다.
+pk 를 감추는 것은 가입자 수를 숨기려는 것이므로 본문 어디에도 그
+숫자가 없어야 의미가 있다.
 
 셋째로, 표시는 요청마다 새로 붙어야 한다. A 가 본 응답을 B 가 그대로
-받으면 B 의 화면에 A 의 줄이 강조된다 - 순위표는 로그인 없이도 보이는
+받으면 B 의 화면에 A 의 줄이 강조된다. 순위표는 로그인 없이도 보이는
 캐시하기 좋은 화면이라 실수하기 쉬운 자리다.
 """
 
@@ -106,7 +106,7 @@ class IsMeMarkTest(TestCase):
     def test_a_guest_sees_no_marked_row_anywhere(self):
         """게스트에게는 표시가 하나도 없어야 한다.
 
-        빈 순위표로 확인하면 안 된다 - 줄이 없어서 표시가 없는 것과
+        빈 순위표로 확인하면 안 된다. 줄이 없어서 표시가 없는 것과
         게스트라서 없는 것이 구분되지 않는다. 여러 줄을 채워두고 본다.
         """
         for i, name in enumerate(("갑", "을", "병", "정")):
@@ -149,7 +149,7 @@ class IsMeMarkTest(TestCase):
 
         rows 에까지 붙으면 화면이 남의 줄을 내 줄로 강조한다. 목록에 내가
         없다는 판정(_me_outside_top)도 같은 표시를 보고 하므로, 여기가
-        틀리면 내 줄이 아예 안 나오거나 두 번 나온다.
+        틀리면 내 줄이 안 나오거나 두 번 나온다.
         """
         for i, user in enumerate(bulk_users("밖채우기_", 22)):
             record_everywhere(user, 200 - i)
@@ -225,8 +225,8 @@ class IsMeMarkTest(TestCase):
         """이름이 비슷해도 표시는 내 줄에만 붙는다.
 
         같은 이름은 DB 제약(display_name 대소문자 무시 유일)이 막으므로
-        만들 수 없다. 대신 한 글자만 다른 이름을 붙여 **이름 문자열로
-        내 줄을 찾는 구현**을 잡는다 - 부분 일치나 접두사 비교를 쓰면
+        만들 수 없다. 대신 한 글자만 다른 이름을 붙여 이름 문자열로
+        내 줄을 찾는 구현을 잡는다. 부분 일치나 접두사 비교를 쓰면
         여기서 둘 다에 표시가 붙는다.
         """
         lookalike = make_user("나비슷한사람")
@@ -272,7 +272,7 @@ class PrimaryKeyNeverLeaksTest(TestCase):
     def test_the_me_row_shape_matches_the_rows(self):
         """me 도 같은 모양이어야 한다. 화면이 같은 컴포넌트로 그린다.
 
-        rows 만 검사하면 me 에 pk 가 남아 있어도 통과한다 - me 는 다른
+        rows 만 검사하면 me 에 pk 가 남아 있어도 통과한다. me 는 다른
         경로(_me_outside_top)로 만들어지므로 따로 봐야 한다.
         """
         for i, user in enumerate(bulk_users("me모양_", 21)):
@@ -292,10 +292,10 @@ class PrimaryKeyNeverLeaksTest(TestCase):
     def test_no_pk_value_appears_anywhere_in_the_body(self):
         """본문 어디에도 사용자 pk 숫자가 없어야 한다.
 
-        **pk 를 직접 큰 값으로 만든다.** 시퀀스에 맡기면 이 테스트를 단독
-        실행할 때 pk 가 1~5 가 되어 rank 1~5 와 겹친다 - 구현이 멀쩡해도
-        실패하고, 전체 실행 때는 pk 가 커서 항상 통과한다. 실행 순서가
-        결과를 정하는 테스트는 아무것도 안 지킨다.
+        pk 를 직접 큰 값으로 만든다. 시퀀스에 맡기면 이 테스트를 단독
+        실행할 때 pk 가 1~5 가 되어 rank 1~5 와 겹친다. 그러면 구현이
+        멀쩡해도 실패하고, 전체 실행 때는 pk 가 커서 항상 통과한다. 실행
+        순서가 결과를 정하는 테스트는 아무것도 확인하지 못한다.
         """
         people = User.objects.bulk_create(
             User(pk=900_000 + i, email=f"pk사람{i}@example.com", display_name=f"pk사람{i}")
@@ -312,7 +312,7 @@ class PrimaryKeyNeverLeaksTest(TestCase):
                 body = self.client.get(url).content.decode()
                 numbers = _all_numbers(json.loads(body))
 
-                # 진짜 검사를 **먼저** 한다. 전제 검사를 앞에 두면 pk 가
+                # 진짜 검사를 먼저 한다. 전제 검사를 앞에 두면 pk 가
                 # 실제로 샜을 때 그 값이 numbers 의 최대가 되어, 원인이
                 # "픽스처가 무너졌다" 로 잘못 표시된다.
                 for person in people:
@@ -391,7 +391,7 @@ class AccountSwitchTest(TestCase):
         바꾼 것이 순위표에만 안 나오고, 사용자는 "왜 여기만 옛날 그림이지"
         를 겪는다.
 
-        표시(is_me)가 이름 기준인지는 여기서 못 잡는다 - 로그인한 사람의
+        표시(is_me)가 이름 기준인지는 여기서 못 잡는다. 로그인한 사람의
         이름은 어떻게 바꿔도 자기 줄과 같기 때문이다. 그쪽은
         test_the_mark_follows_identity_not_a_similar_name 이 본다.
         """
@@ -438,7 +438,7 @@ class AccountSwitchTest(TestCase):
     def test_two_clients_see_different_marks_for_the_same_board(self):
         """두 사람이 같은 순위표를 봐도 각자 자기 줄만 표시된다.
 
-        응답을 통째로 캐시하면 먼저 부른 쪽 표시가 뒤에 온 사람에게 간다.
+        응답을 캐시하면 먼저 부른 쪽 표시가 뒤에 온 사람에게 간다.
         같은 순위표를 연달아 부르는 것이 핵심이라 클라이언트를 둘 쓴다.
         """
         from django.test import Client
@@ -496,7 +496,7 @@ class BuildLevelMarkTest(TestCase):
         cache.clear()
 
     def test_build_without_a_user_marks_nothing(self):
-        """user 를 아예 안 넘기면(게스트) 어느 줄도 내 줄이 아니다."""
+        """user 를 안 넘기면(게스트) 어느 줄도 내 줄이 아니다."""
         for i in range(3):
             record_everywhere(make_user(f"무인자{i}"), 10 - i)
 
@@ -527,11 +527,11 @@ class BuildLevelMarkTest(TestCase):
                 self.assertIsNone(board.me)
 
     def test_building_a_row_without_me_pk_fails_loudly(self):
-        """_row 는 me_pk 를 반드시 받아야 한다.
+        """_row 는 me_pk 를 기본값 없이 받는다.
 
-        기본값을 두면 새 호출부가 빠뜨렸을 때 조용히 "내 줄 없음" 이 된다.
-        화면에서는 강조가 안 되는 것으로만 보여, 순위표는 멀쩡한데 내 줄만
-        안 빛나는 상태로 오래 남는다. 여기서 터져야 그때 잡힌다.
+        기본값을 두면 새 호출부가 빠뜨렸을 때 에러 없이 "내 줄 없음" 이
+        된다. 화면에서는 강조가 안 되는 것으로만 보여, 순위표는 멀쩡한데
+        내 줄만 강조가 빠진 채로 오래 남는다. 여기서 에러가 나야 바로 잡힌다.
         """
         item = {
             "user": 1,

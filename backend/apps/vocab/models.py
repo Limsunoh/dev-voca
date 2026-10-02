@@ -10,11 +10,10 @@ class LearningItemQuerySet(models.QuerySet):
         뷰마다 filter(is_reviewed=True) 를 손으로 쓰면 언젠가 한 곳을 빠뜨린다.
         사용자 노출 경로는 이 메서드를 쓴다(CLAUDE.md 의 검수 규칙).
 
-        **칸 하나만 가리는 게이트는 여기 못 담는다.** 발음(reading)은
-        항목이 아니라 칸 단위로 검수되므로 쿼리셋으로 표현할 수 없다 -
-        그쪽은 serializers.ReviewedReadingField 가 맡는다. 이 프로젝트의
-        노출 게이트가 둘인 이유이고, 새 게이트를 만들 때 어느 쪽인지
-        먼저 정해야 한다.
+        칸 하나만 가리는 게이트는 여기 담지 못한다. 발음(reading)은 항목이
+        아니라 칸 단위로 검수되므로 쿼리셋으로 표현할 수 없어서
+        serializers.ReviewedReadingField 가 맡는다. 그래서 노출 게이트가 둘이고,
+        새 게이트를 만들 때는 어느 쪽인지 먼저 정한다.
         """
         return self.filter(is_reviewed=True)
 
@@ -130,8 +129,8 @@ class Word(LearningItem):
     # 발음을 따로 검수한다.
     #
     # is_reviewed 는 항목 단위라 이미 검수가 끝난 단어에 AI 발음을 채우면
-    # 아무도 확인하지 않은 표기가 그대로 화면에 뜬다. 단어 자체는 멀쩡한데
-    # 발음만 미검수인 상태를 나타낼 칸이 없어 생기는 구멍이다.
+    # 아무도 확인하지 않은 표기가 그대로 화면에 뜬다. 단어는 검수됐고 발음만
+    # 아직인 상태를 나타내려면 칸이 따로 있어야 한다.
     #
     # 사람이 Admin 에서 직접 적은 것은 True 로 두면 된다.
     reading_reviewed = models.BooleanField("발음 검수됨", default=False)
@@ -152,7 +151,7 @@ class Word(LearningItem):
             # choices 는 폼과 full_clean() 에서만 검사한다. update_or_create 나
             # bulk_create 는 그 경로를 안 타므로 목록에 없는 값이 그냥 저장된다.
             #
-            # 그렇게 들어간 값은 화면에서 조용히 깨진다. get_category_display()
+            # 그렇게 들어간 값은 에러 없이 화면을 깨뜨린다. get_category_display()
             # 가 라벨을 못 찾아 원값을 그대로 돌려주므로 영어 코드가 노출되고,
             # 그 코드로 만들어진 필터 링크를 누르면 API 가 400 을 준다.
             # 넣는 시점에 막는다.
@@ -294,7 +293,7 @@ class Sentence(LearningItem):
         ]
 
     def __str__(self) -> str:
-        # 문장은 길어서 통째로 찍으면 Admin 목록이 읽기 어려워진다.
+        # 문장은 길어서 다 찍으면 Admin 목록이 읽기 어려워진다.
         head = self.text if len(self.text) <= 40 else f"{self.text[:40]}..."
         return f"[{self.get_kind_display()}] {head}"
 
@@ -306,12 +305,12 @@ class PhraseScene(models.TextChoices):
     (git·api·devops...)다. 거기에 "식당" 을 더하면 단어장 필터에도 그 항목이
     생기는데, 개발 단어를 보는 화면에 쓸 일이 없는 선택지가 늘어난다.
 
-    모델 안에 중첩하지 않는 이유는 SentenceKind 와 같다 - Meta 의
-    CheckConstraint 가 참조할 수 없다.
+    모델 안에 중첩하지 않는 이유는 SentenceKind 와 같다(Meta 의
+    CheckConstraint 가 참조할 수 없다).
 
-    **처음부터 다 만들지 않는다.** 실제로 쓰는 것만 두고, 표현이 늘어
-    담을 곳이 없을 때 더한다. 207개가 된 지금도 다섯으로 다 담긴다.
-    미리 만들어두면 비어 있는 분류가 화면 필터에 뜬다.
+    처음부터 다 만들지 않는다. 실제로 쓰는 것만 두고, 담을 곳이 없는
+    표현이 생기면 더한다. 표현 207개가 지금 다섯으로 다 담긴다. 미리
+    만들어 두면 빈 분류가 화면 필터에 뜬다.
     """
 
     GREETING = "greeting", "인사·소개"
@@ -324,30 +323,28 @@ class PhraseScene(models.TextChoices):
 class DailyPhrase(LearningItem):
     """일상 영어 표현 하나. 소리내어 말하는 연습에 쓴다.
 
-    **Word 에 섞지 않고 표를 따로 두는 이유는 취향이 아니라 못 하기
-    때문이다.** Word.term 이 unique=True 인데, 일상 영어의 기초 낱말이
-    이미 개발 용어로 등록돼 있다 - 흔히 쓰는 32개를 세어보니 16개가
-    충돌했다(commit·branch·cache·merge·push·pull·deploy·key·index·view·
-    state·queue·stack·thread·port·token). 일상 영어 "commit(약속하다)" 을
-    넣을 자리가 없다.
+    Word 에 섞지 않고 표를 따로 두는 것은 섞을 수가 없어서다. Word.term 이
+    unique=True 인데, 일상 영어의 기초 낱말이 이미 개발 용어로 등록돼 있다.
+    흔히 쓰는 낱말 32개 중 16개가 겹친다(commit·branch·cache·merge·push·
+    pull·deploy·key·index·view·state·queue·stack·thread·port·token). 일상
+    영어 "commit(약속하다)" 을 넣을 자리가 없다.
 
-    unique 를 푸는 쪽도 검토했다. 안 되는 이유: 씨드 명령 넷과
+    unique 를 푸는 쪽도 검토했지만 안 된다. 시드 명령 넷과
     mark_exam_scope·generate_words 가 filter(term=...)·get_or_create(term=...)
     로 term 을 키처럼 쓴다. 제약을 풀면 그것들이 에러 없이 엉뚱한 행을
-    집는다 - 오동작이라 한참 뒤에야 드러난다.
+    집고, 한참 뒤에야 드러난다.
 
     두 번째 이유는 보기(오답) 풀이다. quiz.py 의 _pick_distractors 가 같은
-    분류에서 먼저 뽑고 모자라면 **전체 풀에서** 채운다. 한 표에 두 종류가
+    분류에서 먼저 뽑고 모자라면 전체 풀에서 채운다. 한 표에 두 종류가
     있으면 개발 용어 문제에 일상 표현 오답이 섞여 답이 뻔해진다.
 
-    **낱말 하나가 아니라 표현이다.** "화장실이 어디예요" 를 못 말하는 것이
+    낱말 하나가 아니라 표현을 담는다. "화장실이 어디예요" 를 못 말하는 것이
     일상 영어에서 막히는 지점이고, restroom 을 낱개로 외우는 것은 단어장이
     이미 하는 일이다. 그래서 text 에 여러 낱말이 들어온다.
 
-    **정처기 필드(is_exam·exam_subject)는 이 표에서 안 쓴다.** LearningItem
-    에서 물려받는 것이라 칸은 생기지만 항상 비어 있다. 상속의 대가로
-    받아들였다 - 그 두 칸 때문에 추상을 하나 더 만들 이유는 안 된다.
-    아래 CheckConstraint 가 값이 들어오는 것을 막는다.
+    정처기 필드(is_exam·exam_subject)는 이 표에서 안 쓴다. LearningItem 에서
+    물려받아 칸은 생기지만 항상 비어 있다. 그 두 칸 때문에 추상 모델을
+    하나 더 만들지는 않았다. 아래 CheckConstraint 가 값이 들어오는 것을 막는다.
     """
 
     # 낱말이 아니라 표현이라 term 이 아니라 text 다. Sentence 와 같은 이름을
@@ -365,9 +362,9 @@ class DailyPhrase(LearningItem):
         "상황", max_length=20, blank=True, choices=PhraseScene.choices
     )
 
-    # IPA. **전체를 슬래시로 한 번만** 감싸고 안쪽은 낱말마다 공백으로
-    # 끊는다. 개발 용어 361개가 전부 이 모양이라 두 갈래가 같아지고,
-    # 화면이 갈래를 안 보고 같은 코드로 그린다.
+    # IPA. 전체를 슬래시로 한 번만 감싸고 안쪽은 낱말마다 공백으로 끊는다.
+    # 개발 용어 361개가 전부 이 모양이라 두 갈래가 같아지고, 화면이 갈래를
+    # 안 보고 같은 코드로 그린다.
     #
     # 낱말 경계가 필요한 이유: 화면이 wrong_at 으로 받은 자리를 강조하려면
     # text·pronunciation·reading 셋의 낱말 수가 같아야 한다.
@@ -381,9 +378,9 @@ class DailyPhrase(LearningItem):
     # 한글만 읽어도 통하게 적은 발음. 규칙은 Word.reading 과 같고, 강세를
     # ** 로 감싼다(Reading 컴포넌트가 그것으로 굵게 그린다).
     #
-    # **강세는 낱말 안에서 닫는다.** 공백을 걸치면(`**쏘r s**`) 공백으로
-    # 세는 낱말 수가 어긋나 화면이 강조를 포기한다 - 개발 용어의
-    # source map 이 실제로 그 상태다.
+    # 강세 표시는 낱말 안에서 닫는다. 공백을 걸치면(`**쏘r s**`) 공백으로
+    # 세는 낱말 수가 어긋나 화면이 강조를 포기한다. 개발 용어의 source map 이
+    # 지금 그 상태다.
     reading = models.CharField("한글 발음", max_length=200)
 
     meaning = models.CharField("한글 뜻", max_length=200)
@@ -397,9 +394,8 @@ class DailyPhrase(LearningItem):
             models.Index(fields=["is_reviewed", "text"]),
         ]
         constraints = [
-            # choices 를 DB 에서도 막는다. 이유는 Word 쪽 주석과 같다 -
-            # update_or_create·bulk_create 는 full_clean 을 안 타서
-            # 목록에 없는 값이 그냥 저장되고, 화면에서 조용히 깨진다.
+            # choices 를 DB 에서도 막는다. update_or_create·bulk_create 는
+            # full_clean 을 안 타기 때문이다(Word 의 category 제약 주석 참고).
             models.CheckConstraint(
                 condition=models.Q(scene__in=[*PhraseScene.values, ""]),
                 name="%(app_label)s_%(class)s_scene_valid",

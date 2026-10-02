@@ -329,7 +329,7 @@ class ClaudeGeneratorParsingTest(TestCase):
             self.call(make_generator(make_response("")))
 
     def test_missing_result_key_raises(self):
-        """스키마와 다른 키가 오면 조용히 빈 결과가 되면 안 된다."""
+        """스키마와 다른 키가 오면 에러 없이 빈 결과가 되면 안 된다."""
         response = make_response(json.dumps({"sentences": [make_item("x")]}))
 
         with self.assertRaises(GenerationError) as ctx:

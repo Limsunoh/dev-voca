@@ -9,7 +9,7 @@
     - 로그인해야 쓴다. 진행이 DB 에 남는 기능이다
 
 두 번째가 이 기능의 존재 이유다. 자유 문제풀이처럼 끝내기를 클라이언트에
-맡기면, 더하기 규칙에서는 **점수가 깎이는 판을 버리는 것이 이득**이 된다.
+맡기면, 더하기 규칙에서는 점수가 깎이는 판을 버리는 것이 이득이 된다.
 """
 
 from __future__ import annotations
@@ -47,10 +47,9 @@ def make_user(name: str) -> User:
 def seed_words(count: int = 120) -> None:
     """문제를 만들 수 있을 만큼 단어를 채운다.
 
-    **RECENT_KEEP(40) 보다 넉넉해야 한다.** 출제가 최근 낸 정답을 후보에서
-    빼므로, 단어가 40개 이하면 30분 코스(40문제)가 후보 고갈로 끊긴다 -
-    판은 서버가 닫아주지만 40문제를 약속하고 30문제만 낸다. "넉넉히" 라고
-    쓰고 30 을 뒀다가 실제로 그 자리에서 걸렸다.
+    RECENT_KEEP(40) 보다 넉넉해야 한다. 출제가 최근 낸 정답을 후보에서
+    빼므로, 단어가 40개 이하면 30분 코스(40문제)가 후보 고갈로 끊긴다.
+    판은 서버가 닫아주지만 40문제를 약속하고 30문제만 낸다.
     """
     tag = uuid4().hex[:6]
     Word.objects.bulk_create(
@@ -79,8 +78,7 @@ def pass_learning(study: DailyStudy) -> tuple[str, dict] | None:
 def answer_n(user, study: DailyStudy, token: str, question, count: int):
     """count 번 답한다. 중간에 학습이 끼면 넘긴다. (토큰, 문제)를 돌려준다.
 
-    학습 단계가 생기기 전에는 답이 곧바로 다음 문제를 줬다. 이제는
-    묶음 끝에서 (None, None) 이 오고 학습을 봐야 이어진다 - 테스트마다
+    묶음 끝에서는 (None, None) 이 오고 학습을 봐야 이어진다. 테스트마다
     그 분기를 적으면 구성을 바꿀 때 전부 고쳐야 한다.
     """
     for _ in range(count):
@@ -133,8 +131,8 @@ def run_to_end(user, length: str) -> DailyStudy:
 def tomorrow():
     """하루 뒤로 간 시계.
 
-    자정을 흉내낼 때 **day 를 밀지 않고 시계를 민다.** 프로덕션에서
-    DailyStudy.day 는 만들 때 한 번 정해지고 다시는 안 바뀐다 - 움직이는
+    자정을 흉내낼 때 day 를 밀지 않고 시계를 민다. 프로덕션에서
+    DailyStudy.day 는 만들 때 한 번 정해지고 다시는 안 바뀐다. 움직이는
     것은 시계뿐이다. day 를 미는 방식은 이미 그날 줄에 쌓아둔 점수까지
     같이 옮긴 것처럼 보여, 순위표가 실제와 다르게 나온다.
 
@@ -152,7 +150,7 @@ class PlanTest(TestCase):
         """길게 고를수록 문제도 보너스도 많아야 한다.
 
         보너스가 전부 같으면 짧은 것을 고르는 쪽이 항상 이득이라 긴
-        선택지가 죽는다. 어느 것을 골라도 손해가 없어야 자기 사정에
+        선택지를 고를 이유가 없다. 어느 것을 골라도 손해가 없어야 자기 사정에
         맞춰 고른다.
         """
         short = STUDY_PLANS[StudyLength.SHORT]
@@ -168,7 +166,7 @@ class PlanTest(TestCase):
         """화면에 약속한 숫자 그대로여야 한다.
 
         단조성만 보면 (1,1)/(2,2)/(3,3) 으로 바뀌어도 통과한다. 이 값들은
-        순위표 점수에 그대로 꽂히므로 조용히 바뀌면 아무도 모른다.
+        순위표 점수에 그대로 반영되므로 바뀌어도 눈에 띄지 않는다.
         """
         for length, total, bonus in [
             (StudyLength.SHORT, 10, 5),
@@ -261,7 +259,7 @@ class ScoringTest(TestCase):
         자유 문제풀이는 -1 이다. 여기서 깎으면 모르는 것을 만날수록
         손해라 매일 오지 않는다.
 
-        **score >= 0 을 보면 안 된다.** 완주 보너스가 5 라 감점이 있어도
+        score >= 0 을 보면 안 된다. 완주 보너스가 5 라 감점이 있어도
         그 조건은 참이다. 맞힌 개수와 정확히 같은지를 본다.
         """
         from .tests_daily_study_edge import answer_wrong
@@ -321,7 +319,7 @@ class ProgressTest(TestCase):
         """남의 토큰으로 내 판에 답할 수 없다.
 
         계정을 하나 더 만들어 거기서 정답을 알아낸 뒤 그 토큰을 내 계정으로
-        보내면, 순번 방어만으로는 통과한다 - 둘 다 같은 순번에 있기 때문이다.
+        보내면, 둘 다 같은 순번에 있어 순번 방어만으로는 통과한다.
         토큰이 자기 판을 밝히고 그 판의 주인을 함께 보는 것이 이걸 막는다.
         """
         other = make_user("남")
@@ -343,7 +341,7 @@ class ProgressTest(TestCase):
     def test_yesterdays_open_study_is_settled_when_today_starts(self):
         """어제 못 끝낸 판은 오늘 시작할 때 정산한다.
 
-        안 그러면 그 판이 영원히 열린 채 남는다. 열린 판이 둘이면 이어풀기가
+        안 그러면 그 판이 계속 열린 채 남는다. 열린 판이 둘이면 이어풀기가
         늘 최신 것을 집어, 어제 판은 40문제를 다 풀었어도 완주 보너스를
         못 받는다.
         """
@@ -362,8 +360,8 @@ class ProgressTest(TestCase):
         """자정을 넘겨도 이어서 푼다.
 
         제한 시간이 없는 공부라 23:50 에 30분짜리를 시작하는 것이 권장
-        사용법이다. 날짜로 판을 찾으면 자정에 토큰이 통째로 죽고, 그 판은
-        열린 채 남아 끝내지도 못한다.
+        사용법이다. 날짜로 판을 찾으면 자정에 그 판의 토큰을 전부 못 쓰게
+        되고, 그 판은 열린 채 남아 끝내지도 못한다.
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
@@ -408,7 +406,7 @@ class ProgressTest(TestCase):
     def test_the_same_token_cannot_be_answered_twice(self):
         """옛 토큰을 다시 보내면 거절한다.
 
-        **진행 개수만 보는 것으로는 부족하다.** 옛 토큰을 보내도 answered
+        진행 개수만 보는 것으로는 부족하다. 옛 토큰을 보내도 answered
         는 늘어나지만, 그때 correct 도 같이 늘어난다. 첫 답의 응답이 정답을
         알려주므로 같은 토큰에 그 답을 실어 다시 보내면 확실히 +1 이다.
         문제 수로 끝나는 규칙이라 절반만 탐색해도 만점이 된다.
@@ -441,8 +439,8 @@ class ProgressTest(TestCase):
         """문제 수를 넘겨 답할 수 없다.
 
         마지막 문제에 두 답이 겹치면 answered 가 total 을 넘고 그만큼
-        점수가 는다. 정상 흐름만 보면 이 검사가 안 된다 - 순서대로 풀면
-        어차피 안 넘치기 때문이다. **끝난 뒤 한 번 더 밀어넣는다.**
+        점수가 는다. 순서대로 풀면 어차피 안 넘치므로 정상 흐름만으로는
+        이 검사가 안 된다. 그래서 끝난 뒤 한 번 더 밀어넣는다.
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 

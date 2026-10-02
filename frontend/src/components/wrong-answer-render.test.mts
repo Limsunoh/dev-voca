@@ -1,10 +1,10 @@
 /**
- * WrongAnswer 를 **실제로 그려서** 본다.
+ * WrongAnswer 를 실제로 그려서 본다.
  *
- * 형제 파일 wrong-answer.test.mts 는 호출부(세 화면)가 값을 넘기는지를
- * 원문으로 본다. 여기는 이 조각이 **무엇을 그리는지**를 본다. 원문 검사는
- * "값을 그리긴 하는데 엉뚱한 자리" 를 못 잡는다. react-dom/server 로
- * 글자를 뽑아 보므로 브라우저가 필요 없다.
+ * wrong-answer.test.mts 는 호출부(세 화면)가 값을 넘기는지를 원문으로 본다.
+ * 여기는 이 조각이 무엇을 그리는지를 본다. 원문 검사는 "값을 그리긴 하는데
+ * 엉뚱한 자리" 를 못 잡는다. react-dom/server 로 글자를 뽑아 보므로
+ * 브라우저가 필요 없다.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
@@ -44,8 +44,8 @@ describe("WrongAnswer 가 그리는 것", () => {
   });
 
   it("본문만 비고 뜻이 있으면 뜻을 지킨다", () => {
-    // 서버가 실제로 내는 조합이다 - Sentence.context 를 비우면
-    // _describe 가 ("", 해석) 을 준다. 백엔드 테스트로 확인했다.
+    // 서버가 실제로 내는 조합이다. Sentence.context 를 비우면 _describe 가
+    // ("", 해석) 을 준다(백엔드 테스트로 확인했다).
     const html = draw("", "이 브랜치를 리베이스해 주세요");
     assert.match(html, /이 브랜치를 리베이스해 주세요/, "서버가 보낸 뜻이 사라지면 안 된다");
     // 본문이 없으니 가운뎃점도 없어야 한다.

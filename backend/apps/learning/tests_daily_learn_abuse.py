@@ -1,7 +1,7 @@
 """학습 단계를 우회하거나 악용하는 경로.
 
 화면은 학습 카드를 보여준 뒤 문제로 넘기지만, API 를 직접 치면 그 순서를
-건너뛸 수 있다. 건너뛰어도 **문제는 여전히 그 묶음에서 나와야** 한다 -
+건너뛸 수 있다. 건너뛰어도 문제는 여전히 그 묶음에서 나와야 한다.
 안 그러면 "방금 본 것으로 낸다" 는 약속이 화면을 우회한 사람에게만
 깨지는 것이 아니라, 화면이 느린 순간에도 깨진다.
 """
@@ -74,12 +74,12 @@ class SkipLearningTest(TestCase):
     def test_an_unreviewed_chunk_does_not_trigger_a_reissue(self):
         """뽑아둔 단어가 미검수로 내려가도 새 묶음을 안 뽑는다.
 
-        **여기가 실제로 터졌던 자리다.** "이미 뽑았나" 를 learn_targets 가
-        비었는지로 판정했는데, 저기는 visible() 을 거치므로 검수가 취소되면
-        빈 목록이 된다. 그러면 GET 마다 새 묶음이 이어붙어, 한 문제도 안
-        풀었는데 계획 8개가 새로고침 여섯 번에 14개로 불었다.
+        "이미 뽑았나" 를 learn_targets 가 비었는지로 판정하면, 저기는
+        visible() 을 거치므로 검수가 취소될 때 빈 목록이 된다. 그러면 GET
+        마다 새 묶음이 이어붙어, 한 문제도 안 풀었는데 새로고침 여섯 번에
+        계획 8개가 14개로 분다.
 
-        검수 취소는 이 프로젝트에서 실제로 일어나는 동작이다.
+        검수 취소는 Admin 에서 언제든 일어난다.
         """
         study, _t, _q = daily_study.start(self.user, StudyLength.SHORT)
         study.refresh_from_db()
@@ -135,8 +135,8 @@ class SkipLearningTest(TestCase):
         """이어 풀기를 반복해도 문제가 안 바뀐다.
 
         바뀌면 아는 것이 나올 때까지 화면을 새로 열면 되므로 사실상
-        만점이다. 학습 단계가 생기면서 resume 이 묶음을 뽑는 경로가
-        늘었는데, 그 때문에 이 보호가 뚫리지 않았는지 본다.
+        만점이다. resume 이 묶음을 뽑는 경로를 거쳐도 이 보호가
+        유지되는지 본다.
         """
         study, _token, _q = daily_study.start(self.user, StudyLength.SHORT)
 
@@ -179,7 +179,7 @@ class ScopeIntegrityTest(TestCase):
     def test_a_tiny_corpus_falls_back_to_the_whole_pool(self):
         """단어가 아주 적으면 학습 없이 전체에서 낸다.
 
-        묶음을 만들 수 없는 판인데, 여기서 판이 통째로 끝나면 사용자는
+        묶음을 만들 수 없는 판인데, 여기서 판이 끝나 버리면 사용자는
         "왜 시작하자마자 끝났지" 를 본다.
         """
         Word.objects.bulk_create(
@@ -260,18 +260,17 @@ class ReviewStateWriteTest(TestCase):
     def test_a_correct_answer_does_not_write_streak_back(self):
         """맞힌 답은 streak 을 되쓰지 않는다.
 
-        bulk_update 는 필드 목록에 있는 값을 **읽은 시점 그대로** 쓴다.
+        bulk_update 는 필드 목록에 있는 값을 읽은 시점 그대로 쓴다.
         맞았을 때 streak 을 안 바꾸니 "그대로 두는 것" 처럼 보이지만,
         읽기와 쓰기 사이에 복습이 올린 값이 있으면 낡은 값으로 되돌린다.
 
-        일일공부가 이 함수를 답 하나마다 부르면서 그 창이 25배로
-        넓어졌다 - 자유 문제풀이는 판이 끝날 때 한 번이라 안 띄었다.
-        복습 2회로 졸업하는 규칙(GRADUATE_STREAK)이라 1회가 사라지면
-        사용자는 졸업에 영영 못 닿는다.
+        일일공부는 이 함수를 답 하나마다 불러서, 판이 끝날 때 한 번 부르는
+        자유 문제풀이보다 그 창이 25배 넓다. 복습 2회로 졸업하는
+        규칙(GRADUATE_STREAK)이라 1회가 사라지면 사용자는 졸업에 닿지 못한다.
 
-        창을 실제로 열려면 함수가 DB 를 읽은 **뒤** 복습이 끼어들어야
-        한다. 스레드로는 그 지점을 못 맞히므로 bulk_update 를 감싸
-        직전에 복습을 끼워 넣는다 - 이것이 그 순간이다.
+        창을 실제로 열려면 함수가 DB 를 읽은 뒤 복습이 끼어들어야 한다.
+        스레드로는 그 지점을 못 맞히므로 bulk_update 를 감싸 직전에 복습을
+        끼워 넣는다.
         """
         word = Word.objects.visible().first()
         row = ReviewState.objects.create(
@@ -297,7 +296,7 @@ class ReviewStateWriteTest(TestCase):
     def test_a_wrong_answer_still_breaks_the_streak(self):
         """틀린 답은 여전히 연속을 끊는다.
 
-        위 수정으로 맞은 줄에서 streak 을 뺐는데, 틀린 줄에서까지
+        맞은 줄은 streak 을 쓰지 않는데, 틀린 줄에서까지 streak 이
         빠지면 복습 1회 + 오답 + 복습 1회 로 "연속" 아닌 두 번에
         졸업한다.
         """
@@ -325,7 +324,7 @@ class ChunkWriteTest(TestCase):
         self.user = make_user("동시")
 
     def test_a_full_save_does_not_resurrect_an_old_list(self):
-        """진행 중인 판을 통째로 save() 해도 학습 목록이 안 되살아난다.
+        """진행 중인 판 전체를 save() 해도 학습 목록이 안 되살아난다.
 
         issue_chunk 가 인메모리 learned_ids 에 이어붙여 쓰면, issued_chunks
         만 조건부로 막히고 리스트는 read-modify-write 그대로다. Admin 이
@@ -345,7 +344,7 @@ class ChunkWriteTest(TestCase):
         # _pick_for_study 가 도는 동안(ReviewState 조회 + order_by("?")
         # 세 번, 수십 ms) DB 쪽 learned_ids 가 늘어나는 순간을 만든다.
         # 다른 요청이 묶음을 넣었거나, 관리 화면이 손댄 경우다. 이때
-        # 인메모리 값으로 이어붙이면 그 사이에 늘어난 것이 통째로 날아간다.
+        # 인메모리 값으로 이어붙이면 그 사이에 늘어난 것이 사라진다.
         real = daily_study._pick_for_study
         meanwhile = [-1, -2]
 
@@ -385,12 +384,11 @@ class ScoreboardLockTest(TestCase):
 
         DailyScore 는 (user, day) 유일 인덱스를 잡는다. _take_step 이
         그것까지 하면, 채점을 감싼 트랜잭션이 복습 갱신이 끝날 때까지
-        그 락을 쥔다 - 답하기와 어제 판 정산이 겹치는 자정 언저리가
-        그 조합이고, daily_study 첫머리(settle_stale)가 그 교착을 이미
-        관측해 적어뒀다.
+        그 락을 쥔다. 답하기와 어제 판 정산이 겹치는 자정 언저리가 그
+        조합이다(daily_study 의 settle_stale 주석 참고).
 
         그래서 점수판은 호출부가 트랜잭션 밖에서 쓴다. 여기서는
-        _take_step 이 그 일을 안 하는 것만 못 박는다 - 트랜잭션 경계는
+        _take_step 이 그 일을 안 하는 것만 확인한다. 트랜잭션 경계는
         TestCase 가 전체를 감싸고 있어 안에서는 구분할 수 없다.
         """
         study, _t, _q = daily_study.start(self.user, StudyLength.SHORT)
@@ -433,8 +431,8 @@ class ScoreboardLockTest(TestCase):
     def test_a_failed_review_write_rolls_back_the_score(self):
         """복습 갱신이 실패하면 채점도 되돌린다.
 
-        따로 커밋하면 점수만 오르고 그 답은 복습에 영영 안 뜬다 -
-        순번은 이미 소비돼서 재시도도 "이미 처리한 답입니다" 로 막힌다.
+        따로 커밋하면 점수만 오르고 그 답은 복습에 안 뜬다. 순번은
+        이미 소비돼서 재시도도 "이미 처리한 답입니다" 로 막힌다.
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
         before = study.answered
@@ -463,14 +461,13 @@ class StuckSessionTest(TestCase):
     def test_a_crash_after_scoring_does_not_lock_the_day(self):
         """채점 커밋 뒤 터져도 이어 풀 수 있다.
 
-        **여기가 실제로 터졌던 자리다.** 채점과 복습을 트랜잭션으로 묶고
-        점수판 반영을 커밋 뒤로 빼면서, 커밋과 "다음 문제 심기" 사이에
-        실패 지점이 생겼다. 거기서 터지면 DB 의 step 은 올라갔는데
-        저장된 문제는 옛 순번이라, resume 이 그것을 다시 서명해 주고
-        _take_step 이 영원히 거절한다.
+        채점과 복습은 한 트랜잭션이고 점수판 반영은 커밋 뒤라, 커밋 뒤에
+        실패 지점이 있다. 다음 문제를 그 뒤에 심으면, 거기서 터질 때 DB 의
+        step 은 올라갔는데 저장된 문제는 옛 순번이라 resume 이 그것을 다시
+        서명해 주고 _take_step 이 계속 거절한다.
 
-        화면을 새로 열어도 계속 "이미 처리한 답입니다" 만 나오고, 하루
-        한 번 제약이라 다시 시작할 수도 없다. 그 사람의 오늘이 끝난다.
+        그러면 화면을 새로 열어도 계속 "이미 처리한 답입니다" 만 나오고,
+        하루 한 번 제약이라 다시 시작할 수도 없다.
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
@@ -521,13 +518,13 @@ class StuckSessionTest(TestCase):
 class QuestionSwapRaceTest(TestCase):
     """순번과 저장된 문제가 어긋나지 않나.
 
-    **"같은 순번에 토큰이 둘" 을 막는 것은 이 불변식이 아니다.** 그건
-    resume 이 저장된 문제를 다시 서명해 주는 것이 막는다 - 어느 시점에
+    "같은 순번에 토큰이 둘" 을 막는 것은 이 불변식이 아니다. 그건
+    resume 이 저장된 문제를 다시 서명해 주는 것이 막는다. 어느 시점에
     읽어도 같은 행을 읽으므로 정답이 같다. 여기서 보는 것은 그보다
     앞단인 "두 값이 같은 것을 가리키나" 이고, 어긋나면 resume 이 저장분을
     버리고 새로 뽑는 경로로 빠져 그 보호 밖으로 나간다.
 
-    **스레드로 창을 노리는 테스트는 두지 않았다.** 창이 수십 ms 라
+    스레드로 창을 노리는 테스트는 두지 않았다. 창이 수십 ms 라
     타이밍에 따라 들어갈 때도 안 들어갈 때도 있어서, 통과해도 방어를
     증명하지 못하고 실패해도 원인이 코드인지 타이밍인지 안 갈린다.
     """
@@ -540,18 +537,18 @@ class QuestionSwapRaceTest(TestCase):
     def test_the_saved_question_never_lags_the_step(self):
         """저장된 문제의 순번이 DB 순번보다 뒤처지지 않는다.
 
-        **여기가 실제로 터졌던 자리다.** 순번을 먼저 커밋하고 다음 문제를
-        나중에 심으면 그 사이에 창이 생긴다. 창 안에서는 DB 가 step=N+1
-        인데 저장된 문제는 n=N 이라, 그때 들어온 새로고침(resume)이
-        저장분을 버리고 새로 뽑으면 **같은 순번에 유효한 토큰이 둘**이
-        되어 아는 쪽을 골라 답할 수 있다. 안 뽑아주면 그 판이 갇힌다.
+        순번을 먼저 커밋하고 다음 문제를 나중에 심으면 그 사이에 창이
+        생긴다. 창 안에서는 DB 가 step=N+1 인데 저장된 문제는 n=N 이라,
+        그때 들어온 새로고침(resume)이 저장분을 버리고 새로 뽑으면 같은
+        순번에 유효한 토큰이 둘이 되어 아는 쪽을 골라 답할 수 있다. 안
+        뽑아주면 그 판이 갇힌다.
 
         보기를 누르고 응답 전에 새로고침하면 나는 상황이라, 답 하나마다
         창이 하나씩 생긴다.
 
-        창을 없애는 것이 양쪽을 다 막는 유일한 방법이라, 채점과 문제
-        심기를 한 트랜잭션에 넣었다. 여기서는 그 결과인 **"두 값이 항상
-        같다"** 를 못 박는다 - 창이 다시 열리면 이 불변식이 깨진다.
+        창을 없애야 양쪽을 다 막을 수 있어서 채점과 문제 심기는 한
+        트랜잭션에 있다. 여기서는 그 결과인 "두 값이 항상 같다" 를
+        확인한다. 창이 다시 열리면 이 불변식이 깨진다.
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
@@ -562,7 +559,7 @@ class QuestionSwapRaceTest(TestCase):
             "시작 직후부터 어긋났다",
         )
 
-        # **끝까지 돈다.** 마지막 답은 다음 문제를 안 심으므로 저장 문제가
+        # 끝까지 돈다. 마지막 답은 다음 문제를 안 심으므로 저장 문제가
         # 한 순번 뒤처지는데, 거기서 멈추면 그 자리를 못 본다. 다 푼 판은
         # question 이 비어 있어야 한다 - 남아 있으면 resume 이 그것을 보고
         # 이미 끝난 판에 답할 수 없는 토큰을 내준다.

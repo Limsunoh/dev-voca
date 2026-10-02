@@ -1,6 +1,6 @@
 """일일공부 이어 풀기.
 
-**중간에 나간 사람이 오늘 판을 끝낼 수 있어야 한다.** 답하려면 토큰이
+중간에 나간 사람이 오늘 판을 끝낼 수 있어야 한다. 답하려면 토큰이
 필요한데 토큰은 시작·답하기에서만 나오고, 시작은 하루 한 번 제약에
 막힌다. 제한 시간이 없는 기능이라 중간 이탈이 예외가 아니다.
 
@@ -10,10 +10,10 @@
     문제를 갈아탈 수 없다  같은 순번에서는 늘 같은 문제가 나온다
 
 두 번째가 특히 중요하다. 순번은 답할 때만 오르므로, 새로 뽑아주면
-아는 문제가 나올 때까지 화면을 다시 열면 된다 - 사실상 만점이 된다.
-_take_step 은 "한 순번은 한 번만 소비된다" 만 지키지 그것까지 막지
-못한다. 지금까지는 문제 발급이 순번 소비와 붙어 있어 그 차이가 드러날
-자리가 없었고, 이어 풀기가 그 둘을 처음 분리했다.
+아는 문제가 나올 때까지 화면을 다시 열어 사실상 만점을 받을 수 있다.
+_take_step 은 "한 순번은 한 번만 소비된다" 만 지키고 그것까지는 막지
+못한다. 이어 풀기는 문제 발급을 순번 소비와 떼어 놓으므로 이 차이가
+드러난다.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ class ResumeTest(TestCase):
     def test_a_half_done_study_can_be_continued(self):
         """중간에 나가도 오늘 판을 끝낼 수 있다.
 
-        이게 없으면 3문제 풀고 나간 사람이 완주 보너스를 영영 잃는다 -
+        이게 없으면 3문제 풀고 나간 사람이 완주 보너스를 받을 수 없다.
         시작은 하루 한 번 제약에 막히고 답할 토큰은 받을 길이 없다.
         """
         study, token, question = daily_study.start(self.user, StudyLength.SHORT)
@@ -67,8 +67,8 @@ class ResumeTest(TestCase):
         """화면을 다시 열어도 같은 문제가 나온다.
 
         새로 뽑아주면 순번을 소비하지 않고 문제만 바꿀 수 있다. 모르는
-        문제가 나오면 다시 열고, 아는 것이 나올 때까지 반복한 뒤 답하면
-        된다 - 40문제짜리를 사실상 만점으로 끝낸다.
+        문제가 나오면 다시 열고, 아는 것이 나올 때까지 반복한 뒤 답해
+        40문제짜리를 사실상 만점으로 끝낼 수 있다.
         """
         _study, _token, first = daily_study.start(self.user, StudyLength.LONG)
 
@@ -86,13 +86,13 @@ class ResumeTest(TestCase):
     def test_answering_moves_to_the_next_question(self):
         """답하면 다음 문제로 넘어간다. 고정이 진행을 막지 않는다.
 
-        **문제 내용이 바뀌는지는 안 본다.** 학습 단계가 생기면서 앞쪽
-        문제는 그 묶음 안에서만 나오는데, SHORT 는 묶음이 2개라 연속 두
-        문제가 같은 단어일 확률이 구조적으로 1/2 이다. 그건 의도한
-        동작이다 - 방금 본 것을 다시 묻는 것이라 학습에 손해가 아니고,
-        후보가 2개면 피할 여지도 없다(session.make_question).
+        문제 내용이 바뀌는지는 안 본다. 앞쪽 문제는 학습 묶음 안에서만
+        나오는데, SHORT 는 묶음이 2개라 연속 두 문제가 같은 단어일 확률이
+        구조적으로 1/2 이다. 그건 의도한 동작이다. 방금 본 것을 다시 묻는
+        것이라 학습에 손해가 아니고, 후보가 2개면 피할 여지도 없다
+        (session.make_question).
 
-        여기서 못 박을 것은 "순번이 올랐고 다음 문제가 왔다" 이다.
+        여기서 확인할 것은 "순번이 올랐고 다음 문제가 왔다" 이다.
         """
         _study, token, question = daily_study.start(self.user, StudyLength.SHORT)
 
@@ -127,7 +127,7 @@ class ResumeTest(TestCase):
         picked = question["choices"][0]["id"]
         daily_study.answer(self.user, first_token, picked)
 
-        # 이어 풀 토큰을 받는다. 그래도 옛 토큰은 죽어 있어야 한다.
+        # 이어 풀 토큰을 받는다. 그래도 옛 토큰은 거절돼야 한다.
         today = daily_study.today_of(self.user)
         daily_study.resume(today)
 

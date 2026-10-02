@@ -1,9 +1,9 @@
 /**
- * listenOnce 를 기존 두 파일이 안 흔든 순서로 흔든다.
+ * listenOnce 를 speech.test.mts·speech.order.test.mts 가 안 흔든 순서로 흔든다.
  *
  * 실행: cd frontend && npm test
  *
- * 모든 경우에 onDone 이 **정확히 한 번** 불리는지 타이머가 다 돈 뒤에 센다.
+ * 모든 경우에 onDone 이 정확히 한 번 불리는지 타이머가 다 돈 뒤에 센다.
  */
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";

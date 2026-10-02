@@ -11,7 +11,7 @@ import { getToken } from "@/lib/session";
  * 환경변수이고, 인증 토큰은 httpOnly 쿠키에 있어 브라우저 스크립트가
  * 읽을 수 없다. 그것을 꺼내 헤더에 붙이는 일은 여기서만 일어난다.
  *
- * 자유 문제풀이와 다른 점: **로그인이 없으면 아예 막는다.** 진행이
+ * 자유 문제풀이와 다른 점: 로그인이 없으면 막는다. 진행이
  * 서버에 남아야 하는 기능이라 게스트에게는 이어 볼 자리가 없다.
  */
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  // **먼저 action 을 본다.** 뒤로 미루면 오타 난 action 이 아래 검사에
+  // 먼저 action 을 본다. 뒤로 미루면 오타 난 action 이 아래 검사에
   // 걸려 원인과 무관한 문구를 받는다.
   if (!["start", "answer"].includes(body.action ?? "")) {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });

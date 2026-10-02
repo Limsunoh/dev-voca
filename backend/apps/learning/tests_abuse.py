@@ -1,7 +1,7 @@
 """판을 깨뜨려보는 테스트.
 
-tests.py 가 "정상 흐름과 알려진 공격" 을 본다면 여기는 **아직 아무도 안 해본
-짓** 을 본다. 세 가지를 노린다.
+tests.py 가 "정상 흐름과 알려진 공격" 을 본다면 여기는 아직 아무도 안 해본
+짓을 본다. 세 가지를 노린다.
 
     - 검수 게이트: 검수 안 된 단어·문장이 문제 어디로도 새면 안 된다
     - 하루 상한: 자정 경계·여러 판·여러 계정으로도 한 판 이상 못 센다
@@ -102,7 +102,7 @@ class ReviewGateTest(TestCase):
 
     devvoca 에서 가장 자주 나는 결함이다. 목록·검색은 필터를 눈으로 볼 수
     있지만, 문제 출제는 지문·보기·정답 해설까지 경로가 넷이라 한 곳만
-    빠뜨려도 조용히 샌다.
+    빠뜨려도 에러 없이 샌다.
     """
 
     SECRET_MARKS = ("SECRET", "비밀")
@@ -279,7 +279,7 @@ class MalformedBodyTest(TestCase):
                     self.assertEqual(res.status_code, 400)
 
     def test_bad_choice_ids_are_refused(self):
-        """정수가 아닌 보기 값은 400. 조용히 1번 보기로 읽히면 안 된다."""
+        """정수가 아닌 보기 값은 400. 1번 보기로 읽히면 안 된다."""
         for picked in ("3", 1.5, None, True, False, [1], {"id": 1}, "", "٣"):
             with self.subTest(picked=repr(picked)):
                 res = self.post(
@@ -363,7 +363,7 @@ class RoundFlowAbuseTest(TestCase):
         """일찍 끝낸 뒤 더 풀어서 점수를 올려 다시 낼 수 없다.
 
         판 식별자가 하나라 두 번째 제출이 거절된다. 사용자에게는 손해지만
-        점수를 부풀리는 쪽으로는 절대 안 열린다 - 여기가 열리면 "낮을 때
+        점수를 부풀리는 쪽으로는 열리지 않는다. 여기가 열리면 "낮을 때
         한 번 내고, 오를 때마다 다시 내기" 가 지배 전략이 된다.
         """
         token = self.play(2)
@@ -479,8 +479,8 @@ class RoundFlowAbuseTest(TestCase):
         """지금은 판 토큰에 계정이 안 묶여 있다.
 
         게스트로 푼 판을 아무 계정으로나 낼 수 있다. 대리로 점수를
-        올려주는 길이 열려 있다는 뜻이라, 여기가 붉어지면 그때 계정을
-        토큰에 심었다는 신호다.
+        올려주는 길이 열려 있다는 뜻이다. 여기가 실패하면 계정을 토큰에
+        심었다는 뜻이다.
         """
         token = self.play(3)
 
@@ -620,7 +620,7 @@ class DailyCapTest(TestCase):
         self.assertEqual(row.day, datetime(2026, 8, 15).date())
 
     def test_a_round_cannot_be_banked_longer_than_the_token_lives(self):
-        """토큰 수명이 지나면 그 판은 아예 낼 수 없다. 며칠씩 못 쟁인다."""
+        """토큰 수명이 지나면 그 판은 낼 수 없다. 며칠씩 못 쟁인다."""
         with frozen(kst(2026, 8, 14, 23, 0)):
             token, _ = session.start()
             token, _, _ = session.answer(token, answer_id_of(token))
@@ -729,12 +729,12 @@ class SituationChoiceTest(TestCase):
     def setUpTestData(cls):
         make_words(8)
         # 한 상황에 문장이 몰려 있는 모양. 그냥 뽑으면 오답 셋 중 둘이
-        # 같은 상황이 되기 쉽다 - 시드 데이터가 이 모양이다("브라우저 콘솔"
+        # 같은 상황이 되기 쉽다. 시드 데이터가 이 모양이다("브라우저 콘솔"
         # 한 상황에 문장 14개).
         #
         # 상황을 넷으로 두는 이유: 보기가 넷이라 서로 다른 상황이 최소 넷은
         # 있어야 문제를 만들 수 있다. 셋만 두면 중복을 없앤 뒤 보기가
-        # 모자라 아예 못 만들고(None), 그건 이 테스트가 보려는 것이 아니다.
+        # 모자라 못 만들고(None), 그건 이 테스트가 보려는 것이 아니다.
         crowd = [
             ("빌드가 깨졌을 때", 4),
             ("브라우저 콘솔", 4),
@@ -759,7 +759,7 @@ class SituationChoiceTest(TestCase):
     def test_distractors_do_not_repeat_each_other(self):
         """오답끼리 같은 상황 글자를 쓰면 보기가 둘로 보인다.
 
-        **고쳐진 결함이다. 회귀 방지용이다**(quiz.make_situation_question).
+        고쳐진 결함의 회귀 방지용이다(quiz.make_situation_question).
         정답과 겹치는 상황만 빼고 오답끼리는 안 본다. 시드 380개 중 149개가
         남과 상황을 공유하고(가장 많은 "브라우저 콘솔" 하나에 14개), 상황
         문제 한 번에 보기가 겹칠 확률이 1.2% 다.
@@ -827,13 +827,13 @@ class KnownDefectTest(TestCase):
         cache.clear()
 
     def test_description_kind_without_candidates_kills_the_round(self):
-        """유형 하나를 못 만들면 판이 통째로 끝난다.
+        """유형 하나를 못 만들면 판이 끝나던 결함.
 
-        **고쳐진 결함이다. 회귀 방지용이다**(session._make). 문장 유형은 못 만들면
+        고쳐진 결함의 회귀 방지용이다(session._make). 문장 유형은 못 만들면
         단어 문제로 떨어지는데, 단어 유형은 그 자리에서 None 을 돌려준다.
         그러면 _issue 가 None 이 되어 마감 전인데도 판이 닫힌다.
 
-        시드 566개는 전부 설명이 있어 지금 데이터로는 안 터진다. Admin 에서
+        시드 566개는 전부 설명이 있어 지금 데이터로는 안 생긴다. Admin 에서
         설명 없이 단어를 넣거나, 최근 40개가 설명 있는 후보를 다 먹으면
         그때 사용자는 "왜 30초 만에 끝났지" 를 보게 된다.
         """
@@ -861,7 +861,7 @@ class KnownDefectTest(TestCase):
     def test_blank_does_not_leave_a_derived_form_of_the_answer(self):
         """정답의 파생어가 지문에 남으면 답이 그대로 보인다.
 
-        **고쳐진 결함이다. 회귀 방지용이다**(quiz._blank_out). 낱말 경계로 정확히
+        고쳐진 결함의 회귀 방지용이다(quiz._blank_out). 낱말 경계로 정확히
         일치하는 자리만 가려서 commit 을 가려도 commits 가 남는다.
         같은 파일의 _mask_term 은 이미 \\w* 로 파생어까지 가린다.
 

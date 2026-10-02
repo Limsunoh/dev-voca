@@ -1,17 +1,17 @@
-"""순위표 3차 - 새로 생긴 표면을 깨뜨리려고 쓴 테스트.
+"""순위표 - 앞의 두 테스트 파일이 안 본 자리.
 
 tests_leaderboards.py 는 규칙을, tests_leaderboards_edge.py 는 경계를 본다.
-여기는 그 둘이 안 건드린 **세 자리**를 판다.
+여기는 그 둘이 안 본 세 자리를 본다.
 
     1. 스로틀 통 분리 - 순위표별 / 로그인별 / 게스트와 회원 사이
     2. first_at 절충 - 판을 여러 번 한 사람이 섞였을 때 목록과 me.rank 가
-       서로 어긋나는지. 절충 자체는 알려진 것이고, **둘이 갈리는 것**이
+       서로 어긋나는지. 절충 자체는 알려진 것이고, 둘이 갈리는 것이
        진짜 결함이다
     3. ahead 의 3중 OR - 점수와 first_at 이 완전히 같은 무리에서 등수가
        뭉치거나 겹치는지
 
 절충(첫 판 시각으로 동점을 가르는 것)은 결함으로 보지 않는다. 목록과 내
-등수가 **같은 절충**을 쓰는 한 화면은 일관된다. 여기서 잡으려는 것은
+등수가 같은 절충을 쓰는 한 화면은 일관된다. 여기서 잡으려는 것은
 "한쪽만 절충을 쓰는" 경우다.
 """
 
@@ -47,7 +47,7 @@ TIGHT = "3/min"
 def tighten(rate: str):
     """순위표 한도를 낮춘다.
 
-    **override_settings 로는 안 된다.** DRF 의 SimpleRateThrottle 은
+    override_settings 로는 안 된다. DRF 의 SimpleRateThrottle 은
     THROTTLE_RATES 를 import 시점에 클래스 속성으로 굳혀서, 설정을 나중에
     바꿔도 안 읽는다(settings.py 의 DEFAULT_THROTTLE_RATES 주석이 말하는
     그 성질이다). 그래서 클래스 속성을 직접 갈아끼운다.
@@ -96,17 +96,17 @@ def daily(user, day, *, best=None, study=0) -> DailyScore:
 
 
 class RankAgreementMixin:
-    """목록과 내 등수가 **같은 순서**를 말하는지 본다.
+    """목록과 내 등수가 같은 순서를 말하는지 본다.
 
     edge.py 의 assertBoardIsSane 은 "겹치지 않는지" 를 본다. 여기는 한 발
     더 나아가, 전원의 등수를 모아 1..N 이 되는지와 순서가 목록과 이어지는지를
-    본다 - 겹치지 않아도 순서가 뒤바뀔 수 있다.
+    본다. 겹치지 않아도 순서가 뒤바뀔 수 있다.
     """
 
     def ranks_of(self, kind: str, people: list) -> dict[int, int]:
         """전원의 등수. 목록 안이면 목록에서, 밖이면 me 에서 가져온다.
 
-        내 줄은 **is_me 로 찾는다.** 응답에 pk 가 없으므로 그것이 화면이
+        내 줄은 is_me 로 찾는다. 응답에 pk 가 없으므로 그것이 화면이
         쓰는 유일한 방법이고, 여기서도 같은 것을 쓴다.
         """
         found: dict[int, int] = {}
@@ -164,8 +164,8 @@ class ThrottleBucketTest(TestCase):
 
         통이 하나면 여기서 나머지 둘이 곧바로 429 가 된다.
 
-        로그인해서 본다. 게스트 통은 배수(20)가 곱해져 한도가 흐려진다 -
-        여기서 재는 것은 배수가 아니라 **통이 갈렸는지**다.
+        로그인해서 본다. 게스트 통은 배수(20)가 곱해져 한도가 흐려진다.
+        여기서 재는 것은 배수가 아니라 통이 갈렸는지다.
         """
         self.client.force_login(make_user("한판만태운사람"))
 
@@ -185,7 +185,7 @@ class ThrottleBucketTest(TestCase):
     def test_each_board_has_its_own_budget(self):
         """셋을 각각 한도까지 태울 수 있어야 한다.
 
-        화면이 셋을 한꺼번에 부른다. 통이 공용이면 실제 한도가 1/3 이 된다 -
+        화면이 셋을 한꺼번에 부른다. 통이 공용이면 실제 한도가 1/3 이 된다.
         첫 순위표에서 다 쓰고 나머지 둘은 첫 요청부터 429 다.
         """
         self.client.force_login(make_user("셋다태운사람"))
@@ -304,7 +304,7 @@ class FirstAtWithManyRoundsTest(RankAgreementMixin, TestCase):
     1인 1판이면 첫 판 = 최고점 판이라 절충이 안 드러난다. 여기서는
     사용자마다 판 수를 다르게 두어 first_at 과 "최고점을 낸 판" 을 갈라둔다.
 
-    보는 것은 절충의 옳고 그름이 아니라 **목록과 me.rank 의 일치**다.
+    보는 것은 절충의 옳고 그름이 아니라 목록과 me.rank 의 일치다.
     """
 
     def setUp(self):
@@ -321,7 +321,7 @@ class FirstAtWithManyRoundsTest(RankAgreementMixin, TestCase):
 
         for i, user in enumerate(people):
             # 첫 판 시각은 i 가 클수록 늦다. 최고점 판은 그 반대 순서로
-            # 만든다 - 두 기준이 어긋나야 절충이 드러난다.
+            # 만든다. 두 기준이 어긋나야 절충이 드러난다.
             first = now - timedelta(days=30) + timedelta(minutes=i)
             finish_round(user, 1, when=first)
             finish_round(user, 40, when=now - timedelta(minutes=i + 1))
@@ -340,7 +340,7 @@ class FirstAtWithManyRoundsTest(RankAgreementMixin, TestCase):
     def test_a_user_with_many_rounds_reports_the_best_score_and_all_entries(self):
         """여러 판을 해도 점수는 최고 한 판, 판 수는 전부여야 한다.
 
-        목록 안과 목록 밖(me) 양쪽에서 같은 값이 나와야 한다 - 두 경로가
+        목록 안과 목록 밖(me) 양쪽에서 같은 값이 나와야 한다. 두 경로가
         다른 집계를 쓰면 여기서 갈린다.
         """
         now = timezone.now()
@@ -379,8 +379,8 @@ class FirstAtWithManyRoundsTest(RankAgreementMixin, TestCase):
     def test_weekly_first_at_is_clipped_to_this_week(self):
         """주간의 first_at 은 이번 주 안에서 잡혀야 한다.
 
-        지난주 판이 first_at 에 섞이면, 오래 한 사람이 주간에서도 영구히
-        위를 차지한다 - 주간 순위표를 주마다 리셋하는 의미가 사라진다.
+        지난주 판이 first_at 에 섞이면, 오래 한 사람이 주간에서도 계속
+        위를 차지한다. 주간 순위표를 주마다 리셋하는 의미가 사라진다.
         """
         monday = calendar_kst.day_begins(calendar_kst.this_week_start())
 
@@ -557,7 +557,7 @@ class StreakAheadBranchTest(RankAgreementMixin, TestCase):
     """_streak_ahead 의 세 가지를 각각 태운다.
 
     score__gt / (score=, entries__gt) / (score=, entries=, user__lt).
-    가지 하나가 죽어도 다른 입력에서는 안 드러난다.
+    가지 하나가 빠져도 다른 입력에서는 안 드러난다.
     """
 
     def setUp(self):
@@ -606,7 +606,7 @@ class StreakAheadBranchTest(RankAgreementMixin, TestCase):
         """상쇄되어 총점 0인 날은 날 수에 안 들어간다.
 
         best=5, study=-5 인 날은 두 칸 중 하나가 양수라 칸을 따로 보면
-        하루로 세어진다. 그러면 **점수를 안 준 날**로 등수를 살 수 있다.
+        하루로 세어진다. 그러면 점수를 안 준 날로 등수를 살 수 있다.
         날 수 판정도 하루 총점으로 해야 한다.
         """
         today = calendar_kst.today()
@@ -655,7 +655,7 @@ class StreakAheadBranchTest(RankAgreementMixin, TestCase):
         """비활성 계정은 0점 무리 안에서도 등수를 밀면 안 된다.
 
         세는 쿼리는 0점을 안 거르므로, 여기가 비활성 필터가 빠지기 쉬운
-        자리다 - 목록에 안 보이는 사람들이라 눈에 안 띈다.
+        자리다. 목록에 안 보이는 사람들이라 눈에 안 띈다.
         """
         today = calendar_kst.today()
         gone = bulk_users("떠난영점_", 5)
@@ -823,9 +823,9 @@ class BoardKindWiringTest(TestCase):
         self.assertEqual([r["display_name"] for r in streak], ["꾸준만"])
 
     def test_a_view_without_board_kind_fails_loudly(self):
-        """board_kind 를 빠뜨린 뷰는 조용히 넘어가면 안 된다.
+        """board_kind 를 빠뜨린 뷰는 에러를 내야 한다.
 
-        throttles 가 getattr 기본값을 안 주는 이유가 이것이다 - 빈 문자열로
+        throttles 가 getattr 기본값을 안 주는 이유가 이것이다. 빈 문자열로
         삼키면 그런 뷰들이 통 하나를 같이 쓴다.
         """
         from rest_framework.test import APIRequestFactory
@@ -846,9 +846,9 @@ class BoardKindWiringTest(TestCase):
 class StreakRankSweepTest(RankAgreementMixin, TestCase):
     """꾸준함 전수 검사.
 
-    edge.py 에 있던 것을 옮겼다. 거기서는 목록 안 20명이 me 가 None 이라
-    단언이 통째로 스킵됐다 - RankAgreementMixin 은 목록 안이면 목록에서
-    등수를 집으므로 전원이 실제로 검사된다.
+    edge.py 에 두면 목록 안 20명은 me 가 None 이라 단언을 건너뛴다.
+    RankAgreementMixin 은 목록 안이면 목록에서 등수를 집으므로 전원이
+    실제로 검사된다.
     """
 
     def setUp(self):

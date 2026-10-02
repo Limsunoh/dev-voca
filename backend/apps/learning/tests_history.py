@@ -2,11 +2,11 @@
 
 지키는 것 셋.
 
-1. **하루 점수가 꾸준함 순위표와 같다.** 같은 표(DailyScore)를 같은
+1. 하루 점수가 꾸준함 순위표와 같다. 같은 표(DailyScore)를 같은
    규칙(total)으로 읽는다. 어긋나면 순위표의 "며칠" 과 이 화면의 칸 수가
    다르게 나온다.
-2. **날짜는 한국 날짜다.** 새벽에 끝낸 판이 전날로 붙지 않는다.
-3. **내 것만.**
+2. 날짜는 한국 날짜다. 새벽에 끝낸 판이 전날로 붙지 않는다.
+3. 내 것만 보인다.
 """
 
 from __future__ import annotations
@@ -102,7 +102,7 @@ class HistoryDaysTest(TestCase):
         """
         # 기대값을 숫자로 적는다. DailyScore.total 을 불러 비교하면 뷰가 쓰는
         # 것과 같은 코드를 양쪽에서 부르는 셈이라, total 이 틀려도 같이 틀려
-        # 절대 빨개지지 않는다.
+        # 빨개지지 않는다.
         cases = [
             (0, dict(best=12, study=5), 17),
             (1, dict(best=-3, study=0), 0),
@@ -132,7 +132,7 @@ class HistoryDaysTest(TestCase):
 
         일일공부는 감점이 없어 다 틀려도 그날 줄만 생기고 두 칸이 null·0 이다.
         안 한 날과 똑같이 보여서, 화면이 두 칸으로 짐작하면 "안 함" 으로
-        읽었다. 줄이 있다는 사실을 따로 보낸다.
+        읽는다. 줄이 있다는 사실을 따로 보낸다.
         """
         daily(self.user, self.today, best=None, study=0)
 
@@ -146,7 +146,7 @@ class HistoryDaysTest(TestCase):
         """창의 첫날은 들어가고, 그 하루 전은 안 들어간다.
 
         첫날에 데이터를 넣어야 경계가 지켜진다. 창 밖 날만 보면 필터를
-        `day__gt` 로 잘못 바꿔도(첫날이 늘 0 이 된다) 통과한다 - 뷰가 칸을
+        `day__gt` 로 잘못 바꿔도(첫날이 늘 0 이 된다) 통과한다. 뷰가 칸을
         창 안 날짜로만 만들어서, 창 밖 날은 필터가 어떻든 안 보인다.
         """
         first = self.today - timedelta(days=HISTORY_DAYS - 1)
@@ -289,8 +289,8 @@ class HistoryTodayTest(TestCase):
 
     위 테스트들은 freeze_today 로 calendar_kst.today 를 고정한다. 그러면
     뷰가 calendar_kst 를 건너뛰고 `timezone.now().date()`(UTC) 로 오늘을
-    구해도 초록이다 - 고정한 함수를 아예 안 부르니까. 그래서 여기서는
-    **시계**를 한국 새벽으로 돌린다. UTC 로는 아직 전날이고 전달이다.
+    구해도 통과한다. 고정한 함수를 안 부르기 때문이다. 그래서 여기서는
+    시계를 한국 새벽으로 돌린다. UTC 로는 아직 전날이고 전달이다.
     """
 
     # 3월 1일 00:30 KST = 2월 28일 15:30 UTC. 날짜도 달도 갈린다.
@@ -302,7 +302,7 @@ class HistoryTodayTest(TestCase):
         self.dawn = calendar_kst.day_begins(self.DAWN_DAY) + timedelta(minutes=30)
         # 진짜 timezone.now 처럼 UTC 로 준다. 한국 시간대가 붙은 값을 주면
         # `.date()` 가 그대로 한국 날짜를 내서, UTC 로 오늘을 구하는 뷰도
-        # 통과한다(실제로 그렇게 헛돌았다).
+        # 통과한다.
         patcher = mock.patch(
             "django.utils.timezone.now", return_value=self.dawn.astimezone(timezone.utc)
         )
@@ -355,7 +355,7 @@ class HistoryByApiTest(TestCase):
     """판을 실제 API 로 풀어 쌓은 뒤 기록을 본다.
 
     위 테스트들은 DailyScore 를 손으로 심는다. 그러면 "판을 끝내면 어느
-    날 칸에 붙나" 는 record 와 이 뷰가 **각자** 날짜를 구하는 것이라,
+    날 칸에 붙나" 는 record 와 이 뷰가 각자 날짜를 구하는 것이라,
     둘이 다른 규칙으로 갈려도 손으로 심은 쪽은 모른다.
     """
 
@@ -377,7 +377,7 @@ class HistoryByApiTest(TestCase):
     def test_scored_days_match_the_streak_board(self):
         """꾸준함 순위표 내 줄의 "며칠" 과 점수 있는 칸 수가 같다.
 
-        순위표는 전 기간을 센다. 그래서 판을 전부 14일 안에 둔다 - 그래야
+        순위표는 전 기간을 센다. 그래서 판을 전부 14일 안에 둔다. 그래야
         둘이 같은 것을 세는 상황이 된다. 0점 판, 마이너스 판, 한 날 두 판을
         섞는다. 앞의 둘은 행은 생기지만 "며칠" 에는 안 들어가야 한다.
         """
@@ -403,7 +403,7 @@ class HistoryByApiTest(TestCase):
         """자정 경계. 한국 자정과 UTC 자정(= 한국 오전 9시) 양쪽을 찌른다.
 
         (끝낸 시각, 붙어야 할 날이 오늘에서 며칠 전인지). 판 목록의 날짜와
-        칸의 날짜가 같은 날을 가리켜야 한다 - 한쪽만 UTC 로 자르면 판은
+        칸의 날짜가 같은 날을 가리켜야 한다. 한쪽만 UTC 로 자르면 판은
         어제인데 칸은 오늘이 칠해진다.
         """
         second = timedelta(seconds=1)

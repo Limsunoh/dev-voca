@@ -137,7 +137,7 @@ class ShuffleOrderTest(TestCase):
 
 
 class ShuffleWithFilterTest(TestCase):
-    """섞어도 필터가 그대로 걸리는지. 여기가 깨지면 조용히 틀린 목록이 나간다."""
+    """섞어도 필터가 그대로 걸리는지. 여기가 깨지면 에러 없이 틀린 목록이 나간다."""
 
     @classmethod
     def setUpTestData(cls):

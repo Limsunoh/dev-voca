@@ -1,5 +1,5 @@
 /**
- * useUnsavedGuard 가 **어떤 클릭을 막고 어떤 클릭을 흘려보내는지** 실제
+ * useUnsavedGuard 가 어떤 클릭을 막고 어떤 클릭을 흘려보내는지 실제
  * 처리기를 불러서 본다. LeaveConfirm 의 cancelLabel 도 같이 본다.
  *
  * 실행: cd frontend && npm test

@@ -1,6 +1,6 @@
 """복습.
 
-**점수가 없는 판이다.** 정답을 이미 본 문제가 나오므로 점수를 주면 아는
+점수가 없는 판이다. 정답을 이미 본 문제가 나오므로 점수를 주면 아는
 것만 골라 푸는 길이 열린다. 그래서 순위표에 안 들어간다.
 """
 
@@ -84,8 +84,8 @@ class WriteBackTest(TestCase):
     def test_a_finished_round_fills_the_review_list(self):
         """판을 끝내면 푼 항목들이 복습 표에 남는다.
 
-        이 쓰기가 없으면 복습 화면은 영원히 빈 목록이다 - 모델만 있고
-        행을 만드는 코드가 없는 자리가 된다.
+        이 쓰기가 없으면 복습 화면은 늘 빈 목록이다. 모델만 있고 행을
+        만드는 코드가 없는 셈이 된다.
         """
         words = list(Word.objects.values_list("pk", flat=True)[:3])
         a_round(self.user, [(words[0], False), (words[1], True), (words[2], False)])
@@ -361,8 +361,8 @@ class ApiTest(TestCase):
         """졸업 기준을 화면에 알려준다.
 
         화면이 "한 번 더 맞히면 끝" 을 이 값으로 센다. 안 주면 화면이
-        2 를 박아두게 되고, 기준을 3 으로 올린 날 화면만 옛말을 계속한다 -
-        실제로는 두 번 더 맞혀야 하는데 틀렸다는 신호가 어디에도 안 뜬다.
+        2 를 박아두게 되고, 기준을 3 으로 올린 날 화면만 옛말을 계속한다.
+        실제로는 두 번 더 맞혀야 하는데 화면 어디에도 틀렸다는 표시가 없다.
         """
         body = self.client.get(START_URL).json()
 
@@ -415,7 +415,7 @@ def seed_sentences(count: int = 12) -> None:
 class DueConditionTest(TestCase):
     """_due 의 세 갈래가 조합에서도 성립하는가.
 
-    네 가지가 동시에 맞아야 한다 - 하나를 고치다 다른 하나를 깨뜨리기
+    네 가지가 동시에 맞아야 한다. 하나를 고치다 다른 하나를 깨뜨리기
     쉬운 자리다.
     """
 
@@ -857,7 +857,7 @@ class ApiEdgeTest(TestCase):
                 f"choice_id={bad!r}",
             )
 
-        # 정수는 그냥 오답으로 처리된다. **토큰마다 한 번씩** 본다 - 첫 답이
+        # 정수는 그냥 오답으로 처리된다. 토큰마다 한 번씩 본다. 첫 답이
         # 순번을 태우므로 같은 토큰으로 이어 보내면 되돌리기로 거절된다.
         for odd in (-1, 0, 10**30):
             fresh = self._start()
@@ -926,7 +926,7 @@ class ApiEdgeTest(TestCase):
 class StreakResetTest(TestCase):
     """자유 문제풀이에서 틀리면 복습 연속이 끊기는가.
 
-    "연속 두 번" 은 **중간에 틀린 적이 없다** 는 뜻이다. 자유 문제풀이의
+    "연속 두 번" 은 중간에 틀린 적이 없다는 뜻이다. 자유 문제풀이의
     오답이 연속을 안 끊으면, 틀린 뒤 복습 한 번만 맞혀도 졸업한다.
     """
 
@@ -986,7 +986,7 @@ class ReplayTest(TestCase):
     """같은 토큰을 다시 보내 졸업할 수 있는가.
 
     복습 응답은 맞든 틀리든 정답을 알려준다. 보기를 하나씩 넣어 정답을
-    캐낸 뒤 **같은 토큰**을 정답과 함께 다시 보내면, 한 문제로 연속을
+    캐낸 뒤 같은 토큰을 정답과 함께 다시 보내면, 한 문제로 연속을
     채워 목록에서 지울 수 있다. 자유 문제풀이는 RoundStep 으로 이 길을
     막았다(session.py).
     """
@@ -1030,9 +1030,9 @@ class ReplayTest(TestCase):
     def test_replay_is_still_refused_after_the_round_steps_are_swept(self):
         """판 청소가 돌아도 살아 있는 복습 토큰의 되돌리기는 막혀야 한다.
 
-        RoundStep 은 자유 문제풀이와 복습이 같이 쓰는데, 청소가 판 토큰
-        수명(10분)으로 나이를 재서 10분 지난 복습 표시를 지웠다. 복습
-        토큰은 6시간 사므로 그 뒤 옛 토큰을 다시 보내면 통과했다. 복습 판
+        RoundStep 은 자유 문제풀이와 복습이 같이 쓴다. 청소가 판 토큰
+        수명(10분)으로 나이를 재면 10분 지난 복습 표시가 지워지고, 복습
+        토큰은 6시간 사므로 그 뒤 옛 토큰을 다시 보내면 통과한다. 복습 판
         식별자에 앞머리가 빠져도 이 테스트가 깨진다.
         """
         body = self.client.post(START_URL).json()
@@ -1161,8 +1161,8 @@ class SecondCycleTest(TestCase):
         """첫 사이클에서 졸업했어도 두 번째 사이클은 처음부터다.
 
         연속 횟수에 상한이 없으면 첫 졸업 때 2 를 넘긴 값이 그대로 남아,
-        7일 뒤 돌아온 항목이 **한 번만** 맞혀도 곧장 재졸업한다. 두 번째
-        사이클부터 "연속 두 번" 규칙이 통째로 죽는 자리다.
+        7일 뒤 돌아온 항목이 한 번만 맞혀도 곧장 재졸업한다. 그러면 두 번째
+        사이클부터 "연속 두 번" 규칙이 사라진다.
         """
         # 첫 사이클: 복습에서 두 번 맞혀 졸업.
         review._record(self.user, "word", self.word.pk, correct=True)
@@ -1194,8 +1194,8 @@ class ProgressContractTest(TestCase):
 
     화면(ReviewBoard)은 answered/total 을 스스로 세지 않고 문제 본문에
     실려 온 것을 그대로 그린다. 그래서 이 두 값의 약속이 깨지면 화면이
-    "17/20 에서 끝나는 20문제" 같은 것을 보여준다 - 화면 코드는 멀쩡한데
-    숫자만 틀리는, 눈으로 잡기 어려운 자리다.
+    "17/20 에서 끝나는 20문제" 같은 것을 보여준다. 화면 코드는 멀쩡한데
+    숫자만 틀려서 눈으로 잡기 어렵다.
     """
 
     def setUp(self):
@@ -1406,8 +1406,8 @@ class RecordRaceTest(TestCase):
     def test_a_miss_just_before_the_second_correct_does_not_graduate(self):
         """복습 1회 정답 뒤, 두 번째 정답을 쓰기 직전에 일일공부 오답이 끼면.
 
-        오답이 먼저 들어간 것이므로 연속은 0 에서 다시 센다 - 이번 정답이
-        첫 번째다. 옛 코드는 읽어 둔 1 에 +1 해 2 로 덮어써 졸업시켰다.
+        오답이 먼저 들어간 것이므로 연속은 0 에서 다시 센다. 이번 정답이
+        첫 번째다. 읽어 둔 1 에 +1 해 쓰면 2 로 덮어써 졸업시킨다.
         """
         a_round(self.user, [(self.word.pk, False)])
         review._record(self.user, "word", self.word.pk, correct=True)
@@ -1427,7 +1427,8 @@ class RecordRaceTest(TestCase):
     def test_a_review_miss_keeps_a_correct_time_written_just_before(self):
         """복습 오답을 쓰기 직전에 다른 곳의 정답이 끼면, 그 정답 시각은 남는다.
 
-        옛 코드는 오답이어도 last_correct_at 을 읽어 둔 값으로 되썼다.
+        오답이어도 last_correct_at 을 읽어 둔 값으로 되쓰면 그 정답 시각이
+        사라진다.
         """
         long_ago = timezone.now() - timedelta(days=30)
         ReviewState.objects.create(
@@ -1455,8 +1456,8 @@ class RecordRaceTest(TestCase):
         """반대 방향: 자유·일일공부 오답을 쓰기 직전에 복습 정답이 끼면.
 
         오답이 나중이니 연속은 0 이고 틀린 것으로 남는다. 다만 복습에서
-        맞힌 시각은 지우지 않는다 - 옛 코드는 오답 줄에도 last_correct_at
-        을 읽어 둔 값으로 되썼다.
+        맞힌 시각은 지우지 않는다. 오답 줄에도 last_correct_at 을 읽어 둔
+        값으로 되쓰면 그 시각이 사라진다.
         """
         long_ago = timezone.now() - timedelta(days=30)
         ReviewState.objects.create(
@@ -1734,7 +1735,7 @@ class StepSweepClockTest(TestCase):
     def test_replay_is_refused_at_every_age_the_review_token_still_accepts(self):
         """토큰이 받아지는 동안 어느 시각에 청소가 돌아도 되돌리기는 400 이다.
 
-        11분(옛 청소 기준 바로 뒤), 1시간, 5시간 59분을 차례로 본다. 표시가
+        11분(판 토큰 수명 바로 뒤), 1시간, 5시간 59분을 차례로 본다. 표시가
         남아 있어야 하고, 되돌린 토큰은 거절돼야 한다.
         """
         token, choice = self._answer_once()
@@ -1798,7 +1799,7 @@ class StepSweepClockTest(TestCase):
         )
 
     def test_free_round_replay_is_still_refused_after_a_sweep(self):
-        """자유 문제풀이 되돌리기 방어는 그대로다 - 청소가 돌아도 토큰이 사는 동안 막힌다."""
+        """자유 문제풀이 되돌리기 방어는 그대로다. 청소가 돌아도 토큰이 사는 동안 막힌다."""
         token, question = session.start()
         _, first, _ = session.answer(token, question["choices"][0]["id"])
         with self._later(session.TOKEN_MAX_AGE - 5):

@@ -38,9 +38,9 @@ from .models import (
 from .throttles import EmailRateThrottle, GoogleRateThrottle
 
 # 마이그레이션 모듈은 이름이 숫자로 시작해 평범한 import 가 안 된다.
-# 함수만 꺼내지 않고 모듈째 잡아둔다 - 함수가 operations 에 실제로 걸려
-# 있는지도 봐야 하기 때문이다. 이번 사고가 정확히 "동작하는 코드는 있는데
-# 그것을 실행하는 배선이 없다" 였다.
+# 함수만 꺼내지 않고 모듈째 잡아둔다. 함수가 operations 에 실제로 걸려
+# 있는지도 봐야 한다. "동작하는 코드는 있는데 그것을 실행하는 배선이 없는"
+# 경우를 잡으려는 것이다.
 cache_table_migration = import_module(
     "apps.accounts.migrations.0002_throttle_cache_table"
 )
@@ -87,13 +87,13 @@ class SignUpTest(TestCase):
     def test_password_never_appears_in_response(self):
         """비밀번호 값도, 그 해시도 응답에 실리면 안 된다.
 
-        예전에는 본문에 "password" 라는 글자가 있는지만 봤다. 그 방식은
-        has_password(비밀번호를 쓸 수 있는 계정인가) 같은 **값이 아닌**
-        필드가 생기자 곧바로 걸렸다 - 새는 것이 없는데도 빨개진다.
+        본문에 "password" 라는 글자가 있는지만 보면 has_password(비밀번호를
+        쓸 수 있는 계정인가) 같은 값이 아닌 필드에 걸려, 새는 것이 없는데도
+        빨개진다.
 
-        반대로 느슨하기도 했다. 응답이 해시를 pw 나 secret 같은 다른
-        이름으로 실어 보내면 그 검사는 통과한다. 막으려는 것은 이름이
-        아니라 값이므로, 평문과 해시를 직접 찾는다.
+        반대로 응답이 해시를 pw 나 secret 같은 다른 이름으로 실어 보내면
+        그 검사는 통과한다. 막으려는 것은 이름이 아니라 값이므로, 평문과
+        해시를 직접 찾는다.
         """
         res = self.signup()
         body = res.content.decode()
@@ -105,7 +105,7 @@ class SignUpTest(TestCase):
         stored = User.objects.get(email="a@example.com").password
         self.assertNotIn(stored, body)
 
-        # 해시 앞부분(알고리즘 이름)만 새도 안 된다. 통째로 비교하면
+        # 해시 앞부분(알고리즘 이름)만 새도 안 된다. 전체를 비교하면
         # 잘려 실린 경우를 놓친다.
         self.assertNotIn(stored[:20], body)
 
@@ -135,7 +135,7 @@ class SignUpTest(TestCase):
         """이메일을 그대로 비밀번호로 쓰면 막는다.
 
         Django 의 유사성 검사기는 사용자 정보를 받아야 동작한다. 안 넘기면
-        그 검사만 조용히 건너뛰어, 이메일과 똑같은 비밀번호가 통과한다.
+        그 검사만 에러 없이 건너뛰어, 이메일과 똑같은 비밀번호가 통과한다.
         """
         res = self.signup(email="kimdev@example.com", password="kimdev@example.com")
 
@@ -208,7 +208,7 @@ class LoginTest(TestCase):
         """대문자로 가입한 사람이 소문자로 로그인해도 들어와야 한다.
 
         저장은 소문자로 내리는데 조회가 정확히 일치를 요구하면, 대문자가
-        섞인 행이 하나라도 있을 때 그 계정은 영영 못 들어간다. 사용자는
+        섞인 행이 하나라도 있을 때 그 계정은 못 들어간다. 사용자는
         비밀번호가 틀렸다고만 듣고 이유를 알 수 없다.
         """
         User.objects.create_user(email="Mixed@Example.com", password=PASSWORD)
@@ -491,7 +491,7 @@ class ThrottleTest(TestCase):
 
         요청마다 코드·주소·브라우저를 다르게 보낸다. 전부 같게 보내면
         그 값들로 통을 나누는 구현도 테스트를 통과한다. 특히 코드로
-        나누는 구현이 위험한데, 실제 코드는 매번 달라서 제한이 영영
+        나누는 구현이 위험한데, 실제 코드는 매번 달라서 제한이 한 번도
         안 걸린다.
         """
         self._try_count = getattr(self, "_try_count", 0) + 1
@@ -509,8 +509,8 @@ class ThrottleTest(TestCase):
     def test_google_throttle_counts_every_account(self):
         """계정별로 세면 계정을 늘려가며 무한히 시도할 수 있다.
 
-        토큰을 붙였다고 아예 안 세는 구현도 있어, 그 경우 계정 하나만
-        만들면 제한이 통째로 사라진다.
+        토큰을 붙이면 세지 않는 구현도 있어, 그 경우 계정 하나만 만들면
+        제한이 사라진다.
         """
         self.narrow_google_throttle()
 
@@ -522,7 +522,7 @@ class ThrottleTest(TestCase):
             tokens.append(Token.objects.create(user=user).key)
 
         # 계정을 바꿔가며, 중간에 로그인 안 한 채로도 보낸다. 어떻게
-        # 나눠 보내도 합쳐서 세야 한다 - 인증 여부로 통을 가르는 구현도
+        # 나눠 보내도 합쳐서 세야 한다. 인증 여부로 통을 가르는 구현도
         # 있어서, 토큰 요청만으로는 그것을 잡지 못한다.
         self.try_google(HTTP_AUTHORIZATION=f"Token {tokens[0]}")
         self.try_google(HTTP_AUTHORIZATION=f"Token {tokens[1]}")
@@ -583,7 +583,7 @@ class GoogleLoginTest(TestCase):
     ):
         """fetch_google_user 가 돌려주는 것과 같은 모양으로 흉내 낸다.
 
-        키를 빠뜨리면 뷰가 KeyError 로 터진다. 그게 맞다 - 실제 함수는
+        키를 빠뜨리면 뷰가 KeyError 로 터진다. 그게 맞다. 실제 함수는
         세 키를 항상 채우므로, 흉내가 그것과 어긋나면 테스트가 통과해도
         의미가 없다.
         """
@@ -856,7 +856,7 @@ class GoogleFetchTest(TestCase):
 
     @override_settings(GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="")
     def test_requires_settings(self):
-        """키가 없으면 조용히 실패하지 않고 이유를 알려준다."""
+        """키가 없으면 이유를 담아 실패한다."""
         with self.assertRaises(GoogleAuthError):
             fetch_google_user("code", REDIRECT_URI)
 
@@ -865,8 +865,8 @@ class AdminTest(TestCase):
     """Admin 화면이 뜨는지.
 
     커스텀 User 모델은 Admin 폼과 어긋나기 쉽다. username 자리가 비어
-    있어서, 기본 폼을 그대로 쓰면 필드를 못 찾고 화면이 통째로 죽는다.
-    실제로 계정 추가 화면이 그렇게 500 이 났다.
+    있어서, 기본 폼을 그대로 쓰면 필드를 못 찾고 계정 추가 화면이 500 이
+    된다.
     """
 
     @classmethod
@@ -928,9 +928,8 @@ class UserModelTest(TestCase):
     def test_blank_name_is_generated_not_taken_from_email(self):
         """이름을 안 적으면 지어준다. 이메일 앞부분을 쓰면 안 된다.
 
-        예전에는 비어 있을 때 화면에서 이메일 앞부분을 대신 보여줬다.
-        순위표에 이름이 뜨기 시작하면 그건 남의 메일 주소 절반을 공개하는
-        것이 된다.
+        비어 있을 때 이메일 앞부분을 대신 보여주면, 순위표에서 남의 메일
+        주소 절반을 공개하게 된다.
         """
         user = User.objects.create_user(email="hong@example.com", password=PASSWORD)
 
@@ -945,8 +944,8 @@ class _SchemaEditorStub:
     쓰지도 않을 진짜 schema_editor 를 열 이유가 없어 그 자리만 채운다.
 
     여기 alias 는 항상 "default" 다. 진짜 마이그레이션에서는
-    `migrate --database=<alias>` 로 준 값이 온다. 즉 **이 테스트는 alias 를
-    제대로 넘기는지는 검증하지 못한다** - 0002 에서 그 자리를 "default" 로
+    `migrate --database=<alias>` 로 준 값이 온다. 그래서 이 테스트는 alias 를
+    제대로 넘기는지는 확인하지 못한다. 0002 에서 그 자리를 "default" 로
     하드코딩해도 전부 통과한다. DB 가 하나뿐이라 지금은 실피해가 없다.
     """
 
@@ -954,24 +953,23 @@ class _SchemaEditorStub:
 
 
 class ThrottleCacheTableTest(TransactionTestCase):
-    """캐시 테이블이 없으면 무엇이 죽고 무엇이 멀쩡해 보이는지 고정한다.
+    """캐시 테이블이 없으면 무엇이 죽고 무엇이 멀쩡해 보이는지 확인한다.
 
-    2026-08-13 에 이 테이블이 프로덕션에 없어서 가입·로그인·구글 로그인이
-    500 이었다. 그때 배포 후 확인표에는 조회 경로만 있어서 전부 초록이었고,
-    사용자가 로그인이 안 된다고 알려주고 나서야 드러났다.
+    이 테이블이 없으면 가입·로그인·구글 로그인이 500 이 되는데, 조회
+    경로만 보는 배포 후 확인으로는 전부 정상으로 보인다.
 
-    여기서 고정하는 것:
-    - 어느 경로가 이 사고를 감지하고 어느 경로가 못 하는가 (DEPLOY.md 확인표의 근거)
+    여기서 보는 것:
+    - 테이블이 없을 때 어느 경로가 깨지고 어느 경로가 멀쩡해 보이는가
+      (DEPLOY.md 확인표의 근거)
     - create_cache_table 이 설정된 테이블을 만드는가
     - 그 함수가 operations 에 실제로 걸려 있는가
 
-    세 번째가 빠지면 이번 사고를 그대로 반복한다. 동작하는 코드가 있어도
-    그것을 실행하는 배선이 없으면 아무 일도 일어나지 않는데, 함수를 직접
-    부르는 테스트는 그 차이를 못 본다.
+    세 번째가 빠지면, 동작하는 코드가 있어도 그것을 실행하는 배선이 없어
+    아무 일도 일어나지 않는다. 함수를 직접 부르는 테스트는 그 차이를 못
+    본다.
 
-    **여전히 검증하지 않는 것**: 프로덕션에 실제로 적용됐는지. 그건 배포 후
-    확인표로만 안다. 그리고 동시 실행(레플리카 경합)도 아니다 - 아래는
-    순차 재실행만 본다.
+    확인하지 않는 것: 프로덕션에 실제로 적용됐는지(배포 후 확인표로만
+    안다), 동시 실행(레플리카 경합). 아래는 순차 재실행만 본다.
 
     TransactionTestCase 인 이유: 테이블을 지웠다 만드는 DDL 이라 트랜잭션
     안에서 굴리면 뒤 테스트로 샌다.
@@ -999,9 +997,9 @@ class ThrottleCacheTableTest(TransactionTestCase):
     def test_the_function_is_wired_into_operations(self):
         """0002 의 operations 가 비면 함수가 멀쩡해도 테이블은 안 생긴다.
 
-        아래 테스트들은 함수를 직접 부르므로 이 경우를 못 잡는다. 이번
-        사고의 자리가 정확히 여기였다 - `release:` 줄에 명령은 적혀 있었고,
-        그 줄을 실행하는 쪽이 없었다.
+        아래 테스트들은 함수를 직접 부르므로 이 경우를 못 잡는다.
+        `release:` 줄에 명령을 적어 두어도 그 줄을 실행하는 쪽이 없으면
+        같은 결과가 된다.
         """
         operations = cache_table_migration.Migration.operations
 
@@ -1019,8 +1017,8 @@ class ThrottleCacheTableTest(TransactionTestCase):
     def test_running_it_twice_is_safe(self):
         """이미 있는 테이블 위에서 다시 돌아도 괜찮아야 한다.
 
-        프로덕션이 실제로 그 상태였다 - 급한 대로 손으로 만들어두고
-        마이그레이션은 그다음 배포에 처음 적용됐다.
+        테이블을 손으로 먼저 만들어 둔 뒤 마이그레이션이 적용되는 경우가
+        그렇다.
 
         동시 실행은 다른 이야기다. 여기서는 순차 재실행만 본다.
         """
@@ -1033,13 +1031,13 @@ class ThrottleCacheTableTest(TransactionTestCase):
         """DEPLOY.md 확인표가 이 결과에 기대고 있다.
 
         조회 경로는 요청 제한을 안 거쳐서 테이블이 없어도 200 이다.
-        me/ 도 마찬가지다 - 요청 제한이 아예 안 붙어 있고, 붙어 있더라도
-        권한 검사가 먼저라 거기까지 가지 않는다. 즉 **이 셋만 보면 사고를
-        못 잡는다.** 확인표에 로그인·구글이 있어야 하는 이유다.
+        me/ 도 마찬가지다. 요청 제한이 안 붙어 있고, 붙어 있더라도 권한
+        검사가 먼저라 거기까지 가지 않는다. 그래서 이 셋만 보면 테이블이
+        없는 것을 못 잡는다. 확인표에 로그인·구글이 있어야 하는 이유다.
 
         DatabaseError 로 잡는 이유: 없는 테이블에 대한 예외가 엔진마다
         다르다. SQLite 는 OperationalError, PostgreSQL 은 ProgrammingError 고
-        둘은 상속 관계가 아닌 형제다. 한쪽으로 적으면 다른 엔진에서 깨진다.
+        둘은 서로 상속 관계가 아니다. 한쪽으로 적으면 다른 엔진에서 깨진다.
         """
         self._drop_table()
 
@@ -1061,7 +1059,7 @@ class ThrottleCacheTableTest(TransactionTestCase):
         요청 제한은 캐시를 건드리지 않고 통과한다. 그 상태로는 400 이 나와도
         아무것도 확인하지 못한 것이다.
 
-        이 테스트만으로는 "이메일이 없어서" 와 "요청 제한이 아예 없어서" 를
+        이 테스트만으로는 "이메일이 없어서" 와 "요청 제한이 없어서" 를
         구분하지 못한다. 제한이 붙어 있다는 것은 ThrottleTest 가 본다.
         """
         self._drop_table()
@@ -1076,10 +1074,10 @@ class ThrottleCacheTableTest(TransactionTestCase):
 class DisplayNameMigrationOrderTest(TestCase):
     """이름 길이를 줄이는 순서를 고정한다.
 
-    처음에는 컬럼 축소가 데이터 정리보다 앞에 있었다. PostgreSQL 은 그
-    자리에서 "value too long" 으로 멈추고 컨테이너가 아예 안 뜬다.
-    SQLite 는 max_length 를 강제하지 않아 테스트가 통과해버린다 - 즉
-    실행해보는 것만으로는 이 순서를 지킬 수 없다.
+    컬럼 축소가 데이터 정리보다 앞에 오면 PostgreSQL 은 그 자리에서
+    "value too long" 으로 멈추고 컨테이너가 뜨지 않는다. SQLite 는
+    max_length 를 강제하지 않아 테스트가 통과한다. 그래서 실행해보는
+    것만으로는 이 순서를 지킬 수 없다.
 
     그래서 실행이 아니라 마이그레이션의 모양을 본다. 누가 순서를 되돌리면
     엔진과 무관하게 여기서 걸린다.
@@ -1211,7 +1209,7 @@ class DisplayNameRulesTest(TestCase):
         """파이썬은 upper, DB 는 lower 로 접으면 판정이 갈린다.
 
         갈리면 파이썬은 통과시키고 DB 가 거절해, 사용자는 이유를 알 수 없는
-        오류를 받는다. 켈빈 기호가 그 예다 - lower 하면 k 가 된다.
+        오류를 받는다. 켈빈 기호가 그 예다. lower 하면 k 가 된다.
         """
         User.objects.create_user(
             email="k@example.com", password=PASSWORD, display_name="kelvin"
@@ -1223,8 +1221,8 @@ class DisplayNameRulesTest(TestCase):
 class EmailChangeTest(TestCase):
     """이메일 변경. 확인 링크를 눌러야 바뀐다.
 
-    여기서 봐야 할 것은 "바꿀 수 있는가" 가 아니라 **"바꿀 수 없어야 할 때
-    막히는가"** 다. 이메일은 로그인 키라, 뚫리면 계정이 통째로 넘어간다.
+    여기서 봐야 할 것은 "바꿀 수 있는가" 가 아니라 "바꿀 수 없어야 할 때
+    막히는가" 다. 이메일은 로그인 키라, 뚫리면 계정을 빼앗긴다.
     """
 
     def setUp(self):
@@ -1421,7 +1419,7 @@ class EmailChangeTest(TestCase):
         self.assertIn("비밀번호", str(res.json()))
 
     def test_메일이_안_나가면_실패로_알린다(self):
-        """조용히 성공으로 넘기면 사용자는 오지 않을 메일을 기다린다."""
+        """성공으로 넘기면 사용자는 오지 않을 메일을 기다린다."""
         with mock.patch(
             "apps.accounts.views.send_account_mail",
             side_effect=MailNotConfigured("설정 없음"),
@@ -1437,7 +1435,7 @@ class EmailChangeTest(TestCase):
 
         정지 직전에 신청해둔 링크가 24시간 살아 있다. 그것을 누르면
         이메일이 바뀌고 새 토큰이 나가, 관리자가 끊은 계정이 되살아난다.
-        기존 토큰을 지우는 것으로는 못 막는다 - 이 경로가 새로 내준다.
+        기존 토큰을 지워도 이 경로가 새로 내주므로 못 막는다.
         """
         token = self.issued_token()
 
@@ -1496,7 +1494,7 @@ class EmailChangeThrottleScopeTest(TestCase):
     """신청과 확인이 서로 다른 통을 쓰는지.
 
     합쳐두면 아무나 확인 엔드포인트에 쓰레기를 던져 통을 태우는 것만으로
-    **모두의 이메일 변경 신청**을 막을 수 있다. 확인 쪽은 로그인이 없어
+    모두의 이메일 변경 신청을 막을 수 있다. 확인 쪽은 로그인이 없어
     통 하나를 전원이 나눠 쓰기 때문이다.
     """
 
@@ -1513,7 +1511,7 @@ class EmailChangeThrottleScopeTest(TestCase):
     def test_확인_쪽_통이_더_넉넉하다(self):
         """좁게 잡으면 그 통이 전원을 막는 스위치가 된다.
 
-        **운영 값을 읽는다.** settings 는 테스트로 돌 때 두 통을 다
+        운영 값을 읽는다. settings 는 테스트로 돌 때 두 통을 다
         2000/min 으로 올리므로(다른 통들과 같은 방식), 실행 중 값을 보면
         둘이 같아 아무것도 검증하지 못한다. sys.argv 를 잠시 비워 settings
         모듈을 운영 조건으로 다시 읽는다.
@@ -1559,12 +1557,11 @@ def _png(size=(600, 400), mode="RGB", color=(200, 80, 40)):
 
 
 def _big_png():
-    """상한을 넘는 **진짜 사진**.
+    """상한을 넘는 진짜 사진.
 
     사진이 아닌 바이트를 늘려 쓰면 안 된다. 그건 상한을 지워도 "사진
     파일을 읽을 수 없습니다" 로 거절되므로, 테스트는 통과하는데 정작
-    상한은 검사되지 않는다. 실제로 그렇게 짰다가 상한 두 곳을 모두
-    지워도 117개가 다 초록이었다.
+    상한은 검사되지 않는다.
 
     잡음으로 채우는 이유: PNG 는 무손실 압축이라 단색으로 만들면 아무리
     크게 잡아도 몇 KB 로 줄어든다. 잡음은 압축이 안 먹어서 픽셀 수만큼
@@ -1600,7 +1597,7 @@ class AvatarPhotoShrinkTest(TestCase):
         """원본을 그대로 넣지 않는다는 것을 값으로 확인한다.
 
         크기를 안 줄이면 행 하나가 폰 사진만큼 커진다. 그것을 막는 것이
-        이 함수의 존재 이유라 여기서 못 박는다.
+        이 함수가 있는 이유라 여기서 확인한다.
         """
         raw = _png(size=(2000, 2000))
         out = shrink_avatar_photo(raw)
@@ -1878,8 +1875,8 @@ class AvatarPhotoFileTest(TestCase):
         """ETag 가 올린 시각을 따라간다.
 
         사진을 바꾸면 주소 자체가 달라지므로(avatar_photo_key) 캐시는
-        그쪽에서 이미 깨진다. 여기서 보는 것은 **같은 주소**에서 내용이
-        달라지는 경우다 - 값이 안 따라오면 304 를 잘못 내보낸다.
+        그쪽에서 이미 깨진다. 여기서 보는 것은 같은 주소에서 내용이
+        달라지는 경우다. 값이 안 따라오면 304 를 잘못 내보낸다.
         """
         first = self.client.get(self.url)["ETag"]
 
@@ -1988,7 +1985,7 @@ class AuthQueryWeightTest(TestCase):
     models.py 의 avatar_photo 주석이 "어느 질의에도 안 실어서 푼다" 고
     적어뒀는데, 그 불변식이 실제로 서는지 보는 자리다.
 
-    **응답 크기로는 못 잡는다.** 이미 있는 test_me_does_not_carry_photo_bytes
+    응답 크기로는 못 잡는다. 이미 있는 test_me_does_not_carry_photo_bytes
     는 JSON 이 작은지만 보는데, 직렬화에서 빠져도 DB 에서 앱까지는 이미
     실려온 뒤다. 그래서 질의문 자체를 본다.
     """
@@ -2014,7 +2011,7 @@ class AuthQueryWeightTest(TestCase):
         ]
         self.assertTrue(auth_queries, "토큰 조회 질의를 못 찾았다")
 
-        # **부분일치로 보면 안 된다.** avatar_photo_key 와 avatar_photo_at
+        # 부분일치로 보면 안 된다. avatar_photo_key 와 avatar_photo_at
         # 은 읽어도 되는 칸인데 이름이 avatar_photo 로 시작해서 함께 걸린다.
         # 따옴표까지 붙여 그 칸 하나만 본다.
         for sql in auth_queries:
@@ -2098,7 +2095,7 @@ class AvatarPhotoBombTest(TestCase):
 class AvatarPhotoThrottleTest(TestCase):
     """사진 올리기 제한.
 
-    이 앱에서 제일 비싼 자리다 - 요청 하나가 5MB 를 받아 Pillow 로 열고
+    이 앱에서 제일 비싼 자리다. 요청 하나가 5MB 를 받아 Pillow 로 열고
     줄인 뒤 다시 인코딩한다. 제한이 없으면 계정 하나로 큰 사진을 반복해서
     던지는 것만으로 CPU 와 메모리를 밀 수 있다.
     """
@@ -2113,10 +2110,10 @@ class AvatarPhotoThrottleTest(TestCase):
         )
 
     def test_뷰에_실제로_달려_있다(self):
-        """**이 검사가 핵심이다.**
+        """이 검사가 핵심이다.
 
-        통을 잘 만들어도 뷰에 안 달면 아무것도 안 막는다. 그 줄을 누가
-        지워도 다른 테스트는 전부 초록이라 조용히 통과한다.
+        통을 잘 만들어도 뷰에 안 달면 아무것도 안 막는다. 그 줄을 지워도
+        다른 테스트는 전부 통과한다.
         """
         from .throttles import AvatarPhotoThrottle
         from .views import AvatarPhotoView

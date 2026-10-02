@@ -1,6 +1,6 @@
-"""독립 동적 테스트 - 검수 게이트/권한/입력 검증을 깨뜨리려는 시도.
+"""검수 게이트·권한·입력 검증을 깨뜨리려는 시도를 모은 테스트.
 
-구현자 테스트(tests.py)와 별개로 설계했다. 통과 확인이 아니라 결함 찾기가 목적이다.
+tests.py 가 정상 동작을 본다면, 여기는 결함을 찾으려고 우회 경로를 찌른다.
 """
 
 from django.contrib.auth import get_user_model
@@ -57,7 +57,7 @@ class ReviewGateLeakTest(TestCase):
     def assert_no_leak(self, res, label):
         """요청이 통과했는데 미검수 단어가 섞여 나오지는 않는지 본다.
 
-        200 만 받는다. 거부(400)까지 여기서 허용하면 필터가 통째로 고장나
+        200 만 받는다. 거부(400)까지 여기서 허용하면 필터가 완전히 고장나
         모든 요청이 400 이 되어도 "본문에 미검수가 없다" 며 통과한다.
         잘못된 값의 거부는 그 자체를 확인하는 테스트에서 따로 본다.
 
@@ -115,7 +115,7 @@ class ReviewGateLeakTest(TestCase):
 
     def test_category_filter_does_not_leak(self):
         # 유효한 값만 넣는다. 거부되는 값을 섞으면 200 을 기대하는 케이스까지
-        # 검증이 헐거워져, 필터가 통째로 고장나도 통과한다.
+        # 검증이 헐거워져, 필터가 완전히 고장나도 통과한다.
         for category in ["git", "devops", ""]:
             with self.subTest(category=category):
                 res = self.client.get(LIST_URL, {"category": category})
@@ -620,7 +620,7 @@ class CategoryLabelTest(TestCase):
         """DB 가 막는다. choices 는 full_clean() 을 타는 경로에서만 검사한다.
 
         seed_words 의 update_or_create 나 bulk_create 는 그 경로를 안 타므로,
-        모델 검증만 믿으면 목록에 없는 값이 조용히 저장된다. 그렇게 들어가면
+        모델 검증만 믿으면 목록에 없는 값이 에러 없이 저장된다. 그렇게 들어가면
         화면에 영어 코드가 그대로 노출되고 그 필터 링크는 400 이 된다.
         """
         # 제약 위반은 트랜잭션을 깬다. atomic 으로 감싸야 이후 쿼리가 산다.
@@ -634,7 +634,7 @@ class CategoryLabelTest(TestCase):
         self.assertEqual(Word.objects.get(term="nocat2").get_category_display(), "")
 
     def test_unknown_category_is_rejected(self):
-        """목록에 없는 분류로 거르면 400. 조용히 전체를 주면 필터가 안 먹은 걸 모른다."""
+        """목록에 없는 분류로 거르면 400. 에러 없이 전체를 주면 필터가 안 먹은 걸 모른다."""
         self.assertEqual(
             self.client.get(LIST_URL, {"category": "nonexistent"}).status_code, 400
         )
@@ -645,11 +645,11 @@ class DailyWordsContractTest(TestCase):
 
     프론트(lib/api/vocab.ts 의 getDailyWords)는 날짜로 시작점을 정해 목록에서
     연속 N개를 가져온다. 전용 엔드포인트가 없어 페이지 번호를 직접 계산하는데,
-    그 계산이 아래 셋을 전제한다. 하나라도 바뀌면 홈이 조용히 어긋난다 -
-    엉뚱한 단어가 나오거나(페이지 크기), 빈 자리를 가리키거나(count), 404 로
-    단어 칸이 통째로 빈다(범위 밖 페이지).
+    그 계산이 아래 셋을 전제한다. 하나라도 바뀌면 홈이 어긋난다. 엉뚱한
+    단어가 나오거나(페이지 크기), 빈 자리를 가리키거나(count), 404 로 단어
+    칸이 전부 빈다(범위 밖 페이지).
 
-    **창을 만드는 계산 자체는 여기서 다시 짜지 않는다.** 그건 프론트 테스트
+    창을 만드는 계산 자체는 여기서 다시 짜지 않는다. 그건 프론트 테스트
     (daily-words.test.mts)가 566일 전수로 본다. 여기서 흉내내면 두 벌이 따로
     낡아가고, 정작 위험한 부분(페이지를 병렬로 받는 구조)은 재현되지도 않아
     안전망처럼 보이기만 한다.

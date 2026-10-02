@@ -27,7 +27,7 @@ export const metadata: Metadata = {
  *
  * 사진과 이름을 바꾸고, 순위를 보고, 계정 정보를 보고, 로그아웃한다.
  *
- * 순위는 세 종류(주간·전체·꾸준함)의 내 줄만 본다 - 여기는 남과 비교하러
+ * 순위는 세 종류(주간·전체·꾸준함)의 내 줄만 본다. 여기는 남과 비교하러
  * 오는 자리가 아니라 자기 상태를 보러 오는 자리라 스무 줄 목록이 필요
  * 없다. 아직 못 오른 종류는 0 이 아니라 - 로 둔다. 0 은 "0점을 냈다" 로
  * 읽혀서 안 한 것과 구분되지 않는다.
@@ -116,7 +116,7 @@ export default async function ProfilePage() {
         >
           <div className="flex justify-between gap-4">
             <dt style={{ color: "var(--text-muted)" }}>이메일</dt>
-            {/* min-w-0 이 없으면 truncate 가 아예 발동하지 않는다. flex 항목의
+            {/* min-w-0 이 없으면 truncate 가 발동하지 않는다. flex 항목의
                 min-width 는 auto = min-content 인데, truncate 가 건
                 white-space: nowrap 때문에 min-content 가 이메일 전체 폭이
                 되어 칸이 줄지 않고 행이 그대로 넘친다. */}

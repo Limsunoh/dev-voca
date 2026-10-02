@@ -72,7 +72,7 @@ def take_step_only(study_pk: int) -> DailyStudy:
 def before_close(action):
     """닫는 UPDATE(finished_at 을 쓰는 것) 바로 앞에 action 을 한 번 끼운다.
 
-    refresh_from_db 같은 특정 읽기 자리가 아니라 **쓰기 직전**에 건다.
+    refresh_from_db 같은 특정 읽기 자리가 아니라 쓰기 직전에 건다.
     읽는 자리가 어디든(호출부의 쿼리셋이든 _finish 안이든) 그 뒤 UPDATE
     전까지가 창이므로, 여기가 가장 늦은 끼어들기다. action 안에서 다시
     닫기가 불려도 두 번째부터는 그대로 통과한다.
@@ -237,7 +237,7 @@ class InterleavingTest(_FinishBase):
     """
 
     def test_an_answer_committed_right_before_settles_close_is_kept(self):
-        """정산이 닫기 직전에 다른 탭의 답(마지막 아님)이 통째로 끝난다."""
+        """정산이 닫기 직전에 다른 탭의 답(마지막 아님)이 처음부터 끝까지 돈다."""
         study, token, _q = play(self.user, 3)
 
         def other_tab():
@@ -315,7 +315,7 @@ class InterleavingTest(_FinishBase):
         self._assert_settled(study.pk, answered=TOTAL, bonus=True)
 
     def test_a_settle_inside_a_settle_does_not_double_the_bonus(self):
-        """두 정산이 겹친다 - 한쪽이 닫기 직전에 다른 쪽이 통째로 돈다."""
+        """두 정산이 겹친다. 한쪽이 닫기 직전에 다른 쪽이 처음부터 끝까지 돈다."""
         study, _t, _q = play(self.user, TOTAL - 1)
         take_step_only(study.pk)  # 다 풀었지만 열린 판
 

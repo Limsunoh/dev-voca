@@ -100,8 +100,8 @@ class ScoringTest(TestCase):
     def _play_one(self, correct: bool, late: bool):
         """문제 하나를 풀고 결과를 돌려준다.
 
-        정답은 판 상태에서 직접 읽는다. 예전에는 보기를 하나씩 보내며
-        찾았는데, 그게 바로 되돌리기 공격이라 지금은 막혀 있다([ReplayTest]).
+        정답은 판 상태에서 직접 읽는다. 보기를 하나씩 보내며 찾는 것은
+        되돌리기 공격이라 막혀 있다([ReplayTest]).
         """
         token, question = session.start()
 
@@ -195,7 +195,7 @@ class SkipTest(TestCase):
     def test_answered_counts_the_answer_just_given(self):
         """다음 문제에 실리는 answered 가 방금 푼 답을 세야 한다.
 
-        답을 센 뒤에 문제를 만들지 않으면 화면 숫자가 영구히 하나
+        답을 센 뒤에 문제를 만들지 않으면 화면 숫자가 계속 하나
         뒤처지고, 마지막 값에도 못 닿는다.
         """
         token, question = session.start()
@@ -224,7 +224,7 @@ class ReviewGateTest(TestCase):
     확인하기 전에 보여주면, 영어가 약한 사람이 틀린 것을 그대로 외운다.
 
     이 클래스가 없으면 `.visible()` 을 `.all()` 로 바꿔도 나머지 테스트가
-    전부 통과한다 - 다른 픽스처는 전부 is_reviewed=True 라서다.
+    전부 통과한다. 다른 픽스처는 전부 is_reviewed=True 라서다.
     """
 
     @classmethod
@@ -234,7 +234,7 @@ class ReviewGateTest(TestCase):
         cls.hidden = Word.objects.create(
             term="leaked-term", meaning="새면 안 되는 뜻", category="git"
         )
-        # 미검수 문장은 **문제로 만들어질 수 있는 모양**이어야 한다.
+        # 미검수 문장은 문제로 만들어질 수 있는 모양이어야 한다.
         # 등록된 단어(term0)를 넣지 않으면 빈칸 문제 후보가 안 되고,
         # 상황이 하나뿐이면 상황 문제도 안 만들어진다. 그러면 필터를
         # 지워도 애초에 안 나와서 이 테스트가 아무것도 못 잡는다.
@@ -294,7 +294,7 @@ class ReviewGateTest(TestCase):
         문장 문제의 정답 본문은 문장 자체가 아니라 "나오는 상황" 이다.
         관리자가 Admin 에서 그 칸만 비우면 이 모양이 된다.
 
-        **화면이 이 둘을 한 덩이로 다루면 안 된다는 근거다.** 본문이
+        화면이 이 둘을 한 덩이로 다루면 안 된다는 근거다. 본문이
         비었다고 뜻까지 버리면, 틀린 사람이 받을 수 있었던 해석이 사라진다
         (frontend WrongAnswer.tsx).
         """
@@ -381,8 +381,8 @@ class ReplayTest(TestCase):
 
         검사하면서 순번까지 태우면, 넘기기를 한 번 더 눌러 거절당하는
         순간 토큰은 그대로인데 RoundStep 표에만 순번이 올라가 그 뒤 정상 요청이 전부
-        막힌다. 오래된 탭에서 버튼을 한 번 잘못 누른 것만으로 판이
-        통째로 날아간다.
+        막힌다. 오래된 탭에서 버튼을 한 번 잘못 누른 것만으로 판을 더
+        이어갈 수 없게 된다.
         """
         token, question = session.start()
 
@@ -415,7 +415,7 @@ class ReplayTest(TestCase):
 
         get 후 set 은 원자적이지 않아, 같은 토큰으로 보기 넷을 동시에
         보내면 넷 다 통과한다. 그러면 정답을 몰라도 맞은 응답의 토큰만
-        남겨 매 문제 +1 을 확정할 수 있다 - 정직하게 푸는 것보다 항상
+        남겨 매 문제 +1 을 확정할 수 있다. 정직하게 푸는 것보다 항상
         이득이라 지배 전략이 된다.
 
         여기서는 순차로 본다. 진짜 동시 상황은 아래 _take_step 테스트가 본다.
@@ -435,9 +435,9 @@ class ReplayTest(TestCase):
     def test_cache_pressure_does_not_open_the_door(self):
         """캐시를 아무리 채워도 되돌리기가 뚫리면 안 된다.
 
-        한때 이 방어가 캐시에 있었다. 캐시는 항목이 넘치면 스스로 지우므로
-        (cull), 답하기를 반복해 자기 판의 표시를 밀어낸 뒤 옛 토큰을 쓰면
-        그만이었다. 표로 옮긴 지금은 캐시와 무관해야 한다.
+        캐시는 항목이 넘치면 스스로 지우므로(cull), 방어가 캐시에 있으면
+        답하기를 반복해 자기 판의 표시를 밀어낸 뒤 옛 토큰을 쓸 수 있다.
+        방어는 표(RoundStep)에 있으므로 캐시와 무관해야 한다.
         """
         saved, question = session.start()
         _, first, _ = session.answer(saved, question["choices"][0]["id"])
@@ -486,8 +486,8 @@ class ReplayTest(TestCase):
     def test_two_requests_cannot_take_the_same_step(self):
         """같은 순번을 두 요청이 나눠 가질 수 없어야 한다.
 
-        이것이 위 공격의 핵심이다. 동시에 들어온 요청들은 **같은 상태를
-        읽는다** - 읽고 나서 쓰는 방식이면 전부 통과해버린다. 그 상황을
+        이것이 위 공격의 핵심이다. 동시에 들어온 요청들은 같은 상태를
+        읽는다. 읽고 나서 쓰는 방식이면 전부 통과한다. 그 상황을
         상태를 두 번 읽는 것으로 재현한다.
         """
         token, _ = session.start()
@@ -641,9 +641,9 @@ class RoundEndTest(TestCase):
         """마감이 답 하나당 정확히 REACTION_PAUSE_MS 만큼만 밀리는지.
 
         위의 두 테스트는 "마감이 지났나 안 지났나" 만 본다. 그래서 보상을
-        두 배로 주는 실수(graded * 2 * PAUSE)를 둘 다 통과시킨다 - 판이
-        길어지는 쪽으로 틀린 것이라 아무도 항의하지 않고, 90초 판이 조용히
-        2분이 된다. 여기서는 값을 그대로 견준다.
+        두 배로 주는 실수(graded * 2 * PAUSE)를 둘 다 통과시킨다. 판이
+        길어지는 쪽으로 틀린 것이라 아무도 항의하지 않고, 90초 판이 에러
+        없이 2분이 된다. 여기서는 값을 그대로 견준다.
 
         넘기기를 섞는 이유: 넘긴 것은 화면이 안 멈추므로 보상이 없다.
         그 줄이 빠지면 넘길수록 판이 길어진다.
@@ -814,9 +814,9 @@ class RoundApiTest(TestCase):
     def test_the_start_response_publishes_the_reaction_pause(self):
         """판을 열 때 연출 시간을 함께 내려주는지.
 
-        화면(RoundBoard)은 이 값으로 두 가지를 한다 - 채점 뒤 몇 ms 를
-        멈출지, 그리고 --duration-verdict 를 몇으로 둘지. 값이 없으면
-        0 으로 떨어져 **연출이 통째로 안 뜬다**(옛 서버 대비 방어다).
+        화면(RoundBoard)은 이 값으로 두 가지를 정한다. 채점 뒤 몇 ms 를
+        멈출지와 --duration-verdict 를 몇으로 둘지다. 값이 없으면
+        0 으로 떨어져 연출이 안 뜬다(옛 서버 대비 방어다).
 
         키 이름을 바꾸거나 빠뜨려도 화면은 에러 없이 그냥 안 멈춘다.
         그런데 서버는 여전히 답마다 마감을 1초씩 밀어주므로, 아무도
@@ -944,8 +944,8 @@ class SentenceQuestionTest(TestCase):
             term="rebase", meaning="옮겨 붙이기", category="git", is_reviewed=True
         )
         # 상황을 일부러 겹치게 만든다. 전부 다르면 "같은 상황을 보기에
-        # 두 번 넣지 않는다" 는 규칙이 검사되지 않는다 - 코드에서 그 줄을
-        # 통째로 지워도 테스트가 통과한다.
+        # 두 번 넣지 않는다" 는 규칙이 검사되지 않는다. 코드에서 그 줄을
+        # 지워도 테스트가 통과한다.
         #
         # 그렇다고 두 종류로 두면 안 된다. 보기가 넷이라 서로 다른 상황이
         # 최소 넷은 있어야 문제를 만들 수 있다. 겹치기도 하고 넷도 되게

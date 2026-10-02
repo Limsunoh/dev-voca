@@ -21,8 +21,8 @@ export type BoardKind = (typeof BOARD_KINDS)[number];
  *
  * routes 는 아무것도 import 하지 않는 순수 모듈이라 여기 타입을 못
  * 가져간다. 그래서 값을 두 번 적게 되는데, 한쪽만 고치면 순위표 링크가
- * 조용히 깨진다 - 눌러보기 전까지 모른다. 이 두 줄이 그때 빌드를
- * 멈춘다(런타임 비용 0).
+ * 깨져도 눌러보기 전까지 모른다. 이 두 줄이 그때 빌드를 멈춘다(런타임
+ * 비용 0).
  */
 type _SameAsRoutes = RouteBoardKind extends BoardKind ? true : never;
 type _SameAsApi = BoardKind extends RouteBoardKind ? true : never;
@@ -122,7 +122,7 @@ export function fetchBoard(kind: BoardKind, token?: string): Promise<Board> {
 /**
  * 세 순위표를 한꺼번에. 마이페이지가 내 줄만 쓴다.
  *
- * **하나가 실패해도 나머지를 보여준다.** 순위는 곁들이는 정보라, 이것
+ * 하나가 실패해도 나머지를 보여준다. 순위는 곁들이는 정보라, 이것
  * 때문에 프로필 화면 전체가 안 뜨면 손해가 더 크다.
  */
 export async function fetchMyStandings(

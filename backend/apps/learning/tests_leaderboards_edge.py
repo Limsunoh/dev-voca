@@ -1,7 +1,7 @@
 """순위표 경계 - 깨뜨리려고 쓴 테스트.
 
 tests_leaderboards.py 가 규칙이 지켜지는지를 본다면, 여기는 규칙이
-**어디서 갈리는지**를 본다. 겹치는 시나리오는 안 쓴다.
+어디서 갈리는지를 본다. 겹치는 시나리오는 안 쓴다.
 
     - 등수 겹침: me.rank 가 rows 의 어떤 rank 와도 같으면 안 된다
     - 목록 경계: 정확히 20등 / 21등 / 동점이 경계에 걸릴 때
@@ -109,7 +109,7 @@ class RankOverlapTest(BoardConsistencyMixin, TestCase):
     def test_exactly_twenty_first_place_when_everyone_ties(self):
         """21명 전원 동점. 21번째가 자기를 21등으로 봐야 한다.
 
-        경계다 - 20명은 목록에 들어가고 한 명만 밖이다. 세는 쪽이 동점자를
+        경계다. 20명은 목록에 들어가고 한 명만 밖이다. 세는 쪽이 동점자를
         한 명이라도 놓치면 곧바로 20등이 되어 목록과 겹친다.
         """
         now = timezone.now()
@@ -199,16 +199,15 @@ class RankOverlapTest(BoardConsistencyMixin, TestCase):
         )
 
     # 꾸준함 전수 검사는 edge2.py 의 StreakRankSweepTest 에 있다. 거기
-    # RankAgreementMixin 이 목록 안 사람까지 검사한다 - 여기서 하면
-    # 목록 안 20명은 me 가 None 이라 단언이 통째로 스킵된다.
+    # RankAgreementMixin 이 목록 안 사람까지 검사한다. 여기서 하면
+    # 목록 안 20명은 me 가 None 이라 단언을 전부 건너뛴다.
 
 
 class HugeTieGroupTest(BoardConsistencyMixin, TestCase):
     """동점 무리가 클 때.
 
-    한때 동점자를 한도만큼 꺼내 그 안에서 자리를 찾았고, 그래서 한도를
-    넘는 사람들이 전부 같은 등수로 뭉쳤다. 지금은 세기만 하므로 규모와
-    무관해야 한다.
+    동점자를 한도만큼 꺼내 그 안에서 자리를 찾으면 한도를 넘는 사람들이
+    전부 같은 등수로 뭉친다. 세기만 하므로 규모와 무관해야 한다.
     """
 
     def setUp(self):
@@ -223,7 +222,7 @@ class HugeTieGroupTest(BoardConsistencyMixin, TestCase):
         return people
 
     def test_sixty_tied_users_still_rank_correctly(self):
-        """60명 동점. 예전 한도였던 자리를 고정해 둔다."""
+        """60명 동점. 동점자를 60명까지 꺼내던 방식의 경계다."""
         people = self._tied_crowd(60)
 
         board = leaderboards.build(leaderboards.ALL_TIME, user=people[-1])
@@ -234,8 +233,8 @@ class HugeTieGroupTest(BoardConsistencyMixin, TestCase):
     def test_a_tie_group_over_fetch_size_still_ranks_the_last_user(self):
         """61명 동점. 61번째가 61등이어야 한다.
 
-        예전 한도(60) 바로 위다. 동점자를 꺼내 세던 시절에는 여기서부터
-        잘려나간 사람 전원이 같은 등수로 뭉쳤다.
+        한도 60 바로 위다. 동점자를 꺼내 세는 방식이면 여기서부터
+        잘려나간 사람 전원이 같은 등수로 뭉친다.
         """
         count = 61
         people = self._tied_crowd(count)
@@ -267,7 +266,7 @@ class HugeTieGroupTest(BoardConsistencyMixin, TestCase):
 
         등수가 조금 부정확한 것과 다르다. 61등부터 100등까지가 전원
         '61등' 을 보면, 40명이 서로를 앞질렀는지 알 수 없어 순위표가
-        동기를 못 준다 - 더 잘해도 숫자가 안 움직인다.
+        동기를 못 준다. 더 잘해도 숫자가 안 움직인다.
         """
         people = self._tied_crowd(100)
 
@@ -321,9 +320,9 @@ class HugeTieGroupTest(BoardConsistencyMixin, TestCase):
     def test_the_earliest_achiever_is_listed_first_in_a_huge_tie(self):
         """동점 무리가 커도 '먼저 달성한 쪽이 위' 가 지켜져야 한다.
 
-        한때 목록을 pk 순으로 잘라낸 뒤 그 안에서만 시각으로 다시 세웠다.
-        pk 순서와 달성 순서가 반대면 **진짜 1등이 아예 안 꺼내져** 목록에서
-        사라졌다 - 내 줄이 아니라 목록 자체가 틀리는 종류다.
+        목록을 pk 순으로 잘라낸 뒤 그 안에서만 시각으로 다시 세우면, pk
+        순서와 달성 순서가 반대일 때 진짜 1등이 꺼내지지 않아 목록에서
+        사라진다. 내 줄이 아니라 목록 자체가 틀리는 경우다.
         """
         now = timezone.now()
         count = 61
@@ -372,7 +371,7 @@ class WeekBoundaryTest(TestCase):
         """UTC 로 보면 지난주(일요일 15시)지만 KST 로는 월요일 0시다.
 
         서버가 UTC 로 날짜를 세면 이 판이 빠진다. 밤에 푼 사람이 억울하게
-        순위표에서 사라지는 그 버그다.
+        순위표에서 사라진다.
         """
         user = make_user("자정사람")
         monday = calendar_kst.this_week_start()
@@ -407,7 +406,7 @@ class TotalEquivalenceTest(TestCase):
     """DailyScore.total (파이썬) 과 SQL 합이 같은 값을 내는지.
 
     같은 규칙이 두 곳에 있다. 손으로 고른 몇 개가 아니라 무작위 입력으로
-    본다 - 마이너스·null·0 을 섞으면 두 식이 갈리는 자리가 드러난다.
+    본다. 마이너스·null·0 을 섞으면 두 식이 갈리는 자리가 드러난다.
     """
 
     def setUp(self):
@@ -447,7 +446,7 @@ class TotalEquivalenceTest(TestCase):
                 self.assertEqual(mine.score, active_days, "날 수 셈이 다르다")
 
     def test_a_day_that_is_only_negative_contributes_zero(self):
-        """하루가 통째로 마이너스여도 누적이 줄지 않는다.
+        """하루 점수가 전부 마이너스여도 누적이 줄지 않는다.
 
         SQL 쪽에서 0 으로 자르는 부분이 빠지면 열심히 한 날 점수가 깎인다.
         """
@@ -465,7 +464,7 @@ class TotalEquivalenceTest(TestCase):
         """best_free_score 가 null 인 날의 일일공부 점수가 사라지면 안 된다.
 
         SQL 에서 null + 2 는 2 가 아니라 null 이다. Coalesce 가 빠지면
-        그 날이 합계에서 통째로 빠진다.
+        그 날이 합계에서 빠진다.
         """
         user = make_user("공부만한날사람")
         today = calendar_kst.today()
@@ -621,7 +620,7 @@ class InactiveUserTest(BoardConsistencyMixin, TestCase):
     def test_an_inactive_user_is_not_counted_ahead_of_me(self):
         """탈퇴한 사람이 나보다 위여도 내 등수를 밀면 안 된다.
 
-        목록에서는 빠지는데 세는 쿼리에 남아 있으면 내 등수만 뒤로 밀린다 -
+        목록에서는 빠지는데 세는 쿼리에 남아 있으면 내 등수만 뒤로 밀린다.
         목록 마지막이 3등인데 내가 5등이 되는 식이다.
         """
         now = timezone.now()
@@ -676,7 +675,7 @@ class InactiveUserTest(BoardConsistencyMixin, TestCase):
     def test_an_inactive_user_does_not_shift_streak_ranks(self):
         """꾸준함에서도 마찬가지.
 
-        내가 **목록 밖**이어야 세는 쿼리(_streak_ahead)가 돈다. 목록 안이면
+        내가 목록 밖이어야 세는 쿼리(_streak_ahead)가 돈다. 목록 안이면
         그 경로를 안 타서, 세는 쪽이 비활성을 걸러내는지 확인이 안 된다.
         """
         today = calendar_kst.today()
@@ -726,7 +725,7 @@ class InactiveUserTest(BoardConsistencyMixin, TestCase):
 
 
 class KindArgumentTest(TestCase):
-    """종류 인자. 오타가 조용히 통과하면 안 된다."""
+    """종류 인자. 오타가 에러 없이 통과하면 안 된다."""
 
     def setUp(self):
         cache.clear()

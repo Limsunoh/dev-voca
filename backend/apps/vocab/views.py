@@ -51,8 +51,8 @@ def can_review(user) -> bool:
     """검수 권한 판정.
 
     조회 범위(get_queryset)와 쓰기 권한(CanReview)이 이 함수 하나를 본다.
-    판정이 두 곳으로 갈리면 한쪽만 바뀌었을 때 조용히 어긋난다 - 예를 들어
-    쓰기만 superuser 로 좁히면 일반 staff 가 미검수 단어를 계속 조회하게 된다.
+    판정이 두 곳으로 갈리면 한쪽만 바뀌었을 때 어긋난다. 예를 들어 쓰기만
+    superuser 로 좁히면 일반 staff 가 미검수 단어를 계속 조회하게 된다.
     """
     return user.is_authenticated and user.is_staff and user.is_active
 
@@ -70,7 +70,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
     """학습 콘텐츠(단어/문장) 공용 베이스.
 
     검수 게이트와 쓰기 권한은 콘텐츠 타입이 달라도 규칙이 같다. 도메인마다
-    복사해두면 한쪽만 고쳤을 때 조용히 어긋나고, 그 어긋남이 곧 미검수
+    복사해두면 한쪽만 고쳤을 때 어긋나고, 그 어긋남이 곧 미검수
     노출이다. 규칙을 여기 한 곳에 둔다.
 
     상속하는 쪽이 정할 것:
@@ -85,9 +85,9 @@ class LearningItemViewSet(viewsets.ModelViewSet):
     #
     # 두 파라미터의 오류 처리가 다르다. exam_subject 는 choices 라 없는
     # 값이면 400 인데, is_exam 은 DjangoFilterBackend 가 true/True/1 과
-    # false/0 만 알아듣고 나머지(yes·on·2·abc)는 **필터를 통째로 무시**한다
-    # - 200 에 전체 목록이 나온다. 화면은 "true" 하나만 통과시키므로
-    # 그 경로로는 안 걸리고, API 를 직접 부르는 쪽에서만 드러난다.
+    # false/0 만 알아듣고 나머지(yes·on·2·abc)는 필터를 무시해 200 에 전체
+    # 목록을 준다. 화면은 "true" 하나만 통과시키므로 그 경로로는 안 걸리고,
+    # API 를 직접 부르는 쪽에서만 드러난다.
     filterset_fields = ["category", "difficulty", "is_exam", "exam_subject"]
 
     model: type[LearningItem]
@@ -98,7 +98,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         """사용자에게는 검수된 항목만 보인다.
 
         관리자는 검수 전 항목까지 봐야 검수를 할 수 있으므로 전체를 준다.
-        이 분기가 이 API 의 핵심 규칙이다 - 바꾸기 전에 CLAUDE.md 를 확인할 것.
+        이 분기가 이 API 의 핵심 규칙이고, 근거는 CLAUDE.md 의 검수 규칙이다.
         """
         if can_review(self.request.user):
             return self.model.objects.all()
@@ -108,7 +108,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         """검수자에게는 검수 대기를 앞에 모아 준다.
 
         get_queryset 에서 order_by 를 걸면 소용이 없다. OrderingFilter 가
-        그 뒤에 돌면서 order_by 를 통째로 갈아끼우기 때문이다(ordering
+        그 뒤에 돌면서 order_by 를 새로 갈아끼우기 때문이다(ordering
         기본값이 항상 있어서 무조건 덮어쓴다).
 
         그래서 필터가 다 끝난 뒤에 정렬 키를 앞에 덧붙인다. 사용자가 고른
@@ -127,7 +127,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         앞쪽 항목만 계속 보이고 뒤쪽은 다음 페이지를 눌러야 만난다.
 
         ORDER BY RANDOM() 을 쓰지 않는 이유: 페이지마다 새로 섞여서 1페이지에
-        본 항목이 2페이지에 또 나오고 어떤 항목은 아예 안 나온다. 시드를
+        본 항목이 2페이지에 또 나오고 어떤 항목은 한 번도 안 나온다. 시드를
         받아 같은 시드면 같은 순서가 나오게 해야 페이지 넘기기가 성립한다.
         새로 섞고 싶으면 호출하는 쪽이 새 시드를 보낸다.
 
@@ -140,7 +140,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         문자열을 던져 쿼리를 부풀리는 것을 막는다.
 
         ordering 이 함께 오면 섞지 않는다. 사용자가 정렬을 골랐다는 뜻인데
-        그 위에 섞기를 덮으면 고른 정렬이 조용히 사라진다.
+        그 위에 섞기를 덮으면 고른 정렬이 사라진다.
 
         비용: 해시로 정렬하므로 인덱스를 쓰지 못하고 조건에 맞는 행 전체를
         정렬한다. 지금 규모(수백 건)에서는 문제가 없지만 수만 건을 넘어가면
@@ -168,7 +168,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         """분류 목록. 화면의 필터 버튼을 만들 때 쓴다.
 
         프론트에 목록을 복사해두면 분류를 추가할 때 두 곳을 고쳐야 하고,
-        한쪽만 고치면 조용히 어긋난다. 라벨의 출처는 모델 하나로 둔다.
+        한쪽만 고치면 어긋난다. 라벨의 출처는 모델 하나로 둔다.
         """
         return Response(
             [
@@ -196,7 +196,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         """난이도 목록. 분류와 같은 이유로 모델에서 만들어 내려준다.
 
         프론트에 [쉬움, 보통, 어려움] 을 적어두면 난이도가 하나 늘 때
-        두 곳을 고쳐야 하고, 한쪽만 고치면 조용히 어긋난다.
+        두 곳을 고쳐야 하고, 한쪽만 고치면 어긋난다.
 
         value 를 문자열로 바꾸는 이유: 화면에서 그대로 쿼리스트링에 넣는데,
         숫자로 두면 쓰는 쪽에서 매번 String() 을 붙이게 된다.
@@ -211,8 +211,8 @@ class LearningItemViewSet(viewsets.ModelViewSet):
     # POST 지만 데이터를 바꾸지 않아 익명도 허용하는 액션. 채점처럼
     # "제출" 의미 때문에 POST 를 쓰지만 실제로는 조회에 가깝다.
     #
-    # 여기 이름을 추가하려면 그 액션이 DB 에 아무것도 쓰지 않는지
-    # 먼저 확인할 것. 이 목록에 올리는 순간 로그인 없이 열린다.
+    # 이 목록에 올린 액션은 로그인 없이 열린다. 그래서 DB 에 아무것도
+    # 쓰지 않는 액션만 올린다.
     SAFE_POST_ACTIONS: tuple[str, ...] = ()
 
     def get_permissions(self) -> list[BasePermission]:
@@ -245,7 +245,7 @@ class WordViewSet(LearningItemViewSet):
     ordering = ["term"]
 
     # 채점은 POST 지만 아무것도 저장하지 않는다. 로그인을 요구하면
-    # 문제풀기를 아예 못 쓴다.
+    # 로그인하지 않은 사람은 문제풀기를 못 쓴다.
     SAFE_POST_ACTIONS = ("grade",)
 
     @action(detail=False)
@@ -253,7 +253,7 @@ class WordViewSet(LearningItemViewSet):
         """문제 하나를 낸다.
 
         출제를 서버에서 하는 이유는 두 가지다. 오답을 프론트에서 뽑으려면
-        566개를 통째로 받아야 하고, 정답을 응답에 담으면 개발자도구로
+        566개를 전부 받아야 하고, 정답을 응답에 담으면 개발자도구로
         미리 보인다. 채점은 grade 엔드포인트로 따로 받는다.
 
         검수자에게도 검수된 단어만 낸다. 목록에서 미검수를 보여주는 건
@@ -361,11 +361,11 @@ class WordViewSet(LearningItemViewSet):
 
         correct, answer_id, answer_type = graded
 
-        # **종류를 반드시 확인한다.** 토큰의 salt 가 단어·문장 공용이라
-        # 문장 문제의 토큰도 여기서 정상적으로 풀린다. 그대로 두면 정답
-        # id 가 Sentence pk 인 채로 Word 를 조회해, 같은 번호의 엉뚱한
-        # 단어가 응답에 실린다 - 보기 넷을 돌려가며 부르면 pk 로 표를
-        # 훑는 통로가 되고, 미검수 단어는 404 라 검수 상태까지 드러난다.
+        # 종류를 반드시 확인한다. 토큰의 salt 가 단어·문장 공용이라 문장
+        # 문제의 토큰도 여기서 정상적으로 풀린다. 그대로 두면 정답 id 가
+        # Sentence pk 인 채로 Word 를 조회해, 같은 번호의 엉뚱한 단어가
+        # 응답에 실린다. 보기 넷을 돌려가며 부르면 pk 로 표를 훑을 수 있고,
+        # 미검수 단어는 404 라 검수 상태까지 드러난다.
         if answer_type != TARGET_WORD:
             return Response(
                 {"detail": "문제 정보가 올바르지 않습니다. 새 문제를 받아주세요."},
@@ -422,9 +422,9 @@ def _item_of(
     돌려주는 것: (항목, 오류 응답). 안 정했으면 (None, None) 이다.
     name 은 못 찾았을 때 문구에 들어갈 말이다("단어로", "문장으로").
 
-    **pool 에서 찾는다.** pool 은 이미 검수된 것만 담고 있어서, 검수 안 된
+    pool 에서 찾는다. pool 은 이미 검수된 것만 담고 있어서, 검수 안 된
     항목의 번호를 넣어 그 뜻을 정답으로 받아 가는 길이 여기서 막힌다.
-    없는 번호와 검수 안 된 번호는 같은 404 다 - 둘을 가르면 번호를 돌려가며
+    없는 번호와 검수 안 된 번호는 같은 404 다. 둘을 가르면 번호를 돌려가며
     검수 상태를 알아낼 수 있다.
     """
     raw = request.query_params.get("item", "")
@@ -434,7 +434,7 @@ def _item_of(
     # exclude 와 같은 읽기로 한다. 숫자가 아니거나 너무 긴 값이 pk 조회로
     # 가면 500 이 난다. 하나만 받는다 - "1,2" 는 무엇을 낼지 모른다.
     # 읽은 숫자가 원래 값과 같은지도 본다. _parse_ids 는 쓰레기 조각을
-    # 조용히 버려서 "1,abc" 도 1 로 읽는다.
+    # 에러 없이 버려서 "1,abc" 도 1 로 읽는다.
     ids = _parse_ids(raw)
     if len(ids) != 1 or str(ids[0]) != raw.strip():
         return None, Response(
@@ -455,8 +455,8 @@ def _parse_level(raw: str | None) -> int | None:
     """난이도 쿼리를 읽는다. 아는 값이 아니면 None(전부)이다.
 
     choices 에 있는 값만 통과시킨다. 정수면 다 받으면 difficulty=9 같은
-    값이 그대로 WHERE 에 실려 **빈 결과를 "다 봤습니다" 로 그린다** -
-    데이터가 없는 것과 고를 수 없는 값을 고른 것이 같은 화면이 된다.
+    값이 그대로 WHERE 에 실려 빈 결과를 "다 봤습니다" 로 그린다. 데이터가
+    없는 것과 고를 수 없는 값을 고른 것이 같은 화면이 된다.
     """
     if not raw:
         return None
@@ -538,13 +538,13 @@ class SentenceViewSet(LearningItemViewSet):
         단어 쪽 quiz 와 같은 이유로 출제를 서버에서 한다 - 오답을 프론트에서
         뽑으면 전부 받아야 하고, 정답을 응답에 담으면 개발자도구로 보인다.
 
-        유형이 둘이고 **둘 다 실패할 수 있다.**
+        유형이 둘이고 둘 다 실패할 수 있다.
         - blank(빈칸 채우기): 단어가 들어 있는 문장에서만 낼 수 있다.
           2026-08 기준 380개 중 162개에는 단어가 없다.
         - situation(상황 고르기): 상황(context)이 채워진 문장만.
 
         그래서 하나가 안 되면 다른 쪽으로 넘어간다. 유형을 지정해서 왔는데
-        그 유형을 못 내면 그대로 404 다 - 조용히 다른 유형을 내면 사용자가
+        그 유형을 못 내면 그대로 404 다. 다른 유형을 대신 내면 사용자가
         고른 것과 다른 문제가 나온다.
 
         ?category=git     분류를 좁힌다
@@ -639,8 +639,8 @@ class SentenceViewSet(LearningItemViewSet):
     def grade(self, request: Request) -> Response:
         """고른 보기가 정답인지 알려주고 해설을 준다.
 
-        단어 쪽 grade 와 규칙이 같다. 다른 것은 **정답을 어느 표에서
-        찾느냐** 하나뿐이고, 그건 토큰에 담아둔 종류로 갈린다. 빈칸 문제는
+        단어 쪽 grade 와 규칙이 같다. 다른 것은 정답을 어느 표에서
+        찾느냐 하나뿐이고, 그건 토큰에 담아둔 종류로 갈린다. 빈칸 문제는
         문장을 보여주지만 정답은 단어라, 여기서 갈리지 않으면 id 가 같은
         엉뚱한 문장을 정답이라고 띄운다.
         """
@@ -711,17 +711,17 @@ class SentenceViewSet(LearningItemViewSet):
 class TalkViewSet(viewsets.ViewSet):
     """소리내어 읽기(일상영어).
 
-    **음성이 서버로 오지 않는다.** 브라우저가 음성을 텍스트로 바꿔 그
+    음성이 서버로 오지 않는다. 브라우저가 음성을 텍스트로 바꿔 그
     텍스트만 보낸다. 저장소·비용·생체정보 문제가 없고, Claude API 를
     부르지 않으므로 사용자 경로 AI 금지와도 부딪히지 않는다.
 
     무엇을 재고 무엇을 못 재는지는 talk.py 머리에 적어뒀다. 요약하면
-    **발음이 아니라 철자를 잰다** - 인식기가 그 단어로 알아들었는지를
-    본다. 사용자가 그 한계를 알고 안고 가기로 결정했다.
+    발음이 아니라 철자를 잰다(인식기가 그 단어로 알아들었는지를 본다).
+    이 한계는 알고 받아들인 것이다.
 
     ModelViewSet 이 아니라 ViewSet 인 이유: 목록·상세·쓰기가 없다.
     읽을 것을 하나 받고 채점하는 두 동작뿐이라 라우터가 만드는 CRUD 가
-    전부 죽은 경로가 된다.
+    전부 쓰지 않는 경로가 된다.
 
     로그인 없이 쓸 수 있다. 점수·순위표에 안 들어가므로 막을 이유가 없고,
     발음 연습은 게스트가 먼저 해보고 판단할 성질이다.
@@ -739,13 +739,12 @@ class TalkViewSet(viewsets.ViewSet):
         ?scene=<slug>   그 상황(PhraseScene)만 낸다. 없거나 모르는 값이면
                         전부. 일상 표현에만 걸린다
 
-        **약어·숫자·기호는 출제하지 않는다.** 소리로 채점할 수 없어서다
+        약어·숫자·기호는 출제하지 않는다. 소리로 채점할 수 없어서다
         (talk.is_speakable). 개발 용어 566개 중 361개만 나온다.
 
         그 필터를 SQL 로 옮기지 않고 파이썬에서 도는 이유: 판정이 "낱말로
         쪼개 각 낱말이 전부 대문자인지" 라 SQL 로 옮기면 정규식 세 개가
-        되고, 그것이 DB 엔진마다 다르게 동작한다. 566행은 통째로 읽어도
-        싸다.
+        되고, 그것이 DB 엔진마다 다르게 동작한다. 566행은 다 읽어도 싸다.
         """
         if request.query_params.get("kind") == KIND_DEV:
             kind, model, field = KIND_WORD, Word, "term"
@@ -757,8 +756,8 @@ class TalkViewSet(viewsets.ViewSet):
 
         # 난이도 고르기. 없거나 아는 값이 아니면 전부에서 낸다.
         #
-        # **아는 값이 아닐 때 400 을 주지 않는다.** 주소를 손으로 고쳤거나
-        # 옛 화면이 부르는 경우인데, 거기서 막으면 읽을 것이 아예 안 나온다.
+        # 아는 값이 아닐 때 400 을 주지 않는다. 주소를 손으로 고쳤거나
+        # 옛 화면이 부르는 경우인데, 거기서 막으면 읽을 것이 하나도 안 나온다.
         # 연습 화면이라 잘못된 값 하나로 기능을 닫을 이유가 없다.
         level = _parse_level(request.query_params.get("level"))
         if level is not None:
@@ -766,7 +765,7 @@ class TalkViewSet(viewsets.ViewSet):
 
         # 상황 고르기. 난이도와 같은 규칙이다 - 모르는 값이면 전부에서 낸다.
         #
-        # **개발 용어에서는 무시한다.** Word 에는 상황 칸이 없다. 화면이
+        # 개발 용어에서는 무시한다. Word 에는 상황 칸이 없다. 화면이
         # 갈래를 바꾸면서 주소에 scene 을 남겨도 개발 용어가 안 막힌다.
         scene = _parse_scene(request.query_params.get("scene"))
         if kind != KIND_PHRASE:
@@ -785,8 +784,8 @@ class TalkViewSet(viewsets.ViewSet):
             # 다 봤거나 exclude 가 풀을 비웠다. 화면이 "다 봤습니다" 를
             # 그리고 다른 갈래로 가는 길을 둔다.
             #
-            # **난이도·상황을 골랐으면 그것을 문구에 적는다.** 안 적으면 "다
-            # 봤습니다" 만 보고 전체를 다 읽은 줄 안다 - 실제로는 고른 것
+            # 난이도·상황을 골랐으면 그것을 문구에 적는다. 안 적으면 "다
+            # 봤습니다" 만 보고 전체를 다 읽은 줄 안다. 실제로는 고른 것
             # 하나만 비었고, 그것을 바꾸면 계속할 수 있다.
             if level is not None and scene is not None:
                 detail = "이 난이도·상황은 다 봤습니다. 다른 것을 고르거나 잠시 뒤 다시 해보세요."
@@ -823,15 +822,15 @@ class TalkViewSet(viewsets.ViewSet):
                 # 된다(최장 6낱말).
                 "term": text,
                 "pronunciation": item.pronunciation,
-                # **검수된 발음만 내보낸다.** 시리얼라이저를 안 쓰는 자리라
-                # 게이트를 손으로 태워야 한다 - item.reading 을 그대로 쓰면
-                # AI 가 채운 미검수 표기가 나가고, 이 화면은 그것을 본보기로
+                # 검수된 발음만 내보낸다. 시리얼라이저를 안 쓰는 자리라
+                # 게이트를 직접 거친다. item.reading 을 그대로 쓰면 AI 가
+                # 채운 미검수 표기가 나가고, 이 화면은 그것을 본보기로
                 # 제시하며 따라 읽으라고 시킨다.
                 "reading": visible_reading(item),
                 "meaning": item.meaning,
                 # 얼마나 어려운 것인가. 화면이 배지로 그린다.
                 #
-                # **갈래마다 기준이 다르다.** 일상 표현은 발음이 어려운
+                # 갈래마다 기준이 다르다. 일상 표현은 발음이 어려운
                 # 정도(seed_phrases 머리말), 개발 용어는 Word.difficulty 라
                 # 개념이 어려운 정도다(TalkLevelTabs 머리말).
                 #
@@ -855,12 +854,12 @@ class TalkViewSet(viewsets.ViewSet):
         POST 인 이유는 quiz 쪽과 같다 - 토큰을 URL 에 실으면 브라우저
         기록과 서버 로그에 남는다.
 
-        **빈 목록은 정상이다.** 아무 소리도 안 났거나 인식이 실패한
+        빈 목록은 정상이다. 아무 소리도 안 났거나 인식이 실패한
         경우이고, 그것도 결과("안 들렸다")가 있어야 화면이 그린다.
         400 으로 막으면 그 상태를 표현할 방법이 없다.
 
         서버는 "소리는 났는데 인식이 실패한 것" 과 "아무 소리도 안 난 것"
-        을 구분할 수 없다 - 텍스트만 오기 때문이다. 그 구분은 화면이
+        을 구분할 수 없다. 텍스트만 오기 때문이다. 그 구분은 화면이
         인식기 에러 코드로 한다.
         """
         if not isinstance(request.data, dict):
@@ -878,8 +877,8 @@ class TalkViewSet(viewsets.ViewSet):
 
         heard = clean_heard(request.data.get("heard"))
         if heard is None:
-            # 길이 초과나 형식 오류. **자르지 않고 막는다** - 잘라서
-            # 채점하면 사용자는 왜 틀렸는지 모른다.
+            # 길이 초과나 형식 오류. 자르지 않고 막는다. 잘라서 채점하면
+            # 사용자는 왜 틀렸는지 모른다.
             return Response(
                 {"detail": "인식 결과가 올바르지 않습니다."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -894,7 +893,7 @@ class TalkViewSet(viewsets.ViewSet):
 
         item_id, kind = unsigned
         # 토큰에 담은 종류로 표를 고른다. 이것이 없으면 id 가 같은 엉뚱한
-        # 행을 정답이라고 띄운다 - 단어·문장 채점에서 실제로 났던 구멍이다.
+        # 행을 정답이라고 띄운다(talk.py 의 KIND_WORD 주석 참고).
         model, field = (
             (Word, "term") if kind == KIND_WORD else (DailyPhrase, "text")
         )
