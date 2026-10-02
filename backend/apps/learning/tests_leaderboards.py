@@ -129,7 +129,7 @@ class BestRoundTest(TestCase):
         self.assertEqual(
             [row.display_name for row in board.rows],
             ["오래한사람", "신규"],
-            "절충이 바뀌었다 - 독스트링과 ponytail 주석을 같이 고칠 것",
+            "절충이 바뀌었다. 독스트링과 ponytail 주석도 같이 고친다",
         )
 
     def test_daily_study_rounds_are_not_counted(self):
@@ -688,7 +688,7 @@ class LeaderboardApiTest(TestCase):
                 self.assertEqual(
                     set(row),
                     {"rank", "display_name", "avatar", "score", "entries", "is_me"},
-                    "응답 필드가 바뀌었다 - 프론트 계약이다",
+                    "응답 필드가 바뀌었다(프론트가 이 모양에 기댄다)",
                 )
 
     def test_only_my_row_is_marked(self):

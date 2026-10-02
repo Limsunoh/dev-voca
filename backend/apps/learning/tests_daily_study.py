@@ -273,7 +273,7 @@ class ScoringTest(TestCase):
         self.assertEqual(
             study.score,
             study.bonus,
-            f"보너스 {study.bonus} 와 다르다 - 틀린 답에서 점수가 깎였다",
+            f"보너스 {study.bonus} 와 다르다. 틀린 답에서 점수가 깎였다",
         )
 
     def test_finishing_adds_the_bonus(self):
