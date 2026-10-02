@@ -684,7 +684,7 @@ class PromisedCountTest(TestCase):
             answered += 1
 
         study.refresh_from_db()
-        self.assertTrue(study.is_done, "판이 안 닫혔다 - 사용자가 못 끝낸다")
+        self.assertTrue(study.is_done, "판이 안 닫혀 사용자가 끝낼 수 없다")
         self.assertEqual(
             study.answered,
             promised,

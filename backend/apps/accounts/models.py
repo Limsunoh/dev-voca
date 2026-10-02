@@ -297,14 +297,14 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("이메일은 필수입니다.")
 
-        # 이메일 전체를 소문자로 내린다. normalize_email 은 도메인만 낮추는데,
-        # 그러면 Foo@x.com 으로 가입한 사람이 foo@x.com 으로 로그인할 때
-        # 실패한다. 로그인은 정확히 일치하는 이메일을 찾기 때문이다.
-        # 본인 계정에 못 들어가면서 이유도 알 수 없는 상태가 된다.
+        # 이메일 전체를 소문자로 내린다. normalize_email 은 도메인만 낮춘다.
+        # 이메일 로그인은 대소문자를 무시하고 찾지만(get_by_natural_key),
+        # 구글 로그인은 소문자로 내린 이메일과 정확히 일치하는 행을 찾는다
+        # (views.GoogleLoginView). 저장값에 대문자가 섞이면 같은 사람의
+        # 계정이 둘로 갈라진다.
         #
         # 규격상 @ 앞은 대소문자를 구분할 수 있지만 실제로 그렇게 쓰는
-        # 메일 서버는 사실상 없다. 구글 로그인이 주는 이메일과도 여기서
-        # 맞춰져야 계정이 갈라지지 않는다.
+        # 메일 서버는 사실상 없다.
         email = self.normalize_email(email).lower()
         user = self.model(email=email, **extra)
         user.set_password(password)
@@ -369,7 +369,7 @@ class User(AbstractUser):
     # 줄인 뒤라 한 장이 대개 10~20KB 다. 그래서 행이 무거워지는 걱정보다
     # 읽히는 자리가 문제인데, 그건 avatar_photo 를 어느 질의에도 안 실어서
     # 푼다. UserSerializer 는 이 칸을 내보내지 않고, 사진은
-    # 별도 엔드포인트(PhotoView)가 이 칸만 골라 읽는다.
+    # 별도 엔드포인트(views.AvatarPhotoFileView)가 이 칸만 골라 읽는다.
     avatar_photo = models.BinaryField("올린 사진", null=True, blank=True, editable=False)
 
     # 사진 주소에 쓰는 값. 사진을 올릴 때마다 새로 만든다.

@@ -288,7 +288,7 @@ class PublishFailureTest(TestCase):
         total = study.total_questions
 
         with patch.object(
-            daily_study, "_publish", side_effect=RuntimeError("점수판 죽음")
+            daily_study, "_publish", side_effect=RuntimeError("점수판 실패")
         ):
             for _ in range(total * 3):  # 넉넉히 - 학습 차례가 끼어든다
                 study.refresh_from_db()
@@ -305,7 +305,7 @@ class PublishFailureTest(TestCase):
 
         study.refresh_from_db()
         self.assertEqual(
-            study.answered, total, "점수판이 죽자 문제를 다 못 풀었다"
+            study.answered, total, "점수판이 실패하자 문제를 다 못 풀었다"
         )
 
     def test_the_day_can_still_be_closed_after_the_scoreboard_recovers(self):
@@ -324,7 +324,7 @@ class PublishFailureTest(TestCase):
                 daily_study.answer(self.user, token, answer_id_of(token))
 
         study.refresh_from_db()
-        self.assertEqual(study.answered, 1, "채점이 안 남았다 - 전제가 틀렸다")
+        self.assertEqual(study.answered, 1, "전제 확인: 채점이 안 남았다")
 
         # 그 뒤는 정상으로 끝까지 푼다.
         resumed = daily_study.resume(study)
@@ -430,7 +430,7 @@ class SettleStaleTest(TestCase):
         """
         study, _t, _q = daily_study.start(self.user, StudyLength.SHORT)
         study.refresh_from_db()
-        self.assertIsNotNone(study.question, "전제가 틀렸다 - 저장된 문제가 없다")
+        self.assertIsNotNone(study.question, "전제 확인: 저장된 문제가 없다")
 
         with patch.object(calendar_kst, "today", _tomorrow_of(study)):
             daily_study.settle_stale(self.user)
@@ -569,7 +569,7 @@ class ResumeLoopTest(TestCase):
 
         study.refresh_from_db()
         self.assertEqual(
-            study.answered, 1, "이어 푼 답이 안 세어졌다 - 판이 갇혔다"
+            study.answered, 1, "이어 푼 답이 안 세어져 판을 진행할 수 없다"
         )
 
     def test_a_resumed_token_still_cannot_be_replayed(self):
@@ -758,7 +758,7 @@ class ReviewSideEffectTest(TestCase):
                 "target_id", "streak"
             )
         )
-        self.assertTrue(seeded, "전제가 틀렸다 - 심어둔 복습 줄이 없다")
+        self.assertTrue(seeded, "전제 확인: 심어둔 복습 줄이 없다")
 
         answered = []
         for _ in range(study.total_questions * 3):
@@ -774,8 +774,8 @@ class ReviewSideEffectTest(TestCase):
             daily_study.answer(self.user, token, picked)
 
         study.refresh_from_db()
-        self.assertTrue(study.is_done, "판이 안 끝났다 - 전제가 틀렸다")
-        self.assertTrue(answered, "한 문제도 안 풀었다 - 전제가 틀렸다")
+        self.assertTrue(study.is_done, "전제 확인: 판이 안 끝났다")
+        self.assertTrue(answered, "전제 확인: 한 문제도 안 풀었다")
 
         rows = dict(
             ReviewState.objects.filter(user=self.user).values_list(
@@ -849,7 +849,7 @@ class ReviewSideEffectTest(TestCase):
         daily_study.answer(self.user, token, wrong)
         self.assertTrue(
             ReviewState.objects.get(user=self.user, target_id=right).is_wrong,
-            "전제가 틀렸다 - 틀린 것이 복습에 안 올랐다",
+            "전제 확인: 틀린 것이 복습에 안 올랐다",
         )
 
         # 같은 토큰으로 이번엔 맞게 보낸다. 순번이 이미 소비돼 거절된다.
@@ -926,8 +926,8 @@ class ThinCorpusPlaythroughTest(TestCase):
     def test_a_single_word_finishes_without_a_crash(self):
         """단어 하나짜리 DB 에서도 안 터진다.
 
-        보기를 넷 못 채우므로 문제가 하나도 안 나올 수 있다. 그때는 판이
-        닫혀야지 예외가 나면 안 된다.
+        보기를 넷 못 채우므로 문제를 하나도 만들 수 없다. 그때 start 는
+        판을 열지 않고 SessionError 로 알린다(500 이 아니다).
         """
         seed_words(1)
 
