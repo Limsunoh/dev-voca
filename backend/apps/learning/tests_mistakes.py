@@ -146,7 +146,8 @@ class MistakesListTest(TestCase):
         row = self.client.get(URL).json()["results"][0]
 
         self.assertEqual(
-            set(row), {"id", "target_type", "target_id", "text", "meaning"}
+            set(row),
+            {"id", "target_type", "target_id", "text", "meaning", "sentence_kind"},
         )
 
     def test_free_quiz_path_does_not_move_updated_at(self):
@@ -194,6 +195,26 @@ class MistakesListTest(TestCase):
         self.assertEqual(row["text"], sentence.text)
         self.assertEqual(row["meaning"], sentence.translation)
 
+    def test_rows_carry_the_sentence_kind(self):
+        """화면이 에러 메시지만 고정폭으로 그리려면 문장 종류가 와야 한다.
+
+        값은 문제 응답의 sentence_kind 와 같은 약속이다: 문장이면 그 종류
+        ("error"·"phrase"), 단어면 빈 문자열.
+        """
+        error = make_sentence()
+        error.kind = SentenceKind.ERROR
+        error.save()
+        phrase = make_sentence()
+        word = make_word()
+        for target in (error, phrase, word):
+            mark(self.user, target, wrong=True)
+
+        rows = self.client.get(URL).json()["results"]
+        kinds = {(r["target_type"], r["target_id"]): r["sentence_kind"] for r in rows}
+
+        self.assertEqual(kinds[("sentence", error.pk)], "error")
+        self.assertEqual(kinds[("sentence", phrase.pk)], "phrase")
+        self.assertEqual(kinds[("word", word.pk)], "")
 
     def test_row_points_at_the_target(self):
         """화면이 상세로 보내려면 종류와 id 가 있어야 한다."""
@@ -476,6 +497,112 @@ class MistakesOwnershipTest(TestCase):
 
         self.assertEqual(self._count_of(self.me), 0)
         self.assertEqual(self._count_of(self.other), 4)
+
+
+def make_error_sentence(reviewed: bool = True) -> Sentence:
+    """에러 메시지 문장. 화면이 고정폭으로 그리는 쪽이다."""
+    sentence = make_sentence(reviewed=reviewed)
+    sentence.kind = SentenceKind.ERROR
+    sentence.save(update_fields=["kind"])
+    return sentence
+
+
+class MistakesSentenceKindEdgeTest(TestCase):
+    """줄마다 실리는 sentence_kind 의 가장자리.
+
+    값 자체는 MistakesListTest.test_rows_carry_the_sentence_kind 가 본다.
+    여기서는 검수 게이트·종류가 다른 같은 번호·다음 페이지에서 그 칸이
+    어떻게 되는지 본다.
+    """
+
+    def setUp(self):
+        self.user = make_user("문장종류")
+        self.client.force_login(self.user)
+
+    def test_unreviewed_error_sentence_drops_the_whole_row(self):
+        """미검수로 돌린 에러 메시지는 줄째 빠진다. 종류만 남아 새지 않는다."""
+        hidden = make_error_sentence()
+        shown = make_sentence()
+        mark(self.user, hidden, wrong=True)
+        mark(self.user, shown, wrong=True)
+        Sentence.objects.filter(pk=hidden.pk).update(is_reviewed=False)
+
+        body = self.client.get(URL).json()
+
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(
+            [(r["target_id"], r["sentence_kind"]) for r in body["results"]],
+            [(shown.pk, "phrase")],
+        )
+
+    def test_body_gate_drops_an_unreviewed_error_sentence(self):
+        """주 게이트와 본문 조회 사이의 틈에서도 에러 메시지 줄은 안 나온다."""
+        sentence = make_error_sentence()
+        mark(self.user, sentence, wrong=True)
+        Sentence.objects.filter(pk=sentence.pk).update(is_reviewed=False)
+
+        with mock.patch(
+            "apps.learning.views_history._visible_targets", return_value=Q()
+        ):
+            rows = self.client.get(URL).json()["results"]
+
+        self.assertEqual(rows, [])
+
+    def test_word_with_the_same_id_as_an_error_sentence_stays_empty(self):
+        """번호가 같은 에러 메시지가 있어도 단어 줄의 종류는 빈 값이다.
+
+        id 로만 문장 표를 찾으면 단어가 "error" 를 받아 고정폭 판정이
+        엉뚱한 근거로 맞아떨어진다.
+        """
+        word = make_word()
+        sentence = Sentence.objects.create(
+            pk=word.pk,
+            text="Error: same id",
+            translation="같은 번호 에러",
+            kind=SentenceKind.ERROR,
+            is_reviewed=True,
+        )
+        mark(self.user, word, wrong=True)
+        mark(self.user, sentence, wrong=True)
+
+        rows = self.client.get(URL).json()["results"]
+        kinds = {r["target_type"]: r["sentence_kind"] for r in rows}
+
+        self.assertEqual(kinds, {"word": "", "sentence": "error"})
+
+    def test_second_page_rows_carry_the_kind(self):
+        """2페이지 줄도 종류를 싣는다. 첫 페이지만 채우는 실수를 막는다."""
+        # pk 가 가장 작아 21번째, 즉 2페이지 몫이다.
+        error = make_error_sentence()
+        mark(self.user, error, wrong=True)
+        for _ in range(20):
+            mark(self.user, make_word(), wrong=True)
+
+        rows = self.client.get(URL, {"page": 2}).json()["results"]
+
+        self.assertEqual(
+            [(r["target_type"], r["target_id"], r["sentence_kind"]) for r in rows],
+            [("sentence", error.pk, "error")],
+        )
+
+    def test_query_count_with_error_sentences_does_not_grow(self):
+        """에러 메시지 문장이 섞여도 질의 수가 줄 수와 무관하다.
+
+        only() 에서 kind 를 빼면 줄마다 kind 를 따로 읽으러 가서 늘어난다.
+        """
+        def seed() -> None:
+            for _ in range(3):
+                mark(self.user, make_error_sentence(), wrong=True)
+                mark(self.user, make_sentence(), wrong=True)
+
+        seed()
+        with CaptureQueriesContext(connection) as small:
+            self.client.get(URL)
+        seed()
+        with CaptureQueriesContext(connection) as big:
+            self.client.get(URL)
+
+        self.assertEqual(len(small), len(big))
 
 
 def answer_of(load, token: str) -> tuple[str, int]:

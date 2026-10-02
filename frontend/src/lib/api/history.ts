@@ -29,6 +29,11 @@ export type Mistake = {
   text: string;
   /** 한글 뜻 또는 해석. */
   meaning: string;
+  /**
+   * 문장 종류("error"·"phrase"). 단어 줄은 빈 문자열이다. 문제 응답의
+   * sentence_kind 와 같은 값이라 quiz-text 의 isErrorSentence 로 가른다.
+   */
+  sentence_kind: string;
   // 틀린 날짜는 없다. 담을 칸이 없어서 서버가 안 보낸다 - 이유는
   // views_history 주석에 있다.
 };

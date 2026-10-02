@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { searchText } from "@/lib/routes";
+
 /**
  * 검색 입력창.
  *
@@ -18,10 +20,23 @@ import { useState } from "react";
  */
 export function SearchInput({
   basePath,
+  seed,
   label = "단어 검색",
   placeholder = "단어, 뜻, 설명으로 검색",
 }: {
   basePath: string;
+  /**
+   * 검색어를 비울 때 실을 섞기 시드. 정렬 중이면 안 섞으므로 없다.
+   *
+   * 시드 없이 보내면 목록 화면이 시드를 붙여 한 번 더 보내고, 그 사이 화면이
+   * 새로 그려져 펼쳐 둔 필터 상자가 닫힌다(필터 칩이 새 시드를 싣는 것과 같은
+   * 이유, `learn/words/page.tsx` 의 chipSeed).
+   *
+   * 여기서 만들지 않고 서버가 만들어 넘긴다. 시드를 만드는 newShuffleSeed 는
+   * crypto.randomUUID 를 쓰는데, 브라우저에서는 https 가 아닌 주소에서 이
+   * 기능이 없다.
+   */
+  seed?: string;
   /** 스크린리더용 라벨. 화면에는 안 보인다. */
   label?: string;
   placeholder?: string;
@@ -32,19 +47,23 @@ export function SearchInput({
 
   const [value, setValue] = useState(currentSearch);
 
-  function submit(next: string) {
+  function submit(next: string | undefined) {
     const params = new URLSearchParams(searchParams.toString());
+    // 검색어가 바뀌면 1페이지부터 다시 본다.
+    params.delete("page");
+    // 지금 시드는 버린다. 필터 칩과 같은 규칙이다. 조건을 바꾸면 새 목록이고,
+    // 시드를 유지하는 것은 페이지 넘기기 하나뿐이다. 남겨두면 2페이지에서
+    // 검색했을 때만 옛 순서를 물고 가서 동작이 세 갈래가 된다.
+    params.delete("shuffle");
     if (next) {
       params.set("search", next);
     } else {
       params.delete("search");
+      if (seed) params.set("shuffle", seed);
+      // 쉼표만 쳐서 비운 경우에도 입력창을 비운다. 검색 중이 아니었으면
+      // key 가 그대로라 입력창이 새로 만들어지지 않고 "," 가 남는다.
+      setValue("");
     }
-    // 검색어가 바뀌면 1페이지부터 다시 본다.
-    params.delete("page");
-    // 섞기 시드도 버린다. 필터 칩과 같은 규칙이다 - 조건을 바꾸면 새 목록이고,
-    // 시드를 유지하는 것은 페이지 넘기기 하나뿐이다. 남겨두면 2페이지에서
-    // 검색했을 때만 옛 순서를 물고 가서 동작이 세 갈래가 된다.
-    params.delete("shuffle");
 
     const qs = params.toString();
     router.push(qs ? `${basePath}?${qs}` : basePath);
@@ -55,7 +74,7 @@ export function SearchInput({
       role="search"
       onSubmit={(event) => {
         event.preventDefault();
-        submit(value.trim());
+        submit(searchText(value));
       }}
       className="flex gap-2"
     >

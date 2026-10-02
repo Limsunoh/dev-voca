@@ -6,7 +6,9 @@ import { Pagination } from "@/components/Pagination";
 import { getMistakes } from "@/lib/api/history";
 import { ApiError } from "@/lib/api/client";
 import { routes } from "@/lib/routes";
+import { isErrorSentence } from "@/lib/quiz-text";
 import { getToken } from "@/lib/session";
+import { withWrapPoints } from "@/lib/wrap-points";
 
 export const metadata: Metadata = {
   title: "오답 노트 · devvoca",
@@ -179,13 +181,28 @@ export default async function MistakesPage({ searchParams }: PageProps) {
                     } as React.CSSProperties
                   }
                 >
-                  {/* 단어는 고정폭, 문장은 가변폭. 이 저장소가 단어에만
-                      고정폭을 쓰는 규칙을 따른다(LearningCard 의 monoTitle). */}
+                  {/* 단어와 에러 메시지는 고정폭, 실무 표현은 가변폭. 문제
+                      화면과 같은 규칙이라 판정도 같은 함수(isErrorSentence)를
+                      쓴다 - 따로 비교하면 같은 문장이 화면마다 두 서체로
+                      갈린다.
+
+                      문장만 줄바꿈 자리를 넣는다. 긴 URL·경로·점으로 이은 이름이
+                      폰에서 "de|mo.git" 처럼 낱말 가운데서 잘리지 않게. 밑줄로
+                      이은 이름("ERR_IMPORT_ATTRIBUTE_MISSING")에는 자리가 안
+                      생겨서 아래 anywhere 가 아무 글자에서 접는다.
+
+                      break-words 를 붙이지 않는다. 그 클래스는 body 의
+                      overflow-wrap: anywhere(globals.css)를 break-word 로 덮어쓰는데,
+                      break-word 는 줄은 접어도 "가장 좁게 줄일 수 있는 폭" 계산에는
+                      안 들어가서 grid 칸이 끊을 수 없는 덩어리 폭까지 늘어난다.
+                      고정폭 "[ERR_IMPORT_ATTRIBUTE_MISSING]:"(31자, 약 298px)가 360px
+                      폰에서 카드를 밀어 가로 스크롤을 만들었다. */}
                   <p
                     className={
-                      row.target_type === "word"
-                        ? "font-mono break-words"
-                        : "break-words"
+                      row.target_type === "word" ||
+                      isErrorSentence(row.sentence_kind)
+                        ? "font-mono"
+                        : undefined
                     }
                     lang="en-US"
                     style={{
@@ -193,10 +210,12 @@ export default async function MistakesPage({ searchParams }: PageProps) {
                       fontWeight: "var(--weight-bold)",
                     }}
                   >
-                    {row.text}
+                    {row.target_type === "word"
+                      ? row.text
+                      : withWrapPoints(row.text)}
                   </p>
                   <p
-                    className="mt-1 text-sm break-words"
+                    className="mt-1 text-sm"
                     style={{ color: "var(--text-body)" }}
                   >
                     {row.meaning}

@@ -69,6 +69,7 @@ globalThis.fetch = (async (input: string | URL | Request) => {
       id: 7,
       term: "commit",
       text: "It works on my machine.",
+      translation: "내 컴퓨터에서는 된다.",
       pronunciation: "",
       reading: "",
       meaning: "m",
@@ -478,7 +479,8 @@ for (const { name, page, rows } of lists) {
       assert.equal(listQueries[0].get("shuffle"), null);
     });
 
-    for (const blank of [" ", "\t", "\n", "　", " 　\t "]) {
+    // 쉼표만 있는 것도 같다. 백엔드가 쉼표를 검색어 사이 구분자로 써서 전체를 준다.
+    for (const blank of [" ", "\t", "\n", "　", " 　\t ", ",", " , ,", ",　"]) {
       it(`검색어 ${JSON.stringify(blank)} 는 검색이 아니다 - 다른 조건은 둔 채 섞은 목록으로 보낸다`, async () => {
         const to = await redirectedTo(page, { search: blank, difficulty: "1" });
         assert.equal(to.pathname, `/learn/${name}`);

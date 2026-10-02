@@ -142,15 +142,20 @@ def _serialize(rows: list[ReviewState]) -> list[dict]:
             "pk", "term", "meaning"
         )
     }
+    # kind 를 빼먹으면 줄마다 따로 읽으러 간다(only 로 미뤄 둔 칸).
     sentences = {
         s.pk: s
         for s in Sentence.objects.visible().filter(pk__in=sentence_ids).only(
-            "pk", "text", "translation"
+            "pk", "text", "translation", "kind"
         )
     }
 
     out: list[dict] = []
     for row in rows:
+        # 문장 종류는 문장에만 있다. 단어 줄은 빈 값이다 - 문제 응답의
+        # sentence_kind 와 같은 약속이라, 화면이 같은 판정 함수
+        # (quiz-text 의 isErrorSentence)로 에러 메시지만 고정폭으로 그린다.
+        sentence_kind = ""
         if row.target_type == TARGET_WORD:
             target = words.get(row.target_id)
             text, meaning = (target.term, target.meaning) if target else (None, None)
@@ -159,6 +164,8 @@ def _serialize(rows: list[ReviewState]) -> list[dict]:
             text, meaning = (
                 (target.text, target.translation) if target else (None, None)
             )
+            if target:
+                sentence_kind = target.kind
 
         # 본문을 못 찾은 줄은 뺀다. 지워졌거나 미검수로 돌아간 항목이다.
         # 빈 줄을 내보내면 화면에 뜻 없는 칸이 생기고, 눌러도 갈 곳이 없다.
@@ -172,6 +179,7 @@ def _serialize(rows: list[ReviewState]) -> list[dict]:
                 "target_id": row.target_id,
                 "text": text,
                 "meaning": meaning,
+                "sentence_kind": sentence_kind,
                 # 틀린 날짜는 안 보낸다. 담을 칸이 없다. updated_at 이 그
                 # 값이 아닌 이유는 위 MistakesView.get 의 정렬 주석 참고.
                 # 세 경로 중 복습만 맞는 값을 낸다.
