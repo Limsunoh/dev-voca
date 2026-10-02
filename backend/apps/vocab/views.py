@@ -1,7 +1,8 @@
 import random
 
-from django.db.models import CharField, QuerySet, Value
-from django.db.models.functions import MD5, Cast, Concat
+from django.db import connection
+from django.db.models import CharField, F, QuerySet, Value
+from django.db.models.functions import MD5, Cast, Collate, Concat, Lower
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -66,6 +67,52 @@ class CanReview(BasePermission):
         return can_review(request.user)
 
 
+class ReadableOrdering(filters.OrderingFilter):
+    """글자 필드 정렬을 사람이 읽는 알파벳 순서로 바꾼다.
+
+    어느 필드가 글자 필드인지는 뷰가 text_ordering_fields 로 정한다
+    (WordViewSet 은 term). 다른 콘텐츠 타입은 그 뷰에 한 줄 더하면 된다.
+
+    DB 기본 정렬은 환경마다 다르다. 로컬 postgres:16-alpine 은 바이트 순서라
+    대문자로 시작하는 약어(API, CPU)가 소문자 단어보다 전부 앞에 오고,
+    운영·CI 의 glibc Postgres 는 대소문자를 섞되 띄어쓰기를 무시한다
+    ("code review" 와 "codebase" 의 순서가 갈린다).
+
+    그래서 소문자로 바꾼 값을 바이트 순서("C" 콜레이션)로 비교한다. 어느
+    DB 에서든 같은 주소가 같은 순서를 낸다(영문 용어 기준이다. ASCII 밖
+    글자는 DB 마다 lower 결과가 다를 수 있다). SQLite 는 기본이 바이트
+    순서라 콜레이션을 따로 걸지 않는다(SQLite 에는 "C" 가 없다).
+
+    비용: 계산한 값으로 정렬하므로 인덱스를 못 쓰고 조건에 맞는 행 전체를
+    정렬한다. 지금 규모(수백 건)에서는 문제가 없고, 수만 건을 넘으면
+    소문자 값에 맞춘 인덱스를 따로 둬야 한다.
+
+    대소문자만 다른 두 값(Go, go)은 원래 값을 같은 바이트 순서로 한 번 더
+    비교해 순서를 하나로 정한다. 페이지를 넘길 때 같은 항목이 겹치거나 빠지지
+    않게 하려는 것이다.
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        ordering = self.get_ordering(request, queryset, view)
+        if not ordering:
+            return queryset
+
+        text_fields = getattr(view, "text_ordering_fields", ())
+
+        bytewise = connection.vendor == "postgresql"
+        keys = []
+        for field in ordering:
+            name = field.lstrip("-")
+            if name not in text_fields:
+                keys.append(field)
+                continue
+            lowered = Collate(Lower(name), "C") if bytewise else Lower(name)
+            raw = Collate(name, "C") if bytewise else F(name)
+            for key in (lowered, raw):
+                keys.append(key.desc() if field.startswith("-") else key.asc())
+        return queryset.order_by(*keys)
+
+
 class LearningItemViewSet(viewsets.ModelViewSet):
     """학습 콘텐츠(단어/문장) 공용 베이스.
 
@@ -80,7 +127,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
     """
 
     permission_classes = [IsAuthenticatedOrReadOnly]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, ReadableOrdering]
     # is_exam·exam_subject 로 정처기 범위를 좁힌다.
     #
     # 두 파라미터의 오류 처리가 다르다. exam_subject 는 choices 라 없는
@@ -243,6 +290,8 @@ class WordViewSet(LearningItemViewSet):
     search_fields = ["term", "meaning", "description"]
     ordering_fields = ["term", "created_at", "difficulty"]
     ordering = ["term"]
+    # 대소문자 무시 알파벳 순서로 정렬할 글자 필드(ReadableOrdering 참고).
+    text_ordering_fields = ["term"]
 
     # 채점은 POST 지만 아무것도 저장하지 않는다. 로그인을 요구하면
     # 로그인하지 않은 사람은 문제풀기를 못 쓴다.
