@@ -246,7 +246,10 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           extra={{ kind, sort: sort?.value, shuffle: chipSeed }}
         />
 
-        {/* 검색 중에 "기본순" 인 이유는 learn/words/page.tsx 참고. */}
+        {/* 검색 중에는 섞지 않아 백엔드 기본 순서(SentenceViewSet 의
+            ordering = id)로 온다. 넣은 순서라 따로 부를 이름이 없어
+            "기본순" 이라 한다. 단어는 기본 순서가 ABC순이라 이름이 다르다
+            (learn/words/page.tsx 의 같은 자리). */}
         <ChoiceFilter
           label="정렬"
           paramName="sort"

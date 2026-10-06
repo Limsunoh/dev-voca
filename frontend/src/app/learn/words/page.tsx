@@ -22,6 +22,7 @@ import {
   getDifficulties,
   getExamSubjects,
   getWords,
+  WORD_DEFAULT_SORT,
   WORD_SORTS,
 } from "@/lib/api/vocab";
 import { detailWithBack, listUrl, routes, searchText } from "@/lib/routes";
@@ -47,6 +48,17 @@ type PageProps = {
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
+
+/**
+ * 검색 중에 정렬 줄이 보여 줄 정렬. 기본 순서와 같은 정렬(ABC순)을 뺀다.
+ *
+ * 검색 중에는 섞지 않아 백엔드 기본 순서로 오는데 그것이 ABC순이다
+ * (vocab.ts 의 WORD_DEFAULT_SORT). ABC순 칩을 그대로 두면 맨 앞 칩과 같은
+ * 순서를 내서 눌러도 아무것도 안 바뀐다. 그래서 맨 앞 칩을 그 이름으로 부른다.
+ */
+const SEARCH_SORTS = WORD_SORTS.filter(
+  (option) => option.value !== WORD_DEFAULT_SORT.value,
+);
 
 /** 정수가 아니거나 1 미만이면 1 페이지로 본다. */
 function toPageNumber(value: string | undefined): number {
@@ -80,6 +92,16 @@ export default async function VocabPage({ searchParams }: PageProps) {
   const sort = WORD_SORTS.find(
     (option) => option.value === first(params.sort),
   );
+  // 정렬 줄과 필터 배지가 "고른 정렬" 로 볼 값. 검색 중의 sort=abc 는 기본
+  // 순서와 같아서(SEARCH_SORTS) 고르지 않은 것으로 보고 맨 앞 칩을 켠다.
+  //
+  // ABC순을 고른 뒤 검색하면 주소에 sort=abc 가 남아 이 경우가 생긴다.
+  // 주소의 sort 는 그대로 두므로 검색어를 비우면 ABC순 목록으로 돌아간다.
+  // 쉬운 것부터를 고른 뒤 검색했다 비우면 쉬운 것부터로 돌아가는 것과 같은
+  // 규칙이다. 다만 검색 중에 켜진 맨 앞 칩을 누르면 ChoiceFilter 가 정렬을
+  // 끄는 링크로 만들어 sort 가 빠지고, 그 뒤 비우면 섞인 목록으로 간다.
+  const sortChip =
+    search && sort?.value === WORD_DEFAULT_SORT.value ? undefined : sort?.value;
 
   // 목록을 열 때마다 새로 섞는다. 정렬이 고정이면 앞쪽 단어만 계속 보이고
   // 뒤쪽은 다음 페이지를 눌러야 만난다.
@@ -284,9 +306,10 @@ export default async function VocabPage({ searchParams }: PageProps) {
           다시 골라야 한다.
 
           배지는 정렬도 센다. 필터가 접혀 있을 때 순서가 바뀌어 있다는
-          것을 알려줄 곳이 배지뿐이다. */}
+          것을 알려줄 곳이 배지뿐이다. 검색 중의 ABC순은 기본 순서와 같아
+          세지 않는다(위 sortChip). */}
       <FilterPanel
-        active={[difficulty, category, examOnly, examSubject, sort?.value]}
+        active={[difficulty, category, examOnly, examSubject, sortChip]}
       >
         {/* 정처기 줄이 맨 위다. 다른 조건은 목록을 좁히지만 이건 무엇을
             공부하는지 자체를 바꾼다 - 정처기를 켠 사람에게 분류(Git·리뷰)는
@@ -360,15 +383,17 @@ export default async function VocabPage({ searchParams }: PageProps) {
         {/* 정렬은 맨 아래다. 위 줄들은 무엇을 볼지 좁히고, 이것은 그것을
             어떤 순서로 볼지만 정한다. 고르지 않으면 섞는다.
 
-            검색 중에는 섞지 않으므로(위 shuffle) 맨 앞 칩을 "기본순" 이라
-            부른다. "섞어서" 로 두면 켜진 칩이 실제 순서와 다른 말을 한다. */}
+            검색 중에는 섞지 않으므로(위 shuffle) 맨 앞 칩이 "섞어서" 가
+            아니다. 섞지 않은 단어 목록은 백엔드 기본 순서(WordViewSet 의
+            ordering = term)로 오는데 그것이 곧 ABC순이라, 맨 앞 칩을
+            "ABC순" 이라 부르고 ABC순 칩은 뺀다(SEARCH_SORTS 참고). */}
         <ChoiceFilter
           label="정렬"
           paramName="sort"
-          options={WORD_SORTS}
-          allLabel={search ? "기본순" : "섞어서"}
+          options={search ? SEARCH_SORTS : WORD_SORTS}
+          allLabel={search ? WORD_DEFAULT_SORT.label : "섞어서"}
           basePath={routes.words}
-          selected={sort?.value}
+          selected={sortChip}
           keep={{
             search,
             category,
