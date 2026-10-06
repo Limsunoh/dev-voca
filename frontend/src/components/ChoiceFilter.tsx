@@ -17,6 +17,13 @@ type Props = {
    * "ABC순", 문장은 "기본순"). 전체를 보여주는 것은 같고 순서만 다르다.
    */
   allLabel?: string;
+  /**
+   * 맨 앞 칩이 가리킬 값. 없으면 이 줄을 끄는 링크다.
+   *
+   * 단어 정렬 줄이 검색 중에 쓴다. 그때 맨 앞 칩 이름이 "ABC순" 이라, 누르면
+   * 정렬을 끄지 않고 sort=abc 를 남겨야 검색어를 비운 뒤에도 ABC순이 이어진다.
+   */
+  allValue?: string;
   /** 이 필터를 바꿔도 유지할 다른 조건들. */
   keep?: Record<string, string | undefined>;
   /**
@@ -45,6 +52,7 @@ export function ChoiceFilter({
   basePath,
   selected,
   allLabel = "전체",
+  allValue,
   keep,
   keepWhenOff,
 }: Props) {
@@ -87,7 +95,7 @@ export function ChoiceFilter({
           겹친다(문장 화면은 종류·난이도·분류 셋). 스크린리더의 링크
           목록에서는 nav 이름이 안 읽히므로 여기서 한정해 준다. */}
       <FilterChip
-        href={href()}
+        href={href(allValue)}
         active={!selected}
         ariaLabel={`${label} ${allLabel}`}
       >

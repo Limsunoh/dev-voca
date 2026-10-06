@@ -211,6 +211,18 @@ describe("searchText", () => {
     }
   });
 
+  it("따옴표만 있으면 검색어가 없다(백엔드가 따옴표를 벗겨 빈 검색어로 본다)", () => {
+    for (const blank of ['"', "''", '""', "'", '",', ` " , ' `]) {
+      assert.equal(searchText(blank), undefined, JSON.stringify(blank));
+    }
+  });
+
+  it("따옴표 안에 글자가 있으면 검색이다(백엔드가 그 글자를 찾는다)", () => {
+    for (const quoted of ['","', '" "', "'git'", '"a b"']) {
+      assert.equal(searchText(quoted), quoted, JSON.stringify(quoted));
+    }
+  });
+
   it("검색어가 하나라도 있으면 앞뒤 공백만 털고 그대로 둔다", () => {
     assert.equal(searchText("  git "), "git");
     assert.equal(searchText(",git,"), ",git,");

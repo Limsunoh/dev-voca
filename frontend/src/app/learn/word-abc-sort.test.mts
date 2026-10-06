@@ -6,6 +6,7 @@
  * 검색 중에는 섞지 않아 백엔드 기본 순서(term)가 곧 ABC순이다. 그래서 검색
  * 중에는 정렬 줄 맨 앞 칩을 "ABC순" 이라 부르고 ABC순 칩은 뺀다. 검색과
  * sort=abc 가 같이 오면 맨 앞 칩이 켜지고 필터 배지는 정렬을 세지 않는다.
+ * 검색 중의 맨 앞 칩은 정렬을 끄지 않고 sort=abc 를 가리킨다.
  * 그래도 주소의 sort=abc 는 필터 칩·페이지 넘기기·되돌아올 주소가 들고
  * 다닌다. 검색어를 지우면 ABC순으로 돌아가야 해서다.
  *
@@ -315,8 +316,14 @@ describe("/learn/words ABC순 - 정렬 줄", () => {
             for (const [k, v] of Object.entries(others)) {
               assert.equal(q.get(k), v, `${k} ${chip.href}`);
             }
-            const turnsOff = i === 0 || chip.active;
-            if (turnsOff) {
+            // 검색 중의 맨 앞 칩은 이름대로 ABC순을 가리킨다(끄지 않는다).
+            // 끄면 검색어를 비운 뒤 ABC순이 아니라 섞인 목록으로 간다.
+            const abcWhileSearching = Boolean(search) && i === 0;
+            const turnsOff = !abcWhileSearching && (i === 0 || chip.active);
+            if (abcWhileSearching) {
+              assert.equal(q.get("sort"), "abc", chip.href);
+              assert.equal(q.get("shuffle"), null, chip.href);
+            } else if (turnsOff) {
               assert.equal(q.get("sort"), null, `끄는 링크 ${chip.href}`);
               // 정렬을 끄면 검색 중이 아닐 때만 섞인 목록으로 가서 시드를 싣는다.
               assert.equal(Boolean(q.get("shuffle")), !search, chip.href);

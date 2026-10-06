@@ -18,6 +18,7 @@ import {
   getSentences,
   SENTENCE_SORTS,
 } from "@/lib/api/sentences";
+import { isErrorSentence } from "@/lib/quiz-text";
 import { detailWithBack, listUrl, routes, searchText } from "@/lib/routes";
 
 export const metadata = {
@@ -355,7 +356,7 @@ export default async function SentencesPage({ searchParams }: PageProps) {
                 }
                 // 에러 메시지는 코드에 가까워 고정폭이 읽기 좋지만,
                 // 사람이 쓴 문장은 고정폭으로 길어지면 오히려 읽기 어렵다.
-                monoTitle={sentence.kind === "error"}
+                monoTitle={isErrorSentence(sentence.kind)}
               />
             </li>
           ))}
