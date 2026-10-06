@@ -56,8 +56,8 @@ describe("withWrapPoints", () => {
     );
     // 점 앞 글자가 영숫자가 아니면(말줄임) 넣지 않는다.
     assert.equal(
-      withWrapPoints("see foo...bar_baz_qux_quux_corge"),
-      "see foo...bar_baz_qux_quux_corge",
+      withWrapPoints("see foo...barbazquxquuxcorge"),
+      "see foo...barbazquxquuxcorge",
     );
     assert.equal(
       html("see https://registry.npmjs.org/react-18.2.0.tgz."),
@@ -66,6 +66,23 @@ describe("withWrapPoints", () => {
     assert.equal(
       html("/home/someone/.config/app.json"),
       "<p>/home/<wbr/>someone/<wbr/>.config/<wbr/>app<wbr/>.json</p>",
+    );
+  });
+
+  it(":: 와 _ 로 이은 긴 이름은 그 뒤에서 끊는다", () => {
+    assert.equal(
+      html("net::ERR_CONNECTION_REFUSED"),
+      "<p>net::<wbr/>ERR_<wbr/>CONNECTION_<wbr/>REFUSED</p>",
+    );
+    // 콜론 하나(포트)와 이어진 밑줄(__init__, 빈칸 ____)에는 넣지 않는다.
+    assert.equal(
+      html("http://localhost:8080/__init__"),
+      "<p>http://<wbr/>localhost:8080/<wbr/>__init__</p>",
+    );
+    // 글자에 붙은 빈칸 표시. 21자를 넘는 덩어리라야 규칙이 실제로 돈다.
+    assert.equal(
+      withWrapPoints("Bind failed:____________________is"),
+      "Bind failed:____________________is",
     );
   });
 
