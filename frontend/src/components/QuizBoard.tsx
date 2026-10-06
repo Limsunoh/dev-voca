@@ -1322,7 +1322,7 @@ function SentenceAnswer({
       )}
       {sentence.translation && (
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          {sentence.translation}
+          {withWrapPoints(sentence.translation)}
         </p>
       )}
 

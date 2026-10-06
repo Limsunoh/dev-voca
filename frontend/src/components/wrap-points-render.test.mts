@@ -224,7 +224,7 @@ describe("QuizBoard 해설 카드 문장", () => {
     return choiceNamed(el.props?.children, text);
   }
 
-  it("정답 문장에 wbr 가 들어가고 빼면 원문, 해석·상황은 그대로", async () => {
+  it("정답 문장과 해석에 wbr 가 들어가고 빼면 원문, 상황은 그대로", async () => {
     await board("situation", "Prompt sentence here", ["배포할 때", "리뷰할 때"], "error");
     const button = choiceNamed(render(), "배포할 때");
     assert.ok(button, "보기 버튼을 못 찾았다");
@@ -253,10 +253,14 @@ describe("QuizBoard 해설 카드 문장", () => {
     assert.ok(inner.includes(URL_WBR), inner);
     assert.equal(inner.replace(/<wbr\/>/g, ""), text);
     assert.ok(classes(tag).includes("font-mono"), tag);
-    // 해석·상황에는 적용하지 않았다(긴 덩어리라도).
-    for (const t of ["see/docs/for/details/about/this.Thing", "deploy/staging/production/rollback.Now"]) {
-      assert.equal(find(html, t).inner, t);
-    }
+    // 해석은 원문의 URL 을 그대로 옮기는 경우가 있어 같이 감싼다.
+    const translation = "see/docs/for/details/about/this.Thing";
+    const shown = find(html, translation).inner;
+    assert.ok(shown.includes("<wbr/>"), shown);
+    assert.equal(shown.replace(/<wbr\/>/g, ""), translation);
+    // 상황(보기 문구)에는 적용하지 않는다.
+    const context = "deploy/staging/production/rollback.Now";
+    assert.equal(find(html, context).inner, context);
   });
 });
 
