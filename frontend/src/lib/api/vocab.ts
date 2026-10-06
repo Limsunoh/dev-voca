@@ -73,22 +73,31 @@ export type WordDetail = WordListItem & {
  * 동점은 term 으로 끊는다. 난이도만으로 정렬하면 같은 난이도 300개의
  * 순서를 DB 가 정하는데, 페이지마다 따로 조회하니 1페이지에서 본 단어가
  * 2페이지에 또 나올 수 있다. term 은 unique 라 순서가 하나로 정해진다.
- * 같은 난이도 안의 순서는 DB 의 글자 정렬 규칙을 따라서, 로컬
- * (postgres alpine)에서는 대문자 약어(API·CI)가 소문자 단어보다 먼저 온다.
- * 여기서 term 이 맡는 일은 순서를 하나로 정하는 것뿐이라 그대로 둔다.
  *
- * 없는 것:
- * - 최신순. 지금 단어는 시드로 같은 1분 안에 들어가서 created_at 순서가
- *   사실상 입력 순서일 뿐이다. 검수로 단어가 따로 늘기 시작하면 넣는다.
- * - ABC순. term 으로만 정렬하면 위의 글자 정렬 규칙 때문에 대문자로
- *   시작하는 단어 200여 개가 다 지나간 뒤(11페이지쯤) 알파벳이 a 부터 다시
- *   시작한다.
- *   운영 DB 는 규칙이 달라 순서가 또 다르다. 대소문자를 무시한 정렬은
- *   백엔드(WordViewSet)가 Lower("term") 을 받아야 한다.
+ * term 순서는 대소문자를 무시한 알파벳 순이다. 백엔드(views.py 의
+ * ReadableOrdering)가 term 을 소문자로 바꿔 바이트 순서로 비교해서, 영문
+ * 용어는 DB 의 글자 정렬 규칙과 상관없이 로컬과 운영이 같은 순서를 낸다.
+ * 그래서 ABC순은 term 하나로 된다.
+ *
+ * 없는 것: 최신순. 지금 단어는 시드로 같은 1분 안에 들어가서 created_at
+ * 순서가 사실상 입력 순서일 뿐이다. 검수로 단어가 따로 늘기 시작하면 넣는다.
  */
+const ABC_SORT = { value: "abc", label: "ABC순", ordering: "term" } as const;
+
 export const WORD_SORTS = [
   { value: "easy", label: "쉬운 것부터", ordering: "difficulty,term" },
+  ABC_SORT,
 ] as const;
+
+/**
+ * 백엔드 기본 순서(WordViewSet 의 ordering = term)와 같은 정렬.
+ *
+ * 섞지도 정렬하지도 않은 목록(검색 결과)이 이 순서로 온다. 목록 화면은
+ * 검색 중에 정렬 줄 맨 앞 칩을 이 이름으로 부르고 이 칩은 따로 두지 않는다
+ * (learn/words/page.tsx 의 SEARCH_SORTS). 백엔드 기본 순서를 바꾸면 이것도
+ * 같이 바꿔야 한다.
+ */
+export const WORD_DEFAULT_SORT = ABC_SORT;
 
 export type WordListParams = {
   search?: string;

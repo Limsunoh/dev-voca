@@ -177,7 +177,10 @@ describe("정렬 표", () => {
 // ---- 단어 목록 ------------------------------------------------------------
 
 describe("/learn/words 정렬", () => {
-  for (const [sort, ordering] of [["easy", "difficulty,term"]]) {
+  for (const [sort, ordering] of [
+    ["easy", "difficulty,term"],
+    ["abc", "term"],
+  ]) {
     it(`?sort=${sort} 는 보내지 않고 ordering=${ordering} 로 부르며 섞지 않는다`, async () => {
       await visit(WordsPage, { sort });
       assert.equal(listQueries.length, 1);
@@ -189,23 +192,22 @@ describe("/learn/words 정렬", () => {
   it("정렬과 시드가 같이 오면 시드를 버린다(백엔드에도, 링크에도)", async () => {
     const links = await renderedLinks(WordsPage, {
       sort: "easy",
-      shuffle: "abc",
+      shuffle: "old",
     });
     assert.equal(listQueries[0].get("shuffle"), null);
     assert.equal(listQueries[0].get("ordering"), "difficulty,term");
     for (const link of links) {
       const seed = query(link.href).get("shuffle");
-      // 옛 시드("abc")는 어느 링크에도 새지 않는다. 시드가 붙는 것은 정렬을
+      // 옛 시드("old")는 어느 링크에도 새지 않는다. 시드가 붙는 것은 정렬을
       // 끄는 링크뿐이고, 그것은 새로 만든 시드다(섞인 목록으로 가니까).
-      assert.notEqual(seed, "abc", link.href);
+      assert.notEqual(seed, "old", link.href);
       if (query(link.href).get("sort") === "easy") {
         assert.equal(seed, null, link.href);
       }
     }
   });
 
-  // abc 는 한때 있던 ABC순이다. 대소문자 정렬 문제로 뺐다(vocab.ts WORD_SORTS).
-  for (const bad of ["", "EASY", " easy", "easy ", "__proto__", "toString", "constructor", "latest", "abc"]) {
+  for (const bad of ["", "EASY", " easy", "easy ", "ABC", "abc ", "__proto__", "toString", "constructor", "latest"]) {
     it(`모르는 sort ${JSON.stringify(bad)} 는 없는 것으로 보고 시드를 붙여 보낸다`, async () => {
       const to = await redirectedTo(WordsPage, { sort: bad });
       assert.equal(to.pathname, "/learn/words");
@@ -283,6 +285,7 @@ describe("/learn/words 정렬", () => {
       [
         ["섞어서", false],
         ["쉬운 것부터", true],
+        ["ABC순", false],
       ],
     );
     for (const chip of row) {
@@ -290,6 +293,9 @@ describe("/learn/words 정렬", () => {
     }
     assert.equal(query(row[0].href).get("sort"), null);
     assert.equal(query(row[1].href).get("sort"), null, "켜진 칩은 끄는 링크다");
+    // 다른 정렬로 바꾸는 링크는 정렬 중이라 시드 없이 간다.
+    assert.equal(query(row[2].href).get("sort"), "abc");
+    assert.equal(query(row[2].href).get("shuffle"), null, row[2].href);
     // 정렬을 끄는 두 링크는 섞인 목록으로 가므로 새 시드를 미리 싣는다.
     // 없으면 서버가 시드를 붙여 한 번 더 보내고 그 사이 필터 상자가 닫힌다.
     assert.ok(query(row[0].href).get("shuffle"), row[0].href);
@@ -332,14 +338,55 @@ describe("/learn/words 정렬", () => {
     assert.equal(row.find((c) => c.active)?.text, "섞어서");
   });
 
-  it("검색 중에는 섞지 않으므로 맨 앞 칩이 섞어서가 아니라 기본순이다", async () => {
+  it("검색 중에는 섞지 않으므로 맨 앞 칩이 섞어서가 아니라 실제 순서 이름이다", async () => {
     // 되돌리면 켜진 "섞어서" 칩이 섞이지 않은 검색 결과 위에 뜬다.
-    for (const page of [WordsPage, SentencesPage]) {
+    // 단어의 기본 순서는 term(ABC순), 문장은 id(기본순)다.
+    for (const [page, name] of [
+      [WordsPage, "ABC순"],
+      [SentencesPage, "기본순"],
+    ] as const) {
       const row = await sortRow(page, { search: "git" });
-      assert.equal(row[0].text, "기본순");
-      assert.equal(row.find((c) => c.active)?.text, "기본순");
+      assert.equal(row[0].text, name);
+      assert.equal(row.find((c) => c.active)?.text, name);
       assert.ok(!row.some((c) => c.text === "섞어서"));
     }
+  });
+
+  it("검색 중에는 ABC순 칩이 하나다(맨 앞 칩과 같은 순서를 내는 칩을 두지 않는다)", async () => {
+    const row = await sortRow(WordsPage, { search: "git" });
+    assert.deepEqual(
+      row.map((c) => [c.text, c.active]),
+      [
+        ["ABC순", true],
+        ["쉬운 것부터", false],
+      ],
+    );
+    assert.equal(query(row[1].href).get("sort"), "easy");
+    assert.equal(query(row[1].href).get("search"), "git");
+  });
+
+  it("ABC순을 고른 뒤 검색하면 맨 앞 ABC순 칩이 켜지고 필터 배지는 정렬을 세지 않는다", async () => {
+    const html = renderToStaticMarkup(
+      (await visit(WordsPage, { search: "git", sort: "abc" })) as React.ReactElement,
+    );
+    assert.equal(listQueries[0].get("ordering"), "term");
+    const row = await sortRow(WordsPage, { search: "git", sort: "abc" });
+    assert.equal(row.find((c) => c.active)?.text, "ABC순");
+    assert.equal(row.filter((c) => c.text === "ABC순").length, 1);
+    // 걸린 조건이 없으니 접힌 필터 상자에 개수 배지가 없다(FilterPanel 은 0 이면 안 그린다).
+    const summary = (html.match(/<summary[\s\S]*?<\/summary>/)?.[0] ?? "").replace(
+      /<[^>]*>/g,
+      "",
+    );
+    assert.ok(summary.startsWith("필터"), summary);
+    assert.doesNotMatch(summary, /\d/, summary);
+  });
+
+  it("검색이 아니면 ABC순은 ordering=term 으로 부르고 칩이 켜진다", async () => {
+    const row = await sortRow(WordsPage, { sort: "abc" });
+    assert.equal(row.find((c) => c.active)?.text, "ABC순");
+    assert.equal(listQueries.at(-1)?.get("ordering"), "term");
+    assert.equal(listQueries.at(-1)?.get("shuffle"), null);
   });
 });
 
@@ -347,7 +394,7 @@ describe("/learn/words 정렬", () => {
 
 describe("/learn/sentences 정렬", () => {
   it("?sort=easy 는 ordering=difficulty,id 로 부르며 섞지 않는다", async () => {
-    await visit(SentencesPage, { sort: "easy", shuffle: "abc" });
+    await visit(SentencesPage, { sort: "easy", shuffle: "old" });
     assert.equal(listQueries[0].get("ordering"), "difficulty,id");
     assert.equal(listQueries[0].get("shuffle"), null);
   });
@@ -465,10 +512,20 @@ for (const { name, page, rows } of lists) {
         assert.equal(query(chip.href).get("shuffle"), null, chip.href);
         assert.equal(query(chip.href).get("sort"), "easy", chip.href);
       }
+      // 섞어서와 켜진 칩은 정렬을 끄므로 새 시드를 싣고, 다른 정렬로 바꾸는
+      // 칩(단어의 ABC순)은 정렬 중이라 시드 없이 간다.
+      let offs = 0;
       for (const chip of await sortRow(page, { sort: "easy", category: "git" })) {
-        assert.equal(query(chip.href).get("sort"), null, chip.href);
-        assert.ok(query(chip.href).get("shuffle"), chip.href);
+        const to = query(chip.href).get("sort");
+        if (to === null) {
+          offs++;
+          assert.ok(query(chip.href).get("shuffle"), chip.href);
+        } else {
+          assert.notEqual(to, "easy", chip.href);
+          assert.equal(query(chip.href).get("shuffle"), null, chip.href);
+        }
       }
+      assert.equal(offs, 2);
     });
 
     it("검색 + 정렬 중에는 어느 링크에도 시드가 없다(정렬을 꺼도 검색 중이라 안 섞는다)", async () => {
