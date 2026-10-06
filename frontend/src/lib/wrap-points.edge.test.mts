@@ -16,6 +16,7 @@
  *   때만 끊고, "//" 사이와 끝 `/` 다음 닫는 따옴표·괄호 앞에는 안 끊는다.
  * - `.` 는 앞에서 끊는다. 앞이 영숫자이고 뒤가 영문자일 때만.
  * - 소문자 다음 대문자 앞에서 끊는다("Unsupported|Class").
+ * - `::` 뒤와, 영숫자 바로 다음의 `_` 하나 뒤에서 끊는다("net::|ERR_|CONNECTION").
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
@@ -79,7 +80,11 @@ function expected(text: string): number[] {
     const afterSlash = prev === "/" && /[A-Za-z0-9._~-]/.test(here);
     const beforeDot = here === "." && /[A-Za-z0-9]/.test(prev) && /[A-Za-z]/.test(next);
     const beforeUpper = /[a-z]/.test(prev) && /[A-Z]/.test(here);
-    if (afterSlash || beforeDot || beforeUpper) at.push(k);
+    const before = text[k - 2];
+    const afterJoin =
+      /[A-Za-z0-9]/.test(here) &&
+      ((prev === ":" && before === ":") || (prev === "_" && /[A-Za-z0-9]/.test(before)));
+    if (afterSlash || beforeDot || beforeUpper || afterJoin) at.push(k);
   }
   return at;
 }
@@ -278,7 +283,7 @@ describe("withWrapPoints - 넣는 자리", () => {
   it("앞 점: 앞 글자가 영숫자가 아니면 점 앞에 안 넣는다", () => {
     // "..." 의 셋째 점은 뒤가 영문자지만 앞이 점이다.
     assert.equal(withWrapPoints("wait...what-is-happening-now"), "wait...what-is-happening-now");
-    assert.equal(withWrapPoints("some_thing-_.hidden-file-name"), "some_thing-_.hidden-file-name");
+    assert.equal(withWrapPoints("some-thing--.hidden-file-name"), "some-thing--.hidden-file-name");
   });
 
   it("소문자 다음 대문자 앞에서 끊는다(자바 예외 이름)", () => {
