@@ -211,6 +211,10 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         document.documentElement.style.setProperty("--duration-verdict", "0ms");
       }
       setSeconds(started.round_seconds);
+      // 남은 시간도 여기서 채운다. 타이머 effect 는 판이 그려진 뒤에야 돌아서,
+      // 그 전 첫 그림은 0 이다. 그러면 시작하자마자 숫자가 "0" 과 급할 때
+      // 색(코랄)으로 한 번 그려지고, 막대가 0 에서 차오른다.
+      setLeft(started.round_seconds * 1000);
       tokenRef.current = started.token;
       setQuestion(started.question);
       setSkipsLeft(started.max_skips);
@@ -359,7 +363,9 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
      세운다. 둘 다 fixed 라 자리를 안 차지하고 fire 가 0 이면 안 그린다. */
   const overlays = (
     <>
-      <Burst fire={burst} />
+      {/* 어둡게 까는 연출과 같이 쓰므로 판정 순간에 그 위에서 터진다
+          (Burst 의 atReveal). */}
+      <Burst fire={burst} atReveal />
       {/* 이 연출 동안 다음 문제를 안 낸다. 그 시간은 서버가 마감에서
           빼주므로(session.REACTION_PAUSE_MS) 90초를 손해 보지 않는다.
           대신 한 판의 실제 길이가 그만큼 늘어난다. */}

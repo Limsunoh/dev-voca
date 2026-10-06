@@ -167,6 +167,11 @@ export function QuizBoard({ category, content = "words", item }: Props) {
   // state 가 아니라 ref 인 이유: 연타는 다시 그리기 전에 들어온다.
   // setLoading 은 다음 렌더에야 반영돼서 가드로 쓸 수 없다.
   const loadingRef = useRef(false);
+  // 지금 화면에 걸린 문제의 번호. load 가 새 문제로 넘어갈 때마다 올린다.
+  // "다음 문제" 는 보기를 고르자마자 보여서 채점 응답보다 먼저 눌릴 수
+  // 있다. 그때 늦게 온 채점이 새 문제 위에 해설·연출·점수를 얹지 않도록
+  // pick 이 이 번호로 옛 문제의 응답인지 가른다.
+  const questionSeqRef = useRef(0);
   /**
    * 고른 문제 유형. 빈 문자열이면 섞어서 낸다.
    *
@@ -218,6 +223,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
       setError(null);
       setPicked(null);
       setResult(null);
+      questionSeqRef.current += 1;
 
       const wanted = itemRef.current;
       // 이 요청에 실은 유형. 안내 문구는 응답이 올 때가 아니라 보낸 것을 본다 -
@@ -342,80 +348,54 @@ export function QuizBoard({ category, content = "words", item }: Props) {
     // 탭바와 버튼 사이 숨 쉴 틈. tabBarHeight() 가 safe-area 를 포함해 잰
     // 값이라 이건 순수한 여백이고, 기기가 달라져도 줄어들지 않는다.
     const gap = 16;
+    const target =
+      window.scrollY +
+      button.getBoundingClientRect().bottom -
+      window.innerHeight +
+      tabBarHeight() +
+      gap;
 
-    // 맞혔으면 축포가 먼저다.
+    // 맞든 틀리든 곧바로 옮긴다. 축포는 판정이 드러나는 순간(연출의 66%)에
+    // 터져서(Burst 의 atReveal) 지금 하는 스크롤과 겹치지 않는다. 타이머로
+    // 미루지 않는 것은 한 틱만 늦어도 그 사이 사용자가 손으로 스크롤했을 수
+    // 있어서다.
     //
-    // 둘을 같은 순간에 하면 서로를 지운다. 폭죽은 화면 한가운데에서 터지는데
-    // 그 순간 화면이 300px 튀어서, 눈이 새 위치를 찾는 사이에 조각이 다
-    // 사라진다(scrollY 0 -> 301, 조각은 화면 밖으로).
-    //
-    // 그래서 순서를 준다. 터지는 것을 보고, 그 다음 화면이 움직인다.
-    // 480ms 는 폭죽(900ms)의 절반쯤이다. 다 끝날 때까지 기다리면 다음
-    // 문제로 넘어가려는 손이 먼저 움직여 답답하다.
-    //
-    // 틀렸을 때는 미루지 않는다. 그쪽 연출(흔들림)은 보기 버튼 위에서
-    // 일어나므로 화면이 움직이면 오히려 같이 보인다.
-    const delay = result?.correct ? 480 : 0;
-
-    const move = () => {
-      // 목표를 그때 다시 잰다. 위에서 구한 값은 480ms 전 것이라, 그 사이
-      // 글꼴이 늦게 붙거나 사용자가 손으로 스크롤하면 어긋난다.
-      const now = nextButtonRef.current;
-      if (!now) return;
-      const fresh =
-        window.scrollY +
-        now.getBoundingClientRect().bottom -
-        window.innerHeight +
-        tabBarHeight() +
-        gap;
-
-      // 이미 보이면 화면은 그대로 둔다. 답을 고를 때마다 흔들리면 방금 고른
-      // 보기를 눈으로 다시 찾아야 한다. 데스크톱처럼 화면이 길면 대개 여기다.
-      if (fresh > window.scrollY) {
-        // behavior 를 "auto" 로 둔다. smooth 를 쓰면 이 화면에서는 아무 일도
-        // 일어나지 않는다. 채점 직후의 리렌더와 겹치면 브라우저가 진행 중인
-        // 부드러운 이동을 버린다(scrollTo({top:156}) 를 불러도 scrollY 가 0 에
-        // 남고, 같은 시점의 수동 scrollTo 는 된다).
-        //
-        // 움직임을 줄이겠다고 한 설정을 따로 보지 않는 이유: auto 는
-        // 애니메이션이 없어서 그 설정과 무관하게 같은 결과다.
-        window.scrollTo({ top: fresh, behavior: "auto" });
-      }
-
-      // 포커스도 옮긴다. 화면만 움직이면 포커스는 방금 고른 보기에 남는데,
-      // 그 보기는 해설 카드 높이만큼 화면 위로 밀려나 있다. 키보드로 풀던
-      // 사람은 보이지 않는 곳에 서 있게 되고, 화면 낭독기의 읽는 위치와
-      // 눈에 보이는 위치도 어긋난다.
+    // 이미 보이면 화면은 그대로 둔다. 답을 고를 때마다 흔들리면 방금 고른
+    // 보기를 눈으로 다시 찾아야 한다. 데스크톱처럼 화면이 길면 대개 여기다.
+    if (target > window.scrollY) {
+      // behavior 를 "auto" 로 둔다. smooth 를 쓰면 이 화면에서는 아무 일도
+      // 일어나지 않는다. 채점 직후의 리렌더와 겹치면 브라우저가 진행 중인
+      // 부드러운 이동을 버린다(scrollTo({top:156}) 를 불러도 scrollY 가 0 에
+      // 남고, 같은 시점의 수동 scrollTo 는 된다).
       //
-      // 스크롤 여부와 무관하게 옮긴다. 화면이 안 움직인 경우에도 방금 고른
-      // 보기는 disabled 가 되어 포커스를 잃는다.
-      //
-      // preventScroll 이 있어야 방금 계산한 자리를 브라우저가 다시 건드리지
-      // 않는다. 마우스로 고른 사람에게 포커스 링이 뜨지는 않는다 - 버튼이
-      // focus-visible 만 쓴다.
-      now.focus({ preventScroll: true });
-    };
-
-    // 틀렸을 때는 지체 없이 옮긴다. delay 가 0 이면 타이머를 거치지 않고
-    // 바로 부른다 - setTimeout(0) 도 한 틱 뒤라서, 그 사이 사용자가 이미
-    // 손으로 스크롤했을 수 있다.
-    if (delay === 0) {
-      move();
-      return;
+      // 움직임을 줄이겠다고 한 설정을 따로 보지 않는 이유: auto 는
+      // 애니메이션이 없어서 그 설정과 무관하게 같은 결과다.
+      window.scrollTo({ top: target, behavior: "auto" });
     }
 
-    const id = setTimeout(move, delay);
-    // 그 사이 다음 문제로 넘어가면 취소한다. 안 그러면 새 문제가 뜬 화면을
-    // 옛 계산으로 끌어내린다.
-    return () => clearTimeout(id);
+    // 포커스도 옮긴다. 화면만 움직이면 포커스는 방금 고른 보기에 남는데,
+    // 그 보기는 해설 카드 높이만큼 화면 위로 밀려나 있다. 키보드로 풀던
+    // 사람은 보이지 않는 곳에 서 있게 되고, 화면 낭독기의 읽는 위치와
+    // 눈에 보이는 위치도 어긋난다.
+    //
+    // 스크롤 여부와 무관하게 옮긴다. 화면이 안 움직인 경우에도 방금 고른
+    // 보기는 disabled 가 되어 포커스를 잃는다.
+    //
+    // preventScroll 이 있어야 방금 계산한 자리를 브라우저가 다시 건드리지
+    // 않는다. 마우스로 고른 사람에게 포커스 링이 뜨지는 않는다 - 버튼이
+    // focus-visible 만 쓴다.
+    button.focus({ preventScroll: true });
   }, [picked, result, error]);
 
   async function pick(choiceId: number) {
     if (!question || picked !== null) return;
 
     setPicked(choiceId);
+    const seq = questionSeqRef.current;
     try {
       const graded = await submitAnswer(question.token, choiceId, content);
+      // 기다리는 사이 다음 문제로 넘어갔으면 버린다(questionSeqRef 참고).
+      if (seq !== questionSeqRef.current) return;
       setResult(graded);
       setScore((s) => ({
         solved: s.solved + 1,
@@ -461,6 +441,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
         );
       }
     } catch {
+      if (seq !== questionSeqRef.current) return;
       // picked 를 되돌리지 않는다. 되돌리면 "다음 문제" 버튼이 사라져
       // 안내대로 넘어갈 방법이 없어지고, 같은 토큰으로 다시 채점된다.
       setError("채점하지 못했습니다. 다음 문제로 넘어가주세요.");
@@ -482,7 +463,9 @@ export function QuizBoard({ category, content = "words", item }: Props) {
      fire 가 0 이면 아무것도 안 그린다. */
   const overlays = (
     <>
-      <Burst fire={burst} />
+      {/* 어둡게 까는 연출과 같이 쓰므로 판정 순간에 그 위에서 터진다
+          (Burst 의 atReveal). */}
+      <Burst fire={burst} atReveal />
       {/* 어둡게 깔고 1초 멈춘다. 이 화면은 답한 뒤 "다음 문제" 를 누를
           때까지 기다리므로 가려도 되는 자리다. 곧바로 다음 문제가 뜨는
           화면(일일학습·복습)은 dim={false} 로 끈다 - Reaction 머리말 참고. */}

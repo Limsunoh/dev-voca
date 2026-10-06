@@ -110,6 +110,20 @@ describe("무대는 닿는 순간에 판정색으로 넘어간다", () => {
     assert.match(before.decls, /opacity:\s*1/);
     assert.match(after.decls, /opacity:\s*1/);
   });
+
+  it("판정색이 된 뒤로는 끝까지 불투명하다", () => {
+    // 무대는 혼자 흐려지지 않고 층 전체(vx-out)와 함께 걷힌다. 끝을 0 으로
+    // 두면 무대가 먼저 빠지고 그 위에 서 있던 사람만 해설 위에 떠 보인다.
+    const from = spot.findIndex((s) => s.at.includes("70%"));
+    assert.ok(from > -1, "70% 정지점이 없다");
+    const rest = spot.slice(from);
+    assert.match(rest.at(-1)!.at, /100%/);
+    for (const s of rest) {
+      const m = s.decls.match(/opacity:\s*([\d.]+)/);
+      assert.ok(m, `${s.at} 에 opacity 가 없다`);
+      assert.equal(Number(m[1]), 1, `${s.at} 에서 opacity 가 ${m[1]} 이다`);
+    }
+  });
 });
 
 describe("연출 길이는 서버와 같은 값이다", () => {

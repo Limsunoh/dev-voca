@@ -56,7 +56,25 @@ const PIECES: Piece[] = Array.from({ length: 16 }, (_, i) => {
   };
 });
 
-export function Burst({ fire }: { fire: number }) {
+export function Burst({
+  fire,
+  atReveal = false,
+}: {
+  fire: number;
+  /**
+   * 판정이 드러나는 순간(채점 연출의 66%)에 연출 층 위에서 터진다.
+   *
+   * 화면을 어둡게 까는 채점 연출(Reaction 의 dim)과 같이 쓰는 화면이 켠다.
+   * 끄면 조각이 연출 층(z-40) 아래에서 바로 터져, 화면 가운데의 불투명한
+   * 원형 무대(지름 300px)에 전부 가려진다. 조각은 가운데서 132px 까지만
+   * 날아가기 때문이다. 그렇다고 바로 위로 올리면 "66% 전에는 결과를
+   * 모른다" 는 연출의 요점을 축포가 먼저 깨뜨린다.
+   *
+   * 연출 길이가 0 이면(한 판에서 서버가 멈추지 않을 때) 축포도 안 보인다.
+   * 연출이 안 도는 판에서는 축포도 같이 쉰다.
+   */
+  atReveal?: boolean;
+}) {
   // 아직 한 번도 안 맞혔으면 아무것도 안 그린다.
   //
   // 다 터진 뒤 DOM 에서 빼는 장치는 두지 않는다. 상태와 타이머로 700ms
@@ -76,10 +94,30 @@ export function Burst({ fire }: { fire: number }) {
       aria-hidden
       key={fire}
       // z-10 은 본문 위, 탭바(z-20) 아래다.
-      // 탭바보다 위에 두면 조각이 탭바를 가로지른다. 지금 문제풀이에는
-      // 탭바가 없어 안 드러나지만, 이 컴포넌트가 탭바 있는 화면에서 쓰이면
-      // 나타난다. 조각이 본문 위를 지나가는 데는 z-10 이면 충분하다.
-      className="pointer-events-none fixed inset-0 z-10 flex items-center justify-center"
+      // 탭바보다 위에 두면 조각이 탭바를 가로지른다. 일일공부·복습처럼
+      // 탭바 있는 화면이 이 값을 쓴다. 조각이 본문 위를 지나가는 데는 z-10
+      // 이면 충분하다. atReveal 은 연출 층(z-40) 위, 나가기 장막(z-50)
+      // 아래다. 그 화면들(문제풀기·한 판)에는 탭바가 없다.
+      className={`pointer-events-none fixed inset-0 flex items-center justify-center ${
+        atReveal ? "z-[45]" : "z-10"
+      }`}
+      // 기다리는 시간과 터지는 길이를 연출 길이에서 구한다. 한 판은 서버
+      // 값으로 --duration-verdict 를 덮어써서(RoundBoard) 숫자로 들고 있으면
+      // 갈린다. 0.66 은 무대가 판정색으로 넘어가는 정지점(globals.css 의
+      // vx-spot)과 같은 값이다.
+      //
+      // 길이는 연출이 끝나기 전에 조각이 다 사라지도록 잡는다. 연출 1000ms
+      // 기준으로 660 + 300 에 조각별 시차(최대 36ms)를 더해도 1000ms 안이라,
+      // 한 판에서 다음 문제가 뜰 때는 이미 없다. 더 길게 잡으면 조각이 새 문제 글자 위에
+      // 불투명하게 남는다.
+      style={
+        atReveal
+          ? ({
+              "--burst-wait": "calc(var(--duration-verdict) * 0.66)",
+              "--burst-duration": "calc(var(--duration-verdict) * 0.3)",
+            } as React.CSSProperties)
+          : undefined
+      }
     >
       <div className="relative">
         {PIECES.map((p, i) => (
@@ -91,7 +129,7 @@ export function Burst({ fire }: { fire: number }) {
                 "--burst-x": p.x,
                 "--burst-y": p.y,
                 "--burst-rot": p.rot,
-                animationDelay: p.delay,
+                animationDelay: `calc(var(--burst-wait, 0ms) + ${p.delay})`,
                 background: p.color,
                 width: p.size,
                 height: p.size,
