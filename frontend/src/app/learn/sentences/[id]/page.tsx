@@ -9,6 +9,7 @@ import {
 } from "@/components/DetailLayout";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { getSentence } from "@/lib/api/sentences";
+import { isErrorSentence } from "@/lib/quiz-text";
 import { routes, safeListUrl } from "@/lib/routes";
 
 // Next 16 에서 params 는 Promise 다.
@@ -51,7 +52,7 @@ export default async function SentenceDetailPage({
 
   // 에러 메시지는 코드에 가까워 고정폭이 읽기 좋다. 실무 표현은 사람이
   // 쓴 문장이라 가변폭으로 둔다.
-  const isError = sentence.kind === "error";
+  const isError = isErrorSentence(sentence.kind);
 
   const backToList = safeListUrl((await searchParams).from, routes.sentences);
 

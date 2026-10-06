@@ -357,9 +357,10 @@ export function detailWithBack(detailPath: string, backTo: string): string {
  * 하나도 없는 것이 되어 전체를 준다. 화면이 그것을 검색 중으로 보면 섞지 않은
  * 채 '"," 검색 결과 566개' 를 띄운다.
  *
- * 따옴표만 있는 검색어(`"`, `''`)는 맞추지 않았다. 백엔드는 이것도 빈 검색어로
- * 보지만, 따옴표로 감싼 `','`·`" "` 는 실제로 그 글자를 찾는다. 정규식에
- * 따옴표를 넣으면 그쪽이 틀어진다.
+ * 따옴표도 같다. `"`·`''`·`"" ""` 는 백엔드가 따옴표를 벗겨 빈 조각으로 보고
+ * 전체를 주지만, `","`·`" "`·`"'"` 는 그 글자를 실제로 찾는다. 정규식으로
+ * 흉내 내면 어느 한쪽이 어긋나서, 백엔드가 쪼개는 규칙을 그대로 옮겼다
+ * (backendSearchTerms).
  *
  * 목록 화면과 검색창(SearchInput)이 같이 쓴다. 검색창이 "검색어를 비웠다" 고
  * 보는 기준이 화면과 다르면 시드 없이 보내게 되고, 화면이 시드를 붙여 한 번
@@ -367,7 +368,41 @@ export function detailWithBack(detailPath: string, backTo: string): string {
  */
 export function searchText(value: string | undefined): string | undefined {
   const text = value?.trim();
-  return text && /[^\s,]/.test(text) ? text : undefined;
+  return text && backendSearchTerms(text).some((term) => term) ? text : undefined;
+}
+
+// 파이썬 정규식의 \s(str.isspace). 자바스크립트 \s 와 조금 달라서 직접 적는다
+// (\x85 는 파이썬만, \ufeff 는 자바스크립트만 공백으로 본다).
+const PY_SPACE =
+  "\\t\\n\\v\\f\\r\\x1c-\\x20\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+
+// django.utils.text.smart_split 의 정규식. 따옴표로 감싼 구간은 공백이 있어도
+// 한 조각으로 둔다.
+const SMART_SPLIT = new RegExp(
+  `((?:[^${PY_SPACE}'"]*(?:(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*')[^${PY_SPACE}'"]*)+)|[^${PY_SPACE}]+)`,
+  "g",
+);
+
+/**
+ * 백엔드(DRF search_smart_split)가 검색어를 쪼갠 조각들. 빈 조각도 남긴다.
+ *
+ * 조각마다 앞뒤 쉼표를 떼고, 같은 따옴표로 시작하고 끝나면 안쪽만 꺼낸다.
+ * 아니면 쉼표로 다시 쪼개 빈 것을 버린다. DRF 를 올릴 때 이 규칙이 바뀌면
+ * 여기도 같이 고친다(rest_framework/filters.py).
+ */
+export function backendSearchTerms(text: string): string[] {
+  const terms: string[] = [];
+  for (const [token] of text.matchAll(SMART_SPLIT)) {
+    const term = token.replace(/^,+|,+$/g, "");
+    if (/^["']/.test(term) && term[0] === term[term.length - 1]) {
+      terms.push(term.slice(1, -1));
+      continue;
+    }
+    for (const part of term.split(",")) {
+      if (part) terms.push(part);
+    }
+  }
+  return terms;
 }
 
 /**
