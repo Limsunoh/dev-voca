@@ -98,8 +98,8 @@ export default async function VocabPage({ searchParams }: PageProps) {
   // ABC순을 고른 뒤 검색하면 주소에 sort=abc 가 남아 이 경우가 생긴다.
   // 주소의 sort 는 그대로 두므로 검색어를 비우면 ABC순 목록으로 돌아간다.
   // 쉬운 것부터를 고른 뒤 검색했다 비우면 쉬운 것부터로 돌아가는 것과 같은
-  // 규칙이다. 다만 검색 중에 켜진 맨 앞 칩을 누르면 ChoiceFilter 가 정렬을
-  // 끄는 링크로 만들어 sort 가 빠지고, 그 뒤 비우면 섞인 목록으로 간다.
+  // 규칙이다. 검색 중의 맨 앞 칩("ABC순")도 sort=abc 를 가리키므로(아래
+  // ChoiceFilter 의 allValue) 눌러도 sort 가 빠지지 않는다.
   const sortChip =
     search && sort?.value === WORD_DEFAULT_SORT.value ? undefined : sort?.value;
 
@@ -394,6 +394,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
           allLabel={search ? WORD_DEFAULT_SORT.label : "섞어서"}
           basePath={routes.words}
           selected={sortChip}
+          allValue={search ? WORD_DEFAULT_SORT.value : undefined}
           keep={{
             search,
             category,
