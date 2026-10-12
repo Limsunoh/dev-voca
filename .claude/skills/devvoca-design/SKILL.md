@@ -7,18 +7,18 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 
 전역 `design-references` 스킬의 공통 규칙 위에 devvoca 사정을 얹는다.
 
-## 지금 상태 (2026-08-06 실측)
+## 지금 상태 (2026-10-13 기준)
 
 | 항목 | 값 |
 |---|---|
 | 스택 | Next.js 16.2.12 + React 19.2.4 + Tailwind v4 |
 | 런타임 의존성 | `next`, `react`, `react-dom` **셋뿐** |
-| 폰트 | Geist / Geist Mono (`next/font/google`) |
-| 팔레트 | Tailwind `slate` 계열 + 흑백. 커스텀 토큰 없음 |
-| 다크 모드 | `prefers-color-scheme` 기반. 토글 없음 |
-| 디자인 토큰 | `globals.css`에 `--background` / `--foreground` 두 개뿐 |
+| 폰트 | Noto Sans KR(본문) + JetBrains Mono(영어 용어·에러 메시지), `next/font/google` |
+| 팔레트 | 크림 바탕(`--background` #fff6e9) + 흰 카드(`--paper`) + 코랄 강조(`--coral` #ef5b3c) + 잉크(`--foreground` #191512) |
+| 다크 모드 | 없다. 테마는 크림 하나다(이유는 `globals.css` 머리 주석) |
+| 디자인 토큰 | `globals.css` 의 `:root` 에 색·글자 크기·굵기·간격·모서리·그림자(`--lift-*`)·연출 시간까지 있다. 토큰 밖 값을 새로 쓰지 않는다 |
 
-`npx impeccable detect`를 데스크톱·모바일 양쪽으로 돌렸을 때 결정론적 규칙 59개에서 **0건**이 나왔다. 지금 UI는 절제돼 있고 "AI 티"의 전형(보라 그라데이션·과한 그림자·저대비)은 없다. 밋밋함을 고친다면 없애는 작업이 아니라 **더하는 작업**이다.
+`npx impeccable detect` 는 어느 화면에서든 두 건을 낸다. `cream-palette`(크림 바탕)는 일부러 고른 것이고, `bounce-easing` 은 채점 연출의 튀는 곡선이다. 둘은 알고 둔 것이라 QA 때는 **새로 생긴 건수만** 본다.
 
 ## 화면 유형이 섞여 있다
 
@@ -26,14 +26,19 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 
 | 화면 | 유형 | 무엇이 중요한가 |
 |---|---|---|
-| `/` (홈) | **Persuade** | 한 장짜리 랜딩. 지금 제목 + 문단 + 버튼 2개가 전부라 가장 밋밋한 곳 |
-| `/learn/words`, `/learn/sentences` | **Operate** | 검색·필터·페이지네이션. 훑어보기와 일관성이 표현보다 앞선다 |
+| `/`, `/start` | **Persuade** | 처음 온 사람에게 무엇을 하는 앱인지 보여 주는 화면 |
+| `/learn/words`, `/learn/sentences`, `/mistakes`, `/board` | **Operate** | 검색·필터·페이지 넘기기. 훑어보기와 일관성이 표현보다 앞선다 |
 | `/learn/words/[id]`, `/learn/sentences/[id]` | **Read** | 뜻·발음·예문을 읽는 화면. 읽기 편한 구조가 먼저 |
+| `/test/*`, `/talk` | **Play** | 문제풀기·한 판·일일공부·복습·일상영어. 누르는 손과 채점 연출이 먼저다 |
+| `/profile`, `/login`, `/signup` | **Form** | 입력값 유지, 오류 안내, 누르는 크기 |
 
 그래서:
 
-- **홈에만** `design-taste-frontend`를 쓴다. 이 스킬은 스스로 "대시보드·데이터 테이블·다단계 제품 UI 아님"이라고 못 박고 있어서 목록 화면에 부르면 안 맞는 조언이 나온다. 85KB짜리라 컨텍스트도 크게 잡아먹는다.
-- **목록·상세에는** `impeccable`을 쓴다. Operate/Read를 정면으로 다루는 쪽이다. `critique`, `layout`, `typeset`, `adapt` 위주.
+- **Persuade 에만** `design-taste-frontend` 나 `hallmark` 를 쓴다. 둘을 같은 작업에 함께 부르지 않는다. 둘 다 "대시보드·제품 UI 아님" 쪽이라 다른 화면에 부르면 안 맞는 조언이 나온다.
+  - `hallmark audit` 은 읽기만 하니 점검에 써도 된다.
+  - `hallmark` 기본 동작이나 `redesign` 은 21개 테마 중 하나를 새로 고르려 든다. 크림·코랄 토큰과 Noto Sans KR 을 그대로 쓰라고 먼저 못박는다.
+- **Operate·Read·Form 에는** `impeccable` 을 쓴다. `critique`, `layout`, `typeset`, `adapt` 위주.
+- **Play 의 움직임은** 애니메이션 스킬(`animate`, `review-animations`, `emil-design-eng`)을 쓴다. 채점 연출 길이는 `--duration-verdict` 하나에서 읽는다.
 - 팔레트·폰트 후보를 **찾을 때만** `ui-ux-pro-max`. 예: `py ~/.claude/skills/ui-ux-pro-max/scripts/search.py "learning app education vocabulary" --domain color`
 
 ## 의존성은 셋에서 늘리지 않는 걸 기본으로
@@ -89,12 +94,12 @@ Ionic 팀이 만든 Next.js 스타터조차 `next export` 로 SPA 를 뽑고 라
 - **스트릭의 "1일" 은 KST 로 못 박는다.** UTC 로 두면 밤 9시에 공부한 한국 유저가 다음 날로 카운트된다. 스트릭이 끊기면 유저는 떠난다
 - **푸시 발송 시각은 유저마다 다르게 둔다.** 전원 같은 시각에 쏘면 알림 피로가 오고 서버도 그 순간만 몰린다
 
-## 지금 손볼 곳 (실측으로 찾은 것)
+## 지금 손볼 곳 (2026-10-13 확인)
 
-1. **`src/app/page.tsx:7`의 `min-h-screen`** — iOS Safari에서 주소창이 접히고 펴질 때 레이아웃이 튄다. `min-h-[100dvh]`로 바꾼다.
-2. **`public/` 안 미사용 파일 5개** — `next.svg`, `vercel.svg`, `globe.svg`, `window.svg`, `file.svg`가 `src` 어디에서도 참조되지 않는다. create-next-app 잔해다.
-3. **`frontend/README.md`** — create-next-app 기본 문구 그대로다. 진짜 "템플릿 티"는 여기 남아 있다.
-4. **Geist 폰트** — impeccable의 "너무 흔해진 폰트" 목록에 Geist가 들어 있다. 탐지기는 `next/font`의 해시 클래스명 때문에 못 잡지만 사람 눈에는 보인다. 홈을 다시 만든다면 폰트가 가장 큰 인상 변화를 만든다. 다만 **한글 본문이 있으므로** 라틴 전용 폰트를 본문에 바로 물리면 한글이 폴백으로 떨어져 어색해진다. 라틴(용어·코드)과 한글(뜻·설명)을 나눠 지정한다.
+1. **`public/` 안 미사용 파일 5개** — `next.svg`, `vercel.svg`, `globe.svg`, `window.svg`, `file.svg`가 `src` 어디에서도 참조되지 않는다. create-next-app 잔해다.
+2. **`frontend/README.md`** — create-next-app 기본 문구 그대로다. 진짜 "템플릿 티"는 여기 남아 있다.
+
+홈의 `min-h-screen`(iOS 주소창에서 레이아웃이 튀던 것)과 Geist 폰트(Noto Sans KR + JetBrains Mono 로 바꿈)는 해결됐다.
 
 ## 타이포 제약 (코드에 이미 반영돼 있음, 깨뜨리지 말 것)
 
@@ -106,7 +111,7 @@ Ionic 팀이 만든 Next.js 스타터조차 `next export` 로 SPA 를 뽑고 라
 
 전역 `design-references`의 통과 목록 중 devvoca에 실제로 쓸 만한 것:
 
-- **[Shapefest](https://shapefest.com/)** — 빈 상태(검색 결과 없음, 아직 문장 없음) 일러스트에 쓸 수 있다. 512px 무료, 상업 사용 허용. 이미지 한 장이라 의존성이 늘지 않는다. 다만 3D 클레이 렌더는 지금의 절제된 slate 톤과 결이 다르니, 쓰려면 홈이나 빈 상태처럼 국한된 자리에만 둔다.
+- **[Shapefest](https://shapefest.com/)** — 빈 상태(검색 결과 없음, 아직 문장 없음) 일러스트에 쓸 수 있다. 512px 무료, 상업 사용 허용. 이미지 한 장이라 의존성이 늘지 않는다. 다만 3D 클레이 렌더는 지금의 크림·코랄 톤과 결이 다르니, 쓰려면 홈이나 빈 상태처럼 국한된 자리에만 둔다.
 - **[Vengeance UI](https://github.com/Ashutoshx7/VengeanceUI)** (MIT) — 검색 모달, 내비게이션 같은 실용 컴포넌트의 **구조를 읽는 용도**. 코드가 전부 공개돼 있다. framer-motion 의존 부분은 걷어내고 마크업과 상태 처리만 참고한다.
 
 나머지(Spline, Getlayers, Animmaster Lib, Skiper UI, Craftwork)는 탈락시켰다. 사유는 전역 스킬에 적어뒀으니 다시 조사하지 않는다.
