@@ -8,6 +8,15 @@ import type { ChoiceOption } from "@/lib/api/client";
 import { useLeaveGuard } from "./useLeaveGuard";
 
 /**
+ * 항목을 골라 분류가 바뀐 뒤, 새로 만들어지는 고르개가 여는 버튼에 초점을
+ * 둘지.
+ *
+ * 컴포넌트 안에 두면 안 된다. 호출부의 key={selected} 때문에 분류가 바뀌면
+ * 이 컴포넌트가 통째로 새로 만들어져 ref 도 state 도 이어지지 않는다.
+ */
+let refocusAfterChange = false;
+
+/**
  * 접히는 분류 고르개.
  *
  * 문제풀이 화면에서 칩을 줄줄이 늘어놓으면 폰에서 네 줄을 먹는다. 그만큼
@@ -43,10 +52,27 @@ export function CategoryPicker({
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // 항목을 고르면 메뉴와 함께 초점이 있던 항목도 사라진다. 여는 버튼으로
+  // 돌려주지 않으면 초점이 문서 전체(body)로 떨어져 화면 낭독기가 위치를
+  // 잃는다.
+  const afterPick = (changed: boolean) => {
+    if (changed) refocusAfterChange = true;
+    setOpen(false);
+    buttonRef.current?.focus();
+  };
+
   const { guard, dialog } = useLeaveGuard({
     confirmLabel: "분류 바꾸기",
-    beforeLeave: () => setOpen(false),
+    beforeLeave: () => afterPick(true),
   });
+
+  useEffect(() => {
+    if (!refocusAfterChange) return;
+    refocusAfterChange = false;
+    buttonRef.current?.focus();
+  }, []);
 
   /**
    * 메뉴가 쓸 수 있는 최대 높이. 열 때 재고 화면이 바뀌면 다시 잰다.
@@ -81,7 +107,11 @@ export function CategoryPicker({
       // 닫으면, 창이 포커스를 돌려줄 링크가 메뉴와 함께 사라져 포커스가
       // 문서 맨 앞으로 떨어진다.
       if ((event.target as Element | null)?.closest?.("dialog")) return;
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        // 메뉴 항목에 있던 초점이 항목과 함께 사라지지 않게 돌려준다.
+        buttonRef.current?.focus();
+      }
     }
     // Tab 으로 메뉴 밖으로 나가면 닫는다. pointerdown 만 들으면 마우스로는
     // 닫히는데 키보드로는 열린 채 남아서, 가려진 버튼 위에 포커스가 선다.
@@ -165,6 +195,7 @@ export function CategoryPicker({
   return (
     <div ref={boxRef} className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -225,7 +256,7 @@ export function CategoryPicker({
           <PickerItem
             href={href()}
             active={!selected}
-            onNavigate={() => setOpen(false)}
+            onNavigate={afterPick}
             onGuard={guard}
           >
             전체
@@ -235,7 +266,7 @@ export function CategoryPicker({
               key={option.value}
               href={href(option.value)}
               active={option.value === selected}
-              onNavigate={() => setOpen(false)}
+              onNavigate={afterPick}
               onGuard={guard}
             >
               {option.label}
@@ -260,7 +291,8 @@ function PickerItem({
 }: {
   href: string;
   active: boolean;
-  onNavigate: () => void;
+  /** 메뉴를 닫는다. 다른 분류로 옮겨 가면 changed 가 true 다. */
+  onNavigate: (changed: boolean) => void;
   /** 푼 것이 있으면 이동을 막고 확인 창을 연다. 막았으면 true. */
   onGuard: (event: React.MouseEvent, href: string) => boolean;
   children: React.ReactNode;
@@ -270,7 +302,10 @@ function PickerItem({
       href={href}
       onClick={(event) => {
         if (!active && onGuard(event, href)) return;
-        onNavigate();
+        // 새 탭으로 여는 클릭은 이 탭이 그대로라 새로 만들어지지 않는다.
+        const newTab =
+          event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+        onNavigate(!active && !newTab);
       }}
       // 고른 것을 색만으로 표시하지 않는다. 색각 이상이 있으면 구분이 안 된다.
       // "page" 인 이유: 이 링크를 누르면 그 분류 화면으로 가고, 지금 그
@@ -283,7 +318,7 @@ function PickerItem({
         // 고른 것은 옅은 코랄 채움 + 코랄 글자. 회색 위 회색으로 두면
         // 종이 위에서 대비가 거의 안 남는다.
         background: active ? "var(--coral-soft)" : "transparent",
-        color: active ? "var(--coral-deep)" : "var(--text-body)",
+        color: active ? "var(--coral-soft-text)" : "var(--text-body)",
         fontWeight: active ? "var(--weight-black)" : "var(--weight-medium)",
       }}
     >

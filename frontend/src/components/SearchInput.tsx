@@ -117,7 +117,8 @@ export function SearchInput({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           placeholder={placeholder}
-          className="min-w-0 flex-1 border-0 bg-transparent outline-none"
+          // 안내 글자의 기본색은 글자색의 50% 라 흰 바탕에서 3.44:1 이다.
+          className="min-w-0 flex-1 border-0 bg-transparent outline-none placeholder:text-[color:var(--text-muted)]"
           style={{
             color: "var(--foreground)",
             fontWeight: "var(--weight-medium)",
