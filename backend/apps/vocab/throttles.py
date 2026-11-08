@@ -27,7 +27,7 @@ class _TalkThrottle(SimpleRateThrottle):
     보는 것이 정상이라, 게스트가 동시에 약 250명이면 상한에 닿는다. 429 가
     뜬다는 신고가 오면 여기부터 본다.
 
-    learning.throttles._PerUserOrShared 와 같은 구현을, 앱 간 의존을 만들지
+    learning.throttles._PerUserOrShared 와 같은 구현을, 앱 간 의존을 늘리지
     않으려고 복제했다. 게스트를 식별하는 방식을 바꾸면 두 곳을 함께 고친다.
     공통으로 뺄 자리는 core 앱이 생길 때다.
     """
