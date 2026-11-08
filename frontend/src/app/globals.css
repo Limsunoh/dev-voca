@@ -32,6 +32,9 @@
   --coral: #ef5b3c;
   --coral-deep: #c13e22; /* 코랄 버튼 아래 두께 */
   --coral-soft: #ffe0d6;
+  /* --coral-soft 바탕 위의 글자. --coral-deep 은 이 바탕에서 4.24:1 이라
+     작은 글자 기준(4.5:1)에 못 미친다. 값은 난이도 3 배지 글자와 같다. */
+  --coral-soft-text: var(--level-3-text);
 
   /* ---- 판정·의미 ---- */
   --green: #17916b;

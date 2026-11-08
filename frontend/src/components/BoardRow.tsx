@@ -13,9 +13,13 @@ import { BOARD_LABELS } from "@/lib/api/leaderboards";
  */
 
 /**
- * 1~3위 표시. 등수 숫자의 색과 크기를 함께 바꾼다.
+ * 1~3위 표시. 숫자 뒤의 색 동그라미와 숫자 크기로 가른다.
  *
- * 크림에서 링(ring)을 버렸다. 다크에서는 색 있는 테두리로 상위 셋을 갈랐지만
+ * 메달 색을 글자색으로 쓰지 않는다. 금색 글자는 흰 줄에서 2.00:1, 내 줄의
+ * 코랄 바탕에서 1.61:1 이라 등수가 읽히지 않는다. 숫자는 잉크로 두고
+ * 색은 바탕으로만 쓴다.
+ *
+ * 크림에서 줄을 두르는 링(ring)을 버렸다. 다크에서는 색 있는 테두리로 상위 셋을 갈랐지만
  * 이 시스템은 경계를 테두리가 아니라 아래 두께가 맡는다(가이드 shape-lift).
  * 줄마다 색 링을 두르면 두께가 만든 층 위에 다른 층이 하나 더 생긴다.
  *
@@ -81,11 +85,22 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
           fontWeight: "var(--weight-bold)",
           // 상위 셋은 한 단계 크다. 색만으로 가르지 않는다.
           fontSize: medal ? "var(--text-md)" : "var(--text-sm)",
-          color: medal ?? "var(--text-muted)",
+          color: medal ? "var(--foreground)" : "var(--text-muted)",
           letterSpacing: "var(--tracking-tighter)",
         }}
       >
-        {row.rank}
+        {medal ? (
+          // 동그라미는 폰의 자리 폭(w-7, 28px)과 같다. 줄 높이는 아바타(34px)가
+          // 정하므로 상위 세 줄만 높아지지 않는다.
+          <span
+            className="inline-flex size-7 items-center justify-center rounded-full"
+            style={{ background: medal }}
+          >
+            {row.rank}
+          </span>
+        ) : (
+          row.rank
+        )}
       </span>
 
       <Avatar shown={row.avatar} size={34} className="shrink-0" />
@@ -103,7 +118,7 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
           <span
             className="ml-1.5 text-xs"
             style={{
-              color: "var(--coral-deep)",
+              color: "var(--coral-soft-text)",
               fontWeight: "var(--weight-black)",
             }}
           >
