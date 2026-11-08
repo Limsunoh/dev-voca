@@ -11,9 +11,30 @@ Next 서버가 대신 부르기 때문에, 백엔드가 보는 주소는 항상 
 
 from __future__ import annotations
 
-import hashlib
-
+from django.conf import settings
+from django.db import connection
+from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from rest_framework.throttling import SimpleRateThrottle
+
+
+def sweep_expired_counters(*, apply: bool) -> int:
+    """수명이 다한 시도 횟수 행을 지운다. apply 가 False 면 세기만 한다.
+
+    DB 캐시는 만료된 행을 스스로 치우지 않는다. 같은 키로 다시 읽거나 행이
+    상한을 넘을 때만 지워져서, 이메일에서 나온 키가 정해진 기한 없이 남는다.
+    """
+    table = connection.ops.quote_name(settings.CACHES["default"]["LOCATION"])
+    expires = connection.ops.quote_name("expires")
+    now = connection.ops.adapt_datetimefield_value(
+        timezone.now().replace(microsecond=0)
+    )
+    with connection.cursor() as cursor:
+        if not apply:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {expires} < %s", [now])
+            return cursor.fetchone()[0]
+        cursor.execute(f"DELETE FROM {table} WHERE {expires} < %s", [now])
+        return cursor.rowcount
 
 
 class EmailRateThrottle(SimpleRateThrottle):
@@ -36,7 +57,12 @@ class EmailRateThrottle(SimpleRateThrottle):
         # 해시로 줄이는 이유: 이메일을 그대로 쓰면 키가 길어져 캐시 백엔드가
         # 거부한다(memcached 는 250자 제한). 길이가 고정되면 그 걱정이 없고,
         # 캐시에 이메일 원문이 남지도 않는다.
-        ident = hashlib.sha256(email.strip().lower().encode()).hexdigest()
+        #
+        # 서버 비밀값을 섞는 이유: 그냥 해시면 후보 이메일 목록과 대조해 캐시
+        # 표의 키에서 원래 이메일을 알아낼 수 있다.
+        ident = salted_hmac(
+            "accounts.throttles.email", email.strip().lower(), algorithm="sha256"
+        ).hexdigest()
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 

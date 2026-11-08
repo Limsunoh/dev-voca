@@ -293,6 +293,41 @@ https://dev-voca.vercel.app/api/auth/google/callback
 "구글 로그인을 마치지 못했습니다" 가 뜨면 이유는 Vercel 함수 로그에 있다.
 `redirect_uri_mismatch` 면 위 URI 등록을, 500 이면 백엔드 로그를 본다.
 
+## 정기 정리
+
+`daily_cleanup` 명령이 세 가지를 한다.
+
+- 마지막 이용에서 335일이 지난 회원에게 "30일 뒤 삭제" 메일을 한 번 보낸다.
+  안내 뒤 30일이 지났고 그 사이 이용이 없으면 계정과 학습 기록을 지운다.
+  관리자·검수자(`is_staff`)는 대상이 아니다.
+- 수명이 다한 문제풀기 진행 표시(`RoundStep`)를 지운다.
+- 수명이 다한 시도 횟수 행(`throttle_cache`)을 지운다.
+
+**지우는 작업이라 기본은 미리 보기다.** `--apply` 를 줘야 메일을 보내고 지운다.
+
+```
+python backend/manage.py daily_cleanup            # 몇 건인지 세기만 한다
+python backend/manage.py daily_cleanup --apply    # 실제로 보내고 지운다
+```
+
+하루 한 번 돌도록 Railway 의 Cron Schedule 에 등록한다. 웹 서비스와 같은 코드와
+환경변수(`DATABASE_URL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` 포함)를 쓰는 별도
+서비스로 두고, 시작 명령은 `python backend/manage.py daily_cleanup --apply`,
+일정은 `0 18 * * *`(UTC, 한국 새벽 3시)다. 처음 등록하기 전에 운영 DB 로 건수를 본다.
+
+```
+railway ssh --service web "python backend/manage.py daily_cleanup"
+```
+
+`EMAIL_HOST_USER`·`EMAIL_HOST_PASSWORD` 는 이메일 변경 확인 메일에도 쓰이니 웹 서비스에도
+넣는다. 안내할 회원이 있는데 발송 계정이 비어 있거나 한 통도 못 보내면 명령이 실패로
+끝난다. 안내할 회원이 없는 날은 계정이 비어 있어도 성공으로 끝나므로, 공개 직후에는
+이메일 변경으로 메일이 실제로 나가는지 한 번 확인한다. 정지한 계정(`is_active=False`)은
+자동으로 지우지 않는다.
+
+**등록하지 않으면 1년 파기는 돌지 않는다.** 처리방침에 적힌 내용과 달라지므로
+정식 공개 전에 등록한다.
+
 ## 아직 안 한 것
 
 - HSTS (`SECURE_HSTS_SECONDS`) - 도메인 확정 후 짧은 값부터 켠다.
