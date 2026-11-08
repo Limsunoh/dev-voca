@@ -19,6 +19,7 @@ import { QuestionCard } from "./QuestionCard";
 import { WrongAnswer } from "./WrongAnswer";
 import { Reaction, verdictMs } from "./Reaction";
 import { StudyCards } from "./StudyCards";
+import { useFocusNewQuestion } from "./useFocusNewQuestion";
 
 /**
  * 하루 한 번 일일공부.
@@ -492,6 +493,7 @@ function PlayCard({
    */
   onLearn?: () => void;
 }) {
+  const cardRef = useFocusNewQuestion(question, error);
   const answered = study?.answered ?? 0;
   const total = study?.total ?? 0;
 
@@ -600,7 +602,12 @@ function PlayCard({
           다음 문제는 새 단어를 익힌 뒤에 나옵니다.
         </p>
       ) : ending ? null : (
-        <QuestionCard question={question} busy={busy} onPick={onPick} />
+        <QuestionCard
+          question={question}
+          busy={busy}
+          onPick={onPick}
+          cardRef={cardRef}
+        />
       )}
 
       {/* 다음 묶음이 기다릴 때만. 문제를 가려 두었으므로 이 버튼이 판을

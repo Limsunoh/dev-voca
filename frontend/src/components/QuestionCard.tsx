@@ -25,10 +25,13 @@ export function QuestionCard({
   question,
   busy,
   onPick,
+  cardRef,
 }: {
   question: RoundQuestion;
   busy: boolean;
   onPick: (id: number) => void;
+  /** useFocusNewQuestion 이 돌려준 ref. */
+  cardRef?: React.Ref<HTMLDivElement>;
 }) {
   const mono = promptIsMono(question.kind, question.sentence_kind);
   const sentence = promptIsSentence(question.kind);
@@ -36,7 +39,9 @@ export function QuestionCard({
   return (
     <>
       <div
-        className="px-5 py-6"
+        ref={cardRef}
+        tabIndex={-1}
+        className="px-5 py-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         style={{
           background: "var(--paper)",
           borderRadius: "var(--radius-2xl)",
