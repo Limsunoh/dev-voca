@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ApiError } from "@/lib/api/client";
 import { getQuestion, gradeAnswer, type QuizContent } from "@/lib/api/quiz";
+import { getToken, withTokenOrGuest } from "@/lib/session";
 
 /**
  * 문제풀기 중계.
@@ -47,14 +48,16 @@ export async function GET(request: Request) {
 
 /** 채점. */
 export async function POST(request: Request) {
-  let body: { token?: string; picked?: number };
+  let body: { token?: string; picked?: number } | null;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ detail: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  if (!body.token || typeof body.picked !== "number") {
+  // 본문이 JSON null 이어도 올바른 JSON 이라 위 catch 에 안 걸린다.
+  const { token, picked } = body ?? {};
+  if (!token || typeof picked !== "number") {
     // 백엔드가 같은 상황에 쓰는 문구를 그대로 쓴다. 어느 쪽에서
     // 걸리든 사용자가 보는 말은 같아야 한다.
     return NextResponse.json(
@@ -63,12 +66,21 @@ export async function POST(request: Request) {
     );
   }
 
+  const cookieToken = await getToken();
+
   try {
     // 채점도 같은 콘텐츠로 보내야 한다. 문장 문제를 단어 쪽에 채점시키면
     // 토큰은 유효한데 정답을 엉뚱한 표에서 찾는다.
     const content = toContent(new URL(request.url).searchParams.get("content"));
-    const result = await gradeAnswer(body.token, body.picked, content);
-    return NextResponse.json(result);
+    // 로그인 토큰을 싣는다. 틀린 문제를 오답 노트에 넣으려면 백엔드가
+    // 누구인지 알아야 한다. 채점은 로그인 없이도 되는 요청이라 죽은
+    // 쿠키 때문에 막히면 안 된다.
+    const { value } = await withTokenOrGuest(
+      cookieToken,
+      (auth) => gradeAnswer(token, picked, content, auth),
+      { forget: true },
+    );
+    return NextResponse.json(value);
   } catch (error) {
     return errorResponse(error);
   }

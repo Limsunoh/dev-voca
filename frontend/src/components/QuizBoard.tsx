@@ -25,7 +25,7 @@ async function fetchQuestion(params: {
   category?: string;
   exclude?: string;
   item?: string;
-  /** 문제 유형. 비어 있으면 서버가 섞어서 낸다. */
+  /** 문제 유형. 비어 있으면 서버가 섞어서 낸다(문장을 정해서 오면 상황 고르기부터). */
   kind?: string;
   content: QuizContent;
 }): Promise<Question> {
