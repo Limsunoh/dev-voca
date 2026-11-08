@@ -2519,15 +2519,15 @@ SENTENCES: list[tuple[str, str, str, str, str, int, str, str]] = [
         "이진 탐색은 배열이 미리 정렬되어 있어야 합니다.",
         PHRASE, CS, E, "자료구조 교재",
         "beforehand 는 '미리, 사전에' 라는 뜻이다. 이 전제를 빼먹으면 알고리즘은 "
-        "에러 없이 돌면서 틀린 답을 준다. 정처기에서 전제 조건을 묻는 문제로 자주 나온다.",
+        "에러 없이 돌면서 틀린 답을 준다. 정처기에서도 이 전제 조건을 다룬다.",
     ),
     (
         "cs-stack-lifo",
         "A stack follows the last-in, first-out principle.",
         "스택은 후입선출 원칙을 따릅니다.",
         PHRASE, CS, E, "자료구조 교재",
-        "follow the principle 은 '그 원칙을 따른다' 는 정형 표현이다. 시험에서는 "
-        "LIFO 라는 약자로 더 자주 나오고, 함수 호출이 이 방식으로 쌓이고 풀린다.",
+        "follow the principle 은 '그 원칙을 따른다' 는 정형 표현이다. LIFO 라는 "
+        "약자로도 부르고, 함수 호출이 이 방식으로 쌓이고 풀린다.",
     ),
     (
         "cs-queue-fifo",
@@ -2592,7 +2592,7 @@ SENTENCES: list[tuple[str, str, str, str, str, int, str, str]] = [
         "교착 상태는 네 가지 조건이 동시에 성립할 때만 발생합니다.",
         PHRASE, CS, H, "운영체제 교재",
         "hold 가 '성립하다' 라는 뜻으로 쓰였다. 조건 중 하나만 깨면 교착 상태를 "
-        "막을 수 있다는 것이 예방 기법의 근거이고, 정처기 단골 문제다.",
+        "막을 수 있다는 것이 예방 기법의 근거다. 정처기에서도 이 네 조건을 다룬다.",
     ),
     (
         "cs-context-switch-overhead",
@@ -2665,7 +2665,7 @@ SENTENCES: list[tuple[str, str, str, str, str, int, str, str]] = [
         "서브넷 마스크는 주소의 어느 부분이 네트워크를 식별하는지 결정합니다.",
         PHRASE, CS, H, "네트워크 교재",
         "determine 은 '결정한다', identify 는 '식별한다' 는 뜻으로 둘 다 기술 문서의 "
-        "기본 동사다. 정처기에서 서브넷 계산 문제로 자주 출제된다.",
+        "기본 동사다. 서브넷 계산은 정처기에서 다루는 내용이다.",
     ),
     (
         "cs-symmetric-vs-asymmetric",
@@ -2696,8 +2696,8 @@ SENTENCES: list[tuple[str, str, str, str, str, int, str, str]] = [
         "Normalization reduces data redundancy and improves data integrity.",
         "정규화는 데이터 중복을 줄이고 무결성을 향상시킵니다.",
         PHRASE, CS, N, "데이터베이스 교재",
-        "redundancy 는 중복, integrity 는 무결성으로 정처기 필수 용어다. "
-        "정규화의 목적을 묻는 문제의 답이 대개 이 문장 그대로다.",
+        "redundancy 는 중복, integrity 는 무결성으로 정처기에서 다루는 "
+        "용어다.",
     ),
     (
         "cs-acid-properties",
