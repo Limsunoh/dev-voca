@@ -1,13 +1,35 @@
 """토큰 인증.
 
-기본 TokenAuthentication 을 그대로 쓰지 않는 이유 하나 때문에 있는 모듈이다.
+기본 TokenAuthentication 을 그대로 쓰지 않는 이유가 둘이다. 사진 바이트를
+안 끌고 오는 것과, 마지막 이용일을 남기는 것이다.
 """
 
 from __future__ import annotations
 
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions
 from rest_framework.authentication import TokenAuthentication
+
+
+def _mark_seen(user) -> None:
+    """마지막 이용일을 오늘로 적는다. 하루에 한 번만 쓴다.
+
+    1년 미접속 파기(accounts.purge)가 이 값을 본다. last_login 은 쓸 수 없다.
+    회원 로그인은 토큰을 바로 내주는 구조라 그 칸이 찍히지 않고, 토큰에
+    만료도 없어서 로그인 시각은 이용 시각을 대신하지 못한다.
+
+    파기 안내가 나간 뒤 돌아온 사람은 안내를 비운다. 그래야 다시 1년을 센다.
+    """
+    today = timezone.localdate()
+    if user.last_seen_on == today:
+        return
+
+    type(user).objects.filter(pk=user.pk).update(
+        last_seen_on=today, purge_notice_sent_at=None
+    )
+    user.last_seen_on = today
+    user.purge_notice_sent_at = None
 
 
 class SlimTokenAuthentication(TokenAuthentication):
@@ -42,5 +64,7 @@ class SlimTokenAuthentication(TokenAuthentication):
 
         if not token.user.is_active:
             raise exceptions.AuthenticationFailed(_("User inactive or deleted."))
+
+        _mark_seen(token.user)
 
         return (token.user, token)

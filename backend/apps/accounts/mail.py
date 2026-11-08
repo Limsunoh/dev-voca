@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class MailNotConfigured(RuntimeError):
-    """운영인데 발송 계정이 없다. 보내려는 순간에 터진다."""
+    """발송 계정이 없다. 보내려는 순간에 터진다."""
 
 
 def _really_sends() -> bool:

@@ -126,7 +126,7 @@ ANSWER_FIELDS = 7
 MAX_ANSWERS = 200
 
 # 판을 열 때 이 확률로 오래된 진행 표시를 지운다. 매번 지우면 낭비고,
-# 놓쳐도 다음 판이 지운다. 판 50번에 한 번꼴이면 쌓일 틈이 없다.
+# 놓쳐도 다음 판이 지운다. 판이 뜸할 때는 매일 정리(daily_cleanup)가 치운다.
 _SWEEP_CHANCE = 0.02
 
 
@@ -375,18 +375,22 @@ def _sweep_old_steps() -> None:
     오래 사는 판(LONG_ROUND_PREFIX)의 행은 더 오래 둔다(그 주석).
     매번 지우면 낭비라 가끔만 한다. 놓쳐도 다음 판이 지우므로 정확할
     필요가 없고, 안 지워져도 방어가 열리지는 않는다(캐시와 다른 점이다).
+    판이 뜸하면 오래 남을 수 있어 매일 정리(daily_cleanup)가 상한을 만든다.
     """
     if random.random() >= _SWEEP_CHANCE:
         return
 
+    expired_steps().delete()
+
+
+def expired_steps() -> QuerySet[RoundStep]:
+    """수명이 다한 진행 표시. 판을 열 때의 청소와 매일 정리가 같이 쓴다."""
     now = timezone.now()
     long_rounds = Q(round_id__startswith=LONG_ROUND_PREFIX)
-    RoundStep.objects.filter(
-        ~long_rounds, created_at__lt=now - timedelta(seconds=TOKEN_MAX_AGE)
-    ).delete()
-    RoundStep.objects.filter(
-        long_rounds, created_at__lt=now - timedelta(seconds=LONG_STEP_KEEP_SECONDS)
-    ).delete()
+    return RoundStep.objects.filter(
+        (~long_rounds & Q(created_at__lt=now - timedelta(seconds=TOKEN_MAX_AGE)))
+        | (long_rounds & Q(created_at__lt=now - timedelta(seconds=LONG_STEP_KEEP_SECONDS)))
+    )
 
 
 def _sign(state: dict) -> str:

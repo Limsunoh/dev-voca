@@ -109,7 +109,7 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstr
 
 # 메일 발송.
 #
-# 이메일 변경이 본인 확인을 메일로 하기 때문에 필요하다. 없으면 그 기능만
+# 이메일 변경의 본인 확인과 1년 미접속 안내가 메일로 나가서 필요하다. 없으면 그 기능만
 # 못 쓰는 것이 아니라, 확인 링크가 안 가는데 화면은 "보냈습니다" 라고
 # 말하는 상태가 되어, 사용자는 스팸함만 뒤지게 된다.
 #
@@ -119,6 +119,11 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstr
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+
+# 없으면 SMTP 서버가 응답을 멈췄을 때 정기 정리가 끝나지 않는다. gunicorn 의
+# 기본 제한(30초)보다 짧아야 웹에서도 실패 안내가 나간다.
+EMAIL_TIMEOUT = 10
+
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 
 # Gmail 은 계정 비밀번호가 아니라 앱 비밀번호를 받는다. 2단계 인증을 켠 뒤
@@ -330,8 +335,8 @@ CACHES = {
         # 닫히지 않고 비용만 오른다. 제대로 막으려면 아래 REST_FRAMEWORK
         # 주석대로 Next 중계에 제한을 둬야 한다.
         #
-        # 여기 들어오는 것은 요청 제한 카운터뿐이고 1분이면 만료되므로
-        # 거의 쌓이지 않는다. 넉넉히 잡아도 된다.
+        # 여기 들어오는 것은 요청 제한 카운터뿐이고 1분이면 만료된다. 만료된
+        # 행은 스스로 안 지워져서 daily_cleanup 이 치운다. 넉넉히 잡아도 된다.
         #
         # 되돌리기 방어는 캐시에 두지 않는다. 캐시는 넘치면 스스로 지우므로
         # (cull) 공격자가 항목을 채우면 방어가 열린다. 그래서
