@@ -39,7 +39,15 @@ class UserAdmin(BaseUserAdmin):
     list_filter = ("is_staff", "is_active")
     search_fields = ("email", "display_name")
     ordering = ("-date_joined",)
-    readonly_fields = ("date_joined", "last_login")
+    readonly_fields = (
+        "date_joined",
+        "last_login",
+        "terms_agreed_at",
+        "terms_version",
+        "age_confirmed_at",
+        "last_seen_on",
+        "purge_notice_sent_at",
+    )
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
@@ -62,7 +70,20 @@ class UserAdmin(BaseUserAdmin):
                 "description": "is_staff 를 켜면 미검수 단어를 조회하고 수정할 수 있습니다.",
             },
         ),
-        ("기록", {"fields": ("date_joined", "last_login")}),
+        (
+            "기록",
+            {
+                "fields": (
+                    "date_joined",
+                    "last_login",
+                    "terms_agreed_at",
+                    "terms_version",
+                    "age_confirmed_at",
+                    "last_seen_on",
+                    "purge_notice_sent_at",
+                ),
+            },
+        ),
     )
 
     add_fieldsets = (

@@ -14,6 +14,8 @@ from rest_framework.permissions import (
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.learning.record import note_practice_answer
+
 from .models import DailyPhrase, LearningItem, PhraseScene, Sentence, Word
 from .quiz import (
     TARGET_SENTENCE,
@@ -255,11 +257,11 @@ class LearningItemViewSet(viewsets.ModelViewSet):
             ]
         )
 
-    # POST 지만 데이터를 바꾸지 않아 익명도 허용하는 액션. 채점처럼
-    # "제출" 의미 때문에 POST 를 쓰지만 실제로는 조회에 가깝다.
+    # POST 지만 익명도 허용하는 액션. 채점처럼 "제출" 의미 때문에 POST 를
+    # 쓴다.
     #
-    # 이 목록에 올린 액션은 로그인 없이 열린다. 그래서 DB 에 아무것도
-    # 쓰지 않는 액션만 올린다.
+    # 이 목록에 올린 액션은 로그인 없이 열린다. 그래서 게스트 요청으로는
+    # DB 에 아무것도 쓰지 않는 액션만 올린다.
     SAFE_POST_ACTIONS: tuple[str, ...] = ()
 
     def get_permissions(self) -> list[BasePermission]:
@@ -293,8 +295,9 @@ class WordViewSet(LearningItemViewSet):
     # 대소문자 무시 알파벳 순서로 정렬할 글자 필드(ReadableOrdering 참고).
     text_ordering_fields = ["term"]
 
-    # 채점은 POST 지만 아무것도 저장하지 않는다. 로그인을 요구하면
-    # 로그인하지 않은 사람은 문제풀기를 못 쓴다.
+    # 로그인을 요구하면 로그인하지 않은 사람은 문제풀기를 못 쓴다. 게스트의
+    # 채점은 아무것도 저장하지 않는다. 저장하는 것은 로그인한 사람의 복습
+    # 기록뿐이다(record.note_practice_answer).
     SAFE_POST_ACTIONS = ("grade",)
 
     @action(detail=False)
@@ -435,6 +438,8 @@ class WordViewSet(LearningItemViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        note_practice_answer(request.user, answer_type, answer_id, correct=correct)
+
         return Response(
             {
                 "correct": correct,
@@ -565,7 +570,7 @@ class SentenceViewSet(LearningItemViewSet):
     ordering_fields = ["created_at", "difficulty", "id"]
     ordering = ["id"]
 
-    # 채점은 POST 지만 DB 에 쓰지 않는다 - 토큰을 풀어 맞는지 보고 정답을
+    # 게스트의 채점은 DB 에 쓰지 않는다 - 토큰을 풀어 맞는지 보고 정답을
     # 조회할 뿐이다. 단어 쪽 grade 와 같은 이유로 익명에게 연다. 문제풀이는
     # 로그인 없이 둘러보는 경로에도 있다.
     SAFE_POST_ACTIONS = ("grade",)
@@ -597,7 +602,7 @@ class SentenceViewSet(LearningItemViewSet):
         고른 것과 다른 문제가 나온다.
 
         ?category=git     분류를 좁힌다
-        ?kind=blank       유형을 고정한다. 없으면 무작위
+        ?kind=blank       유형을 고정한다. 없으면 무작위(?item= 이면 상황 고르기 먼저)
         ?exclude=1,2,3    방금 낸 문장을 다시 내지 않는다
         ?item=12          이 문장으로 낸다. 상세의 "이 문장으로 문제 풀기"
         """
@@ -630,11 +635,18 @@ class SentenceViewSet(LearningItemViewSet):
         # 유형을 안 정했으면 무작위로 고르되, 못 내면 남은 쪽으로 넘어간다.
         # 순서를 섞는 이유: 앞의 것을 늘 먼저 시도하면 그 유형이 실패하기
         # 쉬울 때만 다른 유형이 나와서 비율이 한쪽으로 쏠린다.
-        order = (
-            [kind]
-            if kind
-            else random.sample(QuizKind.SENTENCE_KINDS, k=len(QuizKind.SENTENCE_KINDS))
-        )
+        #
+        # 문장을 정해서 왔으면 상황 고르기부터 낸다. 오답 노트의 문장은 상황
+        # 고르기에서 틀린 것인데, 빈칸은 정답이 단어라서 맞혀도 그 문장이
+        # 노트에서 안 빠진다. 상황이 없는 문장이면 빈칸으로 넘어간다.
+        if kind:
+            order = [kind]
+        elif item is not None:
+            order = [QuizKind.SITUATION, QuizKind.BLANK]
+        else:
+            order = random.sample(
+                QuizKind.SENTENCE_KINDS, k=len(QuizKind.SENTENCE_KINDS)
+            )
 
         question = None
         for one in order:
@@ -746,6 +758,8 @@ class SentenceViewSet(LearningItemViewSet):
                 {"detail": "이 문제는 지금 풀 수 없습니다. 다음 문제로 넘어가주세요."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        note_practice_answer(request.user, answer_type, answer_id, correct=correct)
 
         return Response(
             {

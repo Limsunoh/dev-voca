@@ -1,4 +1,4 @@
-"""끝난 판을 기록한다.
+"""끝난 판과 낱개 연습의 결과를 기록한다.
 
 로그인한 사람만 남긴다. 게스트는 화면에서 점수를 보고, 그 값은 브라우저에만
 남는다. 서버가 채점했더라도 계정이 없으면 순위표에 넣을 자리가 없다.
@@ -160,8 +160,9 @@ def _bump_review(user, answers) -> None:
 def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
     """(종류, id) -> 맞았나 를 복습 상태에 반영한다.
 
-    자유 문제풀이(_bump_review)와 일일공부(daily_study)가 같이 쓴다.
-    두 곳이 규칙을 따로 구현하면 한쪽만 고쳐지고, 그 차이는 복습
+    자유 문제풀이(_bump_review), 일일공부(daily_study), 낱개 연습
+    (note_practice_answer)이 같이 쓴다.
+    세 곳이 규칙을 따로 구현하면 한쪽만 고쳐지고, 그 차이는 복습
     목록에서만 드러나 알아채기 어렵다.
 
     규칙은 위 _bump_review docstring 참고. 맞히면 last_correct_at 만,
@@ -212,7 +213,7 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
             miss.append(row)
 
     if new_rows:
-        # 동시에 같은 판을 두 번 기록하면 겹칠 수 있다. 겹친 줄은 이미
+        # 동시에 같은 항목을 기록하면 겹칠 수 있다. 겹친 줄은 이미
         # 있는 것이니 버린다.
         ReviewState.objects.bulk_create(new_rows, ignore_conflicts=True)
 
@@ -230,6 +231,29 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
         ReviewState.objects.bulk_update(hit, ["is_wrong", "last_correct_at"])
     if miss:
         ReviewState.objects.bulk_update(miss, ["is_wrong", "streak"])
+
+
+def note_practice_answer(
+    user, target_type: str, target_id: int, *, correct: bool
+) -> None:
+    """낱개 연습(단어·문장 채점)의 결과를 오답 노트에 반영한다.
+
+    게스트는 쓰지 않는다. 틀리면 넣고, 맞히면 오답 노트에 있던 것만 뺀다.
+    오답 노트 화면이 "어디서든 다시 한 번 맞히면 빠진다" 고 약속한다.
+
+    처음 맞힌 항목에 줄을 만들지 않는 이유: 줄이 생기면 시간이 지나
+    복습의 "오래된 것" 으로 나온다(review._due). 점수가 안 걸리는 연습이
+    복습 목록을 늘리면 안 된다.
+    """
+    if not user.is_authenticated:
+        return
+
+    if correct and not ReviewState.objects.filter(
+        user=user, target_type=target_type, target_id=target_id, is_wrong=True
+    ).exists():
+        return
+
+    bump_review_states(user, {(target_type, target_id): correct})
 
 
 def _bump_daily(session: QuizSession) -> None:
