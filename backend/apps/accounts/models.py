@@ -19,6 +19,11 @@ import unicodedata
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils import timezone
+
+# 지금 약관·처리방침의 버전. 동의할 때 이 값을 함께 남긴다. 문서 내용이 바뀌면
+# 올린다. 그래야 누가 어느 버전에 동의했는지 나중에 가릴 수 있다.
+TERMS_VERSION = "v1"
 
 # 화면에 그릴 수 있는 아바타. 실제 그림은 프론트가 SVG 로 들고 있고,
 # 여기서는 어느 것을 골랐는지만 저장한다. 이미지 파일을 서버에 두지
@@ -411,6 +416,31 @@ class User(AbstractUser):
     #
     # 사진을 지우면 None 으로 되돌린다.
     avatar_photo_at = models.DateTimeField("사진 올린 시각", null=True, blank=True)
+
+    # 가입할 때 약관·처리방침에 동의한 시각과 그때의 문서 버전.
+    # 비어 있으면 가입 동의를 거치지 않은 계정이다. 이 칸이 생기기 전에
+    # 가입했거나 관리자가 직접 만든 경우다.
+    terms_agreed_at = models.DateTimeField("약관 동의 시각", null=True, blank=True)
+    terms_version = models.CharField("동의한 약관 버전", max_length=20, blank=True)
+
+    # 만 14세 이상임을 확인한 시각. 만 14세 미만은 가입을 받지 않는다.
+    age_confirmed_at = models.DateTimeField("나이 확인 시각", null=True, blank=True)
+
+    # 마지막으로 서비스를 쓴 날. 1년 미접속 계정을 고르는 기준이다.
+    #
+    # last_login 으로 고르지 않는 이유: 토큰 로그인은 그 칸을 찍지 않아서
+    # 관리자를 뺀 회원은 전부 비어 있다. 그 칸으로는 오래 안 쓴 사람을 가릴
+    # 수 없다.
+    #
+    # 시각이 아니라 날짜인 이유: 하루에 한 번만 기록하면 된다. 요청마다
+    # 기록하면 읽기만 하는 요청도 DB 에 쓰기를 일으킨다.
+    #
+    # 기본값이 오늘인 이유: 비워 두면 이 칸이 생기기 전에 가입한 사람을
+    # "오래 안 쓴 사람" 과 구분할 수 없다.
+    last_seen_on = models.DateField("마지막 이용일", default=timezone.localdate)
+
+    # 파기 안내 메일을 보낸 시각. 다시 이용하면 비운다.
+    purge_notice_sent_at = models.DateTimeField("파기 안내 시각", null=True, blank=True)
 
     # 가입일은 AbstractUser 의 date_joined 를 그대로 쓴다. 따로 만들면
     # 컬럼이 둘이 되고, Admin 은 이쪽을 Django 기본 기능은 저쪽을 보게 된다.
