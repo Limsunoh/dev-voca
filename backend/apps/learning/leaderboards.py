@@ -283,8 +283,12 @@ def _best_by_user(rounds: QuerySet) -> QuerySet:
 
     꾸준함과 달리 0점 이하를 안 거른다. 꾸준함은 판을 열기만 해도 행이
     생겨 안 거르면 0일이 꼬리에 쌓이지만, 여기 한 줄은 판을 실제로 끝내야
-    생긴다. 끝까지 푼 사람에게 "당신은 순위표에 없습니다" 라고 하는 쪽이
-    마이너스 점수를 보여주는 것보다 나쁘다.
+    생긴다. 끝까지 푼 사람에게 "당신은 순위표에 없습니다" 라고 하지 않는다.
+
+    다만 음수는 0점으로 보여 준다. 남들 앞에 마이너스 점수를 걸어 두는 것은
+    영어와 에러에 대한 공포를 줄이려는 앱의 목적과 반대다. 바뀌는 것은 표시와
+    순위뿐이고 판 기록의 점수는 그대로다. 음수는 실제 0점과도 동점이 되어
+    first_at 으로 갈린다.
     """
     return (
         rounds.values(
@@ -295,7 +299,7 @@ def _best_by_user(rounds: QuerySet) -> QuerySet:
             "user__avatar_photo_key",
         )
         .annotate(
-            score=Max("score"),
+            score=Greatest(Max("score"), Value(0)),
             entries=Count("id"),
             first_at=Min("finished_at"),
         )
