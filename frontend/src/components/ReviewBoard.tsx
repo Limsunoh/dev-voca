@@ -17,6 +17,7 @@ import { Burst } from "./Burst";
 import { QuestionCard } from "./QuestionCard";
 import { WrongAnswer } from "./WrongAnswer";
 import { Reaction, verdictMs } from "./Reaction";
+import { useFocusNewQuestion } from "./useFocusNewQuestion";
 
 /**
  * 틀린 것 다시 풀기. 화면 셋을 phase 로 오간다.
@@ -687,6 +688,7 @@ function PlayCard({
   ending: boolean;
   onPick: (id: number) => void;
 }) {
+  const cardRef = useFocusNewQuestion(question, error);
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
@@ -765,7 +767,12 @@ function PlayCard({
       </p>
 
       {!ending && (
-        <QuestionCard question={question} busy={busy} onPick={onPick} />
+        <QuestionCard
+          question={question}
+          busy={busy}
+          onPick={onPick}
+          cardRef={cardRef}
+        />
       )}
 
       {error && (

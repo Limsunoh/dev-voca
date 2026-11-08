@@ -75,7 +75,8 @@ export function FilterPanel({
           <span
             className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[length:var(--text-11)]"
             style={{
-              background: "var(--coral)",
+              // --coral 위 흰 글자는 3.37:1 이라 11px 글자에 모자란다.
+              background: "var(--coral-deep)",
               color: "var(--text-on-color)",
               fontWeight: "var(--weight-black)",
             }}
