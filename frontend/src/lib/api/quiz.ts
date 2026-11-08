@@ -131,15 +131,17 @@ export type GradeResult = {
  * 고른 보기를 채점한다.
  *
  * POST 인 이유: 토큰을 URL 에 실으면 브라우저 기록과 서버 로그에 남는다.
- * 데이터를 바꾸지는 않지만 "제출" 이라는 의미상으로도 POST 가 맞다.
+ * "제출" 이라는 의미상으로도 POST 가 맞다.
  */
 export async function gradeAnswer(
   token: string,
   pickedId: number,
   content: QuizContent = "words",
+  auth?: string,
 ): Promise<GradeResult> {
   return request(`${BASE[content]}grade/`, {
     method: "POST",
     body: { token, picked: pickedId },
+    token: auth,
   });
 }
