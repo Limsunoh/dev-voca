@@ -61,6 +61,7 @@ export function signUp(body: {
   password: string;
   display_name?: string;
   terms_agreed: boolean;
+  disclosure_agreed: boolean;
   age_confirmed: boolean;
 }): Promise<AuthResult> {
   return request("/api/accounts/signup/", { method: "POST", body });
@@ -85,6 +86,7 @@ export function logInWithGoogle(body: {
   redirect_uri: string;
   /** 가입 화면에서 동의하고 온 경우에만 싣는다. 새 계정을 만들 때 쓰인다. */
   terms_agreed?: boolean;
+  disclosure_agreed?: boolean;
   age_confirmed?: boolean;
 }): Promise<AuthResult> {
   return request("/api/accounts/google/", { method: "POST", body });

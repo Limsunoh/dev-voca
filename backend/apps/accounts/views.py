@@ -184,6 +184,7 @@ class GoogleLoginView(APIView):
             # 사람의 계정과 이메일이 우리에게 남는다.
             if not (
                 request.data.get("terms_agreed") is True
+                and request.data.get("disclosure_agreed") is True
                 and request.data.get("age_confirmed") is True
             ):
                 return Response(

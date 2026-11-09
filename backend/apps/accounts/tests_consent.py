@@ -1,12 +1,13 @@
 """가입 동의.
 
-약관·처리방침 동의와 만 14세 이상 확인은 이메일 가입과 구글 가입 둘 다
-서버가 검사한다. 화면을 거치지 않고 API 를 바로 불러도 동의 없는 계정은
+약관·처리방침 동의, 순위표 공개·해외 보관 동의, 만 14세 이상 확인은 이메일
+가입과 구글 가입 둘 다 서버가 검사한다. 화면을 거치지 않고 API 를 바로 불러도 동의 없는 계정은
 생기지 않아야 하고, 동의한 계정에는 시각과 문서 버전이 남아야 한다.
 """
 
 from __future__ import annotations
 
+import itertools
 import threading
 import unittest
 from datetime import timedelta
@@ -21,14 +22,18 @@ from django.utils import timezone
 
 from .google import GoogleAuthError
 from .models import TERMS_VERSION
+from .tests import CONSENT, PASSWORD
 
 User = get_user_model()
 
 SIGNUP_URL = "/api/accounts/signup/"
 GOOGLE_URL = "/api/accounts/google/"
 REDIRECT_URI = "http://localhost:3000/api/auth/google/callback"
-PASSWORD = "devvoca-pass-8821"
-CONSENT = {"terms_agreed": True, "age_confirmed": True}
+
+
+def without(key: str) -> dict:
+    """동의 값에서 한 칸만 뺀다."""
+    return {name: value for name, value in CONSENT.items() if name != key}
 
 
 class SignUpConsentTest(TestCase):
@@ -52,13 +57,15 @@ class SignUpConsentTest(TestCase):
 
     def test_missing_or_off_is_rejected_and_makes_no_account(self):
         cases = {
-            "둘 다 없음": ({}, "terms_agreed"),
-            "약관만 없음": ({"age_confirmed": True}, "terms_agreed"),
-            "나이만 없음": ({"terms_agreed": True}, "age_confirmed"),
-            "약관 꺼짐": ({"terms_agreed": False, "age_confirmed": True}, "terms_agreed"),
-            "나이 꺼짐": ({"terms_agreed": True, "age_confirmed": False}, "age_confirmed"),
-            "약관 null": ({"terms_agreed": None, "age_confirmed": True}, "terms_agreed"),
-            "약관 이상한 값": ({"terms_agreed": "글쎄", "age_confirmed": True}, "terms_agreed"),
+            "전부 없음": ({}, "terms_agreed"),
+            "약관만 없음": (without("terms_agreed"), "terms_agreed"),
+            "공개·해외만 없음": (without("disclosure_agreed"), "disclosure_agreed"),
+            "나이만 없음": (without("age_confirmed"), "age_confirmed"),
+            "약관 꺼짐": ({**CONSENT, "terms_agreed": False}, "terms_agreed"),
+            "공개·해외 꺼짐": ({**CONSENT, "disclosure_agreed": False}, "disclosure_agreed"),
+            "나이 꺼짐": ({**CONSENT, "age_confirmed": False}, "age_confirmed"),
+            "약관 null": ({**CONSENT, "terms_agreed": None}, "terms_agreed"),
+            "약관 이상한 값": ({**CONSENT, "terms_agreed": "글쎄"}, "terms_agreed"),
         }
         for name, (body, field) in cases.items():
             with self.subTest(name):
@@ -71,13 +78,14 @@ class SignUpConsentTest(TestCase):
         body = self.signup().json()
 
         self.assertEqual(body["terms_agreed"], ["이용약관과 개인정보 처리방침에 동의해주세요."])
+        self.assertEqual(body["disclosure_agreed"], ["순위표 공개와 해외 보관에 동의해주세요."])
         self.assertEqual(body["age_confirmed"], ["만 14세 이상만 가입할 수 있습니다."])
 
     def test_consent_fields_are_not_echoed_back(self):
         body = self.signup(**CONSENT).json()
 
-        self.assertNotIn("terms_agreed", body["user"])
-        self.assertNotIn("age_confirmed", body["user"])
+        for name in CONSENT:
+            self.assertNotIn(name, body["user"])
         self.assertNotIn("terms_agreed_at", body["user"])
 
 
@@ -101,12 +109,14 @@ class GoogleConsentTest(TestCase):
 
     def test_new_account_without_consent_is_not_created(self):
         cases = {
-            "둘 다 없음": {},
-            "약관만": {"terms_agreed": True},
-            "나이만": {"age_confirmed": True},
-            "약관 꺼짐": {"terms_agreed": False, "age_confirmed": True},
+            "전부 없음": {},
+            "약관 없음": without("terms_agreed"),
+            "공개·해외 없음": without("disclosure_agreed"),
+            "나이 없음": without("age_confirmed"),
+            "약관 꺼짐": {**CONSENT, "terms_agreed": False},
+            "공개·해외 꺼짐": {**CONSENT, "disclosure_agreed": False},
             # 문자열 "true" 는 화면이 보내는 값이 아니다. 참처럼 보여도 받지 않는다.
-            "문자열": {"terms_agreed": "true", "age_confirmed": "true"},
+            "문자열": {name: "true" for name in CONSENT},
         }
         for name, body in cases.items():
             with self.subTest(name), self.patch_google():
@@ -196,9 +206,8 @@ class SignUpConsentEdgeTest(TestCase):
                   None, 2, -1, 1.5, "글쎄", [], [True], {}, {"a": 1}]
         for value in values:
             for body in (
-                {"terms_agreed": value, "age_confirmed": True},
-                {"terms_agreed": True, "age_confirmed": value},
-                {"terms_agreed": value, "age_confirmed": value},
+                *({**CONSENT, name: value} for name in CONSENT),
+                {name: value for name in CONSENT},
             ):
                 with self.subTest(body=body):
                     res = self.signup(**body)
@@ -212,6 +221,7 @@ class SignUpConsentEdgeTest(TestCase):
 
         self.assertEqual(res.status_code, 400)
         self.assertEqual(res.json()["terms_agreed"], ["이용약관과 개인정보 처리방침에 동의해주세요."])
+        self.assertEqual(res.json()["disclosure_agreed"], ["순위표 공개와 해외 보관에 동의해주세요."])
         self.assertEqual(res.json()["age_confirmed"], ["만 14세 이상만 가입할 수 있습니다."])
         self.assertFalse(User.objects.filter(email="a@example.com").exists())
 
@@ -281,10 +291,7 @@ class GoogleConsentEdgeTest(TestCase):
     def test_only_the_literal_true_counts_for_a_new_account(self):
         values = [None, False, 0, 1, 2, "", "1", "on", "yes", "True", "true", [], [True], {}, {"a": 1}]
         for value in values:
-            for body in (
-                {"terms_agreed": value, "age_confirmed": True},
-                {"terms_agreed": True, "age_confirmed": value},
-            ):
+            for body in ({**CONSENT, name: value} for name in CONSENT):
                 with self.subTest(body=body), self.patch_google():
                     res = self.google(**body)
 
@@ -294,7 +301,7 @@ class GoogleConsentEdgeTest(TestCase):
 
     def test_form_encoded_consent_is_not_consent(self):
         """폼 인코딩은 값이 문자열로 온다. 화면이 보내는 모양이 아니다."""
-        body = {"code": "c", "redirect_uri": REDIRECT_URI, "terms_agreed": "true", "age_confirmed": "true"}
+        body = {"code": "c", "redirect_uri": REDIRECT_URI, **{name: "true" for name in CONSENT}}
 
         with self.patch_google():
             res = self.client.post(GOOGLE_URL, body)
@@ -389,6 +396,75 @@ class GoogleConsentEdgeTest(TestCase):
         user = User.objects.get(email="new@example.com")
         self.assertEqual(user.terms_agreed_at, first)
         self.assertEqual(user.terms_version, "v0")
+
+
+class ConsentAllCombinationsTest(TestCase):
+    """세 칸의 켜고 끈 조합 여덟 가지. 셋 다 켠 경우만 계정이 생긴다."""
+
+    KEYS = ("terms_agreed", "disclosure_agreed", "age_confirmed")
+
+    def setUp(self):
+        cache.clear()
+
+    def combinations(self):
+        return list(itertools.product((True, False), repeat=3))
+
+    def test_email_signup_refuses_every_combination_but_all_on(self):
+        for index, values in enumerate(self.combinations()):
+            email = f"e{index}@example.com"
+            with self.subTest(values=values):
+                res = self.client.post(
+                    SIGNUP_URL,
+                    {"email": email, "password": PASSWORD, **dict(zip(self.KEYS, values))},
+                    content_type="application/json",
+                )
+                if all(values):
+                    self.assertEqual(res.status_code, 201, res.content)
+                    self.assertEqual(User.objects.get(email=email).terms_version, TERMS_VERSION)
+                else:
+                    self.assertEqual(res.status_code, 400, res.content)
+                    for key, value in zip(self.KEYS, values):
+                        (self.assertNotIn if value else self.assertIn)(key, res.json())
+                    self.assertFalse(User.objects.filter(email=email).exists())
+
+    def test_google_signup_refuses_every_combination_but_all_on(self):
+        for index, values in enumerate(self.combinations()):
+            email = f"g{index}@example.com"
+            with self.subTest(values=values), mock.patch(
+                "apps.accounts.views.fetch_google_user",
+                return_value={"email": email, "name": f"구글{index}", "picture": ""},
+            ):
+                res = self.client.post(
+                    GOOGLE_URL,
+                    {
+                        "code": "구글이-준-코드",
+                        "redirect_uri": REDIRECT_URI,
+                        **dict(zip(self.KEYS, values)),
+                    },
+                    content_type="application/json",
+                )
+                if all(values):
+                    self.assertEqual(res.status_code, 201, res.content)
+                    self.assertEqual(User.objects.get(email=email).terms_version, TERMS_VERSION)
+                else:
+                    self.assertEqual(res.status_code, 400)
+                    self.assertEqual(res.json(), {"code": "consent_required"})
+                    self.assertFalse(User.objects.filter(email=email).exists())
+
+    def test_form_encoded_signup_without_disclosure_makes_no_account(self):
+        res = self.client.post(
+            SIGNUP_URL,
+            {
+                "email": "form@example.com",
+                "password": PASSWORD,
+                "terms_agreed": "on",
+                "age_confirmed": "on",
+            },
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("disclosure_agreed", res.json())
+        self.assertFalse(User.objects.filter(email="form@example.com").exists())
 
 
 class _KeepsCacheTable:
