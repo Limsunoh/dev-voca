@@ -34,10 +34,15 @@ export function TabBar() {
   //
   // /start 도 같다. 앱을 처음 열었을 때 "누구로 시작할지" 를 묻는
   // 화면이라, 고르기 전에 이동 수단이 보이면 그냥 빠져나갈 수 있다.
+  //
+  // /privacy, /terms 는 가입 화면에서 새 탭으로 열리는 읽을거리다. 긴 글의
+  // 마지막 줄을 탭바가 가리지 않게 하고, 나가는 길은 문서 맨 위 링크로 둔다.
   if (
     pathname === "/login" ||
     pathname === "/signup" ||
-    pathname === "/start"
+    pathname === "/start" ||
+    pathname === "/privacy" ||
+    pathname === "/terms"
   ) {
     return null;
   }
