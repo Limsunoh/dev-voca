@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -11,7 +11,7 @@ import {
   useConsent,
 } from "@/app/(auth)/ConsentChecks";
 import type { FormState } from "@/app/(auth)/actions";
-import { continueAsGuestAction } from "@/app/start/actions";
+import { ConsentSheet } from "@/app/(auth)/ConsentSheet";
 import { useFocusOnError } from "@/components/useFocusOnError";
 
 /**
@@ -116,6 +116,7 @@ export function AuthForm({
   const copy = COPY[mode];
   const isSignup = mode === "signup";
   const consent = useConsent();
+  const [guestAsked, setGuestAsked] = useState(false);
 
   const googleHref = isSignup
     ? googleConsentHref(next)
@@ -343,16 +344,14 @@ export function AuthForm({
           그래서 여기에 나가는 문이 없으면 막다른 곳이 된다. 앱 셸로 바꾸며
           화면 맨 위 devvoca 로고가 없어졌으므로, 가입 없이 둘러보려던 사람이
           갇히지 않게 한 줄 남긴다. */}
-      {/* 링크가 아니라 폼 버튼이다. 시작 화면과 같은 action 을 불러 게스트
-          표시를 남기고 곧장 홈으로 간다. 홈(/)으로 가는 링크면 홈이
-          "로그인도 안 했고 게스트도 안 고른 사람" 을 시작 화면으로 돌려보내,
-          거기서 "게스트로 둘러보기" 를 한 번 더 눌러야 한다.
-
-          링크(GET)로 두지 않는 이유는 action 주석에 있다. GET 이 상태를
-          바꾸면 브라우저가 미리 불러오기만 해도 게스트 선택이 굳는다. */}
-      <form action={continueAsGuestAction} className="mt-2 text-center text-sm">
+      {/* 링크가 아니라 시트를 여는 버튼이다. 시작 화면과 같은 두 항목을 묻고
+          거기서 곧장 홈으로 간다. 홈(/)으로 가는 링크면 홈이 "로그인도 안 했고
+          게스트도 안 고른 사람" 을 시작 화면으로 돌려보내, 거기서 "게스트로
+          둘러보기" 를 한 번 더 눌러야 한다. */}
+      <p className="mt-2 text-center text-sm">
         <button
-          type="submit"
+          type="button"
+          onClick={() => setGuestAsked(true)}
           className="inline-flex cursor-pointer items-center px-2 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           // 링크처럼 보이게 둔다. 밑줄은 늘 켠다 - 폰에는 hover 가 없어서
           // hover 에만 걸면 회색 글자 한 줄로만 보인다. 버튼은 기본 커서가
@@ -370,7 +369,11 @@ export function AuthForm({
         >
           로그인 없이 둘러보기
         </button>
-      </form>
+      </p>
+      <ConsentSheet
+        choice={guestAsked ? "guest" : null}
+        onClose={() => setGuestAsked(false)}
+      />
     </div>
   );
 }
