@@ -36,6 +36,8 @@ export type WordListItem = {
    */
   reading: string;
   meaning: string;
+  /** 검색용 한글 표기("커밋, 커미트"). 화면에 그리지 않고 검색어 대조에만 쓴다. */
+  aliases?: string;
   difficulty: number;
   difficulty_label: string;
   /** 영어 코드(devops 등). 필터 링크를 만들 때만 쓴다. */

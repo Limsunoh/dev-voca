@@ -135,6 +135,13 @@ class Word(LearningItem):
     # 사람이 Admin 에서 직접 적은 것은 True 로 두면 된다.
     reading_reviewed = models.BooleanField("발음 검수됨", default=False)
     meaning = models.CharField("한글 뜻", max_length=200)
+    # 검색에만 쓴다. 뜻 칸에 넣으면 문제의 보기와 카드에 그대로 나간다.
+    aliases = models.CharField(
+        "한글 표기",
+        max_length=200,
+        blank=True,
+        help_text="한국어로 읽고 쓰는 표기를 쉼표로 잇습니다. 예: 커밋, 커미트. 검색에만 씁니다.",
+    )
     description = models.TextField("설명", blank=True)
     example = models.TextField("예문", blank=True)
     example_translation = models.TextField("예문 해석", blank=True)

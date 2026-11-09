@@ -25,14 +25,14 @@ class WordAdmin(admin.ModelAdmin):
         "is_exam",
         "exam_subject",
     )
-    search_fields = ("term", "meaning", "description")
+    search_fields = ("term", "meaning", "aliases", "description")
     list_editable = ("is_reviewed", "reading_reviewed")
     readonly_fields = ("created_at", "updated_at")
     # 발음을 별도 묶음으로 둔다. fieldsets 를 명시했으므로 여기 없는 필드는
     # 폼에 나오지 않는다. 칸을 만들고 이 목록에 안 넣으면 관리자가 발음을
     # 검수할 수 없어 화면에도 안 나온다.
     fieldsets = (
-        (None, {"fields": ("term", "pronunciation", "meaning", "description")}),
+        (None, {"fields": ("term", "pronunciation", "meaning", "aliases", "description")}),
         (
             "발음",
             {

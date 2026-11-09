@@ -130,6 +130,9 @@ class WordListSerializer(serializers.ModelSerializer):
             "pronunciation",
             "reading",
             "meaning",
+            # 화면에 그리지 않는다. 표기로 찾은 카드에 "설명에 검색어가 있습니다" 가
+            # 붙지 않도록 프론트가 검색어와 대조하는 데만 쓴다.
+            "aliases",
             "difficulty",
             "difficulty_label",
             "category",
