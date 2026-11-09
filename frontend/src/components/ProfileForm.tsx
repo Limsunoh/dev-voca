@@ -397,13 +397,13 @@ export function ProfileForm({
           onChange={(event) => setName(event.target.value)}
           aria-describedby="display_name-hint"
           // AuthForm 과 같은 값이다. 카드(흰색) 안이라 --surface-field 가
-          // 흰 바탕에서도 한 톤 낮아 칸이 드러난다.
+          // 흰 바탕에서도 한 톤 낮아 칸이 드러나고, 테두리가 경계를 3:1 이상으로 보이게 한다.
           className="mt-2 w-full rounded-[var(--radius-xl)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={{
             minHeight: "var(--hit-floor)",
             background: "var(--surface-field)",
             color: "var(--foreground)",
-            border: 0,
+            border: "1px solid var(--text-muted)",
             boxShadow: "var(--lift-card)",
           }}
         />
