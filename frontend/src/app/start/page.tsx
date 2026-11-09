@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { continueAsGuestAction } from "@/app/start/actions";
-import { StartGoogle } from "@/app/start/StartGoogle";
+import { StartChoices } from "@/app/start/StartChoices";
 import { getCurrentUser, isGuestChosen } from "@/lib/session";
 
 export const metadata: Metadata = {
@@ -93,27 +92,7 @@ export default async function StartPage({
       </div>
 
       <div className="rise flex flex-col gap-3 [animation-delay:240ms]">
-        {/* 구글을 먼저 둔다. 점수와 순위가 남는 쪽이 본래 모습이다. */}
-        <StartGoogle />
-
-        <form action={continueAsGuestAction}>
-          <button
-            type="submit"
-            className="dv-btn flex w-full items-center justify-center rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            style={
-              {
-                minHeight: "var(--hit-min)",
-                background: "var(--paper)",
-                color: "var(--foreground)",
-                border: 0,
-                "--lift": "var(--lift-button-paper)",
-                fontWeight: "var(--weight-bold)",
-              } as React.CSSProperties
-            }
-          >
-            게스트로 둘러보기
-          </button>
-        </form>
+        <StartChoices />
 
         {/* 로그인은 접어둔다. 앱에서 쓸 주된 길이 아니고, 셋을 나란히 두면
               무엇을 고를지 한 박자 늦어진다. 구글로 가입한 기존 회원도 이
