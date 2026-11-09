@@ -3,11 +3,10 @@
  *
  * 실행: cd frontend && npm test
  *
- * 검색 중에는 섞지 않아 백엔드 기본 순서(term)가 곧 ABC순이다. 그래서 검색
- * 중에는 정렬 줄 맨 앞 칩을 "ABC순" 이라 부르고 ABC순 칩은 뺀다. 검색과
- * sort=abc 가 같이 오면 맨 앞 칩이 켜지고 필터 배지는 정렬을 세지 않는다.
- * 검색 중의 맨 앞 칩은 정렬을 끄지 않고 sort=abc 를 가리킨다.
- * 그래도 주소의 sort=abc 는 필터 칩·페이지 넘기기·되돌아올 주소가 들고
+ * 검색 중에는 백엔드가 제목이 맞는 것부터 놓으므로(views.py 의
+ * _rank_by_search) 맨 앞 칩은 "관련순" 이고 sort 를 끈다. ABC순은 검색 중에도
+ * 보통 칩이다. 검색과 sort=abc 가 같이 오면 ABC순 칩이 켜지고 필터 배지도
+ * 정렬을 센다. 주소의 sort=abc 는 필터 칩·페이지 넘기기·되돌아올 주소가 들고
  * 다닌다. 검색어를 지우면 ABC순으로 돌아가야 해서다.
  *
  * 보는 것: sort 값(없음/easy/abc/모르는 값/배열) x 검색 유무 x 다른 조건에서
@@ -192,6 +191,15 @@ const SORTS: [string | string[] | undefined, "easy" | "abc" | undefined][] = [
 
 const ORDERING = { easy: "difficulty,term", abc: "term" } as const;
 
+const WORD_CHIPS = ["쉬운 것부터", "어려운 것부터", "최근 추가순", "ABC순"];
+const SENTENCE_CHIPS = ["쉬운 것부터", "어려운 것부터", "최근 추가순"];
+const CHIP_VALUE: Record<string, string> = {
+  "쉬운 것부터": "easy",
+  "어려운 것부터": "hard",
+  "최근 추가순": "new",
+  ABC순: "abc",
+};
+
 const OTHERS: Params[] = [
   {},
   { category: "git" },
@@ -291,11 +299,8 @@ describe("/learn/words ABC순 - 정렬 줄", () => {
           const { sortRow } = await screen(WordsPage, p);
           const texts = sortRow.map((c) => c.text);
 
-          // 칩 목록. 검색 중에는 맨 앞이 ABC순이고 ABC순 칩은 없다.
-          assert.deepEqual(
-            texts,
-            search ? ["ABC순", "쉬운 것부터"] : ["섞어서", "쉬운 것부터", "ABC순"],
-          );
+          // 칩 목록. 검색 중에는 맨 앞이 관련순이고 나머지는 그대로다.
+          assert.deepEqual(texts, [search ? "관련순" : "섞어서", ...WORD_CHIPS]);
           assert.equal(new Set(texts).size, texts.length, "같은 이름 칩");
           const arias = sortRow.map((c) => c.aria);
           assert.equal(new Set(arias).size, arias.length, "같은 aria-label");
@@ -304,9 +309,9 @@ describe("/learn/words ABC순 - 정렬 줄", () => {
           const on = sortRow.filter((c) => c.active);
           assert.equal(on.length, 1, JSON.stringify(sortRow));
           const expected =
-            meant === "easy" ? "쉬운 것부터" : meant === "abc" ? "ABC순" : search ? "ABC순" : "섞어서";
+            meant === "easy" ? "쉬운 것부터" : meant === "abc" ? "ABC순" : search ? "관련순" : "섞어서";
           assert.equal(on[0].text, expected);
-          if (search && meant !== "easy") assert.equal(on[0], sortRow[0]);
+          if (search && !meant) assert.equal(on[0], sortRow[0]);
 
           for (const [i, chip] of sortRow.entries()) {
             const q = query(chip.href);
@@ -316,20 +321,13 @@ describe("/learn/words ABC순 - 정렬 줄", () => {
             for (const [k, v] of Object.entries(others)) {
               assert.equal(q.get(k), v, `${k} ${chip.href}`);
             }
-            // 검색 중의 맨 앞 칩은 이름대로 ABC순을 가리킨다(끄지 않는다).
-            // 끄면 검색어를 비운 뒤 ABC순이 아니라 섞인 목록으로 간다.
-            const abcWhileSearching = Boolean(search) && i === 0;
-            const turnsOff = !abcWhileSearching && (i === 0 || chip.active);
-            if (abcWhileSearching) {
-              assert.equal(q.get("sort"), "abc", chip.href);
-              assert.equal(q.get("shuffle"), null, chip.href);
-            } else if (turnsOff) {
+            // 맨 앞 칩과 켜진 칩은 정렬을 끈다. 검색 중의 맨 앞 칩도 같다.
+            if (i === 0 || chip.active) {
               assert.equal(q.get("sort"), null, `끄는 링크 ${chip.href}`);
               // 정렬을 끄면 검색 중이 아닐 때만 섞인 목록으로 가서 시드를 싣는다.
               assert.equal(Boolean(q.get("shuffle")), !search, chip.href);
             } else {
-              const value = chip.text === "ABC순" ? "abc" : "easy";
-              assert.equal(q.get("sort"), value, chip.href);
+              assert.equal(q.get("sort"), CHIP_VALUE[chip.text], chip.href);
               assert.equal(q.get("shuffle"), null, chip.href);
             }
           }
@@ -380,8 +378,12 @@ describe("/learn/words ABC순 - 필터 칩·페이지 넘기기·카드", () => 
         }
       }
 
+      // 대역이 count=99, 한 쪽 1개로 답해 "끝" 도 그려진다.
       const pages = s.nav("페이지 이동");
-      assert.equal(pages.length, 2);
+      assert.deepEqual(
+        pages.map((l) => l.text),
+        ["이전", "다음", "끝"],
+      );
       for (const link of pages) {
         assert.equal(query(link.href).get("sort"), "abc", link.href);
         assert.equal(query(link.href).get("shuffle"), null, link.href);
@@ -416,6 +418,7 @@ describe("/learn/words ABC순 - 필터 칩·페이지 넘기기·카드", () => 
       [
         [null, "abc"],
         ["3", "abc"],
+        ["99", "abc"],
       ],
     );
   });
@@ -431,9 +434,8 @@ describe("/learn/words ABC순 - 필터 배지와 검색창 seed", () => {
         const p = params(sort, search, others);
         it(`${JSON.stringify(p)}`, async () => {
           const { badge, tree } = await screen(WordsPage, p);
-          // 검색 중의 ABC순은 기본 순서와 같아 세지 않는다.
-          const sortCounts = meant === "easy" || (meant === "abc" && !search);
-          assert.equal(badge, filterCount(others) + (sortCounts ? 1 : 0));
+          // 고른 정렬은 검색 중에도 센다. 관련순과 다른 순서이기 때문이다.
+          assert.equal(badge, filterCount(others) + (meant ? 1 : 0));
 
           // 정렬 중이면 검색어를 지워도 섞지 않으므로 seed 가 없다.
           // 검색 + ABC순도 정렬 중이다. 지우면 ?sort=abc 로 가 ABC 순서다.
@@ -465,19 +467,19 @@ describe("/learn/sentences 는 ABC순과 무관하다", () => {
   });
 
   for (const sort of [undefined, "abc", "easy"]) {
-    it(`검색 + sort=${sort ?? "없음"}: 칩은 기본순·쉬운 것부터이고 ordering 은 ${sort === "easy" ? "difficulty,id" : "없음"}`, async () => {
+    it(`검색 + sort=${sort ?? "없음"}: 칩은 관련순과 정렬 셋이고 ordering 은 ${sort === "easy" ? "difficulty,id" : "없음"}`, async () => {
       const s = await screen(SentencesPage, {
         search: "git",
         ...(sort ? { sort } : {}),
       });
       assert.deepEqual(
         s.sortRow.map((c) => c.text),
-        ["기본순", "쉬운 것부터"],
+        ["관련순", ...SENTENCE_CHIPS],
       );
       assert.equal(s.sortRow.filter((c) => c.active).length, 1);
       assert.equal(
         s.sortRow.find((c) => c.active)?.text,
-        sort === "easy" ? "쉬운 것부터" : "기본순",
+        sort === "easy" ? "쉬운 것부터" : "관련순",
       );
       assert.equal(s.badge, sort === "easy" ? 1 : 0);
       assert.equal(
@@ -491,11 +493,11 @@ describe("/learn/sentences 는 ABC순과 무관하다", () => {
     });
   }
 
-  it("검색 없이 섞어서·쉬운 것부터 두 칩이다", async () => {
+  it("검색 없이 섞어서와 정렬 셋이다", async () => {
     const s = await screen(SentencesPage, { shuffle: "s1" });
     assert.deepEqual(
       s.sortRow.map((c) => c.text),
-      ["섞어서", "쉬운 것부터"],
+      ["섞어서", ...SENTENCE_CHIPS],
     );
   });
 });

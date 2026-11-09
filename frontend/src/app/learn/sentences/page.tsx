@@ -1,13 +1,13 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { ChoiceFilter } from "@/components/ChoiceFilter";
+import { ClearFiltersLink } from "@/components/ClearFiltersLink";
 import { FilterPanel } from "@/components/FilterPanel";
 import { LearnHeader } from "@/components/LearnHeader";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
-import { LearningCard } from "@/components/LearningCard";
+import { LearningCard, matchVisible } from "@/components/LearningCard";
 import { Pagination } from "@/components/Pagination";
 import { SearchInput } from "@/components/SearchInput";
 import { ApiError, newShuffleSeed } from "@/lib/api/client";
@@ -85,6 +85,12 @@ export default async function SentencesPage({ searchParams }: PageProps) {
     sort: sort?.value,
     shuffle,
   };
+
+  // 쪽 번호 정규화. 이유는 learn/words/page.tsx 참고.
+  const rawPage = first(params.page);
+  if (rawPage !== undefined && rawPage !== page) {
+    redirect(listUrl(routes.sentences, filters, currentPage));
+  }
 
   if (!search && !shuffle && !sort) {
     redirect(
@@ -172,9 +178,14 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           }
         >
           {badRequest
-            ? "검색 조건이 올바르지 않습니다. 위에서 분류를 다시 골라보세요."
+            ? "검색 조건이 올바르지 않습니다. 조건을 지우고 다시 골라보세요."
             : `문장을 불러오지 못했습니다. ${error.message}`}
         </p>
+        {badRequest && (
+          <ClearFiltersLink
+            href={listUrl(routes.sentences, { shuffle: newShuffleSeed() })}
+          />
+        )}
       </main>
     );
   }
@@ -247,15 +258,13 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           extra={{ kind, sort: sort?.value, shuffle: chipSeed }}
         />
 
-        {/* 검색 중에는 섞지 않아 백엔드 기본 순서(SentenceViewSet 의
-            ordering = id)로 온다. 넣은 순서라 따로 부를 이름이 없어
-            "기본순" 이라 한다. 단어는 기본 순서가 ABC순이라 이름이 다르다
-            (learn/words/page.tsx 의 같은 자리). */}
+        {/* 검색 중에는 섞지 않고 본문이 맞는 것부터 나온다(views.py 의
+            _rank_by_search). */}
         <ChoiceFilter
           label="정렬"
           paramName="sort"
           options={SENTENCE_SORTS}
-          allLabel={search ? "기본순" : "섞어서"}
+          allLabel={search ? "관련순" : "섞어서"}
           basePath={routes.sentences}
           selected={sort?.value}
           keep={{ search, category, kind, difficulty }}
@@ -272,7 +281,11 @@ export default async function SentencesPage({ searchParams }: PageProps) {
           fontWeight: "var(--weight-bold)",
         }}
       >
-        {search ? `"${search}" 검색 결과 ` : "전체 "}
+        {search
+          ? `"${search}" 검색 결과 `
+          : category || kind || difficulty
+            ? "조건에 맞는 문장 "
+            : "전체 "}
         {data.count}개
       </p>
 
@@ -294,22 +307,10 @@ export default async function SentencesPage({ searchParams }: PageProps) {
             <>
               <p>조건에 맞는 문장이 없습니다.</p>
               {/* 접힌 필터를 가리키지 않는다. 이유는 learn/words/page.tsx 참고. */}
-              <Link
+              <ClearFiltersLink
                 // 새 시드를 싣는 이유는 learn/words/page.tsx 의 같은 자리.
                 href={listUrl(routes.sentences, { shuffle: newShuffleSeed() })}
-                className="dv-btn mt-4 inline-flex min-h-11 items-center rounded-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                style={
-                  {
-                    background: "var(--paper)",
-                    color: "var(--foreground)",
-                    fontSize: "var(--text-sm)",
-                    fontWeight: "var(--weight-black)",
-                    "--lift": "var(--lift-button-paper)",
-                  } as React.CSSProperties
-                }
-              >
-                조건 지우기
-              </Link>
+              />
             </>
           ) : (
             <p>아직 등록된 문장이 없습니다.</p>
@@ -325,8 +326,20 @@ export default async function SentencesPage({ searchParams }: PageProps) {
                   currentListUrl,
                 )}
                 title={sentence.text}
-                reading={sentence.reading || undefined}
+                // 한글 발음은 목록에 싣지 않는다. 문장 카드가 길어 한 화면에
+                // 두세 장밖에 안 보이고, 발음은 상세에 있다.
                 subtitle={sentence.translation}
+                note={
+                  search &&
+                  !matchVisible(
+                    search,
+                    sentence.text,
+                    sentence.translation,
+                    sentence.context,
+                  )
+                    ? "설명에 검색어가 있습니다"
+                    : undefined
+                }
                 badge={
                   <DifficultyBadge
                     level={sentence.difficulty}
@@ -343,7 +356,9 @@ export default async function SentencesPage({ searchParams }: PageProps) {
                         단어 카드도 분류를 보여주므로 두 목록이 어긋나지 않는다. */}
                     <CategoryChip label={sentence.category_label} />
                     {sentence.context && (
+                      // 칩 줄 옆에 두면 셋째 칩처럼 보이다 만다. 줄을 따로 쓴다.
                       <span
+                        className="basis-full"
                         style={{
                           fontSize: "var(--text-sm)",
                           color: "var(--text-muted)",
@@ -369,6 +384,8 @@ export default async function SentencesPage({ searchParams }: PageProps) {
         currentPage={currentPage}
         hasPrevious={Boolean(data.previous)}
         hasNext={Boolean(data.next)}
+        count={data.count}
+        pageLength={data.results.length}
       />
     </main>
   );
