@@ -22,13 +22,24 @@ from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase, o
 from rest_framework.authtoken.models import Token
 
 from .email_change import _SALT, email_mark, make_token, read_token
-from .tests import EMAIL_CHANGE_CONFIRM_URL, EMAIL_CHANGE_URL, PASSWORD
+from .tests import (
+    EMAIL_CHANGE_CONFIRM_URL,
+    EMAIL_CHANGE_URL,
+    GOOGLE_URL,
+    LOGIN_URL,
+    LOGOUT_URL,
+    ME_URL,
+    PASSWORD,
+    REDIRECT_URI,
+)
+from .tests_password import PASSWORD_URL
 
 User = get_user_model()
 
 OLD = "owner.name@example.com"
 NEW = "next@example.com"
 THIRD = "third@example.com"
+LOGIN = "login-token-only-for-this-test"
 
 
 def decoded_payload(token: str) -> str:
@@ -109,7 +120,7 @@ class TokenPayloadTest(EmailChangeFlowMixin, TestCase):
         """그냥 해시면 흔한 주소를 넣어 보는 것만으로 알아낼 수 있다."""
         mark = json.loads(decoded_payload(self.issued_token()))["o"]
 
-        self.assertEqual(mark, email_mark(OLD))
+        self.assertEqual(mark, email_mark(OLD, self.token.key))
         self.assertRegex(mark, r"^[0-9a-f]{64}$")
         self.assertNotIn(
             mark,
@@ -123,22 +134,31 @@ class TokenPayloadTest(EmailChangeFlowMixin, TestCase):
 
     def test_대조값은_서버_키가_달라지면_달라진다(self):
         with override_settings(SECRET_KEY="another-key-only-for-this-test"):
-            other = email_mark(OLD)
+            other = email_mark(OLD, LOGIN)
 
-        self.assertNotEqual(email_mark(OLD), other)
+        self.assertNotEqual(email_mark(OLD, LOGIN), other)
 
 
 class EmailMarkTest(SimpleTestCase):
     def test_대소문자와_무관하다(self):
-        self.assertEqual(email_mark("A.B@Example.COM"), email_mark("a.b@example.com"))
+        self.assertEqual(email_mark("A.B@Example.COM", LOGIN), email_mark("a.b@example.com", LOGIN))
 
     def test_주소가_다르면_값이_다르다(self):
-        self.assertNotEqual(email_mark("a@example.com"), email_mark("b@example.com"))
+        self.assertNotEqual(email_mark("a@example.com", LOGIN), email_mark("b@example.com", LOGIN))
+
+    def test_로그인_토큰이_다르면_값이_다르다(self):
+        self.assertNotEqual(email_mark(OLD, "first"), email_mark(OLD, "second"))
+
+    def test_토큰이_없을_때의_값은_있을_때와_다르다(self):
+        """같으면 로그아웃으로 토큰이 사라진 뒤에 묵은 링크가 다시 맞아떨어진다."""
+        self.assertNotEqual(email_mark(OLD, ""), email_mark(OLD, LOGIN))
 
     def test_읽을_때_세_값이_나온다(self):
-        token = make_token(user_id=7, current_email=OLD, new_email="N@Example.com")
+        token = make_token(
+            user_id=7, current_email=OLD, new_email="N@Example.com", login_token=LOGIN
+        )
 
-        self.assertEqual(read_token(token), (7, email_mark(OLD), "n@example.com"))
+        self.assertEqual(read_token(token), (7, email_mark(OLD, LOGIN), "n@example.com"))
 
 
 class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
@@ -199,7 +219,12 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
         self.assertEqual(self.confirm(token).status_code, 200)
 
     def test_대문자_주소로_만든_토큰도_같은_대조값이다(self):
-        token = make_token(user_id=self.user.pk, current_email=OLD.upper(), new_email=NEW)
+        token = make_token(
+            user_id=self.user.pk,
+            current_email=OLD.upper(),
+            new_email=NEW,
+            login_token=self.token.key,
+        )
 
         self.assertEqual(self.confirm(token).status_code, 200)
 
@@ -210,7 +235,7 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
         self.assert_rejected(res)
 
     def test_모양이_다른_토큰은_500_없이_거절된다(self):
-        mark = email_mark(OLD)
+        mark = email_mark(OLD, self.token.key)
         pk = self.user.pk
         cases = {
             "키 없음": {},
@@ -237,7 +262,9 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
 
     def test_토큰을_고치거나_형식이_틀리면_거절된다(self):
         good = self.issued_token()
-        other_salt = signing.dumps({"u": self.user.pk, "o": email_mark(OLD), "n": NEW}, salt="x")
+        other_salt = signing.dumps(
+            {"u": self.user.pk, "o": email_mark(OLD, self.token.key), "n": NEW}, salt="x"
+        )
         cases = {
             "서명 변조": good[:-2] + ("aa" if not good.endswith("aa") else "bb"),
             "본문 변조": "A" + good[1:],
@@ -266,7 +293,9 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
         """풀어 볼 수 있어도 고치면 서명이 깨진다."""
         rest = self.issued_token().split(":", 1)[1]
         forged = signing.b64_encode(
-            json.dumps({"u": self.user.pk, "o": email_mark(OLD), "n": THIRD}).encode()
+            json.dumps(
+                {"u": self.user.pk, "o": email_mark(OLD, self.token.key), "n": THIRD}
+            ).encode()
         ).decode()
 
         self.assert_rejected(self.confirm(f"{forged}:{rest}"))
@@ -308,9 +337,15 @@ class TokenConfirmRaceTest(TransactionTestCase):
     def setUp(self):
         cache.clear()
         self.user = User.objects.create_user(email=OLD, password=PASSWORD)
+        self.token = Token.objects.create(user=self.user)
 
     def token_for(self, new_email):
-        return make_token(user_id=self.user.pk, current_email=OLD, new_email=new_email)
+        return make_token(
+            user_id=self.user.pk,
+            current_email=OLD,
+            new_email=new_email,
+            login_token=self.token.key,
+        )
 
     def confirm_together(self, *tokens):
         barrier = threading.Barrier(len(tokens))
@@ -352,3 +387,308 @@ class TokenConfirmRaceTest(TransactionTestCase):
         self.user.refresh_from_db()
         self.assertIn(self.user.email, (NEW, THIRD))
         self.assertEqual(Token.objects.filter(user=self.user).count(), 1)
+
+
+class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
+    """변경이 끝나거나 로그인이 바뀌면 그 전에 보낸 링크는 죽는다."""
+
+    def complete(self, link):
+        """링크로 변경을 끝낸다. 변경 뒤에는 로그인 토큰이 새것이 된다."""
+        res = self.confirm(link)
+        self.assertEqual(res.status_code, 200)
+        self.token = Token.objects.get(user=self.user)
+        self.assertEqual(res.json()["token"], self.token.key)
+
+    def round_trip(self):
+        """a -> b -> a 를 끝내고 처음 보낸 a -> b 링크를 돌려준다."""
+        first = self.issued_token(NEW)
+        self.complete(first)
+        self.complete(self.issued_token(OLD))
+        return first
+
+    def me_status(self, key):
+        return self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {key}").status_code
+
+    def login(self):
+        return self.client.post(
+            LOGIN_URL,
+            {"email": OLD, "password": PASSWORD},
+            content_type="application/json",
+        )
+
+    def logout(self):
+        return self.client.post(LOGOUT_URL, HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def test_a_b_뒤_b_a_로_돌아오면_처음_링크는_거절된다(self):
+        """주소만 대조하면 다시 맞아떨어져 링크를 가진 사람이 계정을 옮길 수 있다."""
+        first = self.round_trip()
+
+        self.assert_rejected(self.confirm(first))
+
+    def test_왕복을_두_번_해도_앞선_링크는_모두_거절된다(self):
+        links = []
+        for _ in range(2):
+            links.append(self.issued_token(NEW))
+            self.complete(links[-1])
+            links.append(self.issued_token(OLD))
+            self.complete(links[-1])
+
+        for index, link in enumerate(links):
+            with self.subTest(index):
+                self.assert_rejected(self.confirm(link))
+
+    def test_왕복_뒤에_새로_받은_링크는_통한다(self):
+        """죽여야 할 것은 옛 링크뿐이다. 다시 바꾸는 길까지 막히면 안 된다."""
+        self.round_trip()
+
+        self.assertEqual(self.confirm(self.issued_token(NEW)).status_code, 200)
+
+    def test_거절된_링크는_로그인을_끊지_않는다(self):
+        """옛 링크를 가진 사람이 눌러 볼 때마다 주인이 로그아웃되면 안 된다."""
+        first = self.round_trip()
+
+        self.assert_rejected(self.confirm(first))
+
+        self.assertEqual(Token.objects.get(user=self.user).key, self.token.key)
+        self.assertEqual(self.me_status(self.token.key), 200)
+
+    def test_a_b_와_a_c_를_함께_받아_b_를_쓰면_c_링크는_거절된다(self):
+        to_b = self.issued_token(NEW)
+        to_c = self.issued_token(THIRD)
+
+        self.complete(to_b)
+
+        self.assert_rejected(self.confirm(to_c), NEW)
+
+    def test_a_b_와_a_c_를_함께_받아_c_를_쓰면_b_링크는_거절된다(self):
+        to_b = self.issued_token(NEW)
+        to_c = self.issued_token(THIRD)
+
+        self.complete(to_c)
+
+        self.assert_rejected(self.confirm(to_b), THIRD)
+
+    def test_함께_받은_링크는_주소가_돌아와도_거절된다(self):
+        to_b = self.issued_token(NEW)
+        to_c = self.issued_token(THIRD)
+        self.complete(to_b)
+        self.complete(self.issued_token(OLD))
+
+        self.assert_rejected(self.confirm(to_c))
+        self.assert_rejected(self.confirm(to_b))
+
+    def test_로그아웃하면_대기_중인_링크는_거절된다(self):
+        link = self.issued_token()
+        self.assertEqual(self.logout().status_code, 204)
+
+        self.assert_rejected(self.confirm(link))
+        self.assertFalse(Token.objects.filter(user=self.user).exists())
+
+    def test_로그아웃_뒤_다시_로그인해도_링크는_거절된다(self):
+        """다시 로그인하면 토큰이 새것이다. 메일의 안내와 같은 동작이다."""
+        link = self.issued_token()
+        self.logout()
+        self.assertEqual(self.login().status_code, 200)
+
+        self.assert_rejected(self.confirm(link))
+
+    def test_비밀번호를_바꾸면_대기_중인_링크는_거절된다(self):
+        link = self.issued_token()
+        res = self.client.post(
+            PASSWORD_URL,
+            {"current_password": PASSWORD, "new_password": PASSWORD + "x"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertNotEqual(res.json()["token"], self.token.key)
+
+        self.assert_rejected(self.confirm(link))
+
+    def test_비밀번호_변경에_실패하면_링크는_살아_있다(self):
+        link = self.issued_token()
+        res = self.client.post(
+            PASSWORD_URL,
+            {"current_password": PASSWORD + "x", "new_password": PASSWORD + "y"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(res.status_code, 400)
+
+        self.assertEqual(self.confirm(link).status_code, 200)
+
+    def test_다른_기기에서_로그인해도_링크는_살아_있다(self):
+        """로그인은 같은 토큰을 돌려준다. 이것으로 링크가 죽으면 이유를 알 수 없다."""
+        link = self.issued_token()
+
+        res = self.login()
+
+        self.assertEqual(res.json()["token"], self.token.key)
+        self.assertEqual(self.confirm(link).status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, NEW)
+
+    def test_구글로_다시_로그인해도_링크는_살아_있다(self):
+        link = self.issued_token()
+        info = {"email": OLD, "name": "주인", "picture": "https://lh3.googleusercontent.com/a/new"}
+
+        with mock.patch("apps.accounts.views.fetch_google_user", return_value=info):
+            res = self.client.post(
+                GOOGLE_URL,
+                {"code": "구글이-준-코드", "redirect_uri": REDIRECT_URI},
+                content_type="application/json",
+            )
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["token"], self.token.key)
+        self.assertEqual(self.confirm(link).status_code, 200)
+
+    def test_로그인_없이_다른_기기에서_링크를_열_수_있다(self):
+        """메일은 로그인하지 않은 폰에서 열 수 있다. 토큰 자체가 증거다."""
+        link = self.issued_token()
+
+        res = Client().post(
+            EMAIL_CHANGE_CONFIRM_URL, {"token": link}, content_type="application/json"
+        )
+
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, NEW)
+        self.assertEqual(self.me_status(self.token.key), 401)
+        self.assertEqual(self.me_status(res.json()["token"]), 200)
+
+    def test_메일_본문에_링크가_죽는_경우를_안내한다(self):
+        body, link = self.issue()
+
+        self.assertIn(f"/profile/email/{link}", body)
+        self.assertIn("하루가 지나면", body)
+        self.assertIn("로그아웃하거나 비밀번호를 바꿔도 쓸 수 없게", body)
+        self.assertIn("다시 신청해주세요", body)
+
+
+class SessionUserEmailChangeTest(TestCase):
+    """로그인 토큰이 없는 세션 사용자. 관리자 화면으로만 로그인한 계정이다."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(email=OLD, password=PASSWORD)
+        self.session = Client()
+        self.session.force_login(self.user)
+
+    def request_change(self, new_email=NEW, password=PASSWORD):
+        return self.session.post(
+            EMAIL_CHANGE_URL,
+            {"new_email": new_email, "current_password": password},
+            content_type="application/json",
+        )
+
+    def issued_token(self, new_email=NEW):
+        with mock.patch("apps.accounts.views.send_account_mail") as sent:
+            res = self.request_change(new_email)
+        self.assertEqual(res.status_code, 202)
+        return sent.call_args.kwargs["body"].split("/profile/email/")[1].split()[0]
+
+    def confirm(self, link):
+        return Client().post(
+            EMAIL_CHANGE_CONFIRM_URL, {"token": link}, content_type="application/json"
+        )
+
+    def complete(self, link):
+        self.assertEqual(self.confirm(link).status_code, 200)
+
+    def logout(self):
+        self.assertEqual(self.session.post(LOGOUT_URL).status_code, 204)
+
+    def assert_rejected(self, res, email=OLD):
+        self.assertEqual(res.status_code, 400)
+        self.assertNotIn("token", res.json())
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, email)
+
+    def test_신청하면_로그인_토큰이_만들어지고_링크가_통한다(self):
+        self.assertFalse(Token.objects.filter(user=self.user).exists())
+
+        link = self.issued_token()
+
+        self.assertTrue(Token.objects.filter(user=self.user).exists())
+        self.complete(link)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, NEW)
+
+    def test_신청이_거절되면_토큰을_만들지_않는다(self):
+        with mock.patch("apps.accounts.views.send_account_mail") as sent:
+            res = self.request_change(password=PASSWORD + "x")
+
+        self.assertEqual(res.status_code, 400)
+        sent.assert_not_called()
+        self.assertFalse(Token.objects.filter(user=self.user).exists())
+
+    def test_로그아웃으로_토큰이_없어지면_링크는_거절된다(self):
+        """신청 때 빈 값을 섞었다면 토큰이 없어진 지금 다시 맞아떨어진다."""
+        link = self.issued_token()
+        self.logout()
+        self.assertFalse(Token.objects.filter(user=self.user).exists())
+
+        self.assert_rejected(self.confirm(link))
+
+    def test_a_b_a_뒤에_로그아웃해도_옛_링크는_거절된다(self):
+        first = self.issued_token(NEW)
+        self.complete(first)
+        back = self.issued_token(OLD)
+        self.complete(back)
+        self.logout()
+        self.assertFalse(Token.objects.filter(user=self.user).exists())
+
+        self.assert_rejected(self.confirm(first))
+        self.assert_rejected(self.confirm(back))
+
+
+@unittest.skipUnless(connection.vendor == "postgresql", "행 잠금이 있어야 뜻이 있다")
+class SessionRequestRaceTest(TransactionTestCase):
+    """로그인 토큰이 없는 세션이 동시에 신청할 때."""
+
+    def test_동시에_신청해도_500_없이_토큰은_하나고_링크는_하나만_쓰인다(self):
+        cache.clear()
+        user = User.objects.create_user(email=OLD, password=PASSWORD)
+        clients = [Client(raise_request_exception=False) for _ in range(2)]
+        for client in clients:
+            client.force_login(user)
+        barrier = threading.Barrier(len(clients))
+        statuses = []
+
+        def send(client, new_email):
+            try:
+                barrier.wait(timeout=10)
+                res = client.post(
+                    EMAIL_CHANGE_URL,
+                    {"new_email": new_email, "current_password": PASSWORD},
+                    content_type="application/json",
+                )
+                statuses.append(res.status_code)
+            finally:
+                connections.close_all()
+
+        with mock.patch("apps.accounts.views.send_account_mail") as sent:
+            threads = [
+                threading.Thread(target=send, args=(client, email))
+                for client, email in zip(clients, (NEW, THIRD), strict=True)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=30)
+
+        self.assertEqual(statuses, [202, 202])
+        self.assertEqual(Token.objects.filter(user=user).count(), 1)
+
+        links = [
+            call.kwargs["body"].split("/profile/email/")[1].split()[0]
+            for call in sent.call_args_list
+        ]
+        results = [
+            Client().post(
+                EMAIL_CHANGE_CONFIRM_URL, {"token": link}, content_type="application/json"
+            ).status_code
+            for link in links
+        ]
+        self.assertEqual(results, [200, 400])

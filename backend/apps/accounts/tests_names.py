@@ -18,7 +18,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
@@ -32,6 +32,8 @@ from .models import (
     DISPLAY_NAME_MAX,
     GENERATED_NAME_PREFIX,
     free_display_name,
+    normalize_display_name,
+    shorten_display_name,
 )
 from .tests import (
     CONSENT,
@@ -754,3 +756,302 @@ class DeleteUploadedPhotoTest(TestCase):
                 self.assertEqual(res.status_code, 302)
                 self.assertIn("/login/", res["Location"])
                 self.assertEqual(self.stored(member), before)
+
+
+# 글자로 분류되지만 화면에서는 빈칸으로 보이는 글자들.
+BLANK_LOOKING = {
+    "U+115F": "\u115f",
+    "U+1160": "\u1160",
+    "U+3164": "\u3164",
+    "U+FFA0": "\uffa0",
+    "U+2800": "\u2800",
+}
+NAME_REQUIRED = ["이름을 입력해주세요."]
+NAME_TAKEN = ["이미 쓰고 있는 이름입니다."]
+
+
+class BlankLookingNormalizeTest(SimpleTestCase):
+    """빈칸처럼 보이는 글자를 공백으로 다루는 규칙 자체."""
+
+    def test_빈칸_글자만_있으면_빈_이름이다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                self.assertEqual(normalize_display_name(char), "")
+                self.assertEqual(normalize_display_name(char * 5), "")
+
+    def test_다섯_글자를_섞어도_빈_이름이다(self):
+        self.assertEqual(normalize_display_name("".join(BLANK_LOOKING.values())), "")
+
+    def test_다른_공백이나_숨은_글자와_섞여도_빈_이름이다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                self.assertEqual(normalize_display_name(f" {char}\u200b{char}\u3000"), "")
+
+    def test_앞뒤의_빈칸_글자는_지운다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                self.assertEqual(normalize_display_name(f"{char}홍길동{char}"), "홍길동")
+
+    def test_사이의_빈칸_글자는_공백_한_칸이_된다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                self.assertEqual(normalize_display_name(f"홍{char}길동"), "홍 길동")
+                self.assertEqual(normalize_display_name(f"홍{char}{char} 길동"), "홍 길동")
+                self.assertEqual(normalize_display_name(f"홍{char}\u200b{char}길동"), "홍 길동")
+
+    def test_이웃한_글자와_보통_이름은_건드리지_않는다(self):
+        """범위로 넓게 잡으면 실제로 쓰이는 글자까지 지워진다."""
+        for name in ("홍길동", "a b", "\u115e", "\u1161", "\u3163", "\u3165", "\uffa1", "\u2801"):
+            with self.subTest(ascii(name)):
+                self.assertEqual(normalize_display_name(name), name)
+
+    def test_완성형으로_모으는_동작은_그대로다(self):
+        self.assertEqual(normalize_display_name("\u1112\u1161\u11ab"), "\ud55c")
+
+    def test_12자로_자른_자리에_공백이_남지_않는다(self):
+        """남으면 저장 직전에 값이 달라져 이미 쓰는 이름과 부딪힌다."""
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                self.assertEqual(shorten_display_name("가" * 11 + char + "나나"), "가" * 11)
+
+    def test_빈칸_글자를_먼저_줄인_뒤에_12자를_센다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                self.assertEqual(shorten_display_name(char * 30 + "가" * 12), "가" * 12)
+                self.assertEqual(shorten_display_name("가" * 12 + char + "나"), "가" * 12)
+
+
+class BlankLookingNameRouteTest(TestCase):
+    """빈칸 글자가 가입, 내정보, 구글 경로에서 공백으로 다뤄지는가."""
+
+    def setUp(self):
+        cache.clear()
+        self.member = User.objects.create_user(
+            email="me@example.com", password=PASSWORD, display_name="평범한이름"
+        )
+        self.token = Token.objects.create(user=self.member)
+        self.owner = User.objects.create_user(
+            email="owner@example.com", password=PASSWORD, display_name="주인"
+        )
+
+    def signup(self, name, email="a@example.com"):
+        payload = {"email": email, "password": PASSWORD, "display_name": name, **CONSENT}
+        return self.client.post(SIGNUP_URL, payload, content_type="application/json")
+
+    def patch_me(self, **body):
+        return self.client.patch(
+            ME_URL,
+            body,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+    def google(self, name, email):
+        payload = {"code": "구글이-준-코드", "redirect_uri": REDIRECT_URI, **CONSENT}
+        info = {"email": email, "name": name, "picture": ""}
+        with mock.patch("apps.accounts.views.fetch_google_user", return_value=info):
+            return self.client.post(GOOGLE_URL, payload, content_type="application/json")
+
+    def name_of(self, email):
+        return User.objects.get(email=email).display_name
+
+    def test_가입_빈칸_글자만이면_400_이고_계정이_안_생긴다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                for name in (char, char * 3, f" {char} "):
+                    res = self.signup(name)
+
+                    self.assertEqual(res.status_code, 400)
+                    self.assertEqual(res.json()["display_name"], NAME_REQUIRED)
+                    self.assertFalse(User.objects.filter(email="a@example.com").exists())
+
+    def test_내정보_빈칸_글자만이면_400_이고_이름이_그대로다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                res = self.patch_me(display_name=char)
+
+                self.assertEqual(res.status_code, 400)
+                self.assertEqual(res.json()["display_name"], NAME_REQUIRED)
+                self.member.refresh_from_db()
+                self.assertEqual(self.member.display_name, "평범한이름")
+
+    def test_구글_빈칸_글자만이면_자동_이름으로_가입된다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                email = f"g{index}@example.com"
+
+                res = self.google(char, email)
+
+                self.assertEqual(res.status_code, 201)
+                self.assertTrue(self.name_of(email).startswith(GENERATED_NAME_PREFIX))
+
+    def test_가입_앞뒤의_빈칸_글자는_지워서_저장한다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                email = f"a{index}@example.com"
+
+                res = self.signup(f"{char}새이름{index}{char}", email)
+
+                self.assertEqual(res.status_code, 201)
+                self.assertEqual(self.name_of(email), f"새이름{index}")
+
+    def test_가입_사이의_빈칸_글자는_공백으로_저장한다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                email = f"a{index}@example.com"
+
+                res = self.signup(f"새{char}이름{index}", email)
+
+                self.assertEqual(res.status_code, 201)
+                self.assertEqual(self.name_of(email), f"새 이름{index}")
+
+    def test_가입_앞이나_끝에_붙여도_기존_이름과_중복이다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                for name in (f"주인{char}", f"{char}주인", f"주인{char}{char}", f"{char}주인{char}"):
+                    res = self.signup(name)
+
+                    self.assertEqual(res.status_code, 400)
+                    self.assertEqual(res.json()["display_name"], NAME_TAKEN)
+                    self.assertFalse(User.objects.filter(email="a@example.com").exists())
+
+    def test_가입_대소문자가_달라도_끝에_붙이면_중복이다(self):
+        User.objects.create_user(
+            email="g@example.com", password=PASSWORD, display_name="Gildong"
+        )
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                res = self.signup(f"gILDONG{char}")
+
+                self.assertEqual(res.status_code, 400)
+                self.assertEqual(res.json()["display_name"], NAME_TAKEN)
+
+    def test_가입_사이에_넣으면_띄어_쓴_기존_이름과_중복이다(self):
+        User.objects.create_user(
+            email="h@example.com", password=PASSWORD, display_name="홍 길동"
+        )
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                res = self.signup(f"홍{char}길동")
+
+                self.assertEqual(res.status_code, 400)
+                self.assertEqual(res.json()["display_name"], NAME_TAKEN)
+
+    def test_가입_빈칸_글자를_끼운_금칙어는_막는다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                for name in (f"운영자{char}", f"{char}운영자", f"관{char}리자"):
+                    res = self.signup(name)
+
+                    self.assertEqual(res.status_code, 400)
+                    self.assertEqual(res.json()["display_name"], FORBIDDEN_MESSAGE)
+
+    def test_내정보_끝에_붙여도_남의_이름과_중복이다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                res = self.patch_me(display_name=f"주인{char}")
+
+                self.assertEqual(res.status_code, 400)
+                self.assertEqual(res.json()["display_name"], NAME_TAKEN)
+                self.member.refresh_from_db()
+                self.assertEqual(self.member.display_name, "평범한이름")
+
+    def test_내정보_내_이름_끝에_붙이면_그대로_내_이름이다(self):
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                res = self.patch_me(display_name=f"평범한이름{char}")
+
+                self.assertEqual(res.status_code, 200)
+                self.member.refresh_from_db()
+                self.assertEqual(self.member.display_name, "평범한이름")
+
+    def test_구글_끝에_붙인_이름이_겹치면_번호가_붙는다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                email = f"g{index}@example.com"
+
+                res = self.google(f"주인{char}", email)
+
+                self.assertEqual(res.status_code, 201)
+                self.assertEqual(self.name_of(email), f"주인{index + 2}")
+
+    def test_save_직접_호출_빈칸_글자만이면_자동_이름이다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                user = User.objects.create_user(
+                    email=f"s{index}@example.com", password=PASSWORD, display_name=char
+                )
+
+                self.assertTrue(user.display_name.startswith(GENERATED_NAME_PREFIX))
+
+    def test_save_직접_호출_끝의_빈칸_글자를_지운다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                self.member.display_name = f"고친이름{index}{char}"
+                self.member.save()
+
+                self.member.refresh_from_db()
+                self.assertEqual(self.member.display_name, f"고친이름{index}")
+
+    def test_save_직접_호출_끝에_붙여도_DB_제약에_걸린다(self):
+        """API 를 거치지 않는 경로. 조용히 같은 이름이 두 줄이 되면 안 된다."""
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                self.member.display_name = f"주인{char}"
+
+                with self.assertRaises(IntegrityError), transaction.atomic():
+                    self.member.save()
+
+    def test_save_직접_호출_12자에서_자른_뒤_공백이_없다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                kept = "가" * 11
+                user = User.objects.create_user(
+                    email=f"s{index}@example.com",
+                    password=PASSWORD,
+                    display_name=f"{kept}{char}나나",
+                )
+
+                self.assertEqual(user.display_name, kept)
+                user.delete()
+
+    def test_가입_11자_끝의_빈칸_글자는_길이_안에서_지운다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                email = f"a{index}@example.com"
+                name = chr(ord("가") + index) * 11
+
+                res = self.signup(f"{name}{char}", email)
+
+                self.assertEqual(res.status_code, 201)
+                self.assertEqual(self.name_of(email), name)
+
+    def test_가입_12자에_빈칸_글자를_붙이면_길이로_막힌다(self):
+        """필드의 글자 수 검사가 다듬기 전 값을 본다. 500 없이 계정도 안 생긴다."""
+        for label, char in BLANK_LOOKING.items():
+            with self.subTest(label):
+                res = self.signup("가" * DISPLAY_NAME_MAX + char)
+
+                self.assertEqual(res.status_code, 400)
+                self.assertIn("display_name", res.json())
+                self.assertFalse(User.objects.filter(email="a@example.com").exists())
+
+    def test_구글_12자에서_자른_자리의_빈칸_글자도_남지_않는다(self):
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
+            with self.subTest(label):
+                email = f"g{index}@example.com"
+                name = chr(ord("가") + index) * 11
+
+                res = self.google(f"{name}{char}나나", email)
+
+                self.assertEqual(res.status_code, 201)
+                self.assertEqual(self.name_of(email), name)
+
+    def test_구글_12자_이름에_붙여도_겹치면_번호가_12자_안에_붙는다(self):
+        full = "가" * DISPLAY_NAME_MAX
+        User.objects.create_user(email="f@example.com", password=PASSWORD, display_name=full)
+
+        res = self.google(f"{full}\u3164", "g@example.com")
+
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(self.name_of("g@example.com"), "가" * 11 + "2")
