@@ -130,6 +130,9 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         token: roundToken,
       });
       if (!aliveRef.current) return;
+      // 판 도중 남은 채점 실패 문구를 지운다. 판은 정상으로 닫혔는데 결과 아래에
+      // 오류가 뜨면 점수가 저장되지 않은 것으로 읽힌다.
+      setError("");
       setSummary(done);
       setPhase("done");
     } catch (err) {
@@ -334,7 +337,12 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       setQuestion(answered.question);
     } catch (err) {
       if (!aliveRef.current) return;
-      setError(err instanceof Error ? err.message : "채점하지 못했습니다.");
+      // 판을 닫는 중이면 이 답의 실패는 알리지 않는다. 닫기가 성공한 뒤에 도착하면
+      // 정상 결과 아래에 오류가 떠서 점수가 저장되지 않은 것으로 읽힌다. 닫기가
+      // 실패하면 그쪽이 자기 문구를 넣는다.
+      if (!closingRef.current) {
+        setError(err instanceof Error ? err.message : "채점하지 못했습니다.");
+      }
 
       // 여기서도 마감을 본다. 답이 실패한 사이 90초가 끝났으면,
       // 그냥 두면 타이머가 갱신 안 된 옛 토큰으로 판을 닫으려 하고
@@ -914,6 +922,22 @@ function RoundResultCard({
       ) : (
         <p className="mt-3" style={{ color: "var(--text-body)" }}>
           {error || "결과를 불러오지 못했습니다."}
+        </p>
+      )}
+
+      {/* 결과가 있는 상태에서 "한 판 더" 가 실패한 경우다. 여기 안 그리면
+          버튼만 되돌아와서 아무 일도 안 일어난 것처럼 보인다. 결과가 없을
+          때는 위 갈래가 같은 문구를 이미 그린다. */}
+      {summary && error && (
+        <p
+          role="alert"
+          className="mt-4 text-sm"
+          style={{
+            color: "var(--coral-deep)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
+          {error}
         </p>
       )}
 
