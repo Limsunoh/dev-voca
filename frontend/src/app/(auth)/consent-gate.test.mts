@@ -8,6 +8,7 @@
  *   - 잠긴 버튼을 누르면 제출·이동 없이 "세 항목을 모두 켜 주세요." 를 보여 주고
  *     아직 안 켠 칸으로 포커스를 옮긴다.
  *   - /login 에는 체크가 없다. 구글 링크에도 consent 가 붙지 않는다.
+ *   - 시작 화면은 버튼을 누르기 전에는 체크가 없고, 게스트는 두 항목만 묻는다.
  *   - 제출에 실패하면 포커스가 오류 문구로 간다.
  *
  * 브라우저 없이 상태를 이어 가는 방법은 profile-cards-state.test.mts 와 같다.
@@ -86,7 +87,7 @@ mock.module("next/link", {
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement } = realReact;
 const { AuthForm } = await import("@/components/AuthForm");
-const { StartGoogle } = await import("../start/StartGoogle");
+const { GoogleStep, GuestStep, StartChoices } = await import("../start/StartChoices");
 
 // ---- 도구 --------------------------------------------------------------------
 
@@ -362,7 +363,7 @@ describe("구글 이름·사진 안내", () => {
   });
 
   it("시작 화면에 있다", () => {
-    mount(createElement(StartGoogle));
+    mount(createElement(GoogleStep, { titleId: "t", onCancel: () => {} }));
     assert.match(html, NOTE);
   });
 });
@@ -389,7 +390,7 @@ describe("로그인 화면", () => {
 // ---- 시작 화면 ----------------------------------------------------------------
 
 describe("시작 화면: 구글로 시작하기", () => {
-  beforeEach(() => mount(createElement(StartGoogle)));
+  beforeEach(() => mount(createElement(GoogleStep, { titleId: "t", onCancel: () => {} })));
 
   it("처음에는 잠긴 버튼이다", () => {
     assert.equal(box(TERMS).checked, false);
@@ -430,6 +431,78 @@ describe("시작 화면: 구글로 시작하기", () => {
     assert.deepEqual(focused, [DISCLOSURE]);
     assert.match(html, new RegExp(GUIDE));
     assert.deepEqual(googleLinks(html), []);
+  });
+});
+
+describe("시작 화면: 버튼을 누르기 전", () => {
+  const press = (label: string) => {
+    const button = hosts.find((h) => h.type === "button" && h.props.children === label);
+    assert.ok(button, `${label} 버튼이 없다`);
+    (button.props.onClick as () => void)();
+    draw();
+  };
+
+  beforeEach(() => mount(createElement(StartChoices)));
+
+  it("체크박스도 구글 링크도 없다", () => {
+    assert.doesNotMatch(html, /type="checkbox"/);
+    assert.deepEqual(googleLinks(html), []);
+  });
+
+  it("구글을 누르면 세 항목이 나온다", () => {
+    press("구글로 시작하기");
+
+    assert.equal(box(TERMS).checked, false);
+    assert.equal(box(DISCLOSURE).checked, false);
+    assert.equal(box(AGE).checked, false);
+  });
+
+  it("게스트를 누르면 공개·해외 항목 없이 두 항목이 나온다", () => {
+    press("게스트로 둘러보기");
+
+    assert.equal(box(TERMS).checked, false);
+    assert.equal(box(AGE).checked, false);
+    assert.doesNotMatch(html, new RegExp(DISCLOSURE));
+  });
+});
+
+describe("시작 화면: 게스트로 둘러보기", () => {
+  const GUEST_FORM = /action="\/__guest__"/;
+
+  beforeEach(() => mount(createElement(GuestStep, { titleId: "t", onCancel: () => {} })));
+
+  it("처음에는 잠겨 있어 들어갈 수 없다", () => {
+    assert.doesNotMatch(html, GUEST_FORM);
+    assert.ok(googleLock());
+  });
+
+  for (const [label, id] of [
+    ["약관만", TERMS],
+    ["나이만", AGE],
+  ] as const) {
+    it(`${label} 켜면 아직 잠겨 있다`, () => {
+      tick(id);
+
+      assert.doesNotMatch(html, GUEST_FORM);
+    });
+  }
+
+  it("둘 다 켜면 들어갈 수 있다", () => {
+    tick(TERMS);
+    tick(AGE);
+
+    assert.match(html, GUEST_FORM);
+    assert.equal(googleLock(), undefined);
+  });
+
+  it("잠긴 버튼을 누르면 두 항목을 안내하고 안 켠 칸으로 포커스를 옮긴다", () => {
+    tick(TERMS);
+
+    (googleLock()?.onClick as () => void)();
+    draw();
+
+    assert.deepEqual(focused, [AGE]);
+    assert.match(html, /두 항목을 모두 켜 주세요\./);
   });
 });
 
