@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { PasswordField, PasswordState } from "@/app/profile/actions";
+import { useFocusOnError } from "@/components/useFocusOnError";
 
 type Passwords = Record<PasswordField, string>;
 
@@ -87,6 +88,7 @@ export function PasswordCard({
     action,
     {},
   );
+  const errorRef = useFocusOnError(state);
 
   // 세 칸을 상태로 든다(제어 입력). 값을 칸에 맡겨 두면 React 가 폼
   // 액션이 끝날 때마다 실패해도 폼을 전부 비운다. 그러면 현재 비밀번호
@@ -286,11 +288,13 @@ export function PasswordCard({
             생기면 화면 낭독기가 대부분 그 등장을 안 알린다(AuthForm 과 같은
             이유). 실패해도 칸 값이 남으므로, 알림이 안 읽히면 화면을 못 보는
             사용자에게는 아무 일도 안 일어난 것과 같다. */}
-      <div aria-live="polite">
+      <div aria-live="polite" className="contents">
         {state.error && (
           <p
             role="alert"
-            className="rounded-[var(--radius-xl)] p-3 text-sm"
+            ref={errorRef}
+            tabIndex={-1}
+            className="rounded-[var(--radius-xl)] p-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={{
               background: "var(--wrong-soft)",
               color: "var(--coral-deep)",

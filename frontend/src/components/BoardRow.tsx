@@ -1,6 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import type { BoardKind, BoardRow as Row } from "@/lib/api/leaderboards";
-import { BOARD_LABELS } from "@/lib/api/leaderboards";
+import { BOARD_LABELS, shownRank } from "@/lib/api/leaderboards";
 
 /**
  * 순위표 한 줄.
@@ -49,7 +49,8 @@ type Props = {
 };
 
 export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
-  const medal = MEDALS[row.rank];
+  const rank = shownRank(kind, row);
+  const medal = rank === null ? undefined : MEDALS[rank];
   const { unit, scoreUnit } = BOARD_LABELS[kind];
 
   // 내 줄은 옅은 코랄로 채운다(번들 identity/BoardRow.jsx). 스무 줄이 전부
@@ -96,10 +97,10 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
             className="inline-flex size-7 items-center justify-center rounded-full"
             style={{ background: medal }}
           >
-            {row.rank}
+            {rank}
           </span>
         ) : (
-          row.rank
+          (rank ?? "-")
         )}
       </span>
 

@@ -166,6 +166,16 @@ class PasswordChangeThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": f"u{user.pk}"}
 
 
+class ProfileUpdateThrottle(PasswordChangeThrottle):
+    """이름·아바타 저장 제한.
+
+    계정으로 세는 것은 비밀번호 변경과 같고 통만 따로 쓴다. 이름을 여러 번
+    고치다가 비밀번호 변경까지 막히면 안 된다.
+    """
+
+    scope = "profile_update"
+
+
 class AvatarPhotoThrottle(SimpleRateThrottle):
     """사진 올리기 제한.
 

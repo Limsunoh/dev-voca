@@ -74,6 +74,17 @@ export const BOARD_LABELS: Record<
  */
 export type BoardAvatar = AvatarDisplay;
 
+/**
+ * 화면에 쓸 등수. 꾸준함이 0일이면 null 이다.
+ *
+ * 서버는 0일인 사람에게도 줄을 준다. 자기 기록을 볼 수 있어야 해서다. 다만
+ * 목록은 0일을 빼므로, 그대로 쓰면 여덟 명뿐인 표에 "10위" 가 뜬다.
+ * 최고점의 0점은 실제로 순위가 있는 점수라 꾸준함만 가른다.
+ */
+export function shownRank(kind: BoardKind, row: BoardRow): number | null {
+  return kind === "streak" && row.score === 0 ? null : row.rank;
+}
+
 /** 순위표 한 줄. */
 export type BoardRow = {
   rank: number;
