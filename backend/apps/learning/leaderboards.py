@@ -367,9 +367,10 @@ def _days() -> QuerySet:
 def _streak_rows_for(user) -> list[dict]:
     """내 한 줄만. 목록 밖일 때 쓴다.
 
-    0일도 낸다. 목록에서는 0일을 빼지만 "내가 몇 등인가" 는 다른 질문이다.
-    매일 들어와 전부 마이너스로 끝낸 사람에게 "기록이 없습니다" 라고 하면
-    안 된다. 그 사람이야말로 자기 위치를 보고 다시 올 사람이다.
+    0일도 낸다. 목록에서는 0일을 빼지만, 매일 들어와 전부 마이너스로 끝낸
+    사람에게 "기록이 없습니다" 라고 하면 안 된다. 등수도 계산해서 주지만
+    화면은 0일에 쓰지 않는다(프론트 lib/api/leaderboards.ts 의 shownRank).
+    목록에 없는 사람의 번호라 뜬금없이 크기 때문이다.
     """
     return list(_streak_by_user(_days().filter(user=user), only_scored=False))
 

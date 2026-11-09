@@ -8,9 +8,12 @@ devvoca는 주니어 개발자들이 흔히 보는 개발 영어 용어들과 �
 - 1순위: 영어가 약한 주니어/예비 개발자
 - 2순위: 정보처리기사 준비생
 
-**MVP 범위**
-- 용어/단어장: 한↔영, 뜻, 예문 CRUD + 검색
-- 이후 단계 후보: 원문 아티클 학습, 에러 메시지 사전, AI 튜터링
+**지금 있는 기능**
+- 익히기: 개발 단어·문장 목록과 상세, 검색
+- 문제풀기: 낱개 연습, 90초 한 판, 일일공부, 복습, 오답 노트, 순위표
+- 일상영어 소리내어 읽기, 회원(이메일·구글)
+
+**이후 단계 후보**: 원문 아티클 학습, AI 튜터링
 
 ## 기술 스택
 
@@ -20,13 +23,13 @@ devvoca는 주니어 개발자들이 흔히 보는 개발 영어 용어들과 �
 | DB | PostgreSQL (로컬은 Docker) |
 | 프론트 | Next.js (App Router) + TypeScript |
 | AI | Anthropic Claude API (콘텐츠 생성 전용) |
-| 모바일 앱 (예정) | React Native (Expo), 별도 프로젝트. 착수는 학습 기록·점수 API 다음. **웹에는 Ionic 을 넣지 않는다** (이유는 `.claude/skills/devvoca-design/SKILL.md`) |
-| 패키지 관리 | Python: pip + requirements.txt / JS: npm 또는 pnpm |
-| 배포 | 미정 (후보: 백엔드 Railway, 프론트 Vercel) |
+| 모바일 앱 (예정) | React Native (Expo), 별도 프로젝트. **웹에는 Ionic 을 넣지 않는다** (이유는 `.claude/skills/devvoca-design/SKILL.md`) |
+| 패키지 관리 | Python: pip + requirements.txt / JS: npm |
+| 배포 | 백엔드·DB Railway, 프론트 Vercel. 절차는 `DEPLOY.md` |
 
 ## 확장성 원칙
 
-devvoca의 MVP는 단어장이지만, 이후 **문장/구문, 에러 메시지, 원문 아티클, AI 튜터링** 등으로 확장된다. 처음부터 다음을 염두에 두고 설계한다.
+devvoca 는 단어장에서 시작해 문장과 문제풀기까지 넓혔고, 이후 **원문 아티클, AI 튜터링** 등으로 확장된다. 다음을 염두에 두고 설계한다.
 
 **데이터 모델**
 - 학습 콘텐츠는 공통 추상화를 가질 수 있게 설계. 예: 공통 베이스 모델(`LearningItem`) + `item_type` 필드, 또는 각 도메인 모델이 공통 mixin/abstract base를 상속
@@ -34,17 +37,17 @@ devvoca의 MVP는 단어장이지만, 이후 **문장/구문, 에러 메시지, 
 - 타입별 고유 필드는 도메인별 모델 또는 JSONField로
 
 **도메인 분리**
-- 단어장 = `apps/vocab/`, 이후 추가될 도메인도 같은 패턴: `apps/sentences/`, `apps/errors/`, `apps/articles/`
-- 검색/태그/즐겨찾기/학습기록 등 **공통 기능은 `apps/learning/` 같은 코어 앱**으로 분리 가능하도록 의식하며 작성
+- 단어·문장·일상 표현 = `apps/vocab/`, 회원 = `apps/accounts/`. 새 도메인은 `apps/articles/` 처럼 앱을 나눈다
+- 학습 기록·점수·순위 같은 **공통 기능은 `apps/learning/`** 에 둔다
 
 **AI 파이프라인 (`apps/ai_pipeline/`)**
 - 단어뿐 아니라 어떤 학습 콘텐츠 타입도 생성할 수 있게 일반화 (콘텐츠 타입을 인자로 받음)
-- 프롬프트 템플릿은 타입별 분리: `prompts/vocab.py`, `prompts/sentence.py`, `prompts/error.py` 등
+- 프롬프트 템플릿은 타입별로 나눈다. 지금은 `prompts/vocab.py`(단어), `prompts/reading.py`(한글 발음) 둘이다
 - AI 응답 파싱/검증 로직도 타입별 분리
 
 **프론트엔드**
 - 학습 카드/상세 UI는 콘텐츠 타입에 무관한 props 인터페이스로 추상화 가능하게 (예: `<LearningCard type="word|sentence|error" data={...} />`)
-- 라우팅: `/vocab`, `/sentences`, `/errors` 등 도메인별 경로
+- 라우팅: 익히기 `/learn/words`·`/learn/sentences`, 문제풀기 `/test/*`, 오답 노트 `/mistakes`, 순위표 `/board`, 일상영어 `/talk` 등
 - API 클라이언트(`lib/api/`)도 도메인별 모듈로 분리
 
 **확장성 vs 단순함의 균형**
@@ -52,27 +55,27 @@ devvoca의 MVP는 단어장이지만, 이후 **문장/구문, 에러 메시지, 
 - 단, **"이 자리에 다른 콘텐츠 타입이 들어올 수 있다"는 확장을 막는 설계는 피한다.** (예: 모델/엔드포인트/UI에 "단어"를 하드코딩하지 않기)
 - 추후 새 콘텐츠 타입 추가가 **반나절 이상 걸릴 것 같으면 지금 추상화 고려**, 30분 안에 끝날 것 같으면 그때 가서 추상화
 
-## 폴더 구조 (계획)
+## 폴더 구조
 
 ```
 devvoca/
-├── backend/              # Django 프로젝트 (예정)
+├── backend/
 │   ├── config/           # settings, urls
 │   ├── apps/
-│   │   ├── vocab/        # 단어장 도메인
-│   │   ├── accounts/     # 사용자/인증
+│   │   ├── vocab/        # 단어·문장·일상 표현, 문제 출제와 채점
+│   │   ├── learning/     # 학습 기록, 일일공부, 복습, 순위
+│   │   ├── accounts/     # 회원, 로그인, 계정 삭제
 │   │   └── ai_pipeline/  # Claude API 호출 (관리자 전용)
 │   └── manage.py
-├── frontend/             # Next.js (예정)
-│   ├── app/
+├── frontend/src/
+│   ├── app/              # 화면과 api 중계
 │   ├── components/
 │   └── lib/
-├── .venv/                # Python 가상환경
+├── .venv/                # Python 가상환경 (git 에 없다)
 ├── requirements.txt
+├── DEPLOY.md
 └── CLAUDE.md
 ```
-
-> 현재는 `.venv/`만 존재. Django/Next.js 프로젝트는 아직 시작 전.
 
 ## 개발 환경 명령어
 
@@ -99,7 +102,7 @@ python manage.py runserver
 python manage.py test
 ```
 
-### 프론트엔드 (Next.js, 추후 생성)
+### 프론트엔드 (Next.js)
 
 ```powershell
 cd frontend
@@ -188,21 +191,42 @@ py ~/.claude/hooks/record_verification.py --show
 | `review_skill` | `.claude/agents/devvoca-reviewer.md` (전역 code-reviewer 스킬 대신 — 도메인 규칙을 안다) |
 | `qa` | UI 를 건드린 변경이면 `impeccable` 로 채운다 — 절차는 `.claude/skills/devvoca-design/SKILL.md`. 백엔드·프론트 무관한 변경이면 `--skip` |
 
-**화면 QA 는 두 크기를 반드시 다 본다.** 하나만 보고 기록하지 않는다.
+**화면 QA 는 앱 화면으로 본다. 데스크톱 크기는 보지 않는다.** devvoca 는 웹이 아니라 앱으로 출시한다.
 
 | 크기 | 용도 |
 |---|---|
-| 390 x 844 | 폰 (iPhone 기준) |
-| 1280 x 800 | 데스크톱 |
+| 390 x 844 | 기준 폰 (iPhone) |
+| 375 x 667 | 작은 iPhone(SE). 세로가 짧아 버튼과 탭바가 겹치기 쉽다 |
+| 412 x 915 | 큰 안드로이드 폰. 폭이 넓어 배치가 벌어지는지 본다 |
+| 360 x 840 | 갤럭시 Z 폴드 7·폴드 8 Ultra 접은 화면. 폭이 가장 좁아 줄바꿈과 넘침이 먼저 깨진다 |
+| 416 x 657 | 폴드 8 접은 화면. 폭은 넓고 세로가 짧아 버튼과 탭바가 겹치기 쉽다 |
+| 984 x 1092 | 폴드 7 펼친 화면 |
+| 1128 x 1252 | 폴드 8 Ultra 펼친 화면 |
+| 1224 x 924 | 폴드 8 펼친 화면. 가로가 더 길다. 폰 화면이 늘어나 배치가 벌어지거나 탭바와 본문 폭이 어긋나는지 본다 |
 
-`mcp__playwright__browser_resize` 로 바꾸고 각각 스크린샷을 찍어 눈으로 확인한다. QA 를 서브에이전트에 맡길 때도 **프롬프트에 두 크기를 명시**한다.
+펼친 화면 셋(984, 1128, 1224)은 `deviceScaleFactor: 2`, 나머지는 `3` 으로 연다. 폴드 크기는 실제 기기에서 잰 값이 아니다. 해상도를 접은 화면은 배율 3, 펼친 화면은 배율 2 로 나눈 값이라 재 보고 다르면 고친다.
 
-데스크톱만 보면 여백이 넉넉해 겹침·넘침이 안 보인다. 2026-08-12 로그인 화면에서 실제로 그랬다 — 머리말이 두 번 나오고 홈에 스크롤이 생겼는데 데스크톱에서는 둘 다 안 띄었고, 모바일로 보자마자 드러났다. 타겟이 주니어 개발자라 폰으로 볼 일이 많다.
+창 크기만 줄이면(`browser_resize`) 앱 화면이 아니다. 데스크톱 브라우저의 스크롤바가 폭을 차지해 줄바꿈이 실제 폰과 달라지고 터치도 꺼져 있다. 모바일 에뮬레이션으로 연다.
+
+```js
+// mcp__playwright__browser_run_code_unsafe
+const ctx = await page.context().browser().newContext({
+  viewport: { width: 390, height: 844 },
+  isMobile: true,
+  hasTouch: true,
+  deviceScaleFactor: 3,
+});
+const phone = await ctx.newPage();
+```
+
+viewport 만 바꿔 여덟 크기를 모두 본다. 크기마다 스크린샷을 찍어 배치, 줄바꿈, 하단 탭바에 가리는 곳을 눈으로 확인한다. QA 를 서브에이전트에 맡길 때도 **프롬프트에 여덟 크기와 에뮬레이션을 명시**한다.
+
+**왜 이렇게 정했나**: 2026-11-09 사용자 지적. 앱으로 출시한다고 여러 번 말했는데 세션들이 넓은 데스크톱 화면까지 웹으로 보고 있었다. 앱 화면으로 봐야 배치와 구성, 줄바꿈이 제대로 보인다.
 
 기록:
 ```
 py ~/.claude/hooks/record_verification.py static --agent static-verifier --note '...'
-py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 데스크톱/모바일 각 1회, N건'
+py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 390x844·360x840·1224x924 각 1회, N건. 앱 화면 여덟 크기 모바일 에뮬레이션 스크린샷 확인'
 py ~/.claude/hooks/record_verification.py qa --skip --note 'UI 변경 없음 - 백엔드만'
 ```
 
@@ -292,7 +316,7 @@ grep -n "^## " .claude/CODE_INSIGHTS.md      # 목록부터. 27개라 통독은 
 
 1. 새로운 기능 작업 전, 먼저 **간단한 계획(2~5줄)**을 제시하고 사용자 확인을 받는다
 2. 큰 변경은 Plan 모드를 활용한다
-3. MVP 범위(단어장)를 벗어나는 제안은 **"MVP 외 제안"이라고 명시**하고 진행 여부를 묻는다
+3. 지금 있는 기능을 벗어나는 제안은 **"범위 밖 제안"이라고 명시**하고 진행 여부를 묻는다
 4. 한 번에 너무 많은 파일을 생성하지 않는다. 작은 단위로 컨펌 받으며 진행
 5. 설치/명령 실행 전, 무엇을 왜 실행하는지 한 줄 요약
 6. 사용자는 Claude Code 초보임. 새 개념 처음 사용 시 한 줄 설명 추가

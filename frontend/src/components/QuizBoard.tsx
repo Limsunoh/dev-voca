@@ -112,9 +112,11 @@ type Props = {
   content?: QuizContent;
   /** 첫 문제로 낼 항목의 id. 상세의 "문제 풀기" 가 넘긴다. */
   item?: string;
+  /** 분류 고르개. 페이지가 만들어 넘기고, 유형 고르개와 한 줄에 놓는다. */
+  picker?: React.ReactNode;
 };
 
-export function QuizBoard({ category, content = "words", item }: Props) {
+export function QuizBoard({ category, content = "words", item, picker }: Props) {
   const [question, setQuestion] = useState<Question | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
   const [result, setResult] = useState<GradeResult | null>(null);
@@ -170,9 +172,13 @@ export function QuizBoard({ category, content = "words", item }: Props) {
   const loadingRef = useRef(false);
   // 지금 화면에 걸린 문제의 번호. load 가 새 문제로 넘어갈 때마다 올린다.
   // "다음 문제" 는 보기를 고르자마자 보여서 채점 응답보다 먼저 눌릴 수
-  // 있다. 그때 늦게 온 채점이 새 문제 위에 해설·연출·점수를 얹지 않도록
-  // pick 이 이 번호로 옛 문제의 응답인지 가른다.
+  // 있다. 그때 늦게 온 채점이 새 문제 위에 해설·연출을 얹지 않도록
+  // pick 이 이 번호로 옛 문제의 응답인지 가른다. 점수와 푼 목록은 센다.
   const questionSeqRef = useRef(0);
+  // 지금 판의 번호. "처음부터 다시" 때만 올린다. 지난 판의 늦은 채점이 비워 둔
+  // 새 판의 점수와 푼 목록에 들어가지 않게 pick 이 본다. 다음 문제마다 오르는
+  // questionSeqRef 로는 가를 수 없다.
+  const boardRef = useRef(0);
   /**
    * 고른 문제 유형. 빈 문자열이면 섞어서 낸다.
    *
@@ -397,31 +403,18 @@ export function QuizBoard({ category, content = "words", item }: Props) {
 
     setPicked(choiceId);
     const seq = questionSeqRef.current;
+    const board = boardRef.current;
     try {
       const graded = await submitAnswer(question.token, choiceId, content);
-      // 기다리는 사이 다음 문제로 넘어갔으면 버린다(questionSeqRef 참고).
-      if (seq !== questionSeqRef.current) return;
-      setResult(graded);
+      if (board !== boardRef.current) return;
+      // 점수와 푼 목록은 다음 문제로 넘어간 뒤에 도착해도 센다. 서버는 이미
+      // 채점을 마쳤다. 안 세면 푼 문제가 점수에서 빠지고, 맞힌 단어가 다음
+      // 요청의 제외 목록에도 안 들어간다.
       setScore((s) => ({
         solved: s.solved + 1,
         correct: s.correct + (graded.correct ? 1 : 0),
       }));
 
-      // 연속은 맞으면 오르고 틀리면 0 이다. 틀렸을 때 유지하면 "연속" 이
-      // 아니라 그냥 누적이 된다.
-      setCombo((c) => (graded.correct ? c + 1 : 0));
-
-      // 틀렸을 때만 화면을 짧게 흔든다. 값을 올려 애니메이션을 다시
-      // 재생시킨다 - boolean 이면 연속으로 틀렸을 때 두 번째부터 안 뛴다.
-      if (!graded.correct) setShake((n) => n + 1);
-      // 맞혔을 때는 화면 가운데에서 조각이 터진다. 흔들림과 같은 이유로
-      // 카운터다.
-      if (graded.correct) setBurst((n) => n + 1);
-      // 사람은 맞히든 틀리든 온다. 쓰다듬기냐 콩이냐만 갈린다.
-      setReaction((r) => ({ fire: r.fire + 1, correct: graded.correct }));
-      // 채점 뒤 화면을 옮기는 일은 아래 useEffect 가 맡는다. 여기서 하면
-      // 해설 카드가 아직 DOM 에 없어 버튼 좌표를 잘못 읽는다.
-      //
       // 맞힌 것만 제외 목록에 넣는다. 틀린 단어야말로 다시 봐야 하는데
       // 여기에 넣으면 그 세션에서 가장 확실하게 안 나오는 단어가 된다.
       //
@@ -440,11 +433,32 @@ export function QuizBoard({ category, content = "words", item }: Props) {
           question.answer_type === "word" && question.source_sentence_id
             ? question.source_sentence_id
             : graded.answer_id;
-        recentRef.current = [excludeId, ...recentRef.current].slice(
-          0,
-          RECENT_LIMIT,
-        );
+        // 늦게 온 채점과 겹치면 같은 문제를 두 번 맞힐 수 있어 중복을 뺀다.
+        recentRef.current = [
+          excludeId,
+          ...recentRef.current.filter((id) => id !== excludeId),
+        ].slice(0, RECENT_LIMIT);
       }
+
+      // 기다리는 사이 다음 문제로 넘어갔으면 해설과 연출은 새 문제 위에
+      // 얹지 않는다(questionSeqRef 참고).
+      if (seq !== questionSeqRef.current) return;
+      setResult(graded);
+
+      // 연속은 맞으면 오르고 틀리면 0 이다. 틀렸을 때 유지하면 "연속" 이
+      // 아니라 그냥 누적이 된다.
+      setCombo((c) => (graded.correct ? c + 1 : 0));
+
+      // 틀렸을 때만 화면을 짧게 흔든다. 값을 올려 애니메이션을 다시
+      // 재생시킨다 - boolean 이면 연속으로 틀렸을 때 두 번째부터 안 뛴다.
+      if (!graded.correct) setShake((n) => n + 1);
+      // 맞혔을 때는 화면 가운데에서 조각이 터진다. 흔들림과 같은 이유로
+      // 카운터다.
+      if (graded.correct) setBurst((n) => n + 1);
+      // 사람은 맞히든 틀리든 온다. 쓰다듬기냐 콩이냐만 갈린다.
+      setReaction((r) => ({ fire: r.fire + 1, correct: graded.correct }));
+      // 채점 뒤 화면을 옮기는 일은 아래 useEffect 가 맡는다. 여기서 하면
+      // 해설 카드가 아직 DOM 에 없어 버튼 좌표를 잘못 읽는다.
     } catch {
       if (seq !== questionSeqRef.current) return;
       // picked 를 되돌리지 않는다. 되돌리면 "다음 문제" 버튼이 사라져
@@ -534,6 +548,7 @@ export function QuizBoard({ category, content = "words", item }: Props) {
                 // 경우에는 그냥 재시도하면 같은 404 가 반복된다.
                 // 점수도 같이 비운다 - 처음부터 다시인데 이전 판 숫자가
                 // 이어지면 몇 개를 맞혔는지 알 수 없다.
+                boardRef.current += 1;
                 recentRef.current = [];
                 setScore({ solved: 0, correct: 0 });
                 setCombo(0);
@@ -700,19 +715,22 @@ export function QuizBoard({ category, content = "words", item }: Props) {
     );
   })();
 
-  // 머리 줄(유형 고르개·점수)은 가지 밖, 가지보다 앞에 둔다. fragment 의 첫
+  // 머리 줄(분류·유형 고르개, 점수)은 가지 밖, 가지보다 앞에 둔다. fragment 의 첫
   // 자식이라 가지가 바뀌어도 같은 자리에 남는다(다시 마운트되지 않는다).
   const body = (
     <>
-      {/* 유형 고르개와 점수 줄. 문제 가지 밖에 둔다. 유형을 바꾸면
+      {/* 고르개와 점수 줄. 문제 가지 밖에 둔다. 유형을 바꾸면
           "가져오는 중" 가지를 거치는데, 고르개가 문제 가지 안에 있으면 그때
           사라졌다가 다시 생겨 키보드 초점을 잃는다. 문제를 못 낸 안내 가지
           에서도 유형을 바꿀 수 있어야 한다 - 그 안내가 "유형을 바꿔보라" 고
           말한다. */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {picker}
         <KindPicker content={content} value={kind} onChange={changeKind} />
         {score.solved > 0 && (
-          <div className="flex items-center gap-2.5">
+          // 폰에서는 점수에 줄을 따로 준다. 고르개 옆에 두면 연속 정답 칩이
+          // 붙고 떨어질 때마다 줄 수가 바뀌어 문제와 보기가 위아래로 움직인다.
+          <div className="ml-auto flex items-center gap-2.5 max-sm:basis-full max-sm:justify-end">
             {/* 연속 정답. 두 개부터 보여준다 - 하나는 그냥 맞힌 것이지
                 연속이 아니다. 끊기면 사라져서 "지금 몇 개째" 가 한눈에
                 보인다.
@@ -790,7 +808,7 @@ const KINDS: Record<QuizContent, { value: string; label: string }[]> = {
 /**
  * 유형 고르개.
  *
- * 보이는 알약은 바로 위 분류 고르개(CategoryPicker)와 같은 모양이다.
+ * 보이는 알약은 바로 옆 분류 고르개(CategoryPicker)와 같은 모양이다.
  * 흰 종이, "유형" 라벨, 고른 값, ▼. 한 화면에 고르개 둘이 다르게 생기면
  * 하나는 누르는 것이 아닌 줄 안다.
  *
@@ -1330,7 +1348,7 @@ function SentenceAnswer({
       {sentence.reading && (
         <Reading
           text={sentence.reading}
-          className="mt-1 block"
+          className="mt-1 block text-sm"
           style={{ color: "var(--text-muted)" }}
         />
       )}

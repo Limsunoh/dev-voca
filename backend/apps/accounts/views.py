@@ -61,6 +61,7 @@ from .throttles import (
     EmailRateThrottle,
     GoogleRateThrottle,
     PasswordChangeThrottle,
+    ProfileUpdateThrottle,
 )
 
 logger = logging.getLogger(__name__)
@@ -337,12 +338,14 @@ class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_throttles(self) -> list:
-        # 삭제만 제한한다. 현재 비밀번호를 확인하는 자리라 제한이 없으면
+        # 삭제는 현재 비밀번호를 확인하는 자리라 제한이 없으면
         # 로그인 화면 대신 여기로 추측을 던질 수 있다. 비밀번호 변경과 통을
         # 같이 써서, 두 자리를 번갈아 써도 시도 횟수가 늘지 않게 한다.
         # 조회는 화면을 그릴 때마다 불려서 걸면 안 된다.
         if self.request.method == "DELETE":
             return [PasswordChangeThrottle()]
+        if self.request.method == "PATCH":
+            return [ProfileUpdateThrottle()]
         return super().get_throttles()
 
     def get(self, request: Request) -> Response:
