@@ -15,14 +15,33 @@
  */
 let solved = 0;
 
+function warnBeforeUnload(event: BeforeUnloadEvent): void {
+  event.preventDefault();
+  // 옛 브라우저는 returnValue 를 채워야 묻는다.
+  event.returnValue = "";
+}
+
+/**
+ * 새로고침·탭 닫기 때 브라우저 확인 창을 띄울지 정한다.
+ *
+ * 화면의 출구와 달리 새로고침은 브라우저가 처리해서 앱의 확인 창을 못 띄운다.
+ * 뒤로가기는 여기로도 못 막는다(App Router 에는 이동을 멈추는 방법이 없다).
+ */
+function setUnloadWarning(on: boolean): void {
+  if (on) globalThis.addEventListener?.("beforeunload", warnBeforeUnload);
+  else globalThis.removeEventListener?.("beforeunload", warnBeforeUnload);
+}
+
 /** 판이 부른다. 푼 수가 바뀔 때마다 적는다. */
 export function markSolved(count: number): void {
   solved = count;
+  setUnloadWarning(count > 0);
 }
 
 /** 판이 사라질 때 부른다. 안 지우면 판이 없는 화면에서도 확인이 뜬다. */
 export function clearSolved(): void {
   solved = 0;
+  setUnloadWarning(false);
 }
 
 /** 지금 판에서 푼 문제 수. */
