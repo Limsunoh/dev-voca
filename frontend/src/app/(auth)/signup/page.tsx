@@ -18,10 +18,17 @@ export default async function SignUpPage({ searchParams }: PageProps) {
 
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : undefined;
+  // 구글로 왔는데 새 계정이고 동의 값이 없어 되돌아온 경우.
+  const consentRequired = params.error === "consent";
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-16">
-      <AuthForm mode="signup" action={signUpAction} next={next} />
+      <AuthForm
+        mode="signup"
+        action={signUpAction}
+        next={next}
+        consentRequired={consentRequired}
+      />
     </main>
   );
 }
