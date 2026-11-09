@@ -21,6 +21,8 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
 
+from .forbidden_names import name_is_forbidden
+
 # 지금 약관·처리방침의 버전. 동의할 때 이 값을 함께 남긴다. 문서 내용이 바뀌면
 # 올린다. 그래야 누가 어느 버전에 동의했는지 나중에 가릴 수 있다.
 TERMS_VERSION = "v1"
@@ -156,10 +158,11 @@ def free_display_name(wanted: str | None) -> str:
     알 수 없다.
 
     빈 문자열을 돌려줄 수 있다. 그 경우 User.save() 가 학습자1234 꼴로
-    지어 넣는다.
+    지어 넣는다. 구글 이름이 금칙어에 걸릴 때도 그렇게 한다. 구글에서
+    온 사람은 이름을 입력한 적이 없어서, 막으면 가입할 길이 없다.
     """
     name = shorten_display_name(wanted)
-    if not name:
+    if not name or name_is_forbidden(name):
         return ""
 
     if not name_taken(name):
@@ -171,7 +174,12 @@ def free_display_name(wanted: str | None) -> str:
         candidate = shorten_display_name(
             f"{name[: DISPLAY_NAME_MAX - len(str(suffix))]}{suffix}"
         )
-        if candidate and not name_taken(candidate):
+        # 잘라 낸 자리에서 금칙어가 새로 생길 수 있어 다시 본다.
+        if (
+            candidate
+            and not name_is_forbidden(candidate)
+            and not name_taken(candidate)
+        ):
             return candidate
 
     # 같은 이름이 천 명이면 지어주는 쪽으로 넘긴다.
