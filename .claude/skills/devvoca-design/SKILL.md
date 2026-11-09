@@ -154,9 +154,10 @@ py ~/.claude/skills/ui-ux-pro-max/scripts/search.py "developer learning korean" 
 기계 검사부터. 백엔드까지 띄워야 학습 화면이 뜬다(아래 절 참고).
 
 ```bash
-npx impeccable detect http://localhost:3000/                    # 홈
-npx impeccable detect http://localhost:3000/learn/words          # 목록
-npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words   # 모바일
+npx impeccable detect --viewport 390x844 http://localhost:3000/             # 홈
+npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words   # 목록
+npx impeccable detect --viewport 360x840 http://localhost:3000/learn/words   # 폴드 접은 화면
+npx impeccable detect --viewport 1224x924 http://localhost:3000/learn/words   # 폴드 펼친 화면
 ```
 
 **결과가 0건이어도 끝이 아니다.** 탐지기가 구조적으로 못 잡는 게 있다.
@@ -167,18 +168,37 @@ npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words   # �
 
 그래서 눈으로 볼 것을 정해둔다.
 
-**두 크기를 반드시 다 본다.** 하나만 보고 넘어가지 않는다.
+**앱 화면 여덟 크기로 본다. 데스크톱 크기는 보지 않는다.** devvoca 는 앱으로 출시한다.
 
+| 크기 | 용도 |
+|---|---|
+| 390 x 844 | 기준 폰 (iPhone) |
+| 375 x 667 | 작은 iPhone(SE). 세로가 짧아 버튼과 탭바가 겹치기 쉽다 |
+| 412 x 915 | 큰 안드로이드 폰. 폭이 넓어 배치가 벌어지는지 본다 |
+| 360 x 840 | 갤럭시 Z 폴드 7·폴드 8 Ultra 접은 화면. 폭이 가장 좁아 줄바꿈과 넘침이 먼저 깨진다 |
+| 416 x 657 | 폴드 8 접은 화면. 폭은 넓고 세로가 짧아 버튼과 탭바가 겹치기 쉽다 |
+| 984 x 1092 | 폴드 7 펼친 화면 |
+| 1128 x 1252 | 폴드 8 Ultra 펼친 화면 |
+| 1224 x 924 | 폴드 8 펼친 화면. 가로가 더 길다. 폰 화면이 늘어나 배치가 벌어지거나 탭바와 본문 폭이 어긋나는지 본다 |
+
+펼친 화면 셋(984, 1128, 1224)은 `deviceScaleFactor: 2`, 나머지는 `3` 으로 연다. 폴드 크기는 실제 기기에서 잰 값이 아니다. 해상도를 접은 화면은 배율 3, 펼친 화면은 배율 2 로 나눈 값이라 재 보고 다르면 고친다.
+
+창 크기만 줄이면(`browser_resize`) 스크롤바가 폭을 차지해 줄바꿈이 실제 폰과 달라진다. 모바일 에뮬레이션으로 연다.
+
+```js
+// mcp__playwright__browser_run_code_unsafe
+const ctx = await page.context().browser().newContext({
+  viewport: { width: 390, height: 844 },
+  isMobile: true,
+  hasTouch: true,
+  deviceScaleFactor: 3,
+});
+const phone = await ctx.newPage();
 ```
-mcp__playwright__browser_resize  390 x 844    # 폰
-mcp__playwright__browser_resize  1280 x 800   # 데스크톱
-```
 
-각각 `browser_take_screenshot` 으로 찍어 **이미지를 직접 열어 본다.** 스냅샷(접근성 트리)만으로는 겹침·넘침이 안 보인다.
+viewport 만 바꿔 여덟 크기를 모두 본다. 각각 `screenshot` 으로 찍어 **이미지를 직접 열어 본다.** 스냅샷(접근성 트리)만으로는 겹침·넘침이 안 보인다.
 
-데스크톱만 보면 여백이 넉넉해 문제가 묻힌다. 2026-08-12 로그인 화면에서 실제로 그랬다 — 머리말이 두 번 나오고 홈에 불필요한 스크롤이 생겼는데, 데스크톱에서는 둘 다 안 띄었고 모바일로 보자마자 드러났다.
-
-QA 를 서브에이전트에 맡길 때도 **프롬프트에 두 크기를 명시한다.** 안 적으면 데스크톱만 보고 온다.
+QA 를 서브에이전트에 맡길 때도 **프롬프트에 여덟 크기와 에뮬레이션을 명시한다.**
 
 볼 것:
 
@@ -196,7 +216,7 @@ QA 를 서브에이전트에 맡길 때도 **프롬프트에 두 크기를 명�
 UI 를 건드렸으면 `qa` 단계를 실제로 채운다. 결과 건수를 사유에 적어둔다.
 
 ```
-py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 데스크톱/모바일 각 1회 N건. 390x844 와 1280x800 스크린샷 확인, 폰트·다크모드 포함'
+py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 390x844·360x840·1224x924 각 1회 N건. 앱 화면 여덟 크기 모바일 에뮬레이션 스크린샷 확인, 폰트·다크모드 포함'
 ```
 
 ### 하지 말 것
@@ -219,9 +239,10 @@ python backend/manage.py runserver
 # 2) 프론트
 cd frontend; npm run dev
 
-# 3) 스캔 (데스크톱 / 모바일)
-npx impeccable detect http://localhost:3000/learn/words
+# 3) 스캔 (앱 화면)
 npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words
+npx impeccable detect --viewport 360x840 http://localhost:3000/learn/words
+npx impeccable detect --viewport 1224x924 http://localhost:3000/learn/words
 ```
 
 ## 커밋 전 검증의 qa 단계
@@ -229,7 +250,7 @@ npx impeccable detect --viewport 390x844 http://localhost:3000/learn/words
 CLAUDE.md의 검증 5단계 중 `qa`는 "프론트 미구현"을 이유로 계속 `--skip` 상태였다. 이제 화면이 있으니 UI를 건드린 변경에서는 실제로 채운다.
 
 ```
-py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'impeccable audit + detect 데스크톱/모바일 N건. 390x844 와 1280x800 스크린샷 확인'
+py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'impeccable audit + detect 390x844·360x840·1224x924 N건. 앱 화면 여덟 크기 모바일 에뮬레이션 스크린샷 확인'
 ```
 
 `impeccable`의 훅 기능(`/impeccable hooks on`)은 **켜지 않는다.** devvoca에는 `check_verification` 훅이 있어서 "코드를 고치면 정적 검증부터 다시"를 강제한다. UI 파일 편집마다 탐지기가 자동으로 끼어들면 검증 지문이 계속 무효화된다. 수동으로만 부른다.
