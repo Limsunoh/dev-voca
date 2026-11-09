@@ -78,7 +78,7 @@ export function ConsentChecks({
         onChange={setDisclosure}
       >
         <span style={{ fontWeight: "var(--weight-bold)" }}>[필수]</span> 순위표에
-        이름과 사진이 공개되고, 정보가 해외 업체(미국·싱가포르)에 보관되는 것에
+        이름과 사진이 공개되고, 정보가 해외 업체(미국·싱가포르 등)에 보관되는 것에
         동의합니다
       </Check>
       <Check id="consent-age" checked={age} onChange={setAge}>
