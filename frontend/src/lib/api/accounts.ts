@@ -61,6 +61,7 @@ export function signUp(body: {
   password: string;
   display_name?: string;
   terms_agreed: boolean;
+  disclosure_agreed: boolean;
   age_confirmed: boolean;
 }): Promise<AuthResult> {
   return request("/api/accounts/signup/", { method: "POST", body });
@@ -85,6 +86,7 @@ export function logInWithGoogle(body: {
   redirect_uri: string;
   /** 가입 화면에서 동의하고 온 경우에만 싣는다. 새 계정을 만들 때 쓰인다. */
   terms_agreed?: boolean;
+  disclosure_agreed?: boolean;
   age_confirmed?: boolean;
 }): Promise<AuthResult> {
   return request("/api/accounts/google/", { method: "POST", body });
@@ -115,6 +117,19 @@ export function updateMe(
   body: { display_name?: string; avatar?: string },
 ): Promise<User> {
   return request("/api/accounts/me/", { method: "PATCH", body, token });
+}
+
+/**
+ * 계정 삭제. 되살릴 수 없다.
+ *
+ * 비밀번호가 있는 계정은 current_password, 구글로만 가입한 계정은 email 을
+ * 보낸다. 어느 쪽인지는 User.has_password 가 알려준다.
+ */
+export function deleteMe(
+  token: string,
+  body: { current_password: string } | { email: string },
+): Promise<void> {
+  return request("/api/accounts/me/", { method: "DELETE", body, token });
 }
 
 /**

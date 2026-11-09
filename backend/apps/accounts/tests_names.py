@@ -627,7 +627,7 @@ class DeleteUploadedPhotoTest(TestCase):
                 entry = self.logs_for(member).get()
                 self.assertEqual(entry.user, self.superuser)
                 self.assertEqual(entry.action_flag, CHANGE)
-                self.assertEqual(entry.object_repr, member.email)
+                self.assertEqual(entry.object_repr, f"회원 {member.pk}")
                 self.assertEqual(entry.get_change_message(), "올린 사진을 지웠습니다.")
 
     def test_사진_없는_회원에게는_기록이_남지_않는다(self):

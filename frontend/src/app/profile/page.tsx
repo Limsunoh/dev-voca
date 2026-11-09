@@ -4,11 +4,13 @@ import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/(auth)/actions";
 import {
   changePasswordAction,
+  deleteAccountAction,
   deletePhotoAction,
   requestEmailChangeAction,
   updateProfileAction,
   uploadPhotoAction,
 } from "@/app/profile/actions";
+import { DeleteAccount } from "@/app/profile/DeleteAccount";
 import { EmailCard } from "@/components/EmailCard";
 import { PasswordCard } from "@/components/PasswordCard";
 import { MyHistory } from "@/components/MyHistory";
@@ -25,7 +27,8 @@ export const metadata: Metadata = {
 /**
  * 내정보.
  *
- * 사진과 이름을 바꾸고, 순위를 보고, 계정 정보를 보고, 로그아웃한다.
+ * 사진과 이름을 바꾸고, 순위를 보고, 계정 정보를 보고, 로그아웃하거나
+ * 계정을 삭제한다.
  *
  * 순위는 세 종류(주간·전체·꾸준함)의 내 줄만 본다. 여기는 남과 비교하러
  * 오는 자리가 아니라 자기 상태를 보러 오는 자리라 스무 줄 목록이 필요
@@ -165,7 +168,46 @@ export default async function ProfilePage() {
             로그아웃
           </button>
         </form>
+
+        {/* 관리자는 서버가 거절하므로 눌러 봐야 막힌다. */}
+        {!user.is_staff && (
+          <div className="mt-3">
+            <DeleteAccount
+              action={deleteAccountAction}
+              hasPassword={user.has_password}
+              email={user.email}
+            />
+          </div>
+        )}
       </section>
+
+      <nav aria-label="문서" className="mt-6 flex justify-center gap-6 text-sm">
+        <DocLink href="/terms">이용약관</DocLink>
+        <DocLink href="/privacy">
+          <strong>개인정보 처리방침</strong>
+        </DocLink>
+      </nav>
     </main>
+  );
+}
+
+function DocLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      style={{ minHeight: "var(--hit-floor)", color: "var(--text-muted)" }}
+    >
+      {children}
+      <span className="sr-only"> (새 탭에서 열림)</span>
+    </a>
   );
 }

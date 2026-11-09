@@ -57,7 +57,9 @@ export async function GET(request: Request) {
       // 구글이 코드를 발급할 때 쓴 주소와 같아야 한다. 백엔드가 구글에
       // 확인을 요청할 때 이 값을 함께 보낸다.
       redirect_uri: callbackUrl(url.origin),
-      ...(consented ? { terms_agreed: true, age_confirmed: true } : {}),
+      ...(consented
+        ? { terms_agreed: true, disclosure_agreed: true, age_confirmed: true }
+        : {}),
     });
     await setToken(token);
   } catch (error) {
