@@ -463,7 +463,8 @@ export default async function VocabPage({ searchParams }: PageProps) {
                 reading={word.reading || undefined}
                 subtitle={word.meaning}
                 note={
-                  search && !matchVisible(search, word.term, word.meaning)
+                  search &&
+                  !matchVisible(search, word.term, word.meaning, word.aliases)
                     ? "설명에 검색어가 있습니다"
                     : undefined
                 }

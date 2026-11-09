@@ -11,7 +11,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import MD5, Cast, Collate, Concat, Lower
+from django.db.models.functions import MD5, Cast, Collate, Concat, Lower, Replace
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -136,9 +136,11 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         list_serializer   - 목록용
         detail_serializer - 상세/생성/수정용
         search_fields     - 앞 두 칸은 제목과 뜻 순서로 둔다(_rank_by_search)
+        alias_field       - 제목과 같은 순위를 줄 표기 칸. 없으면 None
     """
 
     permission_classes = [IsAuthenticatedOrReadOnly]
+    alias_field: str | None = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, ReadableOrdering]
     # is_exam·exam_subject 로 정처기 범위를 좁힌다.
     #
@@ -190,24 +192,43 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         정렬을 직접 고른 요청은 건드리지 않는다. 낱말은 SearchFilter 와 같은
         규칙으로 쪼갠다. 안 그러면 따옴표나 쉼표가 낀 검색어에 순위가 안 걸린다.
 
-        설명에만 있는 말은 뒤로 간다. "커밋" 으로 찾을 때의 commit 이 그렇다
-        (뜻은 "변경사항을 저장하다"). 이런 음역어는 단어에 한글 별칭이 있어야
-        올라온다.
+        "커밋" 처럼 소리로 옮긴 말은 제목에도 뜻에도 없다. alias_field 를 둔
+        목록은 그 칸의 항목 하나를 제목과 같게 친다.
         """
         if self.request.query_params.get("ordering"):
             return queryset
 
-        terms = filters.SearchFilter().get_search_terms(self.request)
+        terms = [t for t in filters.SearchFilter().get_search_terms(self.request) if t]
         if not terms:
             return queryset
 
         phrase = " ".join(terms)
         title, meaning = self.search_fields[:2]
+        exact = Q(**{f"{title}__iexact": phrase})
+        prefix = Q(**{f"{title}__istartswith": phrase})
+        contains = Q(*[(f"{title}__icontains", t) for t in terms])
+        # 쉼표는 표기 항목을 가르는 글자라 검색어에 있으면 항목과 맞을 수 없다.
+        if self.alias_field and "," not in phrase:
+            # "커밋, 커미트" 의 앞뒤에 쉼표를 붙이면 항목 경계를 LIKE 로 잴 수 있다.
+            queryset = queryset.alias(
+                _aliases=Concat(
+                    Value(","),
+                    Replace(self.alias_field, Value(", "), Value(",")),
+                    Value(","),
+                    output_field=CharField(),
+                )
+            )
+            exact |= Q(_aliases__icontains=f",{phrase},")
+            prefix |= Q(_aliases__icontains=f",{phrase}")
+            # 낱말 첫머리만 친다. "로그" 가 "프로그래밍" 에 걸려 뜻 일치보다 앞서면 안 된다.
+            contains |= Q(
+                *[Q(_aliases__icontains=f",{t}") | Q(_aliases__icontains=f" {t}") for t in terms]
+            )
         return queryset.annotate(
             _search_rank=Case(
-                When(**{f"{title}__iexact": phrase}, then=Value(0)),
-                When(**{f"{title}__istartswith": phrase}, then=Value(1)),
-                When(Q(*[(f"{title}__icontains", t) for t in terms]), then=Value(2)),
+                When(exact, then=Value(0)),
+                When(prefix, then=Value(1)),
+                When(contains, then=Value(2)),
                 When(Q(*[(f"{meaning}__icontains", t) for t in terms]), then=Value(3)),
                 default=Value(4),
                 output_field=IntegerField(),
@@ -334,7 +355,8 @@ class WordViewSet(LearningItemViewSet):
     list_serializer = WordListSerializer
     detail_serializer = WordDetailSerializer
 
-    search_fields = ["term", "meaning", "description"]
+    search_fields = ["term", "meaning", "aliases", "description"]
+    alias_field = "aliases"
     ordering_fields = ["term", "created_at", "difficulty"]
     ordering = ["term"]
     # 대소문자 무시 알파벳 순서로 정렬할 글자 필드(ReadableOrdering 참고).
