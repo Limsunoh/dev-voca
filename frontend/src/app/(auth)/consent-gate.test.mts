@@ -4,8 +4,8 @@
  * 실행: cd frontend && npm test
  *
  * 계약:
- *   - 처음에는 둘 다 꺼져 있고, 둘 다 켜야 잠금이 풀린다.
- *   - 잠긴 버튼을 누르면 제출·이동 없이 "두 항목을 모두 켜 주세요." 를 보여 주고
+ *   - 처음에는 모두 꺼져 있고, 셋 다 켜야 잠금이 풀린다.
+ *   - 잠긴 버튼을 누르면 제출·이동 없이 "세 항목을 모두 켜 주세요." 를 보여 주고
  *     아직 안 켠 칸으로 포커스를 옮긴다.
  *   - /login 에는 체크가 없다. 구글 링크에도 consent 가 붙지 않는다.
  *   - 제출에 실패하면 포커스가 오류 문구로 간다.
@@ -113,6 +113,7 @@ const login = (props: Record<string, unknown> = {}) =>
   createElement(AuthForm, { mode: "login", action: async () => ({}), ...props } as never);
 
 const TERMS = "consent-terms";
+const DISCLOSURE = "consent-disclosure";
 const AGE = "consent-age";
 
 function box(id: string): Record<string, unknown> {
@@ -145,7 +146,7 @@ const hiddenConsent = () =>
     .filter((h) => h.type === "input" && h.props.type === "hidden" && String(h.props.name).endsWith("ed"))
     .map((h) => [h.props.name, h.props.value]);
 
-const GUIDE = "두 항목을 모두 켜 주세요.";
+const GUIDE = "세 항목을 모두 켜 주세요.";
 
 /** document.getElementById 대역. 어느 칸으로 포커스를 옮겼는지 남긴다. */
 let focused: string[] = [];
@@ -167,8 +168,9 @@ afterEach(() => {
 describe("가입 화면: 처음 상태", () => {
   beforeEach(() => mount(signup()));
 
-  it("두 칸 모두 꺼져 있다", () => {
+  it("세 칸 모두 꺼져 있다", () => {
     assert.equal(box(TERMS).checked, false);
+    assert.equal(box(DISCLOSURE).checked, false);
     assert.equal(box(AGE).checked, false);
     assert.equal(box(TERMS).type, "checkbox");
   });
@@ -200,6 +202,7 @@ describe("가입 화면: 처음 상태", () => {
 
 for (const [label, id, hidden] of [
   ["약관만", TERMS, [["terms_agreed", "on"]]],
+  ["공개·해외만", DISCLOSURE, [["disclosure_agreed", "on"]]],
   ["나이만", AGE, [["age_confirmed", "on"]]],
 ] as const) {
   describe(`가입 화면: ${label} 켠 경우`, () => {
@@ -220,10 +223,11 @@ for (const [label, id, hidden] of [
   });
 }
 
-describe("가입 화면: 둘 다 켠 경우", () => {
+describe("가입 화면: 셋 다 켠 경우", () => {
   beforeEach(() => {
     mount(signup());
     tick(TERMS);
+    tick(DISCLOSURE);
     tick(AGE);
   });
 
@@ -237,9 +241,10 @@ describe("가입 화면: 둘 다 켠 경우", () => {
     assert.equal(submitButton().onClick, undefined);
   });
 
-  it("두 값이 숨은 칸으로 실린다", () => {
+  it("세 값이 숨은 칸으로 실린다", () => {
     assert.deepEqual(hiddenConsent(), [
       ["terms_agreed", "on"],
+      ["disclosure_agreed", "on"],
       ["age_confirmed", "on"],
     ]);
   });
@@ -250,12 +255,16 @@ describe("가입 화면: 둘 다 켠 경우", () => {
     assert.deepEqual(googleLinks(html), []);
     assert.ok(googleLock());
     assert.equal(submitButton()["aria-disabled"], true);
-    assert.deepEqual(hiddenConsent(), [["terms_agreed", "on"]]);
+    assert.deepEqual(hiddenConsent(), [
+      ["terms_agreed", "on"],
+      ["disclosure_agreed", "on"],
+    ]);
   });
 
   it("돌아갈 곳이 있으면 구글 링크에 같이 싣는다", () => {
     mount(signup({ next: "/board" }));
     tick(TERMS);
+    tick(DISCLOSURE);
     tick(AGE);
 
     assert.deepEqual(googleLinks(html), ['href="/api/auth/google?consent=1&amp;next=%2Fboard"']);
@@ -283,9 +292,21 @@ describe("가입 화면: 잠긴 버튼을 눌렀을 때", () => {
       assert.match(html, new RegExp(GUIDE));
     });
 
-    it(`${name}: 약관만 켰으면 나이 칸으로 포커스를 옮긴다`, () => {
+    it(`${name}: 약관만 켰으면 공개·해외 칸으로 포커스를 옮긴다`, () => {
       mount(signup());
       tick(TERMS);
+
+      press();
+      draw();
+
+      assert.deepEqual(focused, [DISCLOSURE]);
+      assert.match(html, new RegExp(GUIDE));
+    });
+
+    it(`${name}: 약관과 공개·해외를 켰으면 나이 칸으로 포커스를 옮긴다`, () => {
+      mount(signup());
+      tick(TERMS);
+      tick(DISCLOSURE);
 
       press();
       draw();
@@ -304,12 +325,13 @@ describe("가입 화면: 잠긴 버튼을 눌렀을 때", () => {
       assert.deepEqual(focused, [TERMS]);
     });
 
-    it(`${name}: 둘 다 켜면 안내가 사라진다`, () => {
+    it(`${name}: 셋 다 켜면 안내가 사라진다`, () => {
       mount(signup());
       press();
       draw();
 
       tick(TERMS);
+      tick(DISCLOSURE);
       tick(AGE);
 
       assert.doesNotMatch(html, new RegExp(GUIDE));
@@ -318,7 +340,7 @@ describe("가입 화면: 잠긴 버튼을 눌렀을 때", () => {
 });
 
 describe("가입 화면: 구글에서 되돌아온 안내", () => {
-  const NOTICE = "처음 오셨습니다. 아래 두 항목을 확인한 뒤 구글 버튼을 다시";
+  const NOTICE = "처음 오셨습니다. 아래 세 항목을 확인한 뒤 구글 버튼을 다시";
 
   it("consentRequired 면 안내를 보여 준다", () => {
     mount(signup({ consentRequired: true }));
@@ -371,6 +393,7 @@ describe("시작 화면: 구글로 시작하기", () => {
 
   it("처음에는 잠긴 버튼이다", () => {
     assert.equal(box(TERMS).checked, false);
+    assert.equal(box(DISCLOSURE).checked, false);
     assert.equal(box(AGE).checked, false);
     assert.deepEqual(googleLinks(html), []);
     assert.ok(googleLock());
@@ -378,6 +401,7 @@ describe("시작 화면: 구글로 시작하기", () => {
 
   for (const [label, id] of [
     ["약관만", TERMS],
+    ["공개·해외만", DISCLOSURE],
     ["나이만", AGE],
   ] as const) {
     it(`${label} 켜면 아직 잠겨 있다`, () => {
@@ -388,8 +412,9 @@ describe("시작 화면: 구글로 시작하기", () => {
     });
   }
 
-  it("둘 다 켜면 consent=1 링크가 된다", () => {
+  it("셋 다 켜면 consent=1 링크가 된다", () => {
     tick(TERMS);
+    tick(DISCLOSURE);
     tick(AGE);
 
     assert.deepEqual(googleLinks(html), ['href="/api/auth/google?consent=1"']);
@@ -402,7 +427,7 @@ describe("시작 화면: 구글로 시작하기", () => {
     (googleLock()?.onClick as () => void)();
     draw();
 
-    assert.deepEqual(focused, [AGE]);
+    assert.deepEqual(focused, [DISCLOSURE]);
     assert.match(html, new RegExp(GUIDE));
     assert.deepEqual(googleLinks(html), []);
   });

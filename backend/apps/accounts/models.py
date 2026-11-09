@@ -23,9 +23,12 @@ from django.utils import timezone
 
 from .forbidden_names import name_is_forbidden
 
-# 지금 약관·처리방침의 버전. 동의할 때 이 값을 함께 남긴다. 문서 내용이 바뀌면
-# 올린다. 그래야 누가 어느 버전에 동의했는지 나중에 가릴 수 있다.
-TERMS_VERSION = "v1"
+# 지금 약관·처리방침의 버전. 동의할 때 이 값을 함께 남긴다. 문서 내용이나 가입
+# 체크박스 문구, 보관 국가가 바뀌면 올린다. 그래야 누가 어느 버전에 동의했는지
+# 나중에 가릴 수 있다.
+#
+# v2: 순위표 공개·해외 보관 동의를 체크박스로 따로 받기 시작했다.
+TERMS_VERSION = "v2"
 
 # 화면에 그릴 수 있는 아바타. 실제 그림은 프론트가 SVG 로 들고 있고,
 # 여기서는 어느 것을 골랐는지만 저장한다. 이미지 파일을 서버에 두지
@@ -510,7 +513,9 @@ class User(AbstractUser):
         return f"{GENERATED_NAME_PREFIX}{secrets.randbelow(9_000_000) + 1_000_000}"
 
     def __str__(self) -> str:
-        return self.email
+        # 이메일을 돌려주지 않는다. 관리자 작업 기록이 이 글자를 그대로
+        # 저장해서(LogEntry.object_repr), 계정을 지워도 주소가 남는다.
+        return f"회원 {self.pk}"
 
     @property
     def name_for_display(self) -> str:

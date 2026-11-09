@@ -100,6 +100,7 @@ export async function signUpAction(
       password,
       ...(displayName ? { display_name: displayName } : {}),
       terms_agreed: formData.get("terms_agreed") === "on",
+      disclosure_agreed: formData.get("disclosure_agreed") === "on",
       age_confirmed: formData.get("age_confirmed") === "on",
     });
     await setToken(token);

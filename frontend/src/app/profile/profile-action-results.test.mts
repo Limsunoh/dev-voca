@@ -31,6 +31,7 @@ mock.module("@/lib/session", {
   namedExports: {
     async setToken() {},
     async clearToken() {},
+    async forgetToken() {},
     async getToken() {
       return "tok";
     },

@@ -163,7 +163,7 @@ export function AuthForm({
       {consentRequired && (
         <div className="mt-6">
           <Notice>
-            처음 오셨습니다. 아래 두 항목을 확인한 뒤 구글 버튼을 다시
+            처음 오셨습니다. 아래 세 항목을 확인한 뒤 구글 버튼을 다시
             눌러주세요.
           </Notice>
         </div>
@@ -182,7 +182,7 @@ export function AuthForm({
           코랄이 아니라 흰 버튼인 이유: 한 화면에 코랄은 하나뿐이고,
           그 자리는 아래 제출 버튼이 가진다.
 
-          가입 화면에서 두 항목을 안 켰으면 링크 대신 잠긴 버튼을 그린다.
+          가입 화면에서 세 항목을 안 켰으면 링크 대신 잠긴 버튼을 그린다.
           disabled 가 아니라 aria-disabled 다. 눌렀을 때 이유를 알려 줘야 해서
           포커스와 클릭을 받아야 한다.
 
@@ -229,6 +229,9 @@ export function AuthForm({
             이 칸으로 값을 보낸다. */}
         {isSignup && consent.terms && (
           <input type="hidden" name="terms_agreed" value="on" />
+        )}
+        {isSignup && consent.disclosure && (
+          <input type="hidden" name="disclosure_agreed" value="on" />
         )}
         {isSignup && consent.age && (
           <input type="hidden" name="age_confirmed" value="on" />

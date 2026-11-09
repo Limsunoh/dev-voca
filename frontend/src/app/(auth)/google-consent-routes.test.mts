@@ -213,6 +213,7 @@ describe("구글 콜백: 동의 값 싣기", () => {
       code: "c1",
       redirect_uri: `${ORIGIN}/api/auth/google/callback`,
       terms_agreed: true,
+      disclosure_agreed: true,
       age_confirmed: true,
     });
   });

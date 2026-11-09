@@ -180,8 +180,9 @@ class UserSerializer(serializers.ModelSerializer):
             ) from exc
 
 
-# 가입 동의 두 칸의 안내. 칸이 없거나, 꺼져 있거나, 값이 이상해도 같은 말을 한다.
+# 가입 동의 세 칸의 안내. 칸이 없거나, 꺼져 있거나, 값이 이상해도 같은 말을 한다.
 TERMS_REQUIRED = "이용약관과 개인정보 처리방침에 동의해주세요."
+DISCLOSURE_REQUIRED = "순위표 공개와 해외 보관에 동의해주세요."
 AGE_REQUIRED = "만 14세 이상만 가입할 수 있습니다."
 
 
@@ -199,10 +200,13 @@ class SignUpSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=254)
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
 
-    # 둘 다 켜야 가입된다. 화면의 체크박스는 안내이고, 실제로 막는 곳은 여기다.
+    # 셋 다 켜야 가입된다. 화면의 체크박스는 안내이고, 실제로 막는 곳은 여기다.
     # 화면을 거치지 않고 API 를 바로 불러도 동의 없는 계정이 생기면 안 된다.
     terms_agreed = serializers.BooleanField(
         write_only=True, error_messages=_consent_errors(TERMS_REQUIRED)
+    )
+    disclosure_agreed = serializers.BooleanField(
+        write_only=True, error_messages=_consent_errors(DISCLOSURE_REQUIRED)
     )
     age_confirmed = serializers.BooleanField(
         write_only=True, error_messages=_consent_errors(AGE_REQUIRED)
@@ -210,11 +214,23 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["email", "password", "display_name", "terms_agreed", "age_confirmed"]
+        fields = [
+            "email",
+            "password",
+            "display_name",
+            "terms_agreed",
+            "disclosure_agreed",
+            "age_confirmed",
+        ]
 
     def validate_terms_agreed(self, value: bool) -> bool:
         if not value:
             raise serializers.ValidationError(TERMS_REQUIRED)
+        return value
+
+    def validate_disclosure_agreed(self, value: bool) -> bool:
+        if not value:
+            raise serializers.ValidationError(DISCLOSURE_REQUIRED)
         return value
 
     def validate_age_confirmed(self, value: bool) -> bool:
@@ -268,8 +284,10 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> User:
         # 모델 칸이 아니라서 create_user 에 넘기면 터진다. 검사를 통과했다는
-        # 사실은 아래 시각으로 남는다.
+        # 사실은 아래 시각으로 남는다. 공개·해외 보관 동의는 칸을 따로 두지
+        # 않는다. 셋 다 켜야 여기까지 오므로 동의 시각과 버전이 곧 그 기록이다.
         validated_data.pop("terms_agreed")
+        validated_data.pop("disclosure_agreed")
         validated_data.pop("age_confirmed")
         agreed_at = timezone.now()
 

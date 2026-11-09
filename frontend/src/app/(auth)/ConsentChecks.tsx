@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 /**
- * 가입 동의 체크박스 두 개. 가입 화면과 시작 화면이 같이 쓴다.
+ * 가입 동의 체크박스 세 개. 가입 화면과 시작 화면이 같이 쓴다.
  *
  * 처음에는 꺼져 있다. 미리 켜 두면 사용자가 하지 않은 동의가 된다.
  *
@@ -14,9 +14,10 @@ import { useState } from "react";
  * 값이 사라진다. 새 탭이라 미리 불러올 일이 없어서 next/link 를 쓰지 않는다.
  */
 
-/** 체크 상태. 켠 것이 둘 다여야 ready 다. */
+/** 체크 상태. 셋 다 켜야 ready 다. */
 export function useConsent() {
   const [terms, setTerms] = useState(false);
+  const [disclosure, setDisclosure] = useState(false);
   const [age, setAge] = useState(false);
   const [nudged, setNudged] = useState(false);
 
@@ -24,13 +25,28 @@ export function useConsent() {
   // 그냥 무시하면 다 입력하고 Enter 를 눌러도 아무 일이 안 일어난다.
   function guide() {
     setNudged(true);
-    document.getElementById(terms ? "consent-age" : "consent-terms")?.focus();
+    const first = !terms
+      ? "consent-terms"
+      : !disclosure
+        ? "consent-disclosure"
+        : "consent-age";
+    document.getElementById(first)?.focus();
   }
 
-  return { terms, age, setTerms, setAge, ready: terms && age, nudged, guide };
+  return {
+    terms,
+    disclosure,
+    age,
+    setTerms,
+    setDisclosure,
+    setAge,
+    ready: terms && disclosure && age,
+    nudged,
+    guide,
+  };
 }
 
-/** 구글 시작 주소. 두 항목을 켠 뒤에만 이 주소로 보낸다. */
+/** 구글 시작 주소. 세 항목을 켠 뒤에만 이 주소로 보낸다. */
 export function googleConsentHref(next?: string): string {
   const query = new URLSearchParams({ consent: "1" });
   if (next) query.set("next", next);
@@ -41,8 +57,10 @@ type Props = ReturnType<typeof useConsent>;
 
 export function ConsentChecks({
   terms,
+  disclosure,
   age,
   setTerms,
+  setDisclosure,
   setAge,
   ready,
   nudged,
@@ -54,6 +72,15 @@ export function ConsentChecks({
         <DocLink href="/terms">이용약관</DocLink>과{" "}
         <DocLink href="/privacy">개인정보 처리방침</DocLink>에 동의합니다
       </Check>
+      <Check
+        id="consent-disclosure"
+        checked={disclosure}
+        onChange={setDisclosure}
+      >
+        <span style={{ fontWeight: "var(--weight-bold)" }}>[필수]</span> 순위표에
+        이름과 사진이 공개되고, 정보가 해외 업체(미국·싱가포르)에 보관되는 것에
+        동의합니다
+      </Check>
       <Check id="consent-age" checked={age} onChange={setAge}>
         <span style={{ fontWeight: "var(--weight-bold)" }}>[필수]</span> 만
         14세 이상입니다
@@ -63,7 +90,7 @@ export function ConsentChecks({
       <div aria-live="polite">
         {nudged && !ready && (
           <p className="text-sm" style={{ color: "var(--coral-deep)" }}>
-            두 항목을 모두 켜 주세요.
+            세 항목을 모두 켜 주세요.
           </p>
         )}
       </div>
