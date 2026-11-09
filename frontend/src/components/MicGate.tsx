@@ -80,7 +80,7 @@ export function MicGate({
       {copy.action && (
         <button
           type="button"
-          onClick={onAllow}
+          onClick={copy.reload ? () => window.location.reload() : onAllow}
           disabled={pending}
           // 이 화면의 유일한 코랄. 주된 동작이 하나여야 무엇을 눌러야 할지
           // 한눈에 보인다.
@@ -116,27 +116,38 @@ export function MicGate({
  */
 const COPY: Record<
   MicState,
-  { title: string; body: string; action?: string; showPrivacy?: boolean }
+  {
+    title: string;
+    body: string;
+    action?: string;
+    showPrivacy?: boolean;
+    /** 버튼이 권한을 묻는 대신 화면을 새로고침한다. */
+    reload?: boolean;
+  }
 > = {
   prompt: {
     title: "소리내어 읽어봅니다",
-    body: "화면에 뜨는 단어를 소리내어 읽으면 맞게 읽었는지 알려줍니다. 마이크를 한 번 켜야 합니다.",
+    body: "화면에 뜨는 말을 소리내어 읽으면 맞게 읽었는지 알려줍니다. 마이크를 한 번 켜야 합니다.",
     action: "마이크 켜기",
     showPrivacy: true,
   },
   granted: {
     title: "소리내어 읽어봅니다",
-    body: "화면에 뜨는 단어를 소리내어 읽으면 맞게 읽었는지 알려줍니다.",
+    body: "화면에 뜨는 말을 소리내어 읽으면 맞게 읽었는지 알려줍니다.",
     action: "시작하기",
     showPrivacy: true,
   },
   denied: {
     title: "마이크가 막혀 있습니다",
     body: "이 사이트의 마이크 사용이 거절된 상태입니다. 브라우저 주소창 왼쪽의 자물쇠(또는 슬라이더) 아이콘을 눌러 마이크를 허용으로 바꾸고 화면을 새로고침해주세요.",
+    action: "새로고침",
+    reload: true,
   },
   "no-device": {
     title: "마이크를 찾지 못했습니다",
     body: "이 기기에 마이크가 없거나 연결되지 않았습니다. 마이크를 연결한 뒤 화면을 새로고침해주세요. 이어폰에 달린 마이크도 됩니다.",
+    action: "새로고침",
+    reload: true,
   },
   insecure: {
     title: "안전한 연결에서만 됩니다",
