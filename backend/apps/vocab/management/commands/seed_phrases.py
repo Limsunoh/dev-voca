@@ -89,6 +89,12 @@ reading_reviewed 같은 칸 단위 게이트가 없어서(visible_reading 이 �
         으로 넣기로 정했다. 이 True 의 근거는 그 결정이다. 형식 검사와
         Claude 의 검토만으로 켠 것이 아니다.
 
+    내용(207개 전부, 2026-11-09)
+        사용자 지시로 Claude 가 표현·발음·뜻을 다시 읽었다. 사람이 읽은
+        것은 아니다. 고친 것: do you take card 를 복수로, is this seat
+        taken 의 뜻이 반대로 읽히던 것, is this on sale 의 뜻이 질문이 아니던
+        것, my pleasure 의 뜻, appointment 의 뜻 표기.
+
 다음에 크게 늘릴 때는 이 문단도 같이 고친다. 여기는 근거를 적는
 자리라, 숫자만 바꾸면 근거 없는 숫자로 게이트를 여는 셈이다.
 tests_phrases 의 개수 테스트가 그 확인을 강제한다.
@@ -138,7 +144,7 @@ PHRASES: list[tuple[str, str, str, str, str, int]] = [
     ("I'd like to order", "/aɪd laɪk tə ˈɔrdər/", "아이d 라익 투 **오r**더r", "주문할게요", SHOP, N),
     ("can I get a refill", "/kæn aɪ ɡɛt ə ˈrifɪl/", "캔 아이 겥 어 **리**f일", "리필 해주세요", SHOP, N),
     ("for here or to go", "/fɔr hir ɔr tə ɡoʊ/", "f오r **히**어r 오r 투 고우", "먹고 가세요 아니면 가져가세요", SHOP, N),
-    ("do you take card", "/du ju teɪk kɑrd/", "두 유 테익 **카**rd", "카드 받으세요", SHOP, E),
+    ("do you take cards", "/du ju teɪk kɑrdz/", "두 유 테익 **카**rdz", "카드 받으세요", SHOP, E),
     ("just looking", "/dʒʌst ˈlʊkɪŋ/", "저s트 **루**킹", "그냥 보는 거예요", SHOP, E),
     ("can I try this on", "/kæn aɪ traɪ ðɪs ɔn/", "캔 아이 **트**라이 디s 온", "이거 입어봐도 되나요", SHOP, N),
     ("receipt please", "/rɪˈsit pliz/", "리**씨**t 플리z", "영수증 주세요", SHOP, N),
@@ -153,7 +159,7 @@ PHRASES: list[tuple[str, str, str, str, str, int]] = [
     ("over there", "/ˈoʊvər ðɛr/", "**오**우버r 데어r", "저쪽이요", ASK, E),
     ("right now", "/raɪt naʊ/", "**라**잍 나우", "지금 바로요", ASK, E),
     ("what time is it", "/wʌt taɪm ɪz ɪt/", "**왓** 타임 이z 잍", "몇 시예요", ASK, E),
-    ("is this seat taken", "/ɪz ðɪs sit ˈteɪkən/", "이z 디s 씯 **테**이컨", "이 자리 비었나요", ASK, N),
+    ("is this seat taken", "/ɪz ðɪs sit ˈteɪkən/", "이z 디s 씯 **테**이컨", "이 자리 주인 있나요", ASK, N),
     ("can you help me", "/kæn ju hɛlp mi/", "캔 유 **헬**p 미", "도와주실 수 있나요", ASK, E),
     # 곤란할 때
     ("could you say that again", "/kʊd ju seɪ ðæt əˈɡɛn/", "쿠d 유 쎄이 댙 어**겐**", "다시 말씀해 주세요", TROUBLE, H),
@@ -181,7 +187,7 @@ PHRASES: list[tuple[str, str, str, str, str, int]] = [
     ("comfortable", "/ˈkʌmftərbəl/", "**컴**f터r벌", "편안한", TALK, H),
     ("vegetable", "/ˈvɛdʒtəbəl/", "**v에**지터벌", "채소", SHOP, H),
     ("refrigerator", "/rɪˈfrɪdʒəreɪtər/", "리**f리**저레이터r", "냉장고", SHOP, H),
-    ("appointment", "/əˈpɔɪntmənt/", "어**포**인t먼t", "약속 예약", ASK, N),
+    ("appointment", "/əˈpɔɪntmənt/", "어**포**인t먼t", "약속·예약", ASK, N),
     ("pharmacy", "/ˈfɑrməsi/", "**f아**r머씨", "약국", ASK, N),
     ("umbrella", "/ʌmˈbrɛlə/", "엄**브렐**러", "우산", SHOP, N),
     ("neighborhood", "/ˈneɪbərhʊd/", "**네**이버r훗", "동네", TALK, N),
@@ -202,7 +208,7 @@ PHRASES: list[tuple[str, str, str, str, str, int]] = [
     ("talk to you later", "/tɔk tə ju ˈleɪtər/", "톡 투 유 **레**이터r", "나중에 얘기해요", GREET, N),
     ("thanks for coming", "/θæŋks fɔr ˈkʌmɪŋ/", "th앵ks f오r **커**밍", "와줘서 고마워요", GREET, N),
     ("you're welcome", "/jʊr ˈwɛlkəm/", "유어r **웰**컴", "천만에요", GREET, E),
-    ("my pleasure", "/maɪ ˈplɛʒər/", "마이 **플레**저r", "제가 더 기쁩니다", GREET, N),
+    ("my pleasure", "/maɪ ˈplɛʒər/", "마이 **플레**저r", "별말씀을요", GREET, N),
     ("how's everything", "/haʊz ˈɛvriθɪŋ/", "하우z **에**v리th잉", "요즘 다 괜찮아요? 하고 묻는 인사", GREET, N),
     ("this is my colleague", "/ðɪs ɪz maɪ ˈkɑliɡ/", "디s 이z 마이 **칼**리그", "제 동료입니다", GREET, N),
     ("glad to hear that", "/ɡlæd tə hir ðæt/", "글랟 투 히어r **댙**", "그렇다니 다행이에요", GREET, N),
@@ -221,7 +227,7 @@ PHRASES: list[tuple[str, str, str, str, str, int]] = [
     ("can I pay by card", "/kæn aɪ peɪ baɪ kɑrd/", "캔 아이 페이 바이 **카**rd", "카드로 결제해도 되나요", SHOP, N),
     ("do you accept cash", "/du ju əkˈsɛpt kæʃ/", "두 유 억**셉**t 캐시", "현금 받으세요", SHOP, N),
     ("can I get a discount", "/kæn aɪ ɡɛt ə ˈdɪskaʊnt/", "캔 아이 겥 어 **디**s카운t", "할인 되나요", SHOP, N),
-    ("is this on sale", "/ɪz ðɪs ɔn seɪl/", "이z 디s 온 **쎄**일", "이거 세일 중이에요", SHOP, E),
+    ("is this on sale", "/ɪz ðɪs ɔn seɪl/", "이z 디s 온 **쎄**일", "이거 세일 중인가요", SHOP, E),
     ("I'd like to return this", "/aɪd laɪk tə rɪˈtɜrn ðɪs/", "아이d 라익 투 리**턴** 디s", "이거 반품하고 싶어요", SHOP, H),
     ("can I exchange this", "/kæn aɪ ɪksˈtʃeɪndʒ ðɪs/", "캔 아이 익s**체**인지 디s", "교환 되나요", SHOP, N),
     ("do you have a bag", "/du ju hæv ə bæɡ/", "두 유 해v 어 **백**", "봉투 있나요", SHOP, E),
