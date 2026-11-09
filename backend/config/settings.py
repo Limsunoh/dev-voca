@@ -346,6 +346,7 @@ CACHES = {
 }
 
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "config.exceptions.exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     # 토큰이 먼저다. API 요청은 Next 서버가 Authorization 헤더로 보낸다.
@@ -409,6 +410,8 @@ REST_FRAMEWORK = {
         # 있다. 로그인 통(auth_email)과 따로 두는 이유는 세는 단위가 달라서다 -
         # 저쪽은 이메일, 여기는 이미 로그인한 계정이다.
         "password_change": "2000/min" if sys.argv[1:2] == ["test"] else "5/min",
+        # 이름·아바타 저장. 사람이 분당 서른 번 저장할 일은 없다.
+        "profile_update": "2000/min" if sys.argv[1:2] == ["test"] else "30/min",
         # 사진 올리기. 요청 하나가 5MB 를 받아 Pillow 로 열고 줄이는,
         # 이 앱에서 제일 비싼 자리다. 사람이 프로필 사진을 고르는 일은
         # 몇 번 안 되므로 스무 번이면 넉넉하다.

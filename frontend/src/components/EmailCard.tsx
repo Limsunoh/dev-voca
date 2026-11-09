@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { EmailChangeState } from "@/app/profile/actions";
+import { FormError } from "@/components/FormError";
 
 /**
  * 이메일을 바꾸는 카드.
@@ -184,18 +185,7 @@ export function EmailCard({
             </p>
           </div>
 
-          {state.error && (
-            <p
-              role="alert"
-              className="rounded-[var(--radius-xl)] p-3 text-sm"
-              style={{
-                background: "var(--wrong-soft)",
-                color: "var(--coral-deep)",
-              }}
-            >
-              {state.error}
-            </p>
-          )}
+          <FormError state={state} />
 
           {state.sentTo && !state.error && (
             // "저장했습니다" 라고 쓰지 않는다. 아직 안 바뀌었다.

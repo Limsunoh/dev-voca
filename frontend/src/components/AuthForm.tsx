@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/app/(auth)/ConsentChecks";
 import type { FormState } from "@/app/(auth)/actions";
 import { continueAsGuestAction } from "@/app/start/actions";
+import { useFocusOnError } from "@/components/useFocusOnError";
 
 /**
  * 로그인·가입 폼.
@@ -56,6 +57,7 @@ const PASSWORD_MIN = 8;
 const COPY = {
   login: {
     title: "로그인",
+    lede: "로그인하면 푼 문제와 틀린 단어가 기기를 옮겨도 이어집니다.",
     submit: "로그인",
     pending: "로그인하는 중",
     switchText: "계정이 없으신가요?",
@@ -64,6 +66,7 @@ const COPY = {
   },
   signup: {
     title: "가입하기",
+    lede: "가입하면 푼 문제와 틀린 단어가 기기를 옮겨도 이어집니다.",
     submit: "가입하기",
     pending: "가입하는 중",
     switchText: "이미 계정이 있으신가요?",
@@ -120,12 +123,8 @@ export function AuthForm({
       ? `/api/auth/google?next=${encodeURIComponent(next)}`
       : "/api/auth/google";
 
-  // 제출에 실패하면 포커스를 오류 문구로 옮긴다. 키보드로 쓰는 사람이
-  // 제출 버튼에 그대로 머물면 무엇이 틀렸는지 찾아가야 한다.
-  const errorRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (state.error) errorRef.current?.focus();
-  }, [state]);
+  // 제출에 실패하면 오류 문구를 보이게 한다. 동작은 훅의 주석에 있다.
+  const errorRef = useFocusOnError(state);
 
   // 구글 버튼 모양. 눌리는 링크와 잠긴 버튼이 같은 모양이어야 한다.
   const googleClass =
@@ -151,7 +150,7 @@ export function AuthForm({
         {copy.title}
       </h1>
       <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
-        로그인하면 푼 문제와 틀린 단어가 기기를 옮겨도 이어집니다.
+        {copy.lede}
       </p>
 
       {googleFailed && (
@@ -298,7 +297,7 @@ export function AuthForm({
             실패해도 폼이 그대로 남으므로 무언가 일어났다는 표시는 이 알림뿐이다.
             알림이 안 읽히면 화면을 못 보는 사용자에게는 아무 일도 안 일어난
             것과 같다. */}
-        <div aria-live="polite">
+        <div aria-live="polite" className="contents">
           {state.error && <Notice focusRef={errorRef}>{state.error}</Notice>}
         </div>
 

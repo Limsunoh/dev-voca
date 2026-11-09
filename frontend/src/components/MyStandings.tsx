@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import type { BoardKind, BoardRow } from "@/lib/api/leaderboards";
-import { BOARD_KINDS, BOARD_LABELS } from "@/lib/api/leaderboards";
+import { BOARD_KINDS, BOARD_LABELS, shownRank } from "@/lib/api/leaderboards";
 import { routes } from "@/lib/routes";
 
 /**
@@ -113,6 +113,7 @@ export function MyStandings({
 
 function StandingCell({ kind, row }: { kind: BoardKind; row?: BoardRow }) {
   const labels = BOARD_LABELS[kind];
+  const rank = row ? shownRank(kind, row) : null;
 
   return (
     // 칸 안에 두께를 또 얹지 않는다. 카드 안의 카드가 되어 층이 둘이 된다.
@@ -162,11 +163,11 @@ function StandingCell({ kind, row }: { kind: BoardKind; row?: BoardRow }) {
           <span
             className="mt-0.5 block text-xs tabular-nums"
             style={{
-              color: "var(--coral-deep)",
+              color: rank === null ? "var(--text-muted)" : "var(--coral-deep)",
               fontWeight: "var(--weight-bold)",
             }}
           >
-            {row.rank}위
+            {rank === null ? "-" : `${rank}위`}
           </span>
         </dd>
       ) : (

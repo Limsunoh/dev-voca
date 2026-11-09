@@ -34,12 +34,18 @@ function first(value: string | string[] | undefined): string | undefined {
  */
 export default async function TestSentencesPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const category = first(params.category);
   // 상세의 "문제 풀기" 가 붙여 온다. 첫 문제만 이것으로 낸다.
   const item = first(params.item);
 
   // 분류 목록은 실패해도 빈 배열이라 화면을 막지 않는다.
   const categories = await getSentenceCategories();
+
+  // 없는 분류는 "전체" 로 낸다. 이유는 test/words 쪽에 적어뒀다.
+  const asked = first(params.category);
+  const category =
+    categories.length === 0 || categories.some((c) => c.value === asked)
+      ? asked
+      : undefined;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pt-4 pb-10">
@@ -74,25 +80,22 @@ export default async function TestSentencesPage({ searchParams }: PageProps) {
 
       <ContentTabs mode="test" current="sentences" warnOnLeave />
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        {/* key 로 분류를 넘겨 주소가 바뀌면 새로 만든다. 뒤로가기로 돌아올
-            때 메뉴가 열린 채 남아 보기 버튼을 덮는 것을 막는다. */}
-        <CategoryPicker
-          key={category ?? "all"}
-          options={categories}
-          basePath={contentPath("test", "sentences")}
-          selected={category}
-        />
-      </div>
-
       {/* key 로 분류를 넘긴다. 분류가 바뀌면 판을 새로 만들어야 점수와
-          방금 푼 목록이 함께 초기화된다. 항목을 key 에 넣지 않는 이유는
-          test/words/page.tsx 에 적었다. */}
+          방금 푼 목록이 함께 초기화된다. 항목을 key 에 넣지 않는 이유와
+          고르개를 판에 넘기는 이유는 test/words/page.tsx 에 적었다. */}
       <QuizBoard
         key={category ?? "all"}
         category={category}
         item={item}
         content="sentences"
+        picker={
+          <CategoryPicker
+            key={category ?? "all"}
+            options={categories}
+            basePath={contentPath("test", "sentences")}
+            selected={category}
+          />
+        }
       />
     </main>
   );
