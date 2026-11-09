@@ -167,8 +167,10 @@ CREATE SCHEMA public;
 
 ```
 railway ssh --service web "python backend/manage.py seed_words"
+railway ssh --service web "python backend/manage.py seed_words_more"
 railway ssh --service web "python backend/manage.py seed_sentences"
-railway ssh --service web "python backend/manage.py seed_phrases"
+railway ssh --service web "python backend/manage.py seed_sentences_more"
+railway ssh --service web "python backend/manage.py seed_phrases --reset"
 railway ssh --service web
 # 붙은 뒤 셸에서: python backend/manage.py createsuperuser
 ```

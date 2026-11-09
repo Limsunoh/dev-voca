@@ -11,7 +11,7 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 
 | 항목 | 값 |
 |---|---|
-| 스택 | Next.js 16.2.12 + React 19.2.4 + Tailwind v4 |
+| 스택 | Next.js 16.4.5 + React 19.2.4 + Tailwind v4 |
 | 런타임 의존성 | `next`, `react`, `react-dom` **셋뿐** |
 | 폰트 | Noto Sans KR(본문) + JetBrains Mono(영어 용어·에러 메시지), `next/font/google` |
 | 팔레트 | 크림 바탕(`--background` #fff6e9) + 흰 카드(`--paper`) + 코랄 강조(`--coral` #ef5b3c) + 잉크(`--foreground` #191512) |
@@ -96,8 +96,7 @@ Ionic 팀이 만든 Next.js 스타터조차 `next export` 로 SPA 를 뽑고 라
 
 ## 지금 손볼 곳 (2026-10-13 확인)
 
-1. **`public/` 안 미사용 파일 5개** — `next.svg`, `vercel.svg`, `globe.svg`, `window.svg`, `file.svg`가 `src` 어디에서도 참조되지 않는다. create-next-app 잔해다.
-2. **`frontend/README.md`** — create-next-app 기본 문구 그대로다. 진짜 "템플릿 티"는 여기 남아 있다.
+1. **`frontend/README.md`** — create-next-app 기본 문구 그대로다. 진짜 "템플릿 티"는 여기 남아 있다.
 
 홈의 `min-h-screen`(iOS 주소창에서 레이아웃이 튀던 것)과 Geist 폰트(Noto Sans KR + JetBrains Mono 로 바꿈)는 해결됐다.
 
