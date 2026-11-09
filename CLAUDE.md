@@ -188,21 +188,34 @@ py ~/.claude/hooks/record_verification.py --show
 | `review_skill` | `.claude/agents/devvoca-reviewer.md` (전역 code-reviewer 스킬 대신 — 도메인 규칙을 안다) |
 | `qa` | UI 를 건드린 변경이면 `impeccable` 로 채운다 — 절차는 `.claude/skills/devvoca-design/SKILL.md`. 백엔드·프론트 무관한 변경이면 `--skip` |
 
-**화면 QA 는 두 크기를 반드시 다 본다.** 하나만 보고 기록하지 않는다.
+**화면 QA 는 앱 화면으로 본다. 데스크톱 크기는 보지 않는다.** devvoca 는 웹이 아니라 앱으로 출시한다.
 
 | 크기 | 용도 |
 |---|---|
-| 390 x 844 | 폰 (iPhone 기준) |
-| 1280 x 800 | 데스크톱 |
+| 390 x 844 | 기준 폰 (iPhone) |
+| 360 x 640 | 작은 안드로이드 폰. 줄바꿈과 넘침이 여기서 먼저 깨진다 |
 
-`mcp__playwright__browser_resize` 로 바꾸고 각각 스크린샷을 찍어 눈으로 확인한다. QA 를 서브에이전트에 맡길 때도 **프롬프트에 두 크기를 명시**한다.
+창 크기만 줄이면(`browser_resize`) 앱 화면이 아니다. 데스크톱 브라우저의 스크롤바가 폭을 차지해 줄바꿈이 실제 폰과 달라지고 터치도 꺼져 있다. 모바일 에뮬레이션으로 연다.
 
-데스크톱만 보면 여백이 넉넉해 겹침·넘침이 안 보인다. 2026-08-12 로그인 화면에서 실제로 그랬다 — 머리말이 두 번 나오고 홈에 스크롤이 생겼는데 데스크톱에서는 둘 다 안 띄었고, 모바일로 보자마자 드러났다. 타겟이 주니어 개발자라 폰으로 볼 일이 많다.
+```js
+// mcp__playwright__browser_run_code_unsafe
+const ctx = await page.context().browser().newContext({
+  viewport: { width: 390, height: 844 },
+  isMobile: true,
+  hasTouch: true,
+  deviceScaleFactor: 3,
+});
+const phone = await ctx.newPage();
+```
+
+크기마다 스크린샷을 찍어 배치, 줄바꿈, 하단 탭바에 가리는 곳을 눈으로 확인한다. QA 를 서브에이전트에 맡길 때도 **프롬프트에 앱 화면 두 크기와 에뮬레이션을 명시**한다.
+
+**왜 이렇게 정했나**: 2026-11-09 사용자 지적. 앱으로 출시한다고 여러 번 말했는데 세션들이 넓은 데스크톱 화면까지 웹으로 보고 있었다. 앱 화면으로 봐야 배치와 구성, 줄바꿈이 제대로 보인다.
 
 기록:
 ```
 py ~/.claude/hooks/record_verification.py static --agent static-verifier --note '...'
-py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 데스크톱/모바일 각 1회, N건'
+py ~/.claude/hooks/record_verification.py qa --agent impeccable --note 'detect 390x844·360x640 각 1회, N건. 모바일 에뮬레이션 스크린샷 확인'
 py ~/.claude/hooks/record_verification.py qa --skip --note 'UI 변경 없음 - 백엔드만'
 ```
 
