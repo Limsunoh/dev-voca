@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { continueAsGuestAction } from "@/app/start/actions";
+import { StartGoogle } from "@/app/start/StartGoogle";
 import { getCurrentUser, isGuestChosen } from "@/lib/session";
 
 export const metadata: Metadata = {
@@ -68,22 +69,7 @@ export default async function StartPage() {
 
       <div className="rise flex flex-col gap-3 [animation-delay:240ms]">
         {/* 구글을 먼저 둔다. 점수와 순위가 남는 쪽이 본래 모습이다. */}
-        <a
-          href="/api/auth/google"
-          className="dv-btn flex items-center justify-center rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          style={
-            {
-              minHeight: "var(--hit-min)",
-              background: "var(--coral)",
-              color: "var(--text-on-color)",
-              "--lift": "var(--lift-button)",
-              fontWeight: "var(--weight-black)",
-              letterSpacing: "var(--tracking-tight)",
-            } as React.CSSProperties
-          }
-        >
-          구글로 시작하기
-        </a>
+        <StartGoogle />
 
         <form action={continueAsGuestAction}>
           <button
@@ -104,8 +90,9 @@ export default async function StartPage() {
           </button>
         </form>
 
-        {/* 이메일 로그인은 접어둔다. 앱에서 쓸 주된 길이 아니고, 셋을
-              나란히 두면 무엇을 고를지 한 박자 늦어진다. */}
+        {/* 로그인은 접어둔다. 앱에서 쓸 주된 길이 아니고, 셋을 나란히 두면
+              무엇을 고를지 한 박자 늦어진다. 구글로 가입한 기존 회원도 이
+              길로 간다. 로그인 화면의 구글 버튼에는 체크가 없다. */}
         <p
           className="mt-1 text-center text-sm"
           style={{ color: "var(--text-muted)" }}
@@ -119,7 +106,7 @@ export default async function StartPage() {
               fontWeight: "var(--weight-bold)",
             }}
           >
-            이메일로 로그인
+            로그인
           </Link>
         </p>
 

@@ -14,7 +14,8 @@ import { clearToken, getToken, setToken } from "@/lib/session";
  * 브라우저를 거치지 않는다. 백엔드 응답의 토큰을 그 자리에서 httpOnly
  * 쿠키에 넣고, 브라우저에는 결과 화면만 돌려준다.
  *
- * 자바스크립트가 꺼져 있어도 동작한다는 부수 효과도 있다.
+ * 로그인은 자바스크립트가 꺼져 있어도 동작한다는 부수 효과도 있다. 가입은
+ * 동의 체크가 화면 상태라 자바스크립트가 필요하다.
  */
 
 /**
@@ -98,6 +99,8 @@ export async function signUpAction(
       email,
       password,
       ...(displayName ? { display_name: displayName } : {}),
+      terms_agreed: formData.get("terms_agreed") === "on",
+      age_confirmed: formData.get("age_confirmed") === "on",
     });
     await setToken(token);
   } catch (error) {

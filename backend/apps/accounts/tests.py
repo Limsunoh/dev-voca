@@ -63,10 +63,13 @@ REDIRECT_URI = "http://localhost:3000/api/auth/google/callback"
 # 검사기를 통과하는 비밀번호. 짧거나 흔하면 가입 자체가 막힌다.
 PASSWORD = "devvoca-pass-8821"
 
+# 가입과 구글 첫 로그인에 필요한 동의 값. 동의 자체의 검사는 tests_consent 가 본다.
+CONSENT = {"terms_agreed": True, "age_confirmed": True}
+
 
 class SignUpTest(TestCase):
     def signup(self, **body):
-        payload = {"email": "a@example.com", "password": PASSWORD, **body}
+        payload = {"email": "a@example.com", "password": PASSWORD, **CONSENT, **body}
         return self.client.post(SIGNUP_URL, payload, content_type="application/json")
 
     def test_creates_user_and_returns_token(self):
@@ -570,7 +573,7 @@ class GoogleLoginTest(TestCase):
         cache.clear()
 
     def google(self, **body):
-        payload = {"code": "구글이-준-코드", "redirect_uri": REDIRECT_URI, **body}
+        payload = {"code": "구글이-준-코드", "redirect_uri": REDIRECT_URI, **CONSENT, **body}
         return self.client.post(
             GOOGLE_URL, payload, content_type="application/json"
         )
@@ -1137,7 +1140,7 @@ class DisplayNameRulesTest(TestCase):
         )
 
     def signup(self, **body):
-        payload = {"email": "new@example.com", "password": PASSWORD, **body}
+        payload = {"email": "new@example.com", "password": PASSWORD, **CONSENT, **body}
         return self.client.post(SIGNUP_URL, payload, content_type="application/json")
 
     def test_signup_says_the_name_is_taken_not_the_email(self):

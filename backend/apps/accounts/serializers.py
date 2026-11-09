@@ -21,6 +21,7 @@ from .models import (
     AVATAR_PHOTO,
     AVATAR_PHOTO_MAX_BYTES,
     DISPLAY_NAME_MAX,
+    TERMS_VERSION,
     AvatarPhotoError,
     name_taken,
     normalize_display_name,
@@ -171,6 +172,15 @@ class UserSerializer(serializers.ModelSerializer):
             ) from exc
 
 
+# 가입 동의 두 칸의 안내. 칸이 없거나, 꺼져 있거나, 값이 이상해도 같은 말을 한다.
+TERMS_REQUIRED = "이용약관과 개인정보 처리방침에 동의해주세요."
+AGE_REQUIRED = "만 14세 이상만 가입할 수 있습니다."
+
+
+def _consent_errors(message: str) -> dict[str, str]:
+    return {"required": message, "null": message, "invalid": message}
+
+
 class SignUpSerializer(serializers.ModelSerializer):
     """이메일 가입."""
 
@@ -181,9 +191,28 @@ class SignUpSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=254)
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
 
+    # 둘 다 켜야 가입된다. 화면의 체크박스는 안내이고, 실제로 막는 곳은 여기다.
+    # 화면을 거치지 않고 API 를 바로 불러도 동의 없는 계정이 생기면 안 된다.
+    terms_agreed = serializers.BooleanField(
+        write_only=True, error_messages=_consent_errors(TERMS_REQUIRED)
+    )
+    age_confirmed = serializers.BooleanField(
+        write_only=True, error_messages=_consent_errors(AGE_REQUIRED)
+    )
+
     class Meta:
         model = User
-        fields = ["email", "password", "display_name"]
+        fields = ["email", "password", "display_name", "terms_agreed", "age_confirmed"]
+
+    def validate_terms_agreed(self, value: bool) -> bool:
+        if not value:
+            raise serializers.ValidationError(TERMS_REQUIRED)
+        return value
+
+    def validate_age_confirmed(self, value: bool) -> bool:
+        if not value:
+            raise serializers.ValidationError(AGE_REQUIRED)
+        return value
 
     def validate_display_name(self, value: str) -> str:
         return validate_display_name(value)
@@ -230,9 +259,20 @@ class SignUpSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data: dict) -> User:
+        # 모델 칸이 아니라서 create_user 에 넘기면 터진다. 검사를 통과했다는
+        # 사실은 아래 시각으로 남는다.
+        validated_data.pop("terms_agreed")
+        validated_data.pop("age_confirmed")
+        agreed_at = timezone.now()
+
         # create_user 를 거쳐야 비밀번호가 해시된다.
         try:
-            return User.objects.create_user(**validated_data)
+            return User.objects.create_user(
+                **validated_data,
+                terms_agreed_at=agreed_at,
+                terms_version=TERMS_VERSION,
+                age_confirmed_at=agreed_at,
+            )
         except IntegrityError as exc:
             # 위에서 중복을 확인했지만 그 사이 다른 요청이 먼저 들어올 수
             # 있다. DB 가 막아준 것을 500 대신 안내로 바꾼다.

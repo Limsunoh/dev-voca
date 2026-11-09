@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 
+import {
+  ConsentChecks,
+  GoogleNameNote,
+  googleConsentHref,
+  useConsent,
+} from "@/app/(auth)/ConsentChecks";
 import type { FormState } from "@/app/(auth)/actions";
 import { continueAsGuestAction } from "@/app/start/actions";
 
@@ -30,6 +36,8 @@ type Props = {
   next?: string;
   /** 구글 로그인이 실패해 돌아온 경우. */
   googleFailed?: boolean;
+  /** 구글로 왔는데 새 계정이고 동의 값이 없어 되돌아온 경우. */
+  consentRequired?: boolean;
 };
 
 /**
@@ -67,15 +75,23 @@ const COPY = {
 /**
  * 알림 상자(구글 실패·폼 에러).
  *
- * 테두리가 아니라 옅은 채움으로 구분한다. 이 디자인은 경계를 테두리가
- * 아니라 채움과 두께로 만든다 - 크림 바탕에 1px 선을 그으면 그것만
- * 다른 시대의 화면처럼 보인다.
+ * 테두리가 아니라 옅은 채움으로 구분한다. 입력칸과 달리 눌러서 쓰는 곳이
+ * 아니라 경계가 또렷할 필요가 없다.
  */
-function Notice({ children }: { children: React.ReactNode }) {
+function Notice({
+  children,
+  focusRef,
+}: {
+  children: React.ReactNode;
+  /** 나타날 때 포커스를 받아야 하면 넘긴다. */
+  focusRef?: React.Ref<HTMLParagraphElement>;
+}) {
   return (
     <p
+      ref={focusRef}
+      tabIndex={focusRef ? -1 : undefined}
       role="alert"
-      className="rounded-[var(--radius-xl)] p-3 text-sm"
+      className="rounded-[var(--radius-xl)] p-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       style={{
         background: "var(--amber-soft)",
         color: "var(--amber-deep)",
@@ -86,13 +102,42 @@ function Notice({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function AuthForm({ mode, action, next, googleFailed }: Props) {
+export function AuthForm({
+  mode,
+  action,
+  next,
+  googleFailed,
+  consentRequired,
+}: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(action, {});
   const copy = COPY[mode];
+  const isSignup = mode === "signup";
+  const consent = useConsent();
 
-  const googleHref = next
-    ? `/api/auth/google?next=${encodeURIComponent(next)}`
-    : "/api/auth/google";
+  const googleHref = isSignup
+    ? googleConsentHref(next)
+    : next
+      ? `/api/auth/google?next=${encodeURIComponent(next)}`
+      : "/api/auth/google";
+
+  // 제출에 실패하면 포커스를 오류 문구로 옮긴다. 키보드로 쓰는 사람이
+  // 제출 버튼에 그대로 머물면 무엇이 틀렸는지 찾아가야 한다.
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (state.error) errorRef.current?.focus();
+  }, [state]);
+
+  // 구글 버튼 모양. 눌리는 링크와 잠긴 버튼이 같은 모양이어야 한다.
+  const googleClass =
+    "dv-btn flex w-full items-center justify-center gap-2.5 rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-disabled:opacity-60";
+  const googleStyle = {
+    minHeight: "var(--hit-min)",
+    background: "var(--paper)",
+    color: "var(--foreground)",
+    border: 0,
+    "--lift": "var(--lift-button-paper)",
+    fontWeight: "var(--weight-bold)",
+  } as React.CSSProperties;
 
   return (
     <div className="mx-auto w-full max-w-sm">
@@ -115,25 +160,53 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
         </div>
       )}
 
+      {consentRequired && (
+        <div className="mt-6">
+          <Notice>
+            처음 오셨습니다. 아래 두 항목을 확인한 뒤 구글 버튼을 다시
+            눌러주세요.
+          </Notice>
+        </div>
+      )}
+
+      {isSignup && (
+        <div className="mt-6">
+          <ConsentChecks {...consent} />
+          <div className="mt-2">
+            <GoogleNameNote />
+          </div>
+        </div>
+      )}
+
       {/* 링크지만 버튼처럼 보인다. 누르면 구글 동의 화면으로 간다.
           코랄이 아니라 흰 버튼인 이유: 한 화면에 코랄은 하나뿐이고,
-          그 자리는 아래 제출 버튼이 가진다. */}
-      <a
-        href={googleHref}
-        className="dv-btn mt-6 flex w-full items-center justify-center gap-2.5 rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-        style={
-          {
-            minHeight: "var(--hit-min)",
-            background: "var(--paper)",
-            color: "var(--foreground)",
-            "--lift": "var(--lift-button-paper)",
-            fontWeight: "var(--weight-bold)",
-          } as React.CSSProperties
-        }
-      >
-        <GoogleMark />
-        구글로 계속하기
-      </a>
+          그 자리는 아래 제출 버튼이 가진다.
+
+          가입 화면에서 두 항목을 안 켰으면 링크 대신 잠긴 버튼을 그린다.
+          disabled 가 아니라 aria-disabled 다. 눌렀을 때 이유를 알려 줘야 해서
+          포커스와 클릭을 받아야 한다.
+
+          로그인 화면은 체크가 없다. 그쪽으로 새 사람이 오면 서버가 계정을
+          만들지 않고 가입 화면으로 돌려보낸다. */}
+      <div className={isSignup ? "mt-3" : "mt-6"}>
+        {isSignup && !consent.ready ? (
+          <button
+            type="button"
+            aria-disabled="true"
+            onClick={consent.guide}
+            className={googleClass}
+            style={googleStyle}
+          >
+            <GoogleMark />
+            구글로 계속하기
+          </button>
+        ) : (
+          <a href={googleHref} className={googleClass} style={googleStyle}>
+            <GoogleMark />
+            구글로 계속하기
+          </a>
+        )}
+      </div>
 
       <div className="mt-6 flex items-center gap-3">
         <span
@@ -151,6 +224,15 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
 
       <form action={formAction} className="mt-6 grid gap-4">
         {next && <input type="hidden" name="next" value={next} />}
+
+        {/* 체크박스는 구글 버튼과 같이 쓰려고 폼 밖에 있다. 서버 액션에는
+            이 칸으로 값을 보낸다. */}
+        {isSignup && consent.terms && (
+          <input type="hidden" name="terms_agreed" value="on" />
+        )}
+        {isSignup && consent.age && (
+          <input type="hidden" name="age_confirmed" value="on" />
+        )}
 
         {/* 이메일 칸에 maxLength 를 걸지 않는 이유:
 
@@ -214,10 +296,15 @@ export function AuthForm({ mode, action, next, googleFailed }: Props) {
             알림이 안 읽히면 화면을 못 보는 사용자에게는 아무 일도 안 일어난
             것과 같다. */}
         <div aria-live="polite">
-          {state.error && <Notice>{state.error}</Notice>}
+          {state.error && <Notice focusRef={errorRef}>{state.error}</Notice>}
         </div>
 
-        <SubmitButton label={copy.submit} pendingLabel={copy.pending} />
+        <SubmitButton
+          label={copy.submit}
+          pendingLabel={copy.pending}
+          blocked={isSignup && !consent.ready}
+          onBlocked={consent.guide}
+        />
       </form>
 
       <p
@@ -381,13 +468,16 @@ function Field({
         // 흰 바탕이 아니라 --surface-field 다. 크림(#FFF6E9) 위에 흰
         // 입력칸을 놓으면 경계가 거의 안 보인다. 여기에 카드 두께까지
         // 얹어서 "눌러서 쓰는 칸" 임을 두 겹으로 알린다.
-        // ProfileForm 과 같은 값이다.
+        // 바탕과 두께는 ProfileForm 과 같다.
+        //
+        // 테두리는 칸의 경계를 3:1 이상으로 보이게 하려고 넣었다. 채움과
+        // 두께만으로는 저시력 사용자에게 칸이 어디인지 잘 안 보인다.
         className="mt-1 w-full rounded-[var(--radius-xl)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         style={{
           minHeight: "var(--hit-floor)",
           background: "var(--surface-field)",
           color: "var(--foreground)",
-          border: 0,
+          border: "1px solid var(--text-muted)",
           boxShadow: "var(--lift-card)",
         }}
       />
@@ -413,9 +503,14 @@ function Field({
 function SubmitButton({
   label,
   pendingLabel,
+  blocked,
+  onBlocked,
 }: {
   label: string;
   pendingLabel: string;
+  /** 필수 항목을 안 켰을 때. 제출은 막고 이유를 알린다. */
+  blocked?: boolean;
+  onBlocked?: () => void;
 }) {
   const { pending } = useFormStatus();
 
@@ -423,8 +518,19 @@ function SubmitButton({
     <button
       type="submit"
       disabled={pending}
+      // disabled 가 아니라 aria-disabled 다. disabled 면 Enter 로 제출해도
+      // 아무 일이 안 일어나 왜 안 되는지 알 수 없다.
+      aria-disabled={blocked || undefined}
+      onClick={
+        blocked
+          ? (event) => {
+              event.preventDefault();
+              onBlocked?.();
+            }
+          : undefined
+      }
       // 이 화면의 유일한 코랄. 주된 동작이 무엇인지 색 하나로 정한다.
-      className="dv-btn mt-2 w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+      className="dv-btn mt-2 w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 aria-disabled:opacity-60"
       style={
         {
           minHeight: "var(--hit-min)",

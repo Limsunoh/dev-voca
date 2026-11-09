@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api/client";
 import { callbackUrl } from "@/lib/google";
 import { safeNext } from "@/lib/routes";
 import { setToken } from "@/lib/session";
-import { NEXT_COOKIE, STATE_COOKIE } from "../route";
+import { CONSENT_COOKIE, NEXT_COOKIE, STATE_COOKIE } from "../route";
 
 /**
  * 구글에서 돌아오는 자리.
@@ -27,10 +27,12 @@ export async function GET(request: Request) {
 
   const state = store.get(STATE_COOKIE)?.value;
   const next = store.get(NEXT_COOKIE)?.value ?? "/";
+  const consented = store.get(CONSENT_COOKIE)?.value === "1";
 
   // 한 번 쓰면 지운다. 남겨두면 같은 값으로 다시 시도할 수 있다.
   store.delete(STATE_COOKIE);
   store.delete(NEXT_COOKIE);
+  store.delete(CONSENT_COOKIE);
 
   // 사용자가 동의 화면에서 취소한 경우. 오류가 아니므로 안내 없이 돌려보낸다.
   if (url.searchParams.get("error")) {
@@ -55,9 +57,24 @@ export async function GET(request: Request) {
       // 구글이 코드를 발급할 때 쓴 주소와 같아야 한다. 백엔드가 구글에
       // 확인을 요청할 때 이 값을 함께 보낸다.
       redirect_uri: callbackUrl(url.origin),
+      ...(consented ? { terms_agreed: true, age_confirmed: true } : {}),
     });
     await setToken(token);
   } catch (error) {
+    // 새 계정인데 동의 값이 없는 경우. 실패가 아니라 가입 화면으로 안내한다.
+    // 계정은 만들어지지 않았다.
+    if (
+      error instanceof ApiError &&
+      error.field === "code" &&
+      error.message === "consent_required"
+    ) {
+      const signup = new URL("/signup", request.url);
+      signup.searchParams.set("error", "consent");
+      const target = safeNext(next);
+      if (target !== "/") signup.searchParams.set("next", target);
+      return NextResponse.redirect(signup);
+    }
+
     const detail = error instanceof ApiError ? error.message : String(error);
     return backToLogin(request, detail);
   }

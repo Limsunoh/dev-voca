@@ -19,6 +19,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AbstractBaseUser
 from django.db import IntegrityError, transaction
 from django.http import Http404, HttpResponse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -41,7 +42,7 @@ from .email_change import (
 )
 from .google import GoogleAuthError, fetch_google_user
 from .mail import MailNotConfigured, send_account_mail
-from .models import AVATAR_PHOTO, free_display_name
+from .models import AVATAR_PHOTO, TERMS_VERSION, free_display_name
 from .serializers import (
     AvatarPhotoSerializer,
     EmailChangeRequestSerializer,
@@ -111,7 +112,7 @@ class LoginView(APIView):
 
 
 class GoogleLoginView(APIView):
-    """구글 로그인. 계정이 없으면 만들고 있으면 그대로 들어온다.
+    """구글 로그인. 계정이 있으면 그대로 들어오고, 없으면 동의를 확인해 만든다.
 
     Next 서버가 구글에서 받은 코드를 넘긴다. 사용자 정보를 그대로 받지
     않는 이유: 그러면 누구든 남의 이메일을 적어 보내 그 계정으로 들어올
@@ -172,37 +173,62 @@ class GoogleLoginView(APIView):
         # 이메일은 저장할 때 소문자로 내려가므로 여기서도 맞춘다.
         email = info["email"].lower()
 
-        # make_password(None) 로 비밀번호를 못 쓰는 값으로 넣는다. 만든 뒤
-        # 따로 설정하면 그 사이에 password 가 빈 문자열인 행이 존재하고,
-        # 그 상태로 로그인을 시도하면 400 이 아니라 500 이 난다.
-        # 이름이 부딪히면 다시 뽑아 재시도한다. 뽑는 사이 다른 요청이 같은
-        # 이름을 먼저 가져갈 수 있고, 그때 그냥 두면 IntegrityError 가 그대로
-        # 올라가 500 이 된다. 사용자는 구글 로그인이 왜 안 되는지 알 수 없다.
-        #
-        # 두 번째는 이름을 비워 부른다. 그러면 save() 가 학습자1234 꼴로
-        # 지어 넣어 부딪힐 여지가 거의 없다.
-        for wanted in (info["name"], ""):
-            try:
-                user, created = User.objects.get_or_create(
-                    email=email,
-                    defaults={
-                        # 구글이 준 이름을 첫 이름으로 쓴다. 이미 그 이름을
-                        # 쓰는 사람이 있으면 뒤에 번호를 붙인다 - 동명이인
-                        # 때문에 가입 자체가 막히면 안 된다.
-                        "display_name": free_display_name(wanted),
-                        "google_picture": info["picture"],
-                        "password": make_password(None),
-                    },
+        # 이미 있는 계정은 동의 값 없이 그대로 로그인한다. 로그인 화면의 구글
+        # 버튼에는 체크박스가 없다.
+        user = User.objects.filter(email=email).first()
+        created = False
+
+        if user is None:
+            # 새 계정인데 동의 값이 없으면 만들지 않는다. 화면이 이 값을 보고
+            # 가입 화면으로 안내한다. 만들어 두고 나중에 받으면, 동의하지 않은
+            # 사람의 계정과 이메일이 우리에게 남는다.
+            if not (
+                request.data.get("terms_agreed") is True
+                and request.data.get("age_confirmed") is True
+            ):
+                return Response(
+                    {"code": "consent_required"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-                break
-            except IntegrityError:
-                continue
-        else:
-            logger.warning("구글 로그인에서 이름을 정하지 못했습니다: %s", email)
-            return Response(
-                {"detail": "잠시 후 다시 시도해주세요."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+
+            agreed_at = timezone.now()
+
+            # make_password(None) 로 비밀번호를 못 쓰는 값으로 넣는다. 만든 뒤
+            # 따로 설정하면 그 사이에 password 가 빈 문자열인 행이 존재하고,
+            # 그 상태로 로그인을 시도하면 400 이 아니라 500 이 난다.
+            # 이름이 부딪히면 다시 뽑아 재시도한다. 뽑는 사이 다른 요청이 같은
+            # 이름을 먼저 가져갈 수 있고, 그때 그냥 두면 IntegrityError 가
+            # 그대로 올라가 500 이 된다. 사용자는 구글 로그인이 왜 안 되는지
+            # 알 수 없다.
+            #
+            # 두 번째는 이름을 비워 부른다. 그러면 save() 가 학습자1234 꼴로
+            # 지어 넣어 부딪힐 여지가 거의 없다.
+            for wanted in (info["name"], ""):
+                try:
+                    user, created = User.objects.get_or_create(
+                        email=email,
+                        defaults={
+                            # 구글이 준 이름을 첫 이름으로 쓴다. 이미 그 이름을
+                            # 쓰는 사람이 있으면 뒤에 번호를 붙인다 - 동명이인
+                            # 때문에 가입 자체가 막히면 안 된다.
+                            "display_name": free_display_name(wanted),
+                            "google_picture": info["picture"],
+                            "password": make_password(None),
+                            "terms_agreed_at": agreed_at,
+                            "terms_version": TERMS_VERSION,
+                            "age_confirmed_at": agreed_at,
+                        },
+                    )
+                    break
+                except IntegrityError:
+                    continue
+            else:
+                # 이메일은 적지 않는다. 로그는 오래 남고 여러 곳으로 복사된다.
+                logger.warning("구글 로그인에서 이름을 정하지 못했습니다.")
+                return Response(
+                    {"detail": "잠시 후 다시 시도해주세요."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # 사진은 로그인할 때마다 갱신한다. 구글에서 사진을 바꾸면 옛 주소가
         # 죽어서 깨진 그림이 남는다.
