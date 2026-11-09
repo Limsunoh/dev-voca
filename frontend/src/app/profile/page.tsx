@@ -117,8 +117,10 @@ export default async function ProfilePage() {
             boxShadow: "var(--lift-card)",
           }}
         >
-          <div className="flex justify-between gap-4">
-            <dt style={{ color: "var(--text-muted)" }}>이메일</dt>
+          <div className="flex min-w-0 justify-between gap-4">
+            <dt className="shrink-0" style={{ color: "var(--text-muted)" }}>
+              이메일
+            </dt>
             {/* min-w-0 이 없으면 truncate 가 발동하지 않는다. flex 항목의
                 min-width 는 auto = min-content 인데, truncate 가 건
                 white-space: nowrap 때문에 min-content 가 이메일 전체 폭이

@@ -295,19 +295,19 @@ describe("PasswordCard: 결과가 오면 틀린 칸만 비운다", () => {
 
   it("성공은 aria-live 자리 안의 상자, 오류 상자는 없다", () => {
     arrive(0, { saved: true, created: false });
-    assert.match(html, /<div aria-live="polite"><p[^>]*>비밀번호를 바꿨습니다\./);
+    assert.match(html, /<div aria-live="polite"[^>]*><p[^>]*>비밀번호를 바꿨습니다\./);
     assert.doesNotMatch(html, /role="alert"/);
   });
 
   it("처음 설정 성공은 설정 문구", () => {
     arrive(0, { saved: true, created: true });
-    assert.match(html, /<div aria-live="polite"><p[^>]*>비밀번호를 설정했습니다\./);
+    assert.match(html, /<div aria-live="polite"[^>]*><p[^>]*>비밀번호를 설정했습니다\./);
   });
 
   it("결과가 없어도 알림 자리(aria-live)는 미리 있다", () => {
     // 리전이 내용과 함께 새로 생기면 낭독기가 대부분 안 읽는다.
     assert.doesNotMatch(html, /role="(alert|status)"/);
-    assert.match(html, /<div aria-live="polite"><\/div>/);
+    assert.match(html, /<div aria-live="polite"[^>]*><\/div>/);
   });
 });
 
