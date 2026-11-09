@@ -5,13 +5,14 @@ import { redirect } from "next/navigation";
 
 import {
   changePassword,
+  deleteMe,
   deleteMyPhoto,
   requestEmailChange,
   updateMe,
   uploadMyPhoto,
 } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
-import { getToken, setToken } from "@/lib/session";
+import { clearToken, forgetToken, getToken, setToken } from "@/lib/session";
 
 /**
  * 프로필 수정.
@@ -219,6 +220,49 @@ export async function changePasswordAction(
   revalidatePath("/", "layout");
 
   return { saved: true, created: result.created };
+}
+
+export type DeleteAccountState = {
+  error?: string;
+};
+
+/**
+ * 계정 삭제. 성공하면 쿠키를 지우고 시작 화면에서 완료를 알린다.
+ *
+ * 비밀번호가 틀리는 등 실패하면 창을 그대로 두고 문구만 돌려준다.
+ */
+export async function deleteAccountAction(
+  _prev: DeleteAccountState,
+  formData: FormData,
+): Promise<DeleteAccountState> {
+  const token = await getToken();
+  if (!token) redirect("/login?next=/profile");
+
+  // 화면에는 둘 중 한 칸만 그려진다. trim 하지 않는다 - 비밀번호는 앞뒤
+  // 공백도 값이고, 이메일은 서버가 다듬어서 비교한다.
+  const password = formData.get("current_password");
+  const body =
+    password === null
+      ? { email: String(formData.get("email") ?? "") }
+      : { current_password: String(password) };
+
+  try {
+    await deleteMe(token, body);
+  } catch (error) {
+    // 토큰이 이미 무효다. 다른 기기에서 지웠거나 끊겼고, 지워졌는데 응답만
+    // 못 받은 경우도 있다. 창에 남겨 두면 몇 번을 눌러도 같은 오류만 나온다.
+    if (error instanceof ApiError && error.status === 401) {
+      await forgetToken();
+      redirect("/login?next=/profile");
+    }
+    if (error instanceof ApiError) return { error: error.message };
+    return { error: "잠시 후 다시 시도해주세요." };
+  }
+
+  await clearToken();
+
+  // redirect 는 내부적으로 예외를 던져서 위 try 안에 두면 안 된다.
+  redirect("/start?deleted=1");
 }
 
 /**

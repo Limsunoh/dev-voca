@@ -505,7 +505,9 @@ class User(AbstractUser):
         return f"{GENERATED_NAME_PREFIX}{secrets.randbelow(9_000_000) + 1_000_000}"
 
     def __str__(self) -> str:
-        return self.email
+        # 이메일을 돌려주지 않는다. 관리자 작업 기록이 이 글자를 그대로
+        # 저장해서(LogEntry.object_repr), 계정을 지워도 주소가 남는다.
+        return f"회원 {self.pk}"
 
     @property
     def name_for_display(self) -> str:

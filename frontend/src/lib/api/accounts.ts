@@ -120,6 +120,19 @@ export function updateMe(
 }
 
 /**
+ * 계정 삭제. 되살릴 수 없다.
+ *
+ * 비밀번호가 있는 계정은 current_password, 구글로만 가입한 계정은 email 을
+ * 보낸다. 어느 쪽인지는 User.has_password 가 알려준다.
+ */
+export function deleteMe(
+  token: string,
+  body: { current_password: string } | { email: string },
+): Promise<void> {
+  return request("/api/accounts/me/", { method: "DELETE", body, token });
+}
+
+/**
  * 이메일 변경 신청. 새 주소로 확인 메일이 간다.
  *
  * 여기서는 주소가 바뀌지 않고, 링크를 눌러야 바뀐다. 이메일은 로그인 키라서

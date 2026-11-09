@@ -320,13 +320,22 @@ class PasswordChangeView(APIView):
 
 
 class MeView(APIView):
-    """내 정보 조회와 수정.
+    """내 정보 조회와 수정, 계정 삭제.
 
     화면을 새로 그릴 때 쿠키의 토큰이 아직 유효한지 확인하는 용도로도
     쓴다. 토큰이 없거나 만료면 401 이 오고, 화면은 로그아웃 상태로 그린다.
     """
 
     permission_classes = [IsAuthenticated]
+
+    def get_throttles(self) -> list:
+        # 삭제만 제한한다. 현재 비밀번호를 확인하는 자리라 제한이 없으면
+        # 로그인 화면 대신 여기로 추측을 던질 수 있다. 비밀번호 변경과 통을
+        # 같이 써서, 두 자리를 번갈아 써도 시도 횟수가 늘지 않게 한다.
+        # 조회는 화면을 그릴 때마다 불려서 걸면 안 된다.
+        if self.request.method == "DELETE":
+            return [PasswordChangeThrottle()]
+        return super().get_throttles()
 
     def get(self, request: Request) -> Response:
         return Response(UserSerializer(request.user).data)
@@ -336,6 +345,64 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+    def delete(self, request: Request) -> Response:
+        """계정을 지운다. 되살리지 않는다.
+
+        비밀번호가 있는 계정은 비밀번호를 확인한다. 토큰만으로 지우면 잠시
+        자리를 비운 기기에서 계정이 사라져도 되돌릴 길이 없다. 구글로만
+        가입한 계정은 확인할 비밀번호가 없어서 이메일을 다시 입력받는다.
+        이것은 실수를 막는 확인이고, 토큰이 샜을 때까지 막아 주지는 못한다.
+
+        관리자는 여기서 지우지 못한다. 작업 기록(LogEntry.user)이 CASCADE 로
+        함께 사라지고, 하나뿐인 관리자면 관리자 화면에 들어갈 계정이 없어진다.
+
+        학습 기록과 토큰은 CASCADE 로 함께 지워진다.
+        """
+        user = request.user
+        if user.is_staff or user.is_superuser:
+            return Response(
+                {"detail": "관리자 계정은 관리자 화면에서 지워주세요."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = request.data if isinstance(request.data, dict) else {}
+
+        if user.has_usable_password():
+            password = data.get("current_password")
+            # 짝 없는 서러게이트 문자는 해시하다가 UnicodeEncodeError 가 난다.
+            # 로그인과 비밀번호 변경은 DRF 의 CharField 가 먼저 걸러 준다.
+            try:
+                matches = isinstance(password, str) and user.check_password(password)
+            except UnicodeEncodeError:
+                matches = False
+            if not matches:
+                return Response(
+                    {"current_password": ["비밀번호가 올바르지 않습니다."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            email = data.get("email")
+            if not isinstance(email, str) or email.strip().lower() != user.email.lower():
+                return Response(
+                    {"email": ["이메일이 이 계정과 다릅니다."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # 행을 잠그고 지운다. 잠그지 않으면 지울 목록을 모은 뒤에 다른 탭의 기록
+        # 저장이 커밋되어 삭제가 FK 오류로 끝난다. 같은 요청이 두 번 와도 뒤의
+        # 것은 지울 행이 없을 뿐이다.
+        #
+        # ponytail: 저장이 잡은 하루 점수 줄과 잠그는 순서가 엇갈리면 교착이 나서
+        # 어느 한쪽이 500 으로 끝난다. 롤백되므로 다시 누르면 된다. 자주 보이면
+        # 자식 행을 먼저 잠근다.
+        with transaction.atomic():
+            members = get_user_model().objects.select_for_update().only("pk")
+            locked = members.filter(pk=user.pk).first()
+            if locked is not None:
+                locked.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EmailChangeRequestView(APIView):
