@@ -10,6 +10,7 @@ import {
   AvatarMark,
   avatarLabel,
 } from "@/components/Avatar";
+import { FormError } from "@/components/FormError";
 import { useUnsavedGuard } from "@/components/useUnsavedGuard";
 import type { AvatarDisplay } from "@/lib/api/accounts";
 
@@ -90,6 +91,9 @@ export function ProfileForm({
     deletePhoto,
     {},
   );
+
+  // 고른 파일이 너무 클 때. 서버까지 보내지 않아서 따로 든다.
+  const [sizeError, setSizeError] = useState<{ error?: string }>({});
 
   // 방금 올리거나 지운 결과가 있으면 그것을, 없으면 서버가 준 것을 쓴다.
   // 서버 응답을 기다렸다가 반영하는 이유: 서버가 줄여서 저장하므로,
@@ -266,7 +270,10 @@ export function ProfileForm({
             한 줄로 붙인다. */}
         <div className="flex flex-wrap items-center gap-2">
           <form action={photoAction}>
-            <PhotoPicker hasPhoto={hasMyPhoto} />
+            <PhotoPicker
+              hasPhoto={hasMyPhoto}
+              onPick={(error) => setSizeError({ error })}
+            />
           </form>
 
           {hasMyPhoto && (
@@ -276,18 +283,9 @@ export function ProfileForm({
           )}
         </div>
 
-        {(photoState.error || deleteState.error) && (
-          <p
-            role="alert"
-            className="rounded-[var(--radius-xl)] p-3 text-sm"
-            style={{
-              background: "var(--wrong-soft)",
-              color: "var(--coral-deep)",
-            }}
-          >
-            {photoState.error || deleteState.error}
-          </p>
-        )}
+        <FormError state={sizeError} />
+        <FormError state={photoState} />
+        <FormError state={deleteState} />
 
       </div>
 
@@ -417,18 +415,7 @@ export function ProfileForm({
       </section>
 
       {/* 알림은 테두리가 아니라 옅은 채움으로 구분한다. AuthForm 과 같다. */}
-      {state.error && (
-        <p
-          role="alert"
-          className="rounded-[var(--radius-xl)] p-3 text-sm"
-          style={{
-            background: "var(--wrong-soft)",
-            color: "var(--coral-deep)",
-          }}
-        >
-          {state.error}
-        </p>
-      )}
+      <FormError state={state} />
 
       {/* 저장한 뒤 또 바꿨으면 "저장했습니다" 를 내린다. 둘이 같이 뜨면
           지금 바꾼 것까지 저장된 것으로 읽힌다. */}
@@ -538,6 +525,17 @@ function AvatarOption({
   );
 }
 
+// 운영 프론트(Vercel)의 요청 본문 한도 4.5MB 보다 작아야 한다. 넘으면 서버 액션이
+// 응답을 못 받아 화면이 통째로 죽는다. 백엔드 허용치(5MB)보다 이쪽이 먼저 걸린다.
+//
+// ponytail: 4MB 넘는 폰 사진은 거절한다. 자주 걸리면 브라우저에서 줄여 보낸다.
+const PHOTO_MAX_BYTES = 4 * 1024 * 1024;
+const PHOTO_TOO_LARGE = "사진은 4MB 까지 올릴 수 있습니다.";
+
+export function isPhotoTooLarge(size: number): boolean {
+  return size > PHOTO_MAX_BYTES;
+}
+
 /**
  * 갤러리에서 사진 고르기.
  *
@@ -556,7 +554,14 @@ function AvatarOption({
  * 안 먹는다. 빠지면 이 버튼만 52px 이 아니라 글자 높이(24px)로 그려져,
  * 옆의 "사진 지우기" 버튼과 달리 밑줄 친 글자처럼 보인다.
  */
-function PhotoPicker({ hasPhoto }: { hasPhoto: boolean }) {
+function PhotoPicker({
+  hasPhoto,
+  onPick,
+}: {
+  hasPhoto: boolean;
+  /** 파일을 고를 때마다 부른다. 너무 크면 문구를 넘기고, 아니면 undefined. */
+  onPick: (error?: string) => void;
+}) {
   const { pending } = useFormStatus();
 
   return (
@@ -586,9 +591,13 @@ function PhotoPicker({ hasPhoto }: { hasPhoto: boolean }) {
         // 값이 안 바뀌어 onChange 가 나지 않는다. 사진을 지웠다가
         // 같은 것을 다시 올리려는 흐름에서 아무 일도 안 일어난다.
         onChange={(event) => {
-          const form = event.currentTarget.form;
-          form?.requestSubmit();
-          event.currentTarget.value = "";
+          const input = event.currentTarget;
+          // 큰 사진은 서버로 보내기 전에 막는다. 폰 데이터를 쓰지 않게 하고,
+          // 서버 액션의 본문 한도를 넘겨 화면이 통째로 죽는 것도 막는다.
+          const tooLarge = isPhotoTooLarge(input.files?.[0]?.size ?? 0);
+          onPick(tooLarge ? PHOTO_TOO_LARGE : undefined);
+          if (!tooLarge) input.form?.requestSubmit();
+          input.value = "";
         }}
         className="sr-only"
       />

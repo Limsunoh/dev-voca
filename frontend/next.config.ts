@@ -1,6 +1,27 @@
 import type { NextConfig } from "next";
 
+const SECURITY_HEADERS = [
+  // 다른 사이트의 iframe 안에 로그인·문제풀기를 띄우지 못하게 한다.
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // 말하기 연습(MicCheck, TalkBoard)이 마이크를 쓴다. 비우면 그 화면이 죽는다.
+  { key: "Permissions-Policy", value: "microphone=(self)" },
+];
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
+  experimental: {
+    serverActions: {
+      // 프로필 사진은 서버 액션으로 올린다. 기본 한도 1MB 를 넘으면 화면이
+      // 통째로 죽는데 폰 사진은 대부분 그보다 크다. 화면이 4MB 에서 먼저
+      // 막으므로(ProfileForm) multipart 경계만큼만 여유를 뒀다.
+      bodySizeLimit: "5mb",
+    },
+  },
   async redirects() {
     return [
       // 단어장 경로를 두 번 옮겼다. /vocab -> /learn/vocab -> /learn/words.
