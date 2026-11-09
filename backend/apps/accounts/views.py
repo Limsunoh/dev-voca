@@ -66,6 +66,11 @@ from .throttles import (
 logger = logging.getLogger(__name__)
 
 
+def _login_token_key(user: AbstractBaseUser) -> str:
+    """지금 로그인 토큰의 값. 없으면 빈 문자열."""
+    return Token.objects.filter(user=user).values_list("key", flat=True).first() or ""
+
+
 def _auth_response(user: AbstractBaseUser, created: bool = False) -> Response:
     """토큰과 사용자 정보를 함께 돌려준다.
 
@@ -364,6 +369,9 @@ class EmailChangeRequestView(APIView):
             user_id=request.user.pk,
             current_email=request.user.email,
             new_email=new_email,
+            # 없으면 만든다. 관리자 화면으로만 로그인한 계정은 토큰이 없는데, 빈
+            # 값으로 만든 링크는 로그아웃 뒤에 다시 맞아떨어진다.
+            login_token=Token.objects.get_or_create(user=request.user)[0].key,
         )
 
         # 링크는 화면(Next) 주소로 만든다. 요청 헤더에서 뽑지 않는 이유는
@@ -400,7 +408,7 @@ class EmailChangeConfirmView(APIView):
 
     토큰이 유효한 것만으로는 부족하다. 만든 시점과 쓰는 시점 사이에
     상황이 달라질 수 있어서, 쓸 때 다시 본다:
-    - 그 사이 주소가 또 바뀌었나 (토큰에 담아둔 옛 주소의 대조값과 비교)
+    - 그 사이 주소가 또 바뀌었거나 변경이 끝났나 (토큰에 담아둔 대조값과 비교)
     - 그 사이 다른 사람이 그 주소로 가입했나
     """
 
@@ -450,9 +458,9 @@ class EmailChangeConfirmView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # 신청 당시의 주소와 지금 주소가 다르면 그 사이에 또 바뀐 것이다.
+            # 신청 뒤에 주소가 또 바뀌었거나 변경이 한 번 끝났으면 값이 다르다.
             # 그대로 진행하면 나중에 바꾼 주소가 옛 주소로 되돌아간다.
-            if email_mark(user.email) != old_mark:
+            if email_mark(user.email, _login_token_key(user)) != old_mark:
                 return Response(
                     {"detail": "이미 처리되었거나 만료된 링크입니다."},
                     status=status.HTTP_400_BAD_REQUEST,

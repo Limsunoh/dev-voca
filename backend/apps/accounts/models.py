@@ -100,6 +100,12 @@ def _strip_hidden(value: str) -> str:
 _SPACES = re.compile(r"\s+")
 
 
+# 한글 채움 문자와 점자 빈칸. 글자로 분류돼 위의 거름을 지나가는데 화면에서는 빈칸으로
+# 보인다. 그대로 두면 이것만으로 된 빈 이름이 순위표에 오르고, 이름 끝에
+# 붙여 남의 이름과 다른 문자열을 만들 수 있다. 보이는 대로 공백으로 다룬다.
+_BLANK_LOOKING = re.compile("[\u115f\u1160\u3164\uffa0\u2800]")
+
+
 def normalize_display_name(value: str | None) -> str:
     """보여지는 이름을 비교 가능한 형태로 다듬는다.
 
@@ -111,7 +117,8 @@ def normalize_display_name(value: str | None) -> str:
     않으면 조합형으로 남의 이름과 같은 줄을 만들 수 있고, 자모가 글자마다
     세 개라 길이도 세 배로 세어져 멀쩡한 이름이 길이 제한에 걸린다.
     """
-    cleaned = _SPACES.sub(" ", _strip_hidden(value or "")).strip()
+    spaced = _BLANK_LOOKING.sub(" ", value or "")
+    cleaned = _SPACES.sub(" ", _strip_hidden(spaced)).strip()
     return unicodedata.normalize("NFC", cleaned)
 
 
