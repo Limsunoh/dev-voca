@@ -27,6 +27,11 @@ a→b 로 바꾸는 링크를 받아두고, 그 사이 a→c 로 바꾼 뒤, 묵
 누르면 c 가 b 로 되돌아간다. 사용자는 바꾼 적 없는 주소로
 계정이 옮겨간 것을 나중에야 안다.
 
+원문이 아니라 HMAC 값을 담는다. 토큰은 서명만 했을 뿐 암호화하지 않아서
+base64 를 풀면 그대로 읽힌다. 링크는 메일함에 오래 남고 새 주소의 주인도
+보는데, 대조에는 같은 값인지만 알면 된다. 새 주소는 링크를 받는 본인의
+주소이고 바꿀 때 그 값이 있어야 해서 원문으로 둔다.
+
 ## 비밀번호를 함께 확인하는 이유
 
 토큰을 보내기 전에 현재 비밀번호를 묻는다. 링크는 새 주소의 주인임을
@@ -38,6 +43,7 @@ a→b 로 바꾸는 링크를 받아두고, 그 사이 a→c 로 바꾼 뒤, 묵
 from __future__ import annotations
 
 from django.core import signing
+from django.utils.crypto import salted_hmac
 
 # 확인 링크의 수명. 짧게 두면 메일을 늦게 여는 사람이 다시 요청해야 하고,
 # 길게 두면 새어나간 링크가 오래 살아 있다. 메일을 확인하는 데 걸리는
@@ -53,6 +59,14 @@ class InvalidToken(Exception):
     """확인 링크가 만료됐거나 손상됐거나 이미 쓸 수 없는 상태다."""
 
 
+def email_mark(email: str) -> str:
+    """토큰에 실을 현재 주소의 대조용 값.
+
+    서버 키를 섞는다. 그냥 해시로 두면 흔한 주소를 대입해 알아낼 수 있다.
+    """
+    return salted_hmac(_SALT, email.lower(), algorithm="sha256").hexdigest()
+
+
 def make_token(*, user_id: int, current_email: str, new_email: str) -> str:
     """확인 링크에 실을 토큰.
 
@@ -62,8 +76,8 @@ def make_token(*, user_id: int, current_email: str, new_email: str) -> str:
     return signing.dumps(
         {
             "u": user_id,
-            # 신청 당시의 주소. 쓸 때 현재 값과 비교한다.
-            "o": current_email.lower(),
+            # 신청 당시의 주소. 쓸 때 현재 값으로 만든 것과 비교한다.
+            "o": email_mark(current_email),
             "n": new_email.lower(),
         },
         salt=_SALT,
@@ -71,7 +85,7 @@ def make_token(*, user_id: int, current_email: str, new_email: str) -> str:
 
 
 def read_token(token: str) -> tuple[int, str, str]:
-    """토큰에서 (사용자 번호, 옛 주소, 새 주소) 를 꺼낸다.
+    """토큰에서 (사용자 번호, 옛 주소의 email_mark, 새 주소) 를 꺼낸다.
 
     만료와 위조를 여기서 함께 거른다. 부르는 쪽이 둘을 나눠 처리할 일이
     없다. 사용자에게는 어느 쪽이든 "링크를 다시 받으세요" 다. 어느 쪽인지
