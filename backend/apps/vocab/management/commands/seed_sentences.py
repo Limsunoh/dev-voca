@@ -2575,7 +2575,7 @@ SENTENCES: list[tuple[str, str, str, str, str, int, str, str]] = [
         "Threads within a process share the same memory space.",
         "한 프로세스 안의 스레드들은 같은 메모리 공간을 공유합니다.",
         PHRASE, CS, N, "운영체제 교재",
-        "정처기에서 프로세스와 스레드를 비교할 때 핵심이 되는 문장이다. "
+        "프로세스와 스레드를 비교할 때 쓰는 문장이다. "
         "공유하기 때문에 데이터를 주고받기 쉽고, 같은 이유로 경쟁 상태가 생긴다.",
     ),
     (

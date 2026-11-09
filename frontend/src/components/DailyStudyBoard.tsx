@@ -688,6 +688,9 @@ function PlayCard({
 /* ---- 끝난 뒤 ---- */
 
 function DoneCard({ study }: { study: StudyProgress | null }) {
+  // 결과로 초점을 옮긴다. 이유는 RoundBoard 의 결과 카드와 같다.
+  const cardRef = useFocusNewQuestion(study, null);
+
   // done 으로는 못 가른다. 여기 오는 두 경로(초기 phase 판정, 답한 뒤
   // finished)가 둘 다 판을 닫고 온다. 서버가 _finish 를 부른 뒤 그 인스턴스를
   // 그대로 내려주므로 done 은 항상 참이다. 다 풀었는지는 개수로 본다.
@@ -696,7 +699,13 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
   const short = study === null || study.answered < study.total;
 
   return (
-    <div className="rise flex flex-1 flex-col justify-center text-center">
+    <div
+      ref={cardRef}
+      tabIndex={-1}
+      // 화면 높이를 다 차지하는 칸이라 초점 링을 그리면 화면 전체에 네모가
+      // 뜬다. Tab 으로 오는 자리가 아니므로 링을 끈다.
+      className="rise flex flex-1 flex-col justify-center text-center outline-none"
+    >
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
         {short ? "오늘은 여기까지" : "오늘 몫 완료"}
       </p>

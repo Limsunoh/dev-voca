@@ -44,6 +44,7 @@
   --amber-deep: #8a5a08;
   --amber-soft: #ffefd1;
   --rose-soft: #fde1db;
+  --rose-pale: #ffebe6;
   --violet: #5844a8;
   --violet-soft: #e7e2f7;
   --navy: #2a4a7b; /* 아바타·정보성 강조 */
@@ -111,7 +112,9 @@
   --correct-soft: var(--green-soft);
   --wrong: var(--coral);
   --wrong-deep: var(--coral-deep);
-  --wrong-soft: var(--rose-soft);
+  /* --coral-deep 글자를 올리는 바탕이다. --rose-soft 에서는 4.26:1 이라 작은
+     글자 기준(4.5:1)에 못 미쳐 한 단계 옅게 둔다. */
+  --wrong-soft: var(--rose-pale);
 
   /* ---- 난이도 ----
      채움은 옅게, 글자는 진하게. 채움을 진하게 하면 목록이 알록달록해진다.

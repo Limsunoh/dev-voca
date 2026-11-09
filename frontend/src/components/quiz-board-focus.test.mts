@@ -87,6 +87,7 @@ type FakeEl = {
   matches(selector: string): boolean;
   focus?(options: unknown): void;
   nextElementSibling?: unknown;
+  contains?(node: unknown): boolean;
   getBoundingClientRect?(): { bottom: number };
 };
 
@@ -111,6 +112,7 @@ function elementFor(el: El): FakeEl {
   const role = el.props.tabIndex === -1 ? "문제" : "다음 문제";
   const made = fake(role);
   made.nextElementSibling = list;
+  made.contains = (node) => node === made;
   made.getBoundingClientRect = () => ({ bottom: 100 });
   made.focus = (options) => {
     focusLog.push({ to: role, options });

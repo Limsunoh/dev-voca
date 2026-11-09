@@ -5,7 +5,8 @@ import { useEffect, useRef } from "react";
 /**
  * 새 문제가 뜨면 초점을 문제로 옮긴다. 돌려준 ref 를 QuestionCard 의 cardRef
  * 로 넘긴다. 카드 없이 그리는 문제풀기(QuizBoard)는 안내문과 지문을 감싼 곳에
- * 붙인다. 어느 쪽이든 바로 다음 요소가 보기 목록이어야 한다.
+ * 붙인다. 어느 쪽이든 바로 다음 요소가 보기 목록이어야 한다. 판이 끝난 뒤의
+ * 결과 카드에도 같은 이유로 쓴다. 그때는 question 자리에 결과 값을 넘긴다.
  *
  * 방금 누른 보기는 잠기거나 문제와 함께 사라져서, 그대로 두면 초점이 문서
  * 전체(body)로 떨어지고 키보드로 풀던 사람은 문제마다 맨 위에서 다시 Tab 을
@@ -33,6 +34,10 @@ export function useFocusNewQuestion(question: unknown, error: string | null) {
 
     const card = cardRef.current;
     const focused = document.activeElement;
+    // 카드 안에 있으면 그대로 둔다. 결과 카드의 "한 판 더" 는 눌렀을 때
+    // 잠겼다 풀리는데, 그 초점을 뺏으면 다시 누르려고 Tab 을 또 눌러야 한다.
+    if (focused && card?.contains(focused)) return;
+
     // 초점이 보기 밖(나가기 버튼 등)에 서 있으면 뺏지 않는다. 카드 바로
     // 다음 요소가 보기 목록이다. 보기 번호가 다음 문제에도 나오면 React 가
     // 그 버튼을 다시 쓰므로 초점이 목록 안에 남아 있을 수 있다. 잠긴 버튼에

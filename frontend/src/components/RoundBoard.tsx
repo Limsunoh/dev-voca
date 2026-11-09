@@ -813,9 +813,15 @@ function RoundResultCard({
    */
   late: number;
 }) {
+  // 결과 카드로 초점을 옮긴다. 마지막 문제가 사라지면 초점이 문서 전체로
+  // 떨어져, 키보드로 풀던 사람은 맨 위에서 다시 Tab 을 눌러야 한다.
+  const cardRef = useFocusNewQuestion(summary, error);
+
   return (
     <div
-      className="rise dv-card px-6 py-8 text-center"
+      ref={cardRef}
+      tabIndex={-1}
+      className="rise dv-card px-6 py-8 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       style={
         {
           background: "var(--paper)",

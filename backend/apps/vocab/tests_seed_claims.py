@@ -26,7 +26,16 @@ from .management.commands.seed_words import WORDS
 ALWAYS_A_CLAIM = ("자주 출제", "필수 암기")
 
 # 일반 글에도 쓰는 표현. 같은 문장에 시험 맥락이 있어야 주장이다.
-CLAIM_IN_EXAM_CONTEXT = ("자주 나온", "자주 나오", "단골", "필수 용어", "필수 개념", "필수 항목", "대개 이 문장")
+CLAIM_IN_EXAM_CONTEXT = (
+    "자주 나온",
+    "자주 나오",
+    "단골",
+    "필수 용어",
+    "필수 개념",
+    "필수 항목",
+    "대개 이 문장",
+    "핵심이 되는",
+)
 
 EXAM_CONTEXT = re.compile(r"정처기|기출|출제|시험에|묻는 문제|문제로 자주|문제에 자주")
 
@@ -83,6 +92,21 @@ class DetectorTest(SimpleTestCase):
             "정처기에서 값 호출과 함께 다루는 개념이다.",
             "정처기에서 생성·구조·행위 세 갈래로 나눠 묻는다.",
             "LIFO 라는 약자로도 부르고, 함수 호출이 이 방식으로 쌓이고 풀린다.",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(frequency_claims(text), [])
+
+    def test_finds_core_sentence_claim_only_with_exam_context(self):
+        """'핵심이 되는' 은 시험 맥락이 있는 문장에서만 출제 주장이다."""
+        self.assertTrue(
+            frequency_claims("정처기에서 프로세스와 스레드를 비교할 때 핵심이 되는 문장이다.")
+        )
+        self.assertTrue(frequency_claims("시험에 나올 때 핵심이 되는 개념이다."))
+        for text in (
+            "프로세스와 스레드를 비교할 때 쓰는 문장이다.",
+            "트랜잭션 설계에서 핵심이 되는 개념이다.",
+            "정처기에서도 다룬다. 실무에서는 핵심이 되는 문장이다.",
+            "정처기에서 핵심을 짚는 문장이다.",
         ):
             with self.subTest(text=text):
                 self.assertEqual(frequency_claims(text), [])
