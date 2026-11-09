@@ -116,6 +116,8 @@ describe("색 대비 4.5:1", () => {
     ["--foreground / --medal-3", () => token("--foreground"), () => token("--medal-3")],
     // 내 줄이 4위 아래면 등수가 코랄 바탕 위 --text-muted 다.
     ["--text-muted / --coral-soft", () => token("--text-muted"), () => token("--coral-soft")],
+    // 내정보·이메일·일상영어의 오류 상자와 문제풀기의 정답 안내가 쓰는 짝이다.
+    ["--coral-deep / --wrong-soft", () => token("--coral-deep"), () => token("--wrong-soft")],
   ];
 
   for (const [name, text, back] of PAIRS) {

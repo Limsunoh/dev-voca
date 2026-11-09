@@ -4,16 +4,33 @@
 기본 폼은 username 필드를 찾다가 터진다.
 """
 
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.db import transaction
 from django.db.models import Case, F, Value, When
 
-from .models import AVATAR_PHOTO, User
+from .models import AVATAR_PHOTO, User, name_taken, shorten_display_name
 
 
-class UserCreateForm(AdminUserCreationForm):
+class LowercaseEmailMixin:
+    """이메일을 저장할 값(소문자)으로, 대소문자 구분 없이 검사한다.
+
+    폼의 기본 중복 검사는 글자가 똑같은지만 봐서, 대소문자만 다른 주소가
+    검사를 지나 save() 에서 DB 제약에 걸려 500 이 된다. 대문자가 섞인 옛
+    행이 있으면 500 도 안 나고 같은 주소의 계정이 둘 생겨 그 주소의 로그인이
+    깨진다.
+    """
+
+    def clean_email(self) -> str:
+        email = self.cleaned_data["email"].lower()
+        if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("이미 가입된 이메일입니다.")
+        return email
+
+
+class UserCreateForm(LowercaseEmailMixin, AdminUserCreationForm):
     """Admin 의 계정 추가 폼.
 
     UserCreationForm 이 아니라 AdminUserCreationForm 을 상속해야 한다.
@@ -26,10 +43,24 @@ class UserCreateForm(AdminUserCreationForm):
         fields = ("email",)
 
 
-class UserEditForm(UserChangeForm):
+class UserEditForm(LowercaseEmailMixin, UserChangeForm):
     class Meta(UserChangeForm.Meta):
         model = User
         fields = "__all__"
+
+    def clean_display_name(self) -> str:
+        """저장할 때 다듬어지는 값으로 중복을 본다.
+
+        폼의 기본 검사는 다듬기 전 값을 봐서, 다듬으면 같아지는 이름이 검사를
+        지나 save() 에서 DB 제약에 걸려 500 이 된다. 규칙을 어긴 회원의 이름을
+        바꾸는 자리라 500 으로 죽으면 안 된다.
+
+        금칙어는 보지 않는다. 운영 계정의 이름은 이 화면에서 정한다.
+        """
+        name = shorten_display_name(self.cleaned_data["display_name"])
+        if name and name_taken(name, exclude_pk=self.instance.pk):
+            raise forms.ValidationError("이미 쓰고 있는 이름입니다.")
+        return name
 
 
 @admin.register(User)
