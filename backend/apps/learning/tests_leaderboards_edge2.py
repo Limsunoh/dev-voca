@@ -445,7 +445,7 @@ class FirstAtWithManyRoundsTest(RankAgreementMixin, TestCase):
         board = leaderboards.build(leaderboards.ALL_TIME, user=loser)
 
         self.assertIsNotNone(board.me, "마이너스라고 줄이 사라졌다")
-        self.assertEqual(board.me.score, -5, "최고 한 판이 아니다")
+        self.assertEqual(board.me.score, 0, "음수 최고점은 0점으로 보인다")
         self.assertEqual(board.me.rank, 22)
 
 

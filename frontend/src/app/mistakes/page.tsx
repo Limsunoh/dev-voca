@@ -222,8 +222,8 @@ export default async function MistakesPage({ searchParams }: PageProps) {
                   </p>
 
                   {/* 틀린 날짜는 안 보여준다. 서버가 그 값을 못 준다 -
-                      이유는 views_history 주석에 있다(쓰는 경로 셋 중
-                      둘이 시각을 안 남긴다). 틀린 날짜를 보여주느니 안
+                      이유는 views_history 주석에 있다(쓰는 경로 넷 중
+                      셋이 시각을 안 남긴다). 틀린 날짜를 보여주느니 안
                       보여주는 것이 낫다. */}
                 </Link>
               </li>

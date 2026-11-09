@@ -15,6 +15,7 @@ import {
 } from "@/lib/quiz-text";
 import { withWrapPoints } from "@/lib/wrap-points";
 import { Reading } from "./Reading";
+import { useFocusNewQuestion } from "./useFocusNewQuestion";
 
 /**
  * 백엔드를 직접 부르지 않고 같은 출처의 중계(/api/quiz)를 부른다.
@@ -25,7 +26,7 @@ async function fetchQuestion(params: {
   category?: string;
   exclude?: string;
   item?: string;
-  /** 문제 유형. 비어 있으면 서버가 섞어서 낸다. */
+  /** 문제 유형. 비어 있으면 서버가 섞어서 낸다(문장을 정해서 오면 상황 고르기부터). */
   kind?: string;
   content: QuizContent;
 }): Promise<Question> {
@@ -387,6 +388,10 @@ export function QuizBoard({ category, content = "words", item }: Props) {
     button.focus({ preventScroll: true });
   }, [picked, result, error]);
 
+  // "다음 문제" 를 누르면 그 버튼이 사라져 초점이 문서 전체로 떨어진다.
+  // 새 문제가 뜨면 안내문과 지문으로 옮긴다. 한 판·일일공부·복습과 같은 규칙이다.
+  const promptRef = useFocusNewQuestion(question, error);
+
   async function pick(choiceId: number) {
     if (!question || picked !== null) return;
 
@@ -562,29 +567,38 @@ export function QuizBoard({ category, content = "words", item }: Props) {
 
     return (
       <div>
-        {/* 무엇을 고르라는 것인지. 지문보다 확실히 작고 흐리다 - 여기서
-            눈이 멈추면 안 되고, 바로 아래 지문으로 넘어가야 한다. */}
-        <h2
-          className="mt-5"
-          style={{
-            fontSize: "var(--text-xs)",
-            fontWeight: "var(--weight-black)",
-            letterSpacing: "var(--tracking-wide)",
-            // 본문이라 --text-muted. --text-dim 은 작은 라벨용이다.
-            //
-            // 대비 값은 여기 적지 않고 globals.css 의 토큰 주석 한 곳에만
-            // 둔다. 값이 움직이면 호출부마다 적어 둔 숫자가 틀린 말이 된다.
-            color: "var(--text-muted)",
-          }}
+        {/* 초점은 안내문과 지문을 함께 받는다. 안내문에만 주면 화면 낭독기가
+            지문을 안 읽을 수 있다(실제 낭독기로는 확인하지 않았다). */}
+        <div
+          ref={promptRef}
+          tabIndex={-1}
+          className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          style={{ borderRadius: "var(--radius-xl)" }}
         >
-          {question.question}
-        </h2>
+          {/* 무엇을 고르라는 것인지. 지문보다 확실히 작고 흐리다 - 여기서
+              눈이 멈추면 안 되고, 바로 아래 지문으로 넘어가야 한다. */}
+          <h2
+            className="mt-5"
+            style={{
+              fontSize: "var(--text-xs)",
+              fontWeight: "var(--weight-black)",
+              letterSpacing: "var(--tracking-wide)",
+              // 본문이라 --text-muted. --text-dim 은 작은 라벨용이다.
+              //
+              // 대비 값은 여기 적지 않고 globals.css 의 토큰 주석 한 곳에만
+              // 둔다. 값이 움직이면 호출부마다 적어 둔 숫자가 틀린 말이 된다.
+              color: "var(--text-muted)",
+            }}
+          >
+            {question.question}
+          </h2>
 
-        <Prompt
-          kind={question.kind}
-          sentenceKind={question.sentence_kind}
-          text={question.prompt}
-        />
+          <Prompt
+            kind={question.kind}
+            sentenceKind={question.sentence_kind}
+            text={question.prompt}
+          />
+        </div>
 
         {/* 틀리면 보기 묶음이 짧게 흔들린다.
             key 로 횟수를 넘겨 매번 다시 마운트시킨다 - 클래스만 토글하면

@@ -1432,7 +1432,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "normalization", "/ˌnɔrmələˈzeɪʃn/", "중복 없게 표를 쪼개기", DB, H,
         "같은 정보가 여러 곳에 중복되지 않도록 표를 나누는 설계 원칙. 한 곳만 고치면 "
         "되니 데이터가 어긋날 일이 줄어든다. 대신 조회할 때 조인이 늘어난다. "
-        "정처기에서 1정규형부터 단계별로 자주 나온다.",
+        "정처기에서는 1정규형부터 단계별로 다룬다.",
         "The table is not normalized; the customer name is duplicated everywhere.",
         "이 테이블은 정규화가 안 돼서 고객 이름이 여기저기 중복돼 있습니다.",
     ),
@@ -1496,7 +1496,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "dirty read", "/ˈdɜrti ˌrid/", "아직 확정 안 된 값을 읽기", DB, H,
         "다른 트랜잭션이 고쳤지만 아직 확정하지 않은 값을 읽어버리는 현상. "
         "그 트랜잭션이 취소되면 존재한 적도 없는 값을 본 셈이 된다. "
-        "정처기 시험에서 격리 수준 문제와 함께 자주 나온다.",
+        "정처기에서는 격리 수준과 함께 다룬다.",
         "A dirty read can expose data from a transaction that later rolls back.",
         "더티 리드는 나중에 취소될 트랜잭션의 데이터를 보여줄 수 있습니다.",
     ),
@@ -1514,7 +1514,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "의 앞 글자를 딴 말로 원자성·일관성·고립성·지속성을 뜻한다. "
         "트랜잭션이 믿을 만하려면 갖춰야 "
         "할 성질들이다. '에이시아이디' 가 아니라 '애시드' 로 읽는다. "
-        "정처기 단골 문제다.",
+        "정처기에서 다루는 개념이다.",
         "The database guarantees ACID properties for each transaction.",
         "이 데이터베이스는 각 트랜잭션에 대해 ACID 성질을 보장합니다.",
     ),
@@ -2351,8 +2351,8 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     (
         "boundary value", "/ˈbaʊndri ˌvælju/", "경계에 딱 걸친 값", DEBUG, N,
         "허용 범위의 맨 처음과 맨 끝, 그리고 그 바로 바깥의 값. 오류는 범위 한가운데가 "
-        "아니라 경계에서 나기 때문에 여기를 먼저 시험한다. 정처기 테스트 기법 "
-        "문제에 자주 나온다.",
+        "아니라 경계에서 나기 때문에 여기를 먼저 시험한다. 정처기에서는 테스트 기법으로 "
+        "다룬다.",
         "Add boundary value cases for zero and the maximum length.",
         "0 과 최대 길이에 대한 경계값 케이스를 추가하세요.",
     ),
@@ -2856,7 +2856,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "linked list", "/ˌlɪŋkt ˈlɪst/", "다음 것의 위치를 들고 있는 구조", CS, N,
         "각 항목이 다음 항목의 위치를 가리키며 사슬처럼 이어진 구조. 중간에 끼워 넣거나 "
         "빼기가 쉬운 대신, 몇 번째 것을 보려면 처음부터 따라가야 한다. "
-        "배열과의 이 차이가 정처기 단골 비교 문제다.",
+        "정처기에서는 배열과 비교해 다룬다.",
         "Insertion is cheap in a linked list, but random access is not.",
         "연결 리스트는 삽입은 싸지만 임의 접근은 그렇지 않습니다.",
     ),
@@ -2896,7 +2896,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "time complexity", "/ˈtaɪm kəmˌpleksəti/", "입력이 커질 때 시간이 느는 정도", CS, H,
         "데이터 양이 늘어날 때 걸리는 시간이 어떤 비율로 늘어나는지. 실제 초 단위 시간이 "
         "아니라 증가하는 추세를 본다. 그래서 데이터가 적으면 복잡도가 나쁜 쪽이 "
-        "더 빠를 수도 있다. 정처기 필수 개념이다.",
+        "더 빠를 수도 있다. 정처기에서도 다룬다.",
         "The nested loop makes the time complexity quadratic.",
         "중첩 반복문 때문에 시간 복잡도가 제곱이 됩니다.",
     ),
@@ -2937,7 +2937,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "thread", "/θred/", "한 프로그램 안의 실행 갈래", CS, N,
         "한 프로세스 안에서 메모리를 함께 쓰며 나란히 도는 실행 갈래. 전환 비용이 "
         "적고 데이터를 공유하기 쉽지만, 그 공유 때문에 경쟁 상태가 생긴다. "
-        "프로세스와의 차이는 정처기 단골 문제다.",
+        "정처기에서는 프로세스와 비교해 다룬다.",
         "Two threads share the same memory, so the counter needs a lock.",
         "두 스레드가 같은 메모리를 공유해서 카운터에 락이 필요합니다.",
     ),
@@ -2976,7 +2976,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "semaphore", "/ˈseməfɔr/", "정해진 수만큼만 들여보내는 장치", CS, H,
         "동시에 들어갈 수 있는 수를 정해두고 그만큼만 허용하는 장치. 하나만 허용하면 "
         "뮤텍스와 비슷해지지만, 원래는 여러 개를 허용하는 개수 세기 장치다. "
-        "정처기에서 상호 배제와 함께 자주 나온다.",
+        "정처기에서는 상호 배제와 함께 다룬다.",
         "The semaphore limits us to five concurrent connections.",
         "세마포어가 동시 연결을 다섯 개로 제한합니다.",
     ),
@@ -2999,8 +2999,8 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     (
         "paging", "/ˈpeɪdʒɪŋ/", "메모리를 같은 크기로 잘라 관리", CS, H,
         "메모리를 일정한 크기의 조각으로 나눠 필요한 조각만 올려 쓰는 방식. "
-        "필요한 조각이 올라와 있지 않으면 가져오는 처리가 일어난다. 정처기에서 "
-        "교체 알고리즘과 함께 자주 출제된다.",
+        "필요한 조각이 올라와 있지 않으면 가져오는 처리가 일어난다. 정처기에서는 "
+        "교체 알고리즘과 함께 다룬다.",
         "A page fault occurs when the requested page is not in memory.",
         "요청한 페이지가 메모리에 없으면 페이지 폴트가 발생합니다.",
     ),
@@ -3040,7 +3040,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "UDP", "/ˌju di ˈpi/", "확인 없이 그냥 보내는 방식", CS, N,
         "도착 확인이나 재전송 없이 그냥 보내는 전송 방식. 일부가 없어져도 신경 쓰지 "
         "않아 빠르다. 조금 끊겨도 계속 진행돼야 하는 실시간 영상이나 게임에 쓴다. "
-        "정처기에서 TCP 와 비교해 자주 나온다.",
+        "정처기에서는 TCP 와 비교해 다룬다.",
         "Video calls use UDP because a dropped frame is better than a delay.",
         "영상 통화는 지연보다 프레임 손실이 낫기 때문에 UDP 를 씁니다.",
     ),
@@ -3080,7 +3080,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "subnet", "/ˈsʌbnet/", "네트워크를 나눈 구역", CS, H,
         "큰 네트워크를 작은 구역으로 나눈 것. 어디까지가 같은 구역인지는 마스크로 "
         "정한다. 같은 구역 안에서는 바로 통신하고 밖으로 나갈 때는 라우터를 거친다. "
-        "정처기에서 계산 문제로 자주 나온다.",
+        "정처기에서는 계산 문제로 다룬다.",
         "Those two servers are on different subnets, so the traffic has to go through a router.",
         "그 두 서버는 서로 다른 서브넷에 있어서 트래픽이 라우터를 거쳐야 합니다.",
     ),
@@ -3128,7 +3128,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "SQL injection", "/ˌes kju ˈel ɪnˌdʒekʃən/", "입력값에 쿼리를 심어 넣는 공격", CS, H,
         "사용자 입력을 쿼리 문자열에 그대로 이어 붙일 때, 입력에 쿼리 조각을 넣어 "
         "의도하지 않은 명령을 실행시키는 공격. 특수문자를 걸러내는 방식은 빠져나갈 "
-        "구멍이 많아서, 값을 따로 넘기는 방식으로 막아야 한다. 정처기 보안 단골이다.",
+        "구멍이 많아서, 값을 따로 넘기는 방식으로 막아야 한다. 정처기에서도 보안 항목으로 다룬다.",
         "Use parameterized queries; escaping input is not enough.",
         "입력을 이스케이프하는 걸로는 부족합니다. 파라미터 바인딩을 쓰세요.",
     ),
@@ -3160,7 +3160,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "compiler", "/kəmˈpaɪlər/", "미리 통째로 번역하는 도구", CS, N,
         "소스 코드 전체를 기계가 실행할 형태로 미리 번역하는 도구. 실행 전에 오류를 "
         "잡아주고 실행이 빠른 대신 고칠 때마다 다시 번역해야 한다. "
-        "한 줄씩 그때그때 해석하는 인터프리터와 비교해 출제된다.",
+        "한 줄씩 그때그때 해석하는 인터프리터와 비교해 다룬다.",
         "The compiler catches type errors before the program ever runs.",
         "컴파일러는 프로그램이 실행되기 전에 타입 오류를 잡아줍니다.",
     ),
@@ -3215,8 +3215,8 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
     (
         "ERD", "/ˌi ɑr ˈdi/", "표와 관계를 그린 설계도", CS, N,
         "어떤 데이터 덩어리가 있고 서로 어떻게 연결되는지 그림으로 나타낸 설계도. "
-        "표를 만들기 전에 관계를 눈으로 확인하는 데 쓴다. 정처기 실기에서 "
-        "관계 표기와 함께 자주 나온다.",
+        "표를 만들기 전에 관계를 눈으로 확인하는 데 쓴다. 정처기에서는 "
+        "관계 표기와 함께 다룬다.",
         "Update the ERD before you add the new relation.",
         "새 관계를 추가하기 전에 ERD 를 갱신하세요.",
     ),
@@ -3708,7 +3708,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "DML", "/ˌdi em ˈel/", "데이터를 넣고 고치고 지우는 명령", DB, N,
         "Data Manipulation Language 의 줄임말. 구조가 아니라 안에 든 데이터를 다루는 "
         "명령이다. 트랜잭션 안에서 되돌릴 수 있다는 점이 DDL 과 다르고, "
-        "정처기에서 이 구분을 자주 묻는다.",
+        "정처기에서도 이 구분을 다룬다.",
         "Wrap the DML in a transaction so you can roll it back.",
         "롤백할 수 있게 DML 을 트랜잭션으로 감싸세요.",
     ),
@@ -4261,7 +4261,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "Open Systems Interconnection 의 줄임말. 통신 과정을 물리, 데이터링크, 네트워크, "
         "전송, 세션, 표현, 응용의 일곱 계층으로 나눈 모형이다. 실제 인터넷은 이 모형이 "
         "아니라 더 단순한 TCP/IP 구조로 돌아가지만, 문제를 어느 층에서 찾을지 "
-        "말할 때 공통 언어가 된다. 정처기 필수 암기 항목이다.",
+        "말할 때 공통 언어가 된다. 정처기에서도 다룬다.",
         "That failure is at the network layer, not the application layer.",
         "그 장애는 응용 계층이 아니라 네트워크 계층 문제입니다.",
     ),
@@ -4603,7 +4603,7 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
         "SDLC", "/ˌes di el ˈsi/", "개발이 거치는 전체 단계", CS, N,
         "Software Development Life Cycle 의 줄임말. 요구 분석, 설계, 구현, 시험, 유지보수로 "
         "이어지는 전체 흐름을 가리킨다. 이 단계들을 한 번에 순서대로 밟는 방식이 폭포수 "
-        "모형이고, 짧게 여러 번 도는 방식이 반복형이다. 정처기 필수 항목이다.",
+        "모형이고, 짧게 여러 번 도는 방식이 반복형이다. 정처기에서도 다룬다.",
         "Which SDLC model does this project follow?",
         "이 프로젝트는 어떤 개발 생명주기 모형을 따르나요?",
     ),

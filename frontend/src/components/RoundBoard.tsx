@@ -16,6 +16,7 @@ import type {
   RoundSummary,
 } from "@/lib/api/rounds";
 import { routes } from "@/lib/routes";
+import { useFocusNewQuestion } from "@/components/useFocusNewQuestion";
 
 /**
  * 90초 한 판.
@@ -614,6 +615,7 @@ function PlayCard({
   onPick: (id: number) => void;
   onSkip: () => void;
 }) {
+  const cardRef = useFocusNewQuestion(question, error);
   const seconds = Math.ceil(left / 1000);
   // 10초 아래로 내려가면 색이 바뀐다. 숫자만으로는 급한 줄 모른다.
   const urgent = seconds <= 10;
@@ -686,7 +688,12 @@ function PlayCard({
           쓴다). 같은 것을 두 벌 두면 보기의 터치 높이나 발음기호 서체를
           한쪽만 고치게 된다(QuestionCard 머리말). 화면 셋이 같은 문제를
           내므로 같은 모양이어야 한다. */}
-      <QuestionCard question={question} busy={busy} onPick={onPick} />
+      <QuestionCard
+        question={question}
+        busy={busy}
+        onPick={onPick}
+        cardRef={cardRef}
+      />
 
       {/* 행 높이를 버튼 높이로 고정한다. 오답일 때 옆의 결과가 두
           줄(정답과 그 뜻)이 되는데, 높이를 내용에 맡기면 90초가 흐르는

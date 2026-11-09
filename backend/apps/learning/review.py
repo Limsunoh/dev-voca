@@ -233,7 +233,7 @@ def _record(user, target_type: str, target_id: int, correct: bool) -> tuple[int,
     now = timezone.now()
 
     # 연속 횟수를 UPDATE 안에서, 행의 지금 값으로 계산한다. 파이썬에서
-    # 읽어 두고 쓰면, 그 사이 일일공부·자유 문제풀이의 오답(streak=0)이
+    # 읽어 두고 쓰면, 그 사이 일일공부·자유 문제풀이·낱개 연습의 오답(streak=0)이
     # 끼어들어도 읽어 둔 1 에 +1 한 2 로 덮어써 방금 틀린 단어가 졸업한다.
     # daily_study._finish 가 최종 점수를 UPDATE 안에서 계산하는 것과 같은 이유다.
     #
