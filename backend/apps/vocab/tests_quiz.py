@@ -1013,12 +1013,15 @@ class QuizInputAttackTest(TestCase):
         """쓰레기만 보내 상한을 피하며 순회를 길게 끌 수 없다."""
         self.assertEqual(_parse_ids("a," * 100000), [])
 
-    def test_kind_garbage_falls_back_to_random(self):
-        """모르는 유형은 무작위로 떨어진다. 400 이든 200 이든 500 은 안 된다."""
-        for kind in ["MEANING", "", "xxx", "meaning,term", "['meaning']", "9" * 100]:
+    def test_kind_garbage_is_rejected(self):
+        """모르는 유형은 400 이다. 빈 값만 "유형을 안 골랐다" 로 보고 무작위로 낸다."""
+        for kind in ["MEANING", "xxx", "meaning,term", "['meaning']", "9" * 100]:
             with self.subTest(kind=kind[:20]):
                 res = self.client.get(QUIZ_URL, {"kind": kind})
-                self.assertLess(res.status_code, 500)
+                self.assertEqual(res.status_code, 400)
+                self.assertEqual(res.json()["detail"], "그런 문제 유형은 없습니다.")
+
+        self.assertEqual(self.client.get(QUIZ_URL, {"kind": ""}).status_code, 200)
 
     def test_list_filters_on_quiz_do_not_500(self):
         """목록용 필터를 붙여도 터지지 않는다. 출제는 분류만 받는다."""

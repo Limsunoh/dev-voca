@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import {
   DetailAction,
@@ -11,6 +11,8 @@ import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { getSentence } from "@/lib/api/sentences";
 import { isErrorSentence } from "@/lib/quiz-text";
 import { routes, safeListUrl } from "@/lib/routes";
+
+import { canonicalId } from "../../canonical-id";
 
 // Next 16 에서 params 는 Promise 다.
 type PageProps = {
@@ -45,6 +47,9 @@ export default async function SentenceDetailPage({
   searchParams,
 }: PageProps) {
   const { id } = await params;
+  const canonical = canonicalId(id);
+  if (canonical) redirect(routes.sentenceDetail(canonical));
+
   const sentence = await getSentence(id);
 
   // 검수 안 된 문장도 백엔드가 404 를 주므로 여기로 온다.

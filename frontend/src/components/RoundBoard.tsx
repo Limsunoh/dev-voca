@@ -15,6 +15,7 @@ import type {
   RoundStarted,
   RoundSummary,
 } from "@/lib/api/rounds";
+import { setUnloadWarning } from "@/lib/quiz-progress";
 import { routes } from "@/lib/routes";
 import { useFocusNewQuestion } from "@/components/useFocusNewQuestion";
 
@@ -57,6 +58,15 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
   const [summary, setSummary] = useState<RoundSummary | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  /** 판을 닫지 못해 다시 저장하는 중인가. */
+  const [saving, setSaving] = useState(false);
+  /**
+   * 방금 고른 보기. 채점과 연출이 끝날 때까지 표시한다.
+   *
+   * 움직임 줄이기 설정에서는 연출이 없는데 보기는 그만큼 잠겨, 표시가 없으면
+   * 눌렸는지 모른 채 다음 문제가 뜬다.
+   */
+  const [pickedId, setPickedId] = useState<number | null>(null);
 
   const [left, setLeft] = useState(0);
   const [skipsLeft, setSkipsLeft] = useState(0);
@@ -145,6 +155,17 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       setPhase("done");
     }
   }, []);
+
+  // 답을 하나라도 한 판은 새로고침·탭 닫기 전에 브라우저가 묻는다. 서버가
+  // 판을 안 닫아 점수가 사라진다. 저장에 실패한 결과 화면도 같다. 거기서
+  // 떠나면 "다시 저장" 으로 살릴 수 있던 점수가 없어진다.
+  const unsaved =
+    tally.answered > 0 &&
+    (phase === "playing" || (phase === "done" && summary === null));
+  useEffect(() => {
+    setUnloadWarning(unsaved);
+    return () => setUnloadWarning(false);
+  }, [unsaved]);
 
   // 남은 시간. 마감 시각과의 차이로 구하므로 탭이 멈췄다 돌아와도 맞는다.
   useEffect(() => {
@@ -249,6 +270,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     busyRef.current = true;
     setBusy(true);
     setError("");
+    setPickedId(skip ? null : choiceId);
 
     try {
       const answered = await call<RoundAnswered>({
@@ -358,7 +380,22 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     } finally {
       busyRef.current = false;
       setBusy(false);
+      setPickedId(null);
     }
+  };
+
+  // 판을 못 닫았을 때 점수를 다시 보낸다. 서버의 끝내기는 여러 번 와도 같은
+  // 결과라 안전하고(finish 주석), 실패하면 finish 가 다시 열어 둔다.
+  //
+  // busyRef 를 쥔다. 저장 응답을 기다리는 사이 "한 판 더" 가 새 판을 열면, 늦게
+  // 온 응답이 새 판을 지난 판의 결과로 덮고 토큰도 새 판 것으로 바뀌어 있다.
+  const retrySave = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setSaving(true);
+    await finish(tokenRef.current);
+    busyRef.current = false;
+    setSaving(false);
   };
 
   /* 채점 연출 둘. 어느 가지에도 넣지 않는다.
@@ -426,7 +463,8 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       return (
         // 결과 카드도 하나뿐이라 가운데가 맞다.
         <div className="flex flex-1 flex-col justify-center">
-          {/* 판이 끝났다. 점수는 이미 서버에 올라갔으니 경고할 것이 없다.
+          {/* 판이 끝났다. 점수가 서버에 올라갔으면 경고할 것이 없고, 저장에
+              실패했으면 새로고침 때 브라우저가 묻는다(위 unsaved).
 
               게스트에게는 "내 기록" 을 주지 않는다. 게스트는 기록이
               없어서 내정보가 로그인 화면으로 보내므로, 이름과 다른 곳에
@@ -444,6 +482,8 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
             error={error}
             isGuest={guest}
             onAgain={start}
+            onRetrySave={retrySave}
+            saving={saving}
             busy={busy}
             late={tally.late}
           />
@@ -472,6 +512,7 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         <PlayCard
           question={question}
           result={result}
+          pickedId={pickedId}
           left={left}
           total={seconds}
           skipsLeft={skipsLeft}
@@ -556,7 +597,8 @@ function StartCard({
         한 판 풀어봅니다
       </h1>
       <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
-        맞히면 +1, 틀리면 -1. 모르겠으면 세 번까지 넘길 수 있습니다.
+        문제마다 정해진 시간 안에 맞히면 +1, 틀리면 -1, 시간이 지나서 맞히면
+        0점입니다. 모르겠으면 세 번까지 넘길 수 있습니다.
       </p>
 
       {error && (
@@ -602,6 +644,7 @@ function StartCard({
 function PlayCard({
   question,
   result,
+  pickedId,
   left,
   total,
   skipsLeft,
@@ -613,6 +656,7 @@ function PlayCard({
 }: {
   question: RoundQuestion | null;
   result: RoundResult | null;
+  pickedId: number | null;
   left: number;
   /** 서버가 정한 한 판 길이(초). 막대 분모다. */
   total: number;
@@ -701,6 +745,7 @@ function PlayCard({
         busy={busy}
         onPick={onPick}
         cardRef={cardRef}
+        pickedId={pickedId}
       />
 
       {/* 행 높이를 버튼 높이로 고정한다. 오답일 때 옆의 결과가 두
@@ -742,6 +787,9 @@ function PlayCard({
             보낸다(session._skip_result, "넘긴 것도 학습이 되어야 한다").
             모르는 문제를 넘긴 사람이야말로 정답이 필요하다. */}
         <p aria-live="polite" className="text-sm">
+          {/* "방금" 을 붙인다. 넘기면 새 문제와 동시에 뜨는데, 머리말이 없으면
+              아래 보기의 설명처럼 읽힌다. */}
+          {result && <span style={{ color: "var(--text-muted)" }}>방금 </span>}
           {result && (
             // 맞았지만 시간이 지난 것(0점)은 초록으로 두지 않는다. 점수가
             // 안 붙은 것을 정답과 같은 색으로 칠하면 문구만 예외가 되고
@@ -805,6 +853,8 @@ function RoundResultCard({
   error,
   isGuest,
   onAgain,
+  onRetrySave,
+  saving,
   busy,
   late,
 }: {
@@ -812,6 +862,9 @@ function RoundResultCard({
   error: string;
   isGuest: boolean;
   onAgain: () => void;
+  /** 판을 못 닫았을 때 점수를 다시 보낸다. */
+  onRetrySave: () => void;
+  saving: boolean;
   busy: boolean;
   /**
    * 맞혔지만 시간이 지나 0 점이 된 개수.
@@ -856,6 +909,15 @@ function RoundResultCard({
             }}
           >
             {summary.score}
+            <span
+              className="ml-0.5 text-lg"
+              style={{
+                fontWeight: "var(--weight-medium)",
+                color: "var(--text-muted)",
+              }}
+            >
+              점
+            </span>
           </p>
           <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
             {summary.answered}문제 중 {summary.correct}개 정답
@@ -920,9 +982,32 @@ function RoundResultCard({
           )}
         </>
       ) : (
-        <p className="mt-3" style={{ color: "var(--text-body)" }}>
-          {error || "결과를 불러오지 못했습니다."}
-        </p>
+        <>
+          <p className="mt-3" style={{ color: "var(--text-body)" }}>
+            {error || "결과를 불러오지 못했습니다."}
+          </p>
+          {/* 이 판의 점수를 살리는 유일한 길이라 코랄이다. 아래 "한 판 더" 는
+              새 판을 열어 이 판의 점수를 버린다. */}
+          <button
+            type="button"
+            onClick={onRetrySave}
+            disabled={saving || busy}
+            className="dv-btn mt-6 inline-flex items-center px-6 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
+            style={
+              {
+                minHeight: "var(--hit-min)",
+                background: "var(--coral)",
+                color: "var(--text-on-color)",
+                border: 0,
+                borderRadius: "var(--radius-pill)",
+                fontWeight: "var(--weight-black)",
+                "--lift": "var(--lift-button)",
+              } as React.CSSProperties
+            }
+          >
+            {saving ? "저장하는 중..." : "다시 저장"}
+          </button>
+        </>
       )}
 
       {/* 결과가 있는 상태에서 "한 판 더" 가 실패한 경우다. 여기 안 그리면
@@ -942,14 +1027,12 @@ function RoundResultCard({
       )}
 
       <div className="mt-6">
-        {/* 흰 알약. 위의 "순위표에서 확인" 이 코랄이라 여기는 물러난다.
-            결과를 못 불러온 갈래에서는 이것이 화면의 유일한 버튼이 되지만
-            그대로 둔다 - 그때는 방금 실패한 판을 다시 여는 것이라, 코랄로
-            권할 동작이 아니다. */}
+        {/* 흰 알약. 위의 "순위표에서 확인" 이나 "다시 저장" 이 코랄이라 여기는
+            물러난다. */}
         <button
           type="button"
           onClick={onAgain}
-          disabled={busy}
+          disabled={busy || saving}
           className="dv-btn inline-flex min-h-11 items-center px-5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
           style={
             {

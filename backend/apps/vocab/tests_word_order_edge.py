@@ -170,10 +170,21 @@ class ShuffleAndSearchTest(OrderBase):
         for hidden in HIDDEN:
             self.assertNotIn(hidden, got)
 
-    def test_검색만_해도_알파벳_순서다(self):
+    def test_검색만_하면_제목_앞부분이_먼저이고_같은_순위_안은_알파벳_순서다(self):
         got = terms(self.client, {"search": "a"})
+        ascii_got = self.ascii_only(got)
 
-        self.assertEqual(got, sorted(got, key=readable))
+        def rank_then_readable(term: str) -> tuple:
+            lowered = term.lower()
+            if lowered == "a":
+                rank = 0
+            elif lowered.startswith("a"):
+                rank = 1
+            else:
+                rank = 2
+            return (rank, *readable(term))
+
+        self.assertEqual(ascii_got, sorted(ascii_got, key=rank_then_readable))
         self.assertNotIn("aaa-hidden", got)
 
     def test_검색어에_특수문자가_있어도_500이_아니다(self):

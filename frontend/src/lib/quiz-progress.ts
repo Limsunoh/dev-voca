@@ -27,7 +27,7 @@ function warnBeforeUnload(event: BeforeUnloadEvent): void {
  * 화면의 출구와 달리 새로고침은 브라우저가 처리해서 앱의 확인 창을 못 띄운다.
  * 뒤로가기는 여기로도 못 막는다(App Router 에는 이동을 멈추는 방법이 없다).
  */
-function setUnloadWarning(on: boolean): void {
+export function setUnloadWarning(on: boolean): void {
   if (on) globalThis.addEventListener?.("beforeunload", warnBeforeUnload);
   else globalThis.removeEventListener?.("beforeunload", warnBeforeUnload);
 }

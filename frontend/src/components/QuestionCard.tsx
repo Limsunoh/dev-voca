@@ -18,18 +18,23 @@ import { withWrapPoints } from "@/lib/wrap-points";
  * 다르다(일일공부는 점수, 복습은 "한 번 더 맞히면 끝").
  *
  * 보기 버튼의 생김새는 QuizBoard 말고 여기에도 한 벌 있다. 두 곳의 상태가
- * 달라서다. 여기는 고르기 전(idle)만 그리고, 채점 결과는 호출부가 자기
- * 방식으로 알린다. 치수(56px · --radius-xl)와 두께만 같이 간다.
+ * 달라서다. 여기는 고르기 전과 고른 표시(pickedId)만 그리고, 채점 결과는
+ * 호출부가 자기 방식으로 알린다. 치수(56px · --radius-xl)와 두께만 같이 간다.
  */
+const PICKED_LIFT = "0 0 0 2px var(--foreground) inset";
+
 export function QuestionCard({
   question,
   busy,
   onPick,
   cardRef,
+  pickedId,
 }: {
   question: RoundQuestion;
   busy: boolean;
   onPick: (id: number) => void;
+  /** 방금 고른 보기. 안 주면 표시하지 않는다. */
+  pickedId?: number | null;
   /** useFocusNewQuestion 이 돌려준 ref. */
   cardRef?: React.Ref<HTMLDivElement>;
 }) {
@@ -157,7 +162,12 @@ export function QuestionCard({
                   color: "var(--foreground)",
                   borderRadius: "var(--radius-xl)",
                   fontWeight: "var(--weight-bold)",
-                  "--lift": "var(--lift-card)",
+                  // 고른 보기는 QuizBoard 와 같은 잉크 테두리. inset 이라
+                  // 글자가 밀리지 않는다. 방금 누른 자리에는 포인터가 남아
+                  // 있어서 :hover 쪽 값도 같이 줘야 테두리가 안 지워진다.
+                  ...(choice.id === pickedId
+                    ? { "--lift": PICKED_LIFT, "--lift-hover": PICKED_LIFT }
+                    : { "--lift": "var(--lift-card)" }),
                 } as React.CSSProperties
               }
             >

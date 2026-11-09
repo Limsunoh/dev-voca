@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { withWrapPoints } from "@/lib/wrap-points";
 
+import { DetailBackLink } from "./DetailBackLink";
 import { Highlight } from "./Highlight";
 import { Reading } from "./Reading";
 
@@ -34,7 +35,7 @@ export function DetailBack({ href, label }: { href: string; label: string }) {
   return (
     // 히트영역은 링크 전체다. 아이콘만 34px 로 두면 "단어장으로" 글자를
     // 조준해서 눌러야 한다 - 상세에서 목록으로 돌아가는 것은 자주 하는 일이다.
-    <Link
+    <DetailBackLink
       href={href}
       className="dv-card dv-card-press inline-flex min-h-11 items-center gap-2.5 rounded-full pr-4 pl-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       style={
@@ -62,7 +63,7 @@ export function DetailBack({ href, label }: { href: string; label: string }) {
         ←
       </span>
       {label}
-    </Link>
+    </DetailBackLink>
   );
 }
 
@@ -143,7 +144,10 @@ export function DetailHero({
 
           경계를 24자로 둔 이유: 390px 폰에서 고정폭 48px 로 두 줄에 들어가는
           한계가 그 근처다. 카드 좌우 padding 40px 만큼 폭이 좁지만,
-          --text-hero 가 clamp 로 12vw 를 물고 있어 그만큼 같이 줄어든다. */}
+          --text-hero 가 clamp 로 12vw 를 물고 있어 그만큼 같이 줄어든다.
+
+          100자가 넘는 에러 메시지는 한 단계 더 줄인다. 215자가 13줄로 첫
+          화면을 다 쓰고 해석이 탭바 아래로 밀렸다. */}
       <h1
         className={`rise text-balance ${meta ? "mt-4" : ""}`}
         style={{
@@ -156,7 +160,9 @@ export function DetailHero({
           ...(mono
             ? title.length <= 24
               ? { fontSize: "var(--text-hero)", lineHeight: 1.02 }
-              : { fontSize: "clamp(1.5rem,7vw,2rem)", lineHeight: 1.15 }
+              : title.length <= 100
+                ? { fontSize: "clamp(1.5rem,7vw,2rem)", lineHeight: 1.15 }
+                : { fontSize: "clamp(1.0625rem,4.4vw,1.25rem)", lineHeight: 1.3 }
             : title.length <= 40
               ? { fontSize: "clamp(1.75rem,8vw,2.25rem)", lineHeight: 1.08 }
               : { fontSize: "clamp(1.375rem,6vw,1.75rem)", lineHeight: 1.25 }),

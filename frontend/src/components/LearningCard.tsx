@@ -1,8 +1,26 @@
 import Link from "next/link";
 
+import { backendSearchTerms } from "@/lib/routes";
 import { withWrapPoints } from "@/lib/wrap-points";
 
 import { Reading } from "./Reading";
+
+/**
+ * 검색어의 낱말이 카드에 보이는 글자 안에 모두 있는지 본다. 낱말은 백엔드와
+ * 같은 규칙으로 쪼갠다(따옴표, 쉼표).
+ *
+ * 없으면 설명처럼 카드에 안 보이는 칸에서 걸린 것이다. 그 사실을 안 알려
+ * 주면 왜 이 카드가 나왔는지 알 수 없다.
+ */
+export function matchVisible(
+  search: string,
+  ...visible: (string | undefined)[]
+): boolean {
+  const cells = visible.map((text = "") => text.toLowerCase());
+  return backendSearchTerms(search)
+    .filter(Boolean)
+    .every((term) => cells.some((cell) => cell.includes(term.toLowerCase())));
+}
 
 /**
  * 학습 콘텐츠 카드.
@@ -14,6 +32,8 @@ export type LearningCardProps = {
   href: string;
   title: string;
   subtitle: string;
+  /** 뜻 아래 작은 안내. 검색어가 카드에 안 보이는 칸에서 걸렸을 때 쓴다. */
+  note?: string;
   /** 제목 옆에 붙는 보조 문구. 단어의 발음기호 같은 것. */
   aside?: string;
   /**
@@ -57,6 +77,7 @@ export function LearningCard({
   href,
   title,
   subtitle,
+  note,
   aside,
   reading,
   badge,
@@ -176,6 +197,12 @@ export function LearningCard({
           >
             {withWrapPoints(subtitle)}
           </p>
+
+          {!compact && note && (
+            <p className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+              {note}
+            </p>
+          )}
         </div>
         {badge}
       </div>

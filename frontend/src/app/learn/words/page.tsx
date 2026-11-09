@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { ChoiceFilter } from "@/components/ChoiceFilter";
+import { ClearFiltersLink } from "@/components/ClearFiltersLink";
 import { ExamScopeFilter } from "@/components/ExamScopeFilter";
 import { FilterPanel } from "@/components/FilterPanel";
 import { LearnHeader } from "@/components/LearnHeader";
@@ -12,7 +12,7 @@ import {
   DifficultyBadge,
   ExamBadge,
 } from "@/components/MetaBadge";
-import { LearningCard } from "@/components/LearningCard";
+import { LearningCard, matchVisible } from "@/components/LearningCard";
 import { Pagination } from "@/components/Pagination";
 import { SearchInput } from "@/components/SearchInput";
 import { newShuffleSeed } from "@/lib/api/client";
@@ -22,7 +22,6 @@ import {
   getDifficulties,
   getExamSubjects,
   getWords,
-  WORD_DEFAULT_SORT,
   WORD_SORTS,
 } from "@/lib/api/vocab";
 import { detailWithBack, listUrl, routes, searchText } from "@/lib/routes";
@@ -48,17 +47,6 @@ type PageProps = {
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
-
-/**
- * 검색 중에 정렬 줄이 보여 줄 정렬. 기본 순서와 같은 정렬(ABC순)을 뺀다.
- *
- * 검색 중에는 섞지 않아 백엔드 기본 순서로 오는데 그것이 ABC순이다
- * (vocab.ts 의 WORD_DEFAULT_SORT). ABC순 칩을 그대로 두면 맨 앞 칩과 같은
- * 순서를 내서 눌러도 아무것도 안 바뀐다. 그래서 맨 앞 칩을 그 이름으로 부른다.
- */
-const SEARCH_SORTS = WORD_SORTS.filter(
-  (option) => option.value !== WORD_DEFAULT_SORT.value,
-);
 
 /** 정수가 아니거나 1 미만이면 1 페이지로 본다. */
 function toPageNumber(value: string | undefined): number {
@@ -92,16 +80,6 @@ export default async function VocabPage({ searchParams }: PageProps) {
   const sort = WORD_SORTS.find(
     (option) => option.value === first(params.sort),
   );
-  // 정렬 줄과 필터 배지가 "고른 정렬" 로 볼 값. 검색 중의 sort=abc 는 기본
-  // 순서와 같아서(SEARCH_SORTS) 고르지 않은 것으로 보고 맨 앞 칩을 켠다.
-  //
-  // ABC순을 고른 뒤 검색하면 주소에 sort=abc 가 남아 이 경우가 생긴다.
-  // 주소의 sort 는 그대로 두므로 검색어를 비우면 ABC순 목록으로 돌아간다.
-  // 쉬운 것부터를 고른 뒤 검색했다 비우면 쉬운 것부터로 돌아가는 것과 같은
-  // 규칙이다. 검색 중의 맨 앞 칩("ABC순")도 sort=abc 를 가리키므로(아래
-  // ChoiceFilter 의 allValue) 눌러도 sort 가 빠지지 않는다.
-  const sortChip =
-    search && sort?.value === WORD_DEFAULT_SORT.value ? undefined : sort?.value;
 
   // 목록을 열 때마다 새로 섞는다. 정렬이 고정이면 앞쪽 단어만 계속 보이고
   // 뒤쪽은 다음 페이지를 눌러야 만난다.
@@ -120,7 +98,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
   //
   // 검색 중일 때는 섞지 않는다. 찾으러 온 사람에게 섞기는 방해다.
   // "commit" 을 검색했는데 정확히 그 단어가 12번째에 나오면 안 된다.
-  // (백엔드 검색은 관련도 순위가 없어서 기본 정렬이 사실상 그 역할을 한다.)
+  // (검색은 백엔드가 제목이 맞는 것부터 앞에 놓는다. views.py 의 _rank_by_search.)
   //
   // URL 로 들어온 시드는 공백을 털고 길이를 자른다. 자르는 이유는 안 자르면
   // 페이지 넘기기 링크마다 그 길이가 그대로 박히는 것이고(백엔드도 자르지만
@@ -150,6 +128,13 @@ export default async function VocabPage({ searchParams }: PageProps) {
     is_exam: examOnly,
     exam_subject: examSubject,
   };
+
+  // 주소의 쪽 번호가 정규형이 아니면(0, abc, 3.7, 1) 고친 주소로 보낸다.
+  // 화면은 맞게 나와도 주소창에 그 값이 남아 공유되고 기록에 쌓인다.
+  const rawPage = first(params.page);
+  if (rawPage !== undefined && rawPage !== page) {
+    redirect(listUrl(routes.words, filters, currentPage));
+  }
 
   if (!search && !shuffle && !sort) {
     // 목록을 부르기 전에 보낸다. 시드 없이 들어올 때마다 왕복이 한 번
@@ -270,9 +255,14 @@ export default async function VocabPage({ searchParams }: PageProps) {
           }
         >
           {badRequest
-            ? "검색 조건이 올바르지 않습니다. 위에서 분류를 다시 골라보세요."
+            ? "검색 조건이 올바르지 않습니다. 조건을 지우고 다시 골라보세요."
             : `단어를 불러오지 못했습니다. ${error.message}`}
         </p>
+        {badRequest && (
+          <ClearFiltersLink
+            href={listUrl(routes.words, { shuffle: newShuffleSeed() })}
+          />
+        )}
       </main>
     );
   }
@@ -306,10 +296,9 @@ export default async function VocabPage({ searchParams }: PageProps) {
           다시 골라야 한다.
 
           배지는 정렬도 센다. 필터가 접혀 있을 때 순서가 바뀌어 있다는
-          것을 알려줄 곳이 배지뿐이다. 검색 중의 ABC순은 기본 순서와 같아
-          세지 않는다(위 sortChip). */}
+          것을 알려줄 곳이 배지뿐이다. */}
       <FilterPanel
-        active={[difficulty, category, examOnly, examSubject, sortChip]}
+        active={[difficulty, category, examOnly, examSubject, sort?.value]}
       >
         {/* 정처기 줄이 맨 위다. 다른 조건은 목록을 좁히지만 이건 무엇을
             공부하는지 자체를 바꾼다 - 정처기를 켠 사람에게 분류(Git·리뷰)는
@@ -383,18 +372,15 @@ export default async function VocabPage({ searchParams }: PageProps) {
         {/* 정렬은 맨 아래다. 위 줄들은 무엇을 볼지 좁히고, 이것은 그것을
             어떤 순서로 볼지만 정한다. 고르지 않으면 섞는다.
 
-            검색 중에는 섞지 않으므로(위 shuffle) 맨 앞 칩이 "섞어서" 가
-            아니다. 섞지 않은 단어 목록은 백엔드 기본 순서(WordViewSet 의
-            ordering = term)로 오는데 그것이 곧 ABC순이라, 맨 앞 칩을
-            "ABC순" 이라 부르고 ABC순 칩은 뺀다(SEARCH_SORTS 참고). */}
+            검색 중에는 섞지 않고 제목이 맞는 것부터 나오므로(views.py 의
+            _rank_by_search) 맨 앞 칩이 "섞어서" 가 아니라 "관련순" 이다. */}
         <ChoiceFilter
           label="정렬"
           paramName="sort"
-          options={search ? SEARCH_SORTS : WORD_SORTS}
-          allLabel={search ? WORD_DEFAULT_SORT.label : "섞어서"}
+          options={WORD_SORTS}
+          allLabel={search ? "관련순" : "섞어서"}
           basePath={routes.words}
-          selected={sortChip}
-          allValue={search ? WORD_DEFAULT_SORT.value : undefined}
+          selected={sort?.value}
           keep={{
             search,
             category,
@@ -417,7 +403,11 @@ export default async function VocabPage({ searchParams }: PageProps) {
           fontWeight: "var(--weight-bold)",
         }}
       >
-        {search ? `"${search}" 검색 결과 ` : "전체 "}
+        {search
+          ? `"${search}" 검색 결과 `
+          : category || difficulty || examOnly || examSubject
+            ? "조건에 맞는 단어 "
+            : "전체 "}
         {data.count}개
       </p>
 
@@ -448,25 +438,12 @@ export default async function VocabPage({ searchParams }: PageProps) {
                   것을 가리키게 된다. 조건을 좁히다 0 이 되는 것은 흔한
                   경로라(분류 9 x 난이도 4) 여기서 바로 풀 수 있게 둔다.
                   링크라 서버 컴포넌트 그대로이고 접힘과 무관하게 보인다. */}
-              <Link
+              <ClearFiltersLink
                 // 새 시드를 싣는다. 이 링크는 펼친 필터 상자에서 칩으로
                 // 좁히다 0개가 됐을 때 나오는데, 시드가 없으면 서버가 한 번
                 // 더 보내며 상자가 닫힌다(위 chipSeed 와 같은 이유).
                 href={listUrl(routes.words, { shuffle: newShuffleSeed() })}
-                className="dv-btn mt-4 inline-flex min-h-11 items-center rounded-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                style={
-                  {
-                    background: "var(--paper)",
-                    color: "var(--foreground)",
-                    fontSize: "var(--text-sm)",
-                    fontWeight: "var(--weight-black)",
-                    // 쉬는 두께는 --lift 로. 인라인 box-shadow 는 :active 를 이긴다.
-                    "--lift": "var(--lift-button-paper)",
-                  } as React.CSSProperties
-                }
-              >
-                조건 지우기
-              </Link>
+              />
             </>
           ) : (
             <p>아직 등록된 단어가 없습니다.</p>
@@ -485,6 +462,11 @@ export default async function VocabPage({ searchParams }: PageProps) {
                 aside={word.pronunciation || undefined}
                 reading={word.reading || undefined}
                 subtitle={word.meaning}
+                note={
+                  search && !matchVisible(search, word.term, word.meaning)
+                    ? "설명에 검색어가 있습니다"
+                    : undefined
+                }
                 badge={
                   <DifficultyBadge
                     level={word.difficulty}
@@ -521,6 +503,8 @@ export default async function VocabPage({ searchParams }: PageProps) {
         currentPage={currentPage}
         hasPrevious={Boolean(data.previous)}
         hasNext={Boolean(data.next)}
+        count={data.count}
+        pageLength={data.results.length}
       />
     </main>
   );
