@@ -150,10 +150,10 @@ export function StudyCards({
           className="text-xs tabular-nums"
           style={{ color: "var(--text-dim)", fontWeight: "var(--weight-bold)" }}
         >
-          {/* 묶음 수를 모르면 카드 진행만 보여준다. "1/0묶음" 이 뜨는
+          {/* 묶음 수를 모르면 카드 진행만 보여준다. "단어 묶음 1/0" 이 뜨는
               것보다 낫다. */}
-          {chunkCount > 0 && `${chunkIndex + 1}/${chunkCount}묶음 · `}
-          {at + 1}/{cards.length}
+          {chunkCount > 0 && `단어 묶음 ${chunkIndex + 1}/${chunkCount} · `}
+          카드 {at + 1}/{cards.length}
         </p>
       </header>
 

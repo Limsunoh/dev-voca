@@ -87,7 +87,8 @@ mock.module("next/link", {
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement } = realReact;
 const { AuthForm } = await import("@/components/AuthForm");
-const { GoogleStep, GuestStep, StartChoices } = await import("../start/StartChoices");
+const { StartChoices } = await import("../start/StartChoices");
+const { GoogleStep, GuestStep } = await import("./ConsentSheet");
 
 // ---- 도구 --------------------------------------------------------------------
 
@@ -116,6 +117,8 @@ const login = (props: Record<string, unknown> = {}) =>
 const TERMS = "consent-terms";
 const DISCLOSURE = "consent-disclosure";
 const AGE = "consent-age";
+const GUEST_TERMS = "guest-consent-terms";
+const GUEST_AGE = "guest-consent-age";
 
 function box(id: string): Record<string, unknown> {
   const found = hosts.filter((h) => h.type === "input" && h.props.id === id);
@@ -473,8 +476,8 @@ describe("시작 화면: 버튼을 누르기 전", () => {
   it("게스트를 누르면 공개·해외 항목 없이 두 항목이 나온다", () => {
     press("게스트로 둘러보기");
 
-    assert.equal(box(TERMS).checked, false);
-    assert.equal(box(AGE).checked, false);
+    assert.equal(box(GUEST_TERMS).checked, false);
+    assert.equal(box(GUEST_AGE).checked, false);
     assert.doesNotMatch(html, new RegExp(DISCLOSURE));
   });
 });
@@ -490,8 +493,8 @@ describe("시작 화면: 게스트로 둘러보기", () => {
   });
 
   for (const [label, id] of [
-    ["약관만", TERMS],
-    ["나이만", AGE],
+    ["약관만", GUEST_TERMS],
+    ["나이만", GUEST_AGE],
   ] as const) {
     it(`${label} 켜면 아직 잠겨 있다`, () => {
       tick(id);
@@ -501,21 +504,68 @@ describe("시작 화면: 게스트로 둘러보기", () => {
   }
 
   it("둘 다 켜면 들어갈 수 있다", () => {
-    tick(TERMS);
-    tick(AGE);
+    tick(GUEST_TERMS);
+    tick(GUEST_AGE);
 
     assert.match(html, GUEST_FORM);
     assert.equal(googleLock(), undefined);
   });
 
   it("잠긴 버튼을 누르면 두 항목을 안내하고 안 켠 칸으로 포커스를 옮긴다", () => {
-    tick(TERMS);
+    tick(GUEST_TERMS);
 
     (googleLock()?.onClick as () => void)();
     draw();
 
-    assert.deepEqual(focused, [AGE]);
+    assert.deepEqual(focused, [GUEST_AGE]);
     assert.match(html, /두 항목을 모두 켜 주세요\./);
+  });
+});
+
+describe("로그인·가입 화면: 로그인 없이 둘러보기", () => {
+  const press = () => {
+    const button = hosts.find(
+      (h) => h.type === "button" && h.props.children === "로그인 없이 둘러보기",
+    );
+    assert.ok(button, "버튼이 없다");
+    (button.props.onClick as () => void)();
+    draw();
+  };
+
+  it("누르기 전에는 체크도 게스트 폼도 없다", () => {
+    mount(login());
+
+    assert.doesNotMatch(html, /type="checkbox"/);
+    assert.doesNotMatch(html, /action="\/__guest__"/);
+  });
+
+  it("누르면 두 항목을 묻고, 켜기 전에는 들어갈 수 없다", () => {
+    mount(login());
+    press();
+
+    assert.equal(box(GUEST_TERMS).checked, false);
+    assert.equal(box(GUEST_AGE).checked, false);
+    assert.doesNotMatch(html, /consent-disclosure/);
+    assert.doesNotMatch(html, /action="\/__guest__"/);
+  });
+
+  it("둘 다 켜면 들어갈 수 있다", () => {
+    mount(login());
+    press();
+    tick(GUEST_TERMS);
+    tick(GUEST_AGE);
+
+    assert.match(html, /action="\/__guest__"/);
+  });
+
+  it("가입 화면의 체크박스와 id 가 겹치지 않는다", () => {
+    mount(signup());
+    press();
+
+    assert.equal(box(TERMS).checked, false);
+    assert.equal(box(AGE).checked, false);
+    assert.equal(box(GUEST_TERMS).checked, false);
+    assert.equal(box(GUEST_AGE).checked, false);
   });
 });
 

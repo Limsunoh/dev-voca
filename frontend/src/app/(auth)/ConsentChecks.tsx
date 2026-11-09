@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 /**
- * 가입 동의 체크박스. 가입 화면과 시작 화면이 같이 쓴다. 공개·해외 항목은
+ * 가입 동의 체크박스. 가입 화면과 필수 항목 시트가 같이 쓴다. 공개·해외 항목은
  * 가입할 때 받는 동의라 계정이 없는 게스트에게는 묻지 않고 둘만 묻는다.
  *
  * 처음에는 꺼져 있다. 미리 켜 두면 사용자가 하지 않은 동의가 된다.
@@ -16,7 +16,7 @@ import { useState } from "react";
  */
 
 /** 체크 상태. 물어본 항목을 다 켜야 ready 다. */
-export function useConsent(needsDisclosure = true) {
+export function useConsent(needsDisclosure = true, idPrefix = "consent") {
   const [terms, setTerms] = useState(false);
   const [disclosure, setDisclosure] = useState(false);
   const [age, setAge] = useState(false);
@@ -27,11 +27,11 @@ export function useConsent(needsDisclosure = true) {
   function guide() {
     setNudged(true);
     const first = !terms
-      ? "consent-terms"
+      ? "terms"
       : needsDisclosure && !disclosure
-        ? "consent-disclosure"
-        : "consent-age";
-    document.getElementById(first)?.focus();
+        ? "disclosure"
+        : "age";
+    document.getElementById(`${idPrefix}-${first}`)?.focus();
   }
 
   return {
@@ -41,6 +41,7 @@ export function useConsent(needsDisclosure = true) {
     setTerms,
     setDisclosure,
     setAge,
+    idPrefix,
     needsDisclosure,
     ready: terms && age && (disclosure || !needsDisclosure),
     nudged,
@@ -64,20 +65,21 @@ export function ConsentChecks({
   setTerms,
   setDisclosure,
   setAge,
+  idPrefix,
   needsDisclosure,
   ready,
   nudged,
 }: Props) {
   return (
     <div className="grid gap-1">
-      <Check id="consent-terms" checked={terms} onChange={setTerms}>
+      <Check id={`${idPrefix}-terms`} checked={terms} onChange={setTerms}>
         <span style={{ fontWeight: "var(--weight-bold)" }}>[필수]</span>{" "}
         <DocLink href="/terms">이용약관</DocLink>과{" "}
         <DocLink href="/privacy">개인정보 처리방침</DocLink>에 동의합니다
       </Check>
       {needsDisclosure && (
         <Check
-          id="consent-disclosure"
+          id={`${idPrefix}-disclosure`}
           checked={disclosure}
           onChange={setDisclosure}
         >
@@ -86,7 +88,7 @@ export function ConsentChecks({
           보관되는 것에 동의합니다
         </Check>
       )}
-      <Check id="consent-age" checked={age} onChange={setAge}>
+      <Check id={`${idPrefix}-age`} checked={age} onChange={setAge}>
         <span style={{ fontWeight: "var(--weight-bold)" }}>[필수]</span> 만
         14세 이상입니다
       </Check>

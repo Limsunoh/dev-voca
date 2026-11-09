@@ -886,7 +886,7 @@ function DoneCard({
     >
       <div>
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          이번 판
+          이번 판 맞힌 문제
         </p>
         <p
           className="pop mt-1 text-5xl tabular-nums"

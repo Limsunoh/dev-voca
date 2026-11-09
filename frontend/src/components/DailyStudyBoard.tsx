@@ -358,7 +358,8 @@ function ChooseCard({
             학습 카드가 나왔을 때 잘못 들어온 화면으로 읽힌다. */}
         몇 개를 익히고 그것으로 문제를 풉니다.
         <br />
-        제한 시간은 없고, 틀려도 점수가 깎이지 않습니다.
+        아래 시간은 대략 걸리는 시간이고 제한은 없습니다. 틀려도 점수가 깎이지 않고,
+        끝까지 풀면 보너스를 받습니다.
       </p>
 
       {/* 하다 만 판이 있으면 아래 버튼이 전부 비활성이다. 이유를 안 적으면
@@ -421,6 +422,7 @@ function ChooseCard({
             }
           >
             <span
+              className="shrink-0"
               style={{
                 fontSize: "var(--text-md)",
                 fontWeight: "var(--weight-black)",
@@ -451,13 +453,13 @@ function ChooseCard({
               {/* 보너스는 얻는 것이라 초록이다. 코랄은 "지금 눌러야 할 것"
                   이고 여기 셋은 다 같은 자격의 선택지다. */}
               <span
-                className="ml-2"
+                className="ml-2 whitespace-nowrap"
                 style={{
                   color: "var(--green-deep)",
                   fontWeight: "var(--weight-black)",
                 }}
               >
-                +{one.bonus}
+                보너스 +{one.bonus}
               </span>
             </span>
           </button>
@@ -721,11 +723,17 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
         }}
       >
         {study?.score ?? 0}
+        <span
+          className="ml-1 text-2xl"
+          style={{ fontFamily: "var(--font-sans)" }}
+        >
+          점
+        </span>
       </p>
       {study && (
         <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
           {study.total}문제 중 {study.correct}개 정답
-          {/* 보너스는 얻은 것이라 초록. 길이 고르기의 "+5" 와 같은 색이라
+          {/* 보너스는 얻은 것이라 초록. 길이 고르기의 보너스와 같은 색이라
               고를 때 본 약속과 받은 결과가 이어진다. */}
           {!short && study.bonus > 0 && (
             <span
@@ -735,7 +743,7 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
                 fontWeight: "var(--weight-black)",
               }}
             >
-              +{study.bonus} 보너스
+              보너스 +{study.bonus}
             </span>
           )}
         </p>
@@ -747,9 +755,30 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
         </p>
       )}
 
-      <p className="mt-6 text-sm" style={{ color: "var(--text-muted)" }}>
-        일일공부는 하루 한 번입니다. 내일 또 만나요.
-      </p>
+      <div className="mt-6 grid gap-2">
+        {/* 지금 상태가 아니라 규칙을 말한다. 틀린 뒤 맞히면 목록에서 빠져서
+            "모아 뒀습니다" 는 거짓이 될 수 있고, 같은 이유로 개수도 적지 않는다. */}
+        {study && study.correct < study.answered && (
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            틀린 문제는{" "}
+            <Link
+              href={routes.testReview}
+              className="relative -my-2.5 inline-flex items-center underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={{
+                minHeight: "var(--hit-floor)",
+                color: "var(--text-body)",
+                fontWeight: "var(--weight-bold)",
+              }}
+            >
+              다시 보기
+            </Link>
+            로 모입니다.
+          </p>
+        )}
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          일일공부는 하루 한 번입니다. 내일 또 만나요.
+        </p>
+      </div>
 
       <div className="mt-6 flex flex-col gap-2.5">
         {/* 순위표가 주된 동작이라 코랄. 홈으로는 흰 알약으로 물러난다 -

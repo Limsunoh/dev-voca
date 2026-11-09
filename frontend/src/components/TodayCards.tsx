@@ -48,7 +48,7 @@ function logUnlessRejected(message: string) {
  * 오늘 할 일 카드 두 장 - 일일공부와 다시 보기.
  *
  * 홈과 문제풀기 허브가 같은 카드를 쓴다. 두 벌로 그리면 "시작 전은
- * 하이픈", "볼 것이 없으면 비운다" 같은 판단이 한쪽에서만 바뀐다.
+ * 글로 적는다", "볼 것이 없으면 비운다" 같은 판단이 한쪽에서만 바뀐다.
  *
  * 불러오기(loadToday)와 그리기를 나눈 이유: 홈은 이 둘을 오늘의 단어와
  * 동시에 받는다. 카드가 스스로 불러오면 홈이 단어를 다 받은 뒤에야
@@ -61,13 +61,13 @@ export function TodayCards({ daily, due }: Today) {
           done 을 안 읽으면 다 끝낸 사람의 카드가 10/10 인 채로
           여전히 "할 일" 처럼 보인다.
 
-          시작 전에는 0 이 아니라 하이픈이다. MyStandings 가 같은 자리에서
-          같은 것을 쓴다 - 0 은 "0점을 냈다" 로 읽혀서 아직 안 한 것과
-          구분되지 않는다. */}
+          시작 전에는 0 이 아니라 글로 적는다. 0 은 "0개를 풀었다" 로 읽혀서
+          아직 안 한 것과 구분되지 않고, 하이픈은 카드 한 장만 남으면 화면에서
+          가장 크게 읽히는 것이 대시가 된다. */}
       <StatCard
         href={routes.testDaily}
         label="일일공부"
-        value={daily ? daily.answered : "-"}
+        value={daily ? daily.answered : "시작 전"}
         unit={daily ? `/${daily.total}` : undefined}
         footer={
           daily?.done ? (
@@ -75,7 +75,7 @@ export function TodayCards({ daily, due }: Today) {
           ) : daily ? (
             <ProgressDots total={daily.total} done={daily.answered} />
           ) : (
-            <StatNote>아직 시작 전</StatNote>
+            <StatNote>하루 한 번</StatNote>
           )
         }
       />

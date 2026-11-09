@@ -1,16 +1,16 @@
 /**
- * 로그인·가입 화면의 "로그인 없이 둘러보기" 가 게스트 action 을 부르는 폼인지 본다.
+ * 로그인·가입 화면의 "로그인 없이 둘러보기" 가 필수 항목을 건너뛰지 않는지 본다.
  *
  * 실행: cd frontend && npm test
  *
  * 전에는 홈(/)으로 가는 링크였다. 홈은 로그인도 안 했고 게스트도 안 고른
  * 사람을 /start 로 돌려보내서, 거기서 "게스트로 둘러보기" 를 한 번 더 눌러야
- * 했다. 지금은 /start 와 같은 continueAsGuestAction 을 부르는 폼 버튼이다.
+ * 했다. 그 다음에는 게스트 action 을 바로 부르는 폼이었는데, 그러면 시작 화면이
+ * 묻는 두 항목을 여기로 돌아서 건너뛸 수 있었다. 지금은 시트를 여는 버튼이다.
  *
  * 어떤 action 이 걸렸는지 보는 방법: "use server" 파일은 Next 런타임 밖에서
  * import 할 수 없어 대역으로 갈아끼운다. 대역 함수에 $$FORM_ACTION 을 달면
- * React 서버 렌더가 서버 액션처럼 그 값을 form 의 action 속성으로 쓴다. 그래서
- * 마크업에 표시 경로가 찍혀 있으면 "그 버튼이 그 action 을 부른다" 는 뜻이다.
+ * React 서버 렌더가 서버 액션처럼 그 값을 form 의 action 속성으로 쓴다.
  */
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
@@ -59,12 +59,9 @@ describe("로그인 없이 둘러보기", () => {
         assert.doesNotMatch(html, /<a[^>]*>로그인 없이 둘러보기</);
       });
 
-      it("게스트 action 을 부르는 폼의 submit 버튼이다", () => {
-        const form = html.match(/<form[^>]*action="([^"]*)"[^>]*>((?:(?!<\/form>).)*)<\/form>/g) ?? [];
-        const guest = form.find((f) => f.includes("로그인 없이 둘러보기"));
-        assert.ok(guest, "버튼을 감싼 form 을 못 찾았다");
-        assert.match(guest, new RegExp(`action="${GUEST_MARK}"`));
-        assert.match(guest, /<button[^>]*type="submit"[^>]*>로그인 없이 둘러보기</);
+      it("시트를 여는 버튼이고, 묻기 전에는 게스트 action 이 그려지지 않는다", () => {
+        assert.match(html, /<button[^>]*type="button"[^>]*>로그인 없이 둘러보기</);
+        assert.doesNotMatch(html, new RegExp(`action="${GUEST_MARK}"`));
       });
     });
   }
