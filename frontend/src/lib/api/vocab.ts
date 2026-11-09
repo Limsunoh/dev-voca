@@ -78,26 +78,13 @@ export type WordDetail = WordListItem & {
  * ReadableOrdering)가 term 을 소문자로 바꿔 바이트 순서로 비교해서, 영문
  * 용어는 DB 의 글자 정렬 규칙과 상관없이 로컬과 운영이 같은 순서를 낸다.
  * 그래서 ABC순은 term 하나로 된다.
- *
- * 없는 것: 최신순. 지금 단어는 시드로 같은 1분 안에 들어가서 created_at
- * 순서가 사실상 입력 순서일 뿐이다. 검수로 단어가 따로 늘기 시작하면 넣는다.
  */
-const ABC_SORT = { value: "abc", label: "ABC순", ordering: "term" } as const;
-
 export const WORD_SORTS = [
   { value: "easy", label: "쉬운 것부터", ordering: "difficulty,term" },
-  ABC_SORT,
+  { value: "hard", label: "어려운 것부터", ordering: "-difficulty,term" },
+  { value: "new", label: "최근 추가순", ordering: "-created_at,term" },
+  { value: "abc", label: "ABC순", ordering: "term" },
 ] as const;
-
-/**
- * 백엔드 기본 순서(WordViewSet 의 ordering = term)와 같은 정렬.
- *
- * 섞지도 정렬하지도 않은 목록(검색 결과)이 이 순서로 온다. 목록 화면은
- * 검색 중에 정렬 줄 맨 앞 칩을 이 이름으로 부르고 이 칩은 따로 두지 않는다
- * (learn/words/page.tsx 의 SEARCH_SORTS). 백엔드 기본 순서를 바꾸면 이것도
- * 같이 바꿔야 한다.
- */
-export const WORD_DEFAULT_SORT = ABC_SORT;
 
 export type WordListParams = {
   search?: string;

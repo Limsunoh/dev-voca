@@ -8,9 +8,9 @@
  *    기댓값은 같은 입력을 DRF 에 넣어 "빈 문자열이 아닌 조각이 있나" 로 뽑은
  *    표다(아래 BACKEND_*). 표를 다시 뽑으려면 backend 의 venv 로
  *    rest_framework.filters.search_smart_split 를 부르면 된다.
- * 2. 단어 목록 정렬 줄의 맨 앞 칩(allValue)이 검색 유무 x sort x 다른 조건
- *    에서 어디를 가리키고, 그 링크를 따라가면 redirect 없이 열리는지.
- *    문장 목록은 allValue 를 안 넘기므로 이전과 같아야 한다.
+ * 2. 단어 목록 정렬 줄의 맨 앞 칩이 검색 유무 x sort x 다른 조건에서 어디를
+ *    가리키고, 그 링크를 따라가면 redirect 없이 열리는지. 검색 중의 맨 앞
+ *    칩은 "관련순" 이고 sort 를 끈다. 문장 목록도 같다.
  * 3. 문장 목록·상세가 에러 문장만 고정폭으로 그리는지.
  *
  * searchText 는 DRF 의 쪼개기 규칙을 옮긴 것이라, 따옴표 조합도 DRF 와 같아야 한다.
@@ -277,6 +277,21 @@ describe("searchText - 이 변경이 새로 만든 어긋남이 아닌 것", () 
 
 // ---- 2. 단어 목록 정렬 줄 --------------------------------------------------
 
+const WORD_CHIPS = ["쉬운 것부터", "어려운 것부터", "최근 추가순", "ABC순"];
+const SENTENCE_CHIPS = ["쉬운 것부터", "어려운 것부터", "최근 추가순"];
+const SORT_NAME: Record<string, string> = {
+  easy: "쉬운 것부터",
+  hard: "어려운 것부터",
+  new: "최근 추가순",
+  abc: "ABC순",
+};
+const SORT_ORDERING: Record<string, string> = {
+  easy: "difficulty,term",
+  hard: "-difficulty,term",
+  new: "-created_at,term",
+  abc: "term",
+};
+
 const SEARCHES = [
   "git",
   "a&sort=easy",
@@ -323,16 +338,17 @@ describe("/learn/words 정렬 줄 - 검색 중 맨 앞 칩", () => {
           const row = sortRowOf(html);
           assert.deepEqual(
             row.map((c) => c.text),
-            ["ABC순", "쉬운 것부터"],
+            ["관련순", ...WORD_CHIPS],
           );
 
-          // 켜진 칩은 하나. sort=easy 만 두 번째 칩이고 나머지는 맨 앞이다.
+          // 켜진 칩은 하나. 아는 sort 는 자기 칩이고 나머지는 맨 앞이다.
           const first = Array.isArray(sort) ? sort[0] : sort;
           const on = row.filter((c) => c.active).map((c) => c.text);
-          assert.deepEqual(on, [first === "easy" ? "쉬운 것부터" : "ABC순"]);
+          assert.deepEqual(on, [SORT_NAME[first ?? ""] ?? "관련순"]);
 
+          // 맨 앞 칩은 정렬을 끈다. 끄면 관련순이다.
           const head = query(row[0].href);
-          assert.equal(head.get("sort"), "abc", row[0].href);
+          assert.equal(head.get("sort"), null, row[0].href);
           assert.equal(head.get("search"), search, row[0].href);
           assert.equal(head.get("shuffle"), null, row[0].href);
           assert.equal(head.get("page"), null, row[0].href);
@@ -342,35 +358,31 @@ describe("/learn/words 정렬 줄 - 검색 중 맨 앞 칩", () => {
             assert.equal(head.get(key), want ?? null, `${key} ${row[0].href}`);
           }
 
-          // 두 칩 모두 따라가면 redirect 없이 열리고 순서는 term(ABC) 이거나
-          // 쉬운 것부터다.
+          // 칩을 따라가면 redirect 없이 열리고 ordering 은 그 칩의 정렬이다.
+          // sort 를 끄는 칩(맨 앞, 켜진 칩)은 ordering 이 없어 관련순으로 온다.
           for (const chip of row) {
             listQueries = [];
             await render(WordsPage, follow(chip.href));
             assert.equal(listQueries.length, 1, chip.href);
-            const ordering = listQueries[0].get("ordering");
             const to = query(chip.href).get("sort");
             assert.equal(
-              ordering,
-              to === "easy" ? "difficulty,term" : to === "abc" ? "term" : null,
+              listQueries[0].get("ordering"),
+              to ? SORT_ORDERING[to] : null,
               chip.href,
             );
             assert.equal(listQueries[0].get("search"), search, chip.href);
             assert.equal(listQueries[0].get("shuffle"), null, chip.href);
           }
 
-          // 맨 앞 칩을 누른 뒤 검색어를 지워도 ABC 순서가 이어진다.
+          // 맨 앞 칩은 sort 를 껐으므로 검색어를 지우면 섞인 목록으로 간다.
           const cleared = follow(row[0].href);
           delete cleared.search;
           listQueries = [];
-          const afterClear = await render(WordsPage, cleared);
-          assert.equal(listQueries.length, 1, "검색을 지우니 redirect 했다");
-          assert.equal(listQueries[0].get("ordering"), "term");
-          assert.equal(listQueries[0].get("search"), null);
-          assert.equal(
-            sortRowOf(afterClear).find((c) => c.active)?.text,
-            "ABC순",
-          );
+          const to = await redirectedTo(WordsPage, cleared);
+          assert.equal(listQueries.length, 0, "보내기 전에 목록을 불렀다");
+          assert.ok(to.searchParams.get("shuffle"), to.href);
+          assert.equal(to.searchParams.get("sort"), null, to.href);
+          assert.equal(to.searchParams.get("search"), null, to.href);
         });
       }
     }
@@ -385,7 +397,7 @@ describe("/learn/words 정렬 줄 - 검색이 아닐 때는 맨 앞 칩이 끄�
       const row = sortRowOf(html);
       assert.deepEqual(
         row.map((c) => c.text),
-        ["섞어서", "쉬운 것부터", "ABC순"],
+        ["섞어서", ...WORD_CHIPS],
       );
       assert.deepEqual(
         row.filter((c) => c.active).map((c) => c.text),
@@ -411,7 +423,7 @@ describe("/learn/words 정렬 줄 - 검색이 아닐 때는 맨 앞 칩이 끄�
 
 describe("/learn/words 정렬 줄 - 검색 없음", () => {
   for (const sort of ["abc", "easy", undefined] as const) {
-    it(`sort=${sort ?? "없음"}: 칩 셋, 맨 앞은 끄기, ABC순 칩은 sort=abc`, async () => {
+    it(`sort=${sort ?? "없음"}: 칩 다섯, 맨 앞은 끄기, ABC순 칩은 sort=abc`, async () => {
       const html = await render(WordsPage, {
         shuffle: "s1",
         category: "git",
@@ -420,13 +432,14 @@ describe("/learn/words 정렬 줄 - 검색 없음", () => {
       const row = sortRowOf(html);
       assert.deepEqual(
         row.map((c) => c.text),
-        ["섞어서", "쉬운 것부터", "ABC순"],
+        ["섞어서", ...WORD_CHIPS],
       );
       const head = query(row[0].href);
       assert.equal(head.get("sort"), null);
       assert.equal(head.get("category"), "git");
-      const abc = query(row[2].href);
-      assert.equal(abc.get("sort"), sort === "abc" ? null : "abc");
+      const abcChip = row.find((c) => c.text === "ABC순");
+      assert.ok(abcChip);
+      assert.equal(query(abcChip.href).get("sort"), sort === "abc" ? null : "abc");
     });
   }
 });
@@ -479,8 +492,8 @@ describe("ChoiceFilter allValue - 컴포넌트 단독", () => {
   });
 
   it("allValue 가 선택된 값과 같으면 맨 앞 칩이 끄는 링크가 된다(함정)", () => {
-    // 화면은 검색 중 sort=abc 를 selected 에서 빼서 이 경우를 피한다.
-    // 컴포넌트만 보면 같은 값을 넘기는 순간 "이미 고른 것을 다시 누름" 이다.
+    // 지금은 어느 화면도 allValue 를 넘기지 않는다. 컴포넌트만 보면 같은
+    // 값을 넘기는 순간 "이미 고른 것을 다시 누름" 이다.
     const chip = firstChip({ allValue: "abc", selected: "abc" });
     assert.equal(chip.href, "/p");
   });
@@ -509,20 +522,21 @@ describe("/learn/sentences 정렬 줄 - allValue 를 안 넘긴다", () => {
       const searching = searchText(p.search as string | undefined) !== undefined;
       assert.deepEqual(
         row.map((c) => c.text),
-        [searching ? "기본순" : "섞어서", "쉬운 것부터"],
+        [searching ? "관련순" : "섞어서", ...SENTENCE_CHIPS],
       );
       const head = query(row[0].href);
       assert.equal(head.get("sort"), null, row[0].href);
       // 검색 중이 아니면 시드를 싣고, 검색 중이면 싣지 않는다.
       assert.equal(Boolean(head.get("shuffle")), !searching, row[0].href);
       assert.equal(head.get("search"), searching ? p.search : null);
-      const easy = query(row[1].href);
-      assert.equal(easy.get("sort"), p.sort === "easy" ? null : "easy");
+      const easyChip = row.find((c) => c.text === "쉬운 것부터");
+      assert.ok(easyChip);
+      assert.equal(query(easyChip.href).get("sort"), p.sort === "easy" ? null : "easy");
       assert.ok(!html.includes("ABC순"));
     });
   }
 
-  it("검색 + 문장 기본순 칩을 따라가면 sort 없이 검색 목록이 열린다", async () => {
+  it("검색 + 문장 관련순 칩을 따라가면 sort 없이 검색 목록이 열린다", async () => {
     const row = sortRowOf(await render(SentencesPage, { search: "git", sort: "easy" }));
     listQueries = [];
     await render(SentencesPage, follow(row[0].href));

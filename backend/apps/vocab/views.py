@@ -1,7 +1,16 @@
 import random
 
 from django.db import connection
-from django.db.models import CharField, F, QuerySet, Value
+from django.db.models import (
+    Case,
+    CharField,
+    F,
+    IntegerField,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
 from django.db.models.functions import MD5, Cast, Collate, Concat, Lower
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, serializers, status, viewsets
@@ -126,6 +135,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         model             - 조회 대상
         list_serializer   - 목록용
         detail_serializer - 상세/생성/수정용
+        search_fields     - 앞 두 칸은 제목과 뜻 순서로 둔다(_rank_by_search)
     """
 
     permission_classes = [IsAuthenticatedOrReadOnly]
@@ -165,9 +175,44 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         """
         queryset = super().filter_queryset(queryset)
         queryset = self._shuffle(queryset)
+        queryset = self._rank_by_search(queryset)
         if can_review(self.request.user):
             return queryset.order_by("is_reviewed", *queryset.query.order_by)
         return queryset
+
+    def _rank_by_search(self, queryset: QuerySet) -> QuerySet:
+        """검색 결과를 제목이 맞는 것부터 놓는다.
+
+        검색은 설명까지 뒤지는데 순위가 없으면 제목이 정확히 맞는 항목도
+        알파벳 순서에 밀린다. 제목 일치, 제목 앞부분, 제목 포함, 뜻 포함,
+        나머지 순으로 놓고 같은 순위 안에서는 기존 순서를 둔다.
+
+        정렬을 직접 고른 요청은 건드리지 않는다. 낱말은 SearchFilter 와 같은
+        규칙으로 쪼갠다. 안 그러면 따옴표나 쉼표가 낀 검색어에 순위가 안 걸린다.
+
+        설명에만 있는 말은 뒤로 간다. "커밋" 으로 찾을 때의 commit 이 그렇다
+        (뜻은 "변경사항을 저장하다"). 이런 음역어는 단어에 한글 별칭이 있어야
+        올라온다.
+        """
+        if self.request.query_params.get("ordering"):
+            return queryset
+
+        terms = filters.SearchFilter().get_search_terms(self.request)
+        if not terms:
+            return queryset
+
+        phrase = " ".join(terms)
+        title, meaning = self.search_fields[:2]
+        return queryset.annotate(
+            _search_rank=Case(
+                When(**{f"{title}__iexact": phrase}, then=Value(0)),
+                When(**{f"{title}__istartswith": phrase}, then=Value(1)),
+                When(Q(*[(f"{title}__icontains", t) for t in terms]), then=Value(2)),
+                When(Q(*[(f"{meaning}__icontains", t) for t in terms]), then=Value(3)),
+                default=Value(4),
+                output_field=IntegerField(),
+            )
+        ).order_by("_search_rank", *queryset.query.order_by)
 
     def _shuffle(self, queryset: QuerySet) -> QuerySet:
         """?shuffle=<시드> 가 오면 그 시드로 섞은 순서로 준다.
@@ -331,17 +376,24 @@ class WordViewSet(LearningItemViewSet):
                 )
             pool = pool.filter(category=category)
 
+        # 문장 쪽 quiz 와 같게 모르는 유형은 막는다. 조용히 무작위로 내면 호출
+        # 쪽의 오타가 드러나지 않는다.
+        kind = request.query_params.get("kind")
+        if kind and kind not in QuizKind.WORD_KINDS:
+            return Response(
+                {"detail": "그런 문제 유형은 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         item, error = _item_of(request, pool, "단어로")
         if error is not None:
             return error
 
         if item is not None:
-            question = make_for_word(item, pool, kind=request.query_params.get("kind"))
+            question = make_for_word(item, pool, kind=kind)
         else:
             exclude = _parse_ids(request.query_params.get("exclude", ""))
-            question = make_question(
-                pool, kind=request.query_params.get("kind"), exclude_ids=exclude
-            )
+            question = make_question(pool, kind=kind, exclude_ids=exclude)
 
         if question is None:
             # 보기 4개를 채울 만큼 단어가 없다. 분류를 너무 좁혔거나

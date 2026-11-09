@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import {
   DetailAction,
@@ -10,6 +10,8 @@ import {
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { getWord } from "@/lib/api/vocab";
 import { routes, safeListUrl } from "@/lib/routes";
+
+import { canonicalId } from "../../canonical-id";
 
 // Next 16 에서 params 는 Promise 다.
 type PageProps = {
@@ -40,6 +42,9 @@ export default async function WordDetailPage({
   searchParams,
 }: PageProps) {
   const { id } = await params;
+  const canonical = canonicalId(id);
+  if (canonical) redirect(routes.wordDetail(canonical));
+
   const word = await getWord(id);
 
   // 검수 안 된 단어도 백엔드가 404 를 주므로 여기로 온다.
