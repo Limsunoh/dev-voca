@@ -78,6 +78,7 @@ let focusCalls: unknown[] = [];
 /** 다음 형제로 보기 목록을 가진 카드. */
 const card = {
   nextElementSibling: list,
+  contains: () => false,
   focus(options: unknown) {
     focusCalls.push(options);
   },
@@ -230,6 +231,7 @@ describe("useFocusNewQuestion 카드가 없을 때", () => {
   it("다음 형제가 없는 카드면 보기 안으로 치지 않는다", () => {
     const lone = {
       nextElementSibling: null,
+      contains: () => false,
       focus(options: unknown) {
         focusCalls.push(options);
       },

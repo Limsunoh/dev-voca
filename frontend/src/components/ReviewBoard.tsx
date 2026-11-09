@@ -873,8 +873,17 @@ function DoneCard({
   error: string;
   onAgain: () => void;
 }) {
+  // 결과로 초점을 옮긴다. 이유는 RoundBoard 의 결과 카드와 같다.
+  const cardRef = useFocusNewQuestion(answered, error);
+
   return (
-    <div className="rise flex flex-1 flex-col justify-center gap-6 text-center">
+    <div
+      ref={cardRef}
+      tabIndex={-1}
+      // 화면 높이를 다 차지하는 칸이라 초점 링을 그리면 화면 전체에 네모가
+      // 뜬다. Tab 으로 오는 자리가 아니므로 링을 끈다.
+      className="rise flex flex-1 flex-col justify-center gap-6 text-center outline-none"
+    >
       <div>
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           이번 판
