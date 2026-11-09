@@ -17,6 +17,7 @@ from django.db import IntegrityError
 from django.utils import timezone
 from rest_framework import serializers
 
+from .forbidden_names import name_is_forbidden
 from .models import (
     AVATAR_PHOTO,
     AVATAR_PHOTO_MAX_BYTES,
@@ -32,7 +33,7 @@ User = get_user_model()
 
 
 def validate_display_name(value: str, *, instance=None) -> str:
-    """이름을 다듬고, 이미 쓰는 이름인지 본다.
+    """이름을 다듬고, 쓸 수 없는 이름과 이미 쓰는 이름을 막는다.
 
     가입과 프로필 수정이 같은 함수를 쓴다. 한쪽에만 두면 다른 쪽은 DB
     제약에 걸려 엉뚱한 문구가 나간다. 가입에서 이름이 겹치면 "이미 가입된
@@ -53,6 +54,13 @@ def validate_display_name(value: str, *, instance=None) -> str:
         raise serializers.ValidationError(
             f"이름은 {DISPLAY_NAME_MAX}자까지 쓸 수 있습니다."
         )
+
+    # 지금 쓰는 이름을 그대로 보낸 것은 막지 않는다. 내정보 저장은 아바타만
+    # 바꿔도 이름을 함께 보내서, 막으면 관리자 화면에서 정해 준 이름(운영
+    # 계정 등)을 쓰는 사람이 아바타도 못 바꾼다.
+    unchanged = instance is not None and instance.display_name == name
+    if not unchanged and name_is_forbidden(name):
+        raise serializers.ValidationError("쓸 수 없는 이름입니다. 다른 이름을 입력해주세요.")
 
     if name_taken(name, exclude_pk=instance.pk if instance else None):
         raise serializers.ValidationError("이미 쓰고 있는 이름입니다.")
@@ -172,8 +180,9 @@ class UserSerializer(serializers.ModelSerializer):
             ) from exc
 
 
-# 가입 동의 두 칸의 안내. 칸이 없거나, 꺼져 있거나, 값이 이상해도 같은 말을 한다.
+# 가입 동의 세 칸의 안내. 칸이 없거나, 꺼져 있거나, 값이 이상해도 같은 말을 한다.
 TERMS_REQUIRED = "이용약관과 개인정보 처리방침에 동의해주세요."
+DISCLOSURE_REQUIRED = "순위표 공개와 해외 보관에 동의해주세요."
 AGE_REQUIRED = "만 14세 이상만 가입할 수 있습니다."
 
 
@@ -191,10 +200,13 @@ class SignUpSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=254)
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
 
-    # 둘 다 켜야 가입된다. 화면의 체크박스는 안내이고, 실제로 막는 곳은 여기다.
+    # 셋 다 켜야 가입된다. 화면의 체크박스는 안내이고, 실제로 막는 곳은 여기다.
     # 화면을 거치지 않고 API 를 바로 불러도 동의 없는 계정이 생기면 안 된다.
     terms_agreed = serializers.BooleanField(
         write_only=True, error_messages=_consent_errors(TERMS_REQUIRED)
+    )
+    disclosure_agreed = serializers.BooleanField(
+        write_only=True, error_messages=_consent_errors(DISCLOSURE_REQUIRED)
     )
     age_confirmed = serializers.BooleanField(
         write_only=True, error_messages=_consent_errors(AGE_REQUIRED)
@@ -202,11 +214,23 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["email", "password", "display_name", "terms_agreed", "age_confirmed"]
+        fields = [
+            "email",
+            "password",
+            "display_name",
+            "terms_agreed",
+            "disclosure_agreed",
+            "age_confirmed",
+        ]
 
     def validate_terms_agreed(self, value: bool) -> bool:
         if not value:
             raise serializers.ValidationError(TERMS_REQUIRED)
+        return value
+
+    def validate_disclosure_agreed(self, value: bool) -> bool:
+        if not value:
+            raise serializers.ValidationError(DISCLOSURE_REQUIRED)
         return value
 
     def validate_age_confirmed(self, value: bool) -> bool:
@@ -260,8 +284,10 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> User:
         # 모델 칸이 아니라서 create_user 에 넘기면 터진다. 검사를 통과했다는
-        # 사실은 아래 시각으로 남는다.
+        # 사실은 아래 시각으로 남는다. 공개·해외 보관 동의는 칸을 따로 두지
+        # 않는다. 셋 다 켜야 여기까지 오므로 동의 시각과 버전이 곧 그 기록이다.
         validated_data.pop("terms_agreed")
+        validated_data.pop("disclosure_agreed")
         validated_data.pop("age_confirmed")
         agreed_at = timezone.now()
 

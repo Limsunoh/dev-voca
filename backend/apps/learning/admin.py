@@ -47,6 +47,12 @@ class ViewOnlyAdmin(admin.ModelAdmin):
     list_select_related = ("user",)
     search_fields = USER_SEARCH
 
+    # User.__str__ 이 회원 번호라서 누구의 기록인지 여기서 이메일로 보여 준다.
+    # 목록 표시는 관리자 작업 기록에 저장되지 않는다.
+    @admin.display(description="이메일", ordering="user__email")
+    def user_email(self, obj):
+        return obj.user.email
+
     def has_add_permission(self, request):
         return False
 
@@ -83,7 +89,7 @@ class QuizAnswerInline(admin.TabularInline):
 @admin.register(QuizSession)
 class QuizSessionAdmin(ViewOnlyAdmin):
     deletable = True
-    list_display = ("finished_at", "user", "kind", "score", "answered", "correct", "skipped")
+    list_display = ("finished_at", "user_email", "kind", "score", "answered", "correct", "skipped")
     list_filter = ("kind",)
     search_fields = USER_SEARCH + ("token_id",)
     date_hierarchy = "finished_at"
@@ -107,7 +113,7 @@ class QuizSessionAdmin(ViewOnlyAdmin):
 
 @admin.register(DailyScore)
 class DailyScoreAdmin(ViewOnlyAdmin):
-    list_display = ("day", "user", "best_free_score", "daily_study_score", "streak_points")
+    list_display = ("day", "user_email", "best_free_score", "daily_study_score", "streak_points")
     date_hierarchy = "day"
 
     # "꾸준함 점수" 라고 부르지 않는다. 꾸준함 순위표는 이 값이 0 보다 큰
@@ -121,7 +127,7 @@ class DailyScoreAdmin(ViewOnlyAdmin):
 class DailyStudyAdmin(ViewOnlyAdmin):
     list_display = (
         "day",
-        "user",
+        "user_email",
         "length",
         "answered",
         "total_questions",
@@ -135,5 +141,5 @@ class DailyStudyAdmin(ViewOnlyAdmin):
 
 @admin.register(ReviewState)
 class ReviewStateAdmin(ViewOnlyAdmin):
-    list_display = ("user", "target_type", "target_id", "is_wrong", "streak", "last_correct_at")
+    list_display = ("user_email", "target_type", "target_id", "is_wrong", "streak", "last_correct_at")
     list_filter = ("target_type", "is_wrong")

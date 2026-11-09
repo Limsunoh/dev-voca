@@ -27,6 +27,14 @@ a→b 로 바꾸는 링크를 받아두고, 그 사이 a→c 로 바꾼 뒤, 묵
 누르면 c 가 b 로 되돌아간다. 사용자는 바꾼 적 없는 주소로
 계정이 옮겨간 것을 나중에야 안다.
 
+원문이 아니라 HMAC 값을 담는다. 토큰은 서명만 했을 뿐 암호화하지 않아서
+base64 를 풀면 그대로 읽힌다. 링크는 메일함에 오래 남고 새 주소의 주인도
+보는데, 대조에는 같은 값인지만 알면 된다. 새 주소는 링크를 받는 본인의
+주소이고 바꿀 때 그 값이 있어야 해서 원문으로 둔다.
+
+대조값에는 지금 로그인 토큰도 섞는다. 변경이 끝나면 그 전에 보낸 링크를
+모두 죽이기 위해서다(email_mark 참고).
+
 ## 비밀번호를 함께 확인하는 이유
 
 토큰을 보내기 전에 현재 비밀번호를 묻는다. 링크는 새 주소의 주인임을
@@ -38,6 +46,7 @@ a→b 로 바꾸는 링크를 받아두고, 그 사이 a→c 로 바꾼 뒤, 묵
 from __future__ import annotations
 
 from django.core import signing
+from django.utils.crypto import salted_hmac
 
 # 확인 링크의 수명. 짧게 두면 메일을 늦게 여는 사람이 다시 요청해야 하고,
 # 길게 두면 새어나간 링크가 오래 살아 있다. 메일을 확인하는 데 걸리는
@@ -53,7 +62,25 @@ class InvalidToken(Exception):
     """확인 링크가 만료됐거나 손상됐거나 이미 쓸 수 없는 상태다."""
 
 
-def make_token(*, user_id: int, current_email: str, new_email: str) -> str:
+def email_mark(email: str, login_token: str) -> str:
+    """토큰에 실을 대조용 값. 지금 주소와 지금 로그인 토큰으로 만든다.
+
+    서버 키를 섞는다. 그냥 해시로 두면 흔한 주소를 대입해 알아낼 수 있다.
+
+    로그인 토큰을 섞는 것은 변경이 끝나면 그 전에 보낸 링크를 모두 죽이기
+    위해서다. 확인 뷰는 변경 뒤 토큰을 지운다. 주소만 섞으면 a→b 뒤 b→a 로
+    돌아왔을 때 처음 보낸 a→b 링크가 다시 맞아떨어져, 링크를 가진 사람이
+    계정 주소를 b 로 옮길 수 있다. 별도 표나 캐시에 사용 기록을 두지 않아도
+    된다. 로그아웃이나 비밀번호 변경으로 토큰이 바뀌어도 링크는 무효가 된다.
+    """
+    return salted_hmac(
+        _SALT, f"{email.lower()}|{login_token}", algorithm="sha256"
+    ).hexdigest()
+
+
+def make_token(
+    *, user_id: int, current_email: str, new_email: str, login_token: str
+) -> str:
     """확인 링크에 실을 토큰.
 
     주소를 저장할 때와 같은 방식으로 소문자로 내려 담는다. 안 그러면
@@ -62,8 +89,8 @@ def make_token(*, user_id: int, current_email: str, new_email: str) -> str:
     return signing.dumps(
         {
             "u": user_id,
-            # 신청 당시의 주소. 쓸 때 현재 값과 비교한다.
-            "o": current_email.lower(),
+            # 신청 당시의 주소. 쓸 때 현재 값으로 만든 것과 비교한다.
+            "o": email_mark(current_email, login_token),
             "n": new_email.lower(),
         },
         salt=_SALT,
@@ -71,7 +98,7 @@ def make_token(*, user_id: int, current_email: str, new_email: str) -> str:
 
 
 def read_token(token: str) -> tuple[int, str, str]:
-    """토큰에서 (사용자 번호, 옛 주소, 새 주소) 를 꺼낸다.
+    """토큰에서 (사용자 번호, 옛 주소의 email_mark, 새 주소) 를 꺼낸다.
 
     만료와 위조를 여기서 함께 거른다. 부르는 쪽이 둘을 나눠 처리할 일이
     없다. 사용자에게는 어느 쪽이든 "링크를 다시 받으세요" 다. 어느 쪽인지
@@ -102,7 +129,8 @@ def build_mail(*, link: str) -> tuple[str, str]:
         "devvoca 계정의 이메일을 이 주소로 바꾸려는 요청이 있었습니다.\n"
         "아래 링크를 열면 변경이 끝납니다.\n\n"
         f"{link}\n\n"
-        "링크는 하루가 지나면 쓸 수 없습니다.\n\n"
+        "링크는 하루가 지나면 쓸 수 없습니다. "
+        "그 전에 로그아웃하거나 비밀번호를 바꿔도 쓸 수 없게 되니 다시 신청해주세요.\n\n"
         "이 요청을 한 적이 없다면 아무것도 하지 않으셔도 됩니다. "
         "링크를 열지 않으면 아무 일도 일어나지 않습니다.\n"
     )

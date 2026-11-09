@@ -35,6 +35,9 @@ from .email_change import (
     build_mail as build_email_change_mail,
 )
 from .email_change import (
+    email_mark,
+)
+from .email_change import (
     make_token as make_email_change_token,
 )
 from .email_change import (
@@ -61,6 +64,11 @@ from .throttles import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _login_token_key(user: AbstractBaseUser) -> str:
+    """지금 로그인 토큰의 값. 없으면 빈 문자열."""
+    return Token.objects.filter(user=user).values_list("key", flat=True).first() or ""
 
 
 def _auth_response(user: AbstractBaseUser, created: bool = False) -> Response:
@@ -184,6 +192,7 @@ class GoogleLoginView(APIView):
             # 사람의 계정과 이메일이 우리에게 남는다.
             if not (
                 request.data.get("terms_agreed") is True
+                and request.data.get("disclosure_agreed") is True
                 and request.data.get("age_confirmed") is True
             ):
                 return Response(
@@ -319,13 +328,22 @@ class PasswordChangeView(APIView):
 
 
 class MeView(APIView):
-    """내 정보 조회와 수정.
+    """내 정보 조회와 수정, 계정 삭제.
 
     화면을 새로 그릴 때 쿠키의 토큰이 아직 유효한지 확인하는 용도로도
     쓴다. 토큰이 없거나 만료면 401 이 오고, 화면은 로그아웃 상태로 그린다.
     """
 
     permission_classes = [IsAuthenticated]
+
+    def get_throttles(self) -> list:
+        # 삭제만 제한한다. 현재 비밀번호를 확인하는 자리라 제한이 없으면
+        # 로그인 화면 대신 여기로 추측을 던질 수 있다. 비밀번호 변경과 통을
+        # 같이 써서, 두 자리를 번갈아 써도 시도 횟수가 늘지 않게 한다.
+        # 조회는 화면을 그릴 때마다 불려서 걸면 안 된다.
+        if self.request.method == "DELETE":
+            return [PasswordChangeThrottle()]
+        return super().get_throttles()
 
     def get(self, request: Request) -> Response:
         return Response(UserSerializer(request.user).data)
@@ -335,6 +353,64 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+    def delete(self, request: Request) -> Response:
+        """계정을 지운다. 되살리지 않는다.
+
+        비밀번호가 있는 계정은 비밀번호를 확인한다. 토큰만으로 지우면 잠시
+        자리를 비운 기기에서 계정이 사라져도 되돌릴 길이 없다. 구글로만
+        가입한 계정은 확인할 비밀번호가 없어서 이메일을 다시 입력받는다.
+        이것은 실수를 막는 확인이고, 토큰이 샜을 때까지 막아 주지는 못한다.
+
+        관리자는 여기서 지우지 못한다. 작업 기록(LogEntry.user)이 CASCADE 로
+        함께 사라지고, 하나뿐인 관리자면 관리자 화면에 들어갈 계정이 없어진다.
+
+        학습 기록과 토큰은 CASCADE 로 함께 지워진다.
+        """
+        user = request.user
+        if user.is_staff or user.is_superuser:
+            return Response(
+                {"detail": "관리자 계정은 관리자 화면에서 지워주세요."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = request.data if isinstance(request.data, dict) else {}
+
+        if user.has_usable_password():
+            password = data.get("current_password")
+            # 짝 없는 서러게이트 문자는 해시하다가 UnicodeEncodeError 가 난다.
+            # 로그인과 비밀번호 변경은 DRF 의 CharField 가 먼저 걸러 준다.
+            try:
+                matches = isinstance(password, str) and user.check_password(password)
+            except UnicodeEncodeError:
+                matches = False
+            if not matches:
+                return Response(
+                    {"current_password": ["비밀번호가 올바르지 않습니다."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            email = data.get("email")
+            if not isinstance(email, str) or email.strip().lower() != user.email.lower():
+                return Response(
+                    {"email": ["이메일이 이 계정과 다릅니다."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # 행을 잠그고 지운다. 잠그지 않으면 지울 목록을 모은 뒤에 다른 탭의 기록
+        # 저장이 커밋되어 삭제가 FK 오류로 끝난다. 같은 요청이 두 번 와도 뒤의
+        # 것은 지울 행이 없을 뿐이다.
+        #
+        # ponytail: 저장이 잡은 하루 점수 줄과 잠그는 순서가 엇갈리면 교착이 나서
+        # 어느 한쪽이 500 으로 끝난다. 롤백되므로 다시 누르면 된다. 자주 보이면
+        # 자식 행을 먼저 잠근다.
+        with transaction.atomic():
+            members = get_user_model().objects.select_for_update().only("pk")
+            locked = members.filter(pk=user.pk).first()
+            if locked is not None:
+                locked.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EmailChangeRequestView(APIView):
@@ -361,6 +437,9 @@ class EmailChangeRequestView(APIView):
             user_id=request.user.pk,
             current_email=request.user.email,
             new_email=new_email,
+            # 없으면 만든다. 관리자 화면으로만 로그인한 계정은 토큰이 없는데, 빈
+            # 값으로 만든 링크는 로그아웃 뒤에 다시 맞아떨어진다.
+            login_token=Token.objects.get_or_create(user=request.user)[0].key,
         )
 
         # 링크는 화면(Next) 주소로 만든다. 요청 헤더에서 뽑지 않는 이유는
@@ -397,7 +476,7 @@ class EmailChangeConfirmView(APIView):
 
     토큰이 유효한 것만으로는 부족하다. 만든 시점과 쓰는 시점 사이에
     상황이 달라질 수 있어서, 쓸 때 다시 본다:
-    - 그 사이 주소가 또 바뀌었나 (토큰에 담아둔 옛 주소와 대조)
+    - 그 사이 주소가 또 바뀌었거나 변경이 끝났나 (토큰에 담아둔 대조값과 비교)
     - 그 사이 다른 사람이 그 주소로 가입했나
     """
 
@@ -419,7 +498,7 @@ class EmailChangeConfirmView(APIView):
             )
 
         try:
-            user_id, old_email, new_email = read_email_change_token(token.strip())
+            user_id, old_mark, new_email = read_email_change_token(token.strip())
         except InvalidEmailChangeToken as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -447,9 +526,9 @@ class EmailChangeConfirmView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # 신청 당시의 주소와 지금 주소가 다르면 그 사이에 또 바뀐 것이다.
+            # 신청 뒤에 주소가 또 바뀌었거나 변경이 한 번 끝났으면 값이 다르다.
             # 그대로 진행하면 나중에 바꾼 주소가 옛 주소로 되돌아간다.
-            if user.email.lower() != old_email:
+            if email_mark(user.email, _login_token_key(user)) != old_mark:
                 return Response(
                     {"detail": "이미 처리되었거나 만료된 링크입니다."},
                     status=status.HTTP_400_BAD_REQUEST,

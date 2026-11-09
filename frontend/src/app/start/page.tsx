@@ -25,9 +25,17 @@ export const metadata: Metadata = {
  * 한 번 고르면 30일 동안 다시 안 묻는다. 로그아웃하면 그 표시도 지워져
  * 여기로 돌아온다(session.clearToken).
  */
-export default async function StartPage() {
+export default async function StartPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string }>;
+}) {
   // 이미 정한 사람에게 다시 물어볼 이유가 없다. 홈으로 보낸다.
-  const [user, guest] = await Promise.all([getCurrentUser(), isGuestChosen()]);
+  const [user, guest, { deleted }] = await Promise.all([
+    getCurrentUser(),
+    isGuestChosen(),
+    searchParams,
+  ]);
   if (user || guest) redirect("/");
 
   // 배경 레이어를 깔지 않는다. 크림 바탕(body)이 그대로 이 화면의 배경이다.
@@ -37,6 +45,23 @@ export default async function StartPage() {
     // 이 화면에는 탭바가 없다(app/start/layout.tsx). 고르기 전에는
     // 갈 곳이 없으므로 이동 수단을 보여주면 빠져나갈 수 있다.
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-between px-6 py-10">
+      {/* 계정 삭제를 마치고 온 경우(profile/actions.ts). */}
+      {deleted === "1" && (
+        <p
+          role="status"
+          className="p-4 text-sm"
+          style={{
+            background: "var(--paper)",
+            color: "var(--foreground)",
+            borderRadius: "var(--radius-xl)",
+            boxShadow: "var(--lift-card)",
+            fontWeight: "var(--weight-bold)",
+          }}
+        >
+          계정을 삭제했습니다.
+        </p>
+      )}
+
       <div className="flex flex-1 flex-col justify-center">
         <p
           className="rise text-sm"

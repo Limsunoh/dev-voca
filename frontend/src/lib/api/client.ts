@@ -92,7 +92,7 @@ export function buildQuery(params: Record<string, string | undefined>): string {
 }
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
   /** JSON 으로 직렬화해 본문에 싣는다. */
   body?: unknown;
   /**

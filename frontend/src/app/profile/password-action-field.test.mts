@@ -43,6 +43,7 @@ mock.module("@/lib/session", {
     async setToken(token: string) {
       cookieJar.set("devvoca_token", token);
     },
+    async forgetToken() {},
     async clearToken() {
       cookieJar.delete("devvoca_token");
     },

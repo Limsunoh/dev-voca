@@ -21,9 +21,14 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
 
-# 지금 약관·처리방침의 버전. 동의할 때 이 값을 함께 남긴다. 문서 내용이 바뀌면
-# 올린다. 그래야 누가 어느 버전에 동의했는지 나중에 가릴 수 있다.
-TERMS_VERSION = "v1"
+from .forbidden_names import name_is_forbidden
+
+# 지금 약관·처리방침의 버전. 동의할 때 이 값을 함께 남긴다. 문서 내용이나 가입
+# 체크박스 문구, 보관 국가가 바뀌면 올린다. 그래야 누가 어느 버전에 동의했는지
+# 나중에 가릴 수 있다.
+#
+# v2: 순위표 공개·해외 보관 동의를 체크박스로 따로 받기 시작했다.
+TERMS_VERSION = "v2"
 
 # 화면에 그릴 수 있는 아바타. 실제 그림은 프론트가 SVG 로 들고 있고,
 # 여기서는 어느 것을 골랐는지만 저장한다. 이미지 파일을 서버에 두지
@@ -98,6 +103,12 @@ def _strip_hidden(value: str) -> str:
 _SPACES = re.compile(r"\s+")
 
 
+# 한글 채움 문자와 점자 빈칸. 글자로 분류돼 위의 거름을 지나가는데 화면에서는 빈칸으로
+# 보인다. 그대로 두면 이것만으로 된 빈 이름이 순위표에 오르고, 이름 끝에
+# 붙여 남의 이름과 다른 문자열을 만들 수 있다. 보이는 대로 공백으로 다룬다.
+_BLANK_LOOKING = re.compile("[\u115f\u1160\u3164\uffa0\u2800]")
+
+
 def normalize_display_name(value: str | None) -> str:
     """보여지는 이름을 비교 가능한 형태로 다듬는다.
 
@@ -109,7 +120,8 @@ def normalize_display_name(value: str | None) -> str:
     않으면 조합형으로 남의 이름과 같은 줄을 만들 수 있고, 자모가 글자마다
     세 개라 길이도 세 배로 세어져 멀쩡한 이름이 길이 제한에 걸린다.
     """
-    cleaned = _SPACES.sub(" ", _strip_hidden(value or "")).strip()
+    spaced = _BLANK_LOOKING.sub(" ", value or "")
+    cleaned = _SPACES.sub(" ", _strip_hidden(spaced)).strip()
     return unicodedata.normalize("NFC", cleaned)
 
 
@@ -156,10 +168,11 @@ def free_display_name(wanted: str | None) -> str:
     알 수 없다.
 
     빈 문자열을 돌려줄 수 있다. 그 경우 User.save() 가 학습자1234 꼴로
-    지어 넣는다.
+    지어 넣는다. 구글 이름이 금칙어에 걸릴 때도 그렇게 한다. 구글에서
+    온 사람은 이름을 입력한 적이 없어서, 막으면 가입할 길이 없다.
     """
     name = shorten_display_name(wanted)
-    if not name:
+    if not name or name_is_forbidden(name):
         return ""
 
     if not name_taken(name):
@@ -171,7 +184,12 @@ def free_display_name(wanted: str | None) -> str:
         candidate = shorten_display_name(
             f"{name[: DISPLAY_NAME_MAX - len(str(suffix))]}{suffix}"
         )
-        if candidate and not name_taken(candidate):
+        # 잘라 낸 자리에서 금칙어가 새로 생길 수 있어 다시 본다.
+        if (
+            candidate
+            and not name_is_forbidden(candidate)
+            and not name_taken(candidate)
+        ):
             return candidate
 
     # 같은 이름이 천 명이면 지어주는 쪽으로 넘긴다.
@@ -502,7 +520,9 @@ class User(AbstractUser):
         return f"{GENERATED_NAME_PREFIX}{secrets.randbelow(9_000_000) + 1_000_000}"
 
     def __str__(self) -> str:
-        return self.email
+        # 이메일을 돌려주지 않는다. 관리자 작업 기록이 이 글자를 그대로
+        # 저장해서(LogEntry.object_repr), 계정을 지워도 주소가 남는다.
+        return f"회원 {self.pk}"
 
     @property
     def name_for_display(self) -> str:

@@ -64,7 +64,7 @@ REDIRECT_URI = "http://localhost:3000/api/auth/google/callback"
 PASSWORD = "devvoca-pass-8821"
 
 # 가입과 구글 첫 로그인에 필요한 동의 값. 동의 자체의 검사는 tests_consent 가 본다.
-CONSENT = {"terms_agreed": True, "age_confirmed": True}
+CONSENT = {"terms_agreed": True, "disclosure_agreed": True, "age_confirmed": True}
 
 
 class SignUpTest(TestCase):
@@ -313,10 +313,10 @@ class MeTest(TestCase):
 
         허용하면 순위표에서 누가 누구인지 구분이 안 된다.
         """
-        self.other.display_name = "Devvoca"
+        self.other.display_name = "Gildong"
         self.other.save()
 
-        res = self._patch({"display_name": "devvoca"})
+        res = self._patch({"display_name": "gildong"})
 
         self.assertEqual(res.status_code, 400)
 
