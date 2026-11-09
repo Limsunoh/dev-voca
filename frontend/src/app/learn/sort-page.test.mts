@@ -162,8 +162,20 @@ describe("정렬 표", () => {
 
   it("문장 정렬은 전부 id 로 끝난다(문장엔 unique 한 글자 필드가 없다)", () => {
     for (const sort of SENTENCE_SORTS) {
-      assert.equal(sort.ordering.split(",").at(-1), "id", sort.value);
+      // 최근 추가순은 -id 로 끝난다. 방향과 무관하게 id 가 동점을 가른다.
+      assert.equal(sort.ordering.split(",").at(-1)?.replace(/^-/, ""), "id", sort.value);
     }
+  });
+
+  it("정렬 목록은 단어 넷, 문장 셋이다", () => {
+    assert.deepEqual(
+      WORD_SORTS.map((s) => s.label),
+      ["쉬운 것부터", "어려운 것부터", "최근 추가순", "ABC순"],
+    );
+    assert.deepEqual(
+      SENTENCE_SORTS.map((s) => s.label),
+      ["쉬운 것부터", "어려운 것부터", "최근 추가순"],
+    );
   });
 
   it("쉬운 것부터는 난이도가 첫 키다", () => {
@@ -236,10 +248,11 @@ describe("/learn/words 정렬", () => {
     assert.equal(to.searchParams.get("shuffle"), null);
   });
 
-  it("page=2.5 는 1페이지로 보고 정렬은 그대로 부른다", async () => {
-    await visit(WordsPage, { sort: "easy", page: "2.5" });
-    assert.equal(listQueries[0].get("page"), null);
-    assert.equal(listQueries[0].get("ordering"), "difficulty,term");
+  it("page=2.5 는 정렬을 둔 채 쪽 번호 없는 주소로 보낸다", async () => {
+    const to = await redirectedTo(WordsPage, { sort: "easy", page: "2.5" });
+    assert.equal(to.searchParams.get("page"), null, to.href);
+    assert.equal(to.searchParams.get("sort"), "easy", to.href);
+    assert.equal(listQueries.length, 0, "보내기 전에 목록을 부르지 않는다");
   });
 
   it("페이지 넘기기·카드 되돌아올 주소·거르는 칩이 모두 sort 를 들고 간다", async () => {
@@ -285,6 +298,8 @@ describe("/learn/words 정렬", () => {
       [
         ["섞어서", false],
         ["쉬운 것부터", true],
+        ["어려운 것부터", false],
+        ["최근 추가순", false],
         ["ABC순", false],
       ],
     );
@@ -294,8 +309,14 @@ describe("/learn/words 정렬", () => {
     assert.equal(query(row[0].href).get("sort"), null);
     assert.equal(query(row[1].href).get("sort"), null, "켜진 칩은 끄는 링크다");
     // 다른 정렬로 바꾸는 링크는 정렬 중이라 시드 없이 간다.
-    assert.equal(query(row[2].href).get("sort"), "abc");
-    assert.equal(query(row[2].href).get("shuffle"), null, row[2].href);
+    for (const [index, value] of [
+      [2, "hard"],
+      [3, "new"],
+      [4, "abc"],
+    ] as const) {
+      assert.equal(query(row[index].href).get("sort"), value);
+      assert.equal(query(row[index].href).get("shuffle"), null, row[index].href);
+    }
     // 정렬을 끄는 두 링크는 섞인 목록으로 가므로 새 시드를 미리 싣는다.
     // 없으면 서버가 시드를 붙여 한 번 더 보내고 그 사이 필터 상자가 닫힌다.
     assert.ok(query(row[0].href).get("shuffle"), row[0].href);
@@ -338,34 +359,38 @@ describe("/learn/words 정렬", () => {
     assert.equal(row.find((c) => c.active)?.text, "섞어서");
   });
 
-  it("검색 중에는 섞지 않으므로 맨 앞 칩이 섞어서가 아니라 실제 순서 이름이다", async () => {
+  it("검색 중에는 섞지 않으므로 맨 앞 칩이 섞어서가 아니라 관련순이다", async () => {
     // 되돌리면 켜진 "섞어서" 칩이 섞이지 않은 검색 결과 위에 뜬다.
-    // 단어의 기본 순서는 term(ABC순), 문장은 id(기본순)다.
-    for (const [page, name] of [
-      [WordsPage, "ABC순"],
-      [SentencesPage, "기본순"],
-    ] as const) {
+    for (const page of [WordsPage, SentencesPage]) {
       const row = await sortRow(page, { search: "git" });
-      assert.equal(row[0].text, name);
-      assert.equal(row.find((c) => c.active)?.text, name);
+      assert.equal(row[0].text, "관련순");
+      assert.equal(row.find((c) => c.active)?.text, "관련순");
       assert.ok(!row.some((c) => c.text === "섞어서"));
+      assert.equal(query(row[0].href).get("sort"), null, "관련순은 정렬을 끈다");
+      assert.equal(query(row[0].href).get("search"), "git", row[0].href);
     }
   });
 
-  it("검색 중에는 ABC순 칩이 하나다(맨 앞 칩과 같은 순서를 내는 칩을 두지 않는다)", async () => {
+  it("검색 중에도 ABC순은 보통 칩이다(sort=abc 를 켜고 검색어를 싣는다)", async () => {
     const row = await sortRow(WordsPage, { search: "git" });
     assert.deepEqual(
       row.map((c) => [c.text, c.active]),
       [
-        ["ABC순", true],
+        ["관련순", true],
         ["쉬운 것부터", false],
+        ["어려운 것부터", false],
+        ["최근 추가순", false],
+        ["ABC순", false],
       ],
     );
+    const abc = row[4];
+    assert.equal(query(abc.href).get("sort"), "abc");
+    assert.equal(query(abc.href).get("search"), "git");
     assert.equal(query(row[1].href).get("sort"), "easy");
     assert.equal(query(row[1].href).get("search"), "git");
   });
 
-  it("ABC순을 고른 뒤 검색하면 맨 앞 ABC순 칩이 켜지고 필터 배지는 정렬을 세지 않는다", async () => {
+  it("ABC순을 고른 뒤 검색하면 ABC순 칩이 켜지고 필터 배지가 정렬을 센다", async () => {
     const html = renderToStaticMarkup(
       (await visit(WordsPage, { search: "git", sort: "abc" })) as React.ReactElement,
     );
@@ -373,13 +398,13 @@ describe("/learn/words 정렬", () => {
     const row = await sortRow(WordsPage, { search: "git", sort: "abc" });
     assert.equal(row.find((c) => c.active)?.text, "ABC순");
     assert.equal(row.filter((c) => c.text === "ABC순").length, 1);
-    // 걸린 조건이 없으니 접힌 필터 상자에 개수 배지가 없다(FilterPanel 은 0 이면 안 그린다).
+    // 관련순과 다른 순서를 고른 것이라 접힌 필터 상자의 배지가 1 이다.
     const summary = (html.match(/<summary[\s\S]*?<\/summary>/)?.[0] ?? "").replace(
       /<[^>]*>/g,
       "",
     );
     assert.ok(summary.startsWith("필터"), summary);
-    assert.doesNotMatch(summary, /\d/, summary);
+    assert.match(summary, /1/, summary);
   });
 
   it("검색이 아니면 ABC순은 ordering=term 으로 부르고 칩이 켜진다", async () => {
@@ -436,13 +461,15 @@ describe("/learn/sentences 정렬", () => {
     }
   });
 
-  it("정렬 줄은 섞어서·쉬운 것부터 둘이다", async () => {
+  it("정렬 줄은 섞어서와 정렬 셋이다", async () => {
     const row = await sortRow(SentencesPage, { sort: "easy" });
     assert.deepEqual(
       row.map((c) => [c.text, c.active]),
       [
         ["섞어서", false],
         ["쉬운 것부터", true],
+        ["어려운 것부터", false],
+        ["최근 추가순", false],
       ],
     );
   });

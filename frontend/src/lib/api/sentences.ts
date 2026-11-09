@@ -54,6 +54,8 @@ export type SentenceDetail = SentenceListItem & {
  */
 export const SENTENCE_SORTS = [
   { value: "easy", label: "쉬운 것부터", ordering: "difficulty,id" },
+  { value: "hard", label: "어려운 것부터", ordering: "-difficulty,id" },
+  { value: "new", label: "최근 추가순", ordering: "-created_at,-id" },
 ] as const;
 
 export type SentenceListParams = {

@@ -103,15 +103,13 @@ class WordItemKindTest(ItemQuizMixin, TestCase):
         self.assertEqual(body["kind"], QuizKind.DESCRIPTION)
         self.assertNotIn("rebase", body["prompt"].lower())
 
-    def test_sentence_kind_on_word_endpoint_stays_word_kind(self):
-        """단어 쪽에 문장 유형을 보내도 단어 유형으로 낸다 - 묻는 말과 지문이
-        어긋나면 "이 말이 나오는 상황은?" 에 뜻 보기가 붙는다."""
+    def test_sentence_kind_on_word_endpoint_is_rejected(self):
+        """단어 쪽에 문장 유형을 보내면 400 이다. 조용히 무작위로 내면 호출
+        쪽의 오타가 숨고, 문장 쪽 quiz 와도 어긋난다."""
         for kind in ("blank", "situation", "nonsense"):
             res = self.quiz(WORD_QUIZ_URL, item=self.described.pk, kind=kind)
-            self.assertEqual(res.status_code, 200, (kind, res.content))
-            body = res.json()
-            self.assertIn(body["kind"], QuizKind.WORD_KINDS)
-            self.assertEqual(self.answer_of(WORD_GRADE_URL, body), self.described.pk)
+            self.assertEqual(res.status_code, 400, (kind, res.content))
+            self.assertEqual(res.json()["detail"], "그런 문제 유형은 없습니다.")
 
     def test_item_choices_are_four_distinct_ids_including_item(self):
         for _ in range(REPEAT):
