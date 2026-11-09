@@ -23,12 +23,20 @@ function first(value: string | string[] | undefined): string | undefined {
 
 export default async function TestWordsPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const category = first(params.category);
   // 상세의 "문제 풀기" 가 붙여 온다. 첫 문제만 이것으로 낸다.
   const item = first(params.item);
 
   // 분류 목록은 실패해도 빈 배열이라 화면을 막지 않는다.
   const categories = await getCategories();
+
+  // 옛 북마크처럼 없는 분류가 오면 "전체" 로 낸다. 그대로 보내면 서버가 400
+  // 을 돌려줘 "처음부터 다시" 를 눌러도 같은 오류 화면에 머문다. 목록을 못
+  // 받았을 때는 판단할 수 없으니 그대로 보낸다.
+  const asked = first(params.category);
+  const category =
+    categories.length === 0 || categories.some((c) => c.value === asked)
+      ? asked
+      : undefined;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pt-4 pb-10">
@@ -78,25 +86,29 @@ export default async function TestWordsPage({ searchParams }: PageProps) {
 
       <ContentTabs mode="test" current="words" warnOnLeave />
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        {/* key 로 분류를 넘겨 주소가 바뀌면 새로 만든다. 뒤로가기로 돌아올
-            때 메뉴가 열린 채 남아 보기 버튼을 덮는 것을 막는다. */}
-        <CategoryPicker
-          key={category ?? "all"}
-          options={categories}
-          basePath={contentPath("test", "words")}
-          selected={category}
-        />
-      </div>
-
       {/* key 로 분류를 넘긴다. 분류가 바뀌면 판을 새로 만들어야 점수와
           방금 푼 목록이 함께 초기화된다.
 
           항목은 key 에 넣지 않는다. 넣으면 ?item= 으로 들어온 판에서 분류
           "전체" 를 누를 때 판이 새로 만들어져 푼 것이 확인 없이 사라진다 -
           이미 고른 칩이라 확인 창을 건너뛰기 때문이다. 항목은 첫 문제에만
-          쓰이므로 판이 알아서 한 번 쓰고 버린다. */}
-      <QuizBoard key={category ?? "all"} category={category} item={item} />
+          쓰이므로 판이 알아서 한 번 쓰고 버린다.
+
+          분류 고르개의 key 는 뒤로가기로 돌아올 때 메뉴가 열린 채 남아 보기
+          버튼을 덮는 것을 막는다. 유형 고르개와 한 줄에 놓으려고 판에 넘긴다. */}
+      <QuizBoard
+        key={category ?? "all"}
+        category={category}
+        item={item}
+        picker={
+          <CategoryPicker
+            key={category ?? "all"}
+            options={categories}
+            basePath={contentPath("test", "words")}
+            selected={category}
+          />
+        }
+      />
     </main>
   );
 }

@@ -85,3 +85,25 @@ describe("확인 문구", () => {
     assert.match(leaveDetail(2), /2문제가 사라/);
   });
 });
+
+describe("새로고침 경고", () => {
+  it("푼 것이 있을 때만 건다", () => {
+    const calls: string[] = [];
+    const g = globalThis as unknown as Record<string, unknown>;
+    g.addEventListener = (type: string) => calls.push(`add ${type}`);
+    g.removeEventListener = (type: string) => calls.push(`remove ${type}`);
+    try {
+      markSolved(0);
+      markSolved(2);
+      clearSolved();
+      assert.deepEqual(calls, [
+        "remove beforeunload",
+        "add beforeunload",
+        "remove beforeunload",
+      ]);
+    } finally {
+      delete g.addEventListener;
+      delete g.removeEventListener;
+    }
+  });
+});

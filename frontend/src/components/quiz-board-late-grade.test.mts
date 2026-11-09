@@ -1,10 +1,12 @@
 /**
- * 문제풀기(QuizBoard)에서 채점 응답이 "다음 문제" 보다 늦게 오면 버리는지 본다.
+ * 문제풀기(QuizBoard)에서 채점 응답이 "다음 문제" 보다 늦게 왔을 때를 본다.
  *
  * 실행: cd frontend && npm test
  *
  * "다음 문제" 버튼은 보기를 고르자마자 뜬다. 채점이 느리면 그 버튼이 먼저
- * 눌리고, 늦게 온 옛 문제의 채점이 새 문제 위에 해설·점수·연출을 얹는다.
+ * 눌리고, 늦게 온 옛 문제의 채점이 새 문제 위에 해설·연출을 얹으면 안 된다.
+ * 점수와 푼 목록에는 넣는다. 서버는 이미 채점을 마쳤고, 안 넣으면 푼 문제가
+ * 점수에서 빠지고 맞힌 단어가 곧바로 다시 나온다.
  * 실패 응답이면 새 문제에 "채점하지 못했습니다" 가 붙는다. 반대로 같은 문제
  * 에서 늦게 온 채점은 그대로 반영돼야 한다 - 너무 넓게 버리면 정상 흐름이
  * 깨진다.
@@ -79,6 +81,8 @@ let held: Held[] = [];
 let statuses: number[] = [];
 /** 지금까지 낸 문제 수. 토큰을 t1, t2 ... 로 붙인다. */
 let served = 0;
+/** 문제를 받으러 간 주소들. */
+let asked: string[] = [];
 
 const QUESTION = {
   kind: "meaning",
@@ -100,8 +104,10 @@ beforeEach(() => {
   held = [];
   statuses = [];
   served = 0;
+  asked = [];
   (globalThis as { window?: unknown }).window = { scrollTo() {} };
-  globalThis.fetch = (async (_input: string | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    if (init?.method !== "POST") asked.push(String(input));
     if (init?.method === "POST") {
       const { token } = JSON.parse(String(init.body)) as { token: string };
       return new Promise<Response>((resolve, reject) => {
@@ -206,12 +212,12 @@ function screen() {
   };
 }
 
-/** 아무것도 반영되지 않은 새 문제 화면. */
-function assertUntouched() {
+/** 옛 채점의 해설·연출이 얹히지 않은 새 문제 화면. 점수에는 들어갈 수 있다. */
+function assertUntouched(score: string | null = null) {
   const now = screen();
   assert.equal(now.explained, false, "새 문제에 옛 해설이 붙었다");
   assert.equal(now.alert, false, "새 문제에 옛 채점의 에러가 붙었다");
-  assert.equal(now.score, null, "옛 채점이 점수에 들어갔다");
+  assert.equal(now.score, score, "점수가 어긋났다");
   assert.equal(now.burst, 0, "옛 정답으로 축포가 터졌다");
   assert.equal(now.reaction, 0, "옛 채점으로 연출이 돌았다");
   assert.equal(now.shaking, false, "옛 오답으로 보기가 흔들렸다");
@@ -293,14 +299,14 @@ describe("늦게 온 채점 - 같은 문제면 반영한다", () => {
   });
 });
 
-describe("늦게 온 채점 - 다음 문제로 넘어갔으면 버린다", () => {
+describe("늦게 온 채점 - 다음 문제로 넘어갔으면 해설·연출은 버리고 점수만 센다", () => {
   it("정답 응답", async () => {
     await start();
     await choose();
     await next();
     held[0].pass(true);
     await settle();
-    assertUntouched();
+    assertUntouched("1/1");
   });
 
   it("오답 응답", async () => {
@@ -309,7 +315,7 @@ describe("늦게 온 채점 - 다음 문제로 넘어갔으면 버린다", () =>
     await next();
     held[0].pass(false);
     await settle();
-    assertUntouched();
+    assertUntouched("1/0");
   });
 
   it("서버가 실패로 답한 경우(500)", async () => {
@@ -342,14 +348,14 @@ describe("늦게 온 채점 - 다음 문제로 넘어갔으면 버린다", () =>
     await settle();
     let now = screen();
     assert.equal(now.explained, false, "새 문제가 옛 해설로 채워졌다");
-    assert.equal(now.score, null);
+    assert.equal(now.score, "1/1");
     assert.equal(now.burst, 0);
 
     held[1].pass(false);
     await settle();
     now = screen();
     assert.equal(now.explained, true);
-    assert.equal(now.score, "1/0", "옛 정답이 같이 셌다");
+    assert.equal(now.score, "2/1", "두 채점이 다 들어가야 한다");
     assert.equal(now.burst, 0);
     assert.equal(now.reaction, 1);
   });
@@ -366,7 +372,7 @@ describe("늦게 온 채점 - 다음 문제로 넘어갔으면 버린다", () =>
     await settle();
 
     const now = screen();
-    assert.equal(now.score, "1/0");
+    assert.equal(now.score, "2/1");
     assert.equal(now.burst, 0, "옛 정답으로 축포가 터졌다");
     assert.equal(now.reaction, 1);
     assert.equal(now.shaking, true, "옛 정답이 새 오답의 판정을 덮었다");
@@ -386,10 +392,21 @@ describe("늦게 온 채점 - 다음 문제로 넘어갔으면 버린다", () =>
     const now = screen();
     assert.equal(now.alert, true);
     assert.equal(now.explained, false);
-    assert.equal(now.score, null);
+    assert.equal(now.score, "1/1");
   });
 
-  it("두 문제를 건너뛴 뒤 둘 다 늦게 와도 세 번째 문제만 센다", async () => {
+  it("늦게 온 맞은 답은 다음 요청의 제외 목록에 들어간다", async () => {
+    await start();
+    await choose();
+    await next();
+    held[0].pass(true);
+    await settle();
+    await choose();
+    await next();
+    assert.match(asked.at(-1) ?? "", /exclude=12/);
+  });
+
+  it("두 문제를 건너뛴 뒤 둘 다 늦게 와도 해설·연출은 세 번째 문제만이다", async () => {
     await start();
     await choose();
     await next();
@@ -403,7 +420,8 @@ describe("늦게 온 채점 - 다음 문제로 넘어갔으면 버린다", () =>
     await settle();
 
     const now = screen();
-    assert.equal(now.score, "1/1");
+    // 실패한 채점은 셀 것이 없다. 세 번째 정답과 첫 번째 오답만 들어간다.
+    assert.equal(now.score, "2/1");
     assert.equal(now.burst, 1);
     assert.equal(now.reaction, 1);
     assert.equal(now.alert, false);
