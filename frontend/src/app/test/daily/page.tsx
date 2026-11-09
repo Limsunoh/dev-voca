@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DailyStudyBoard } from "@/components/DailyStudyBoard";
+import { RefreshOnBack } from "@/components/RefreshOnBack";
 import { ApiError } from "@/lib/api/client";
 import { fetchDailyStatus } from "@/lib/api/daily";
 import { routes } from "@/lib/routes";
@@ -81,7 +82,11 @@ export default async function DailyPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-8">
-      <DailyStudyBoard status={status} />
+      {/* 진행이 서버에 있는 화면이라 뒤로 가기로 옛 응답을 그리면 이미 푼
+          문제가 다시 뜬다. */}
+      <RefreshOnBack renderId={crypto.randomUUID()}>
+        <DailyStudyBoard status={status} />
+      </RefreshOnBack>
     </main>
   );
 }
