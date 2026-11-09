@@ -35,6 +35,9 @@ from .email_change import (
     build_mail as build_email_change_mail,
 )
 from .email_change import (
+    email_mark,
+)
+from .email_change import (
     make_token as make_email_change_token,
 )
 from .email_change import (
@@ -465,7 +468,7 @@ class EmailChangeConfirmView(APIView):
 
     토큰이 유효한 것만으로는 부족하다. 만든 시점과 쓰는 시점 사이에
     상황이 달라질 수 있어서, 쓸 때 다시 본다:
-    - 그 사이 주소가 또 바뀌었나 (토큰에 담아둔 옛 주소와 대조)
+    - 그 사이 주소가 또 바뀌었나 (토큰에 담아둔 옛 주소의 대조값과 비교)
     - 그 사이 다른 사람이 그 주소로 가입했나
     """
 
@@ -487,7 +490,7 @@ class EmailChangeConfirmView(APIView):
             )
 
         try:
-            user_id, old_email, new_email = read_email_change_token(token.strip())
+            user_id, old_mark, new_email = read_email_change_token(token.strip())
         except InvalidEmailChangeToken as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -517,7 +520,7 @@ class EmailChangeConfirmView(APIView):
 
             # 신청 당시의 주소와 지금 주소가 다르면 그 사이에 또 바뀐 것이다.
             # 그대로 진행하면 나중에 바꾼 주소가 옛 주소로 되돌아간다.
-            if user.email.lower() != old_email:
+            if email_mark(user.email) != old_mark:
                 return Response(
                     {"detail": "이미 처리되었거나 만료된 링크입니다."},
                     status=status.HTTP_400_BAD_REQUEST,

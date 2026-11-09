@@ -313,10 +313,10 @@ class MeTest(TestCase):
 
         허용하면 순위표에서 누가 누구인지 구분이 안 된다.
         """
-        self.other.display_name = "Devvoca"
+        self.other.display_name = "Gildong"
         self.other.save()
 
-        res = self._patch({"display_name": "devvoca"})
+        res = self._patch({"display_name": "gildong"})
 
         self.assertEqual(res.status_code, 400)
 

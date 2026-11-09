@@ -17,6 +17,7 @@ from django.db import IntegrityError
 from django.utils import timezone
 from rest_framework import serializers
 
+from .forbidden_names import name_is_forbidden
 from .models import (
     AVATAR_PHOTO,
     AVATAR_PHOTO_MAX_BYTES,
@@ -32,7 +33,7 @@ User = get_user_model()
 
 
 def validate_display_name(value: str, *, instance=None) -> str:
-    """이름을 다듬고, 이미 쓰는 이름인지 본다.
+    """이름을 다듬고, 쓸 수 없는 이름과 이미 쓰는 이름을 막는다.
 
     가입과 프로필 수정이 같은 함수를 쓴다. 한쪽에만 두면 다른 쪽은 DB
     제약에 걸려 엉뚱한 문구가 나간다. 가입에서 이름이 겹치면 "이미 가입된
@@ -53,6 +54,13 @@ def validate_display_name(value: str, *, instance=None) -> str:
         raise serializers.ValidationError(
             f"이름은 {DISPLAY_NAME_MAX}자까지 쓸 수 있습니다."
         )
+
+    # 지금 쓰는 이름을 그대로 보낸 것은 막지 않는다. 내정보 저장은 아바타만
+    # 바꿔도 이름을 함께 보내서, 막으면 관리자 화면에서 정해 준 이름(운영
+    # 계정 등)을 쓰는 사람이 아바타도 못 바꾼다.
+    unchanged = instance is not None and instance.display_name == name
+    if not unchanged and name_is_forbidden(name):
+        raise serializers.ValidationError("쓸 수 없는 이름입니다. 다른 이름을 입력해주세요.")
 
     if name_taken(name, exclude_pk=instance.pk if instance else None):
         raise serializers.ValidationError("이미 쓰고 있는 이름입니다.")

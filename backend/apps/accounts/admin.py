@@ -7,8 +7,10 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
+from django.db import transaction
+from django.db.models import Case, F, Value, When
 
-from .models import User
+from .models import AVATAR_PHOTO, User
 
 
 class UserCreateForm(AdminUserCreationForm):
@@ -39,6 +41,7 @@ class UserAdmin(BaseUserAdmin):
     list_filter = ("is_staff", "is_active")
     search_fields = ("email", "display_name")
     ordering = ("-date_joined",)
+    actions = ("delete_uploaded_photo",)
     readonly_fields = (
         "date_joined",
         "last_login",
@@ -95,3 +98,28 @@ class UserAdmin(BaseUserAdmin):
             },
         ),
     )
+
+    @admin.action(description="올린 사진 지우기", permissions=["change"])
+    def delete_uploaded_photo(self, request, queryset) -> None:
+        """약관을 어긴 사진을 지운다. 사진은 올릴 때 자동으로 거르지 않는다.
+
+        내정보의 사진 삭제(AvatarPhotoView.delete)와 결과가 같아야 한다.
+        avatar 가 사진을 가리키고 있었으면 비워서 원래 규칙으로 돌아가고,
+        다른 아바타를 골라 둔 사람은 그대로 둔다.
+
+        사진 칸을 읽지 않으려고 update 로 한 번에 지운다. 되돌릴 수 없으니
+        이의 제기에 답할 수 있게 회원별로 작업 기록을 남긴다.
+        """
+        targets = queryset.filter(avatar_photo_key__isnull=False)
+        # 지운 사진과 남긴 기록이 어긋나지 않게 한 묶음으로 처리한다.
+        with transaction.atomic():
+            members = list(targets.select_for_update().only("email"))
+            targets.update(
+                avatar_photo=None,
+                avatar_photo_key=None,
+                avatar_photo_at=None,
+                avatar=Case(When(avatar=AVATAR_PHOTO, then=Value("")), default=F("avatar")),
+            )
+            for member in members:
+                self.log_change(request, member, "올린 사진을 지웠습니다.")
+        self.message_user(request, f"사진 {len(members)}장을 지웠습니다.")
