@@ -199,7 +199,7 @@ export function PasswordCard({
               minHeight: "var(--hit-floor)",
               background: "var(--surface-field)",
               color: "var(--foreground)",
-              border: 0,
+              border: "1px solid var(--text-muted)",
               boxShadow: "var(--lift-card)",
             }}
           />
@@ -231,7 +231,7 @@ export function PasswordCard({
             minHeight: "var(--hit-floor)",
             background: "var(--surface-field)",
             color: "var(--foreground)",
-            border: 0,
+            border: "1px solid var(--text-muted)",
             boxShadow: "var(--lift-card)",
           }}
         />
@@ -272,7 +272,7 @@ export function PasswordCard({
             minHeight: "var(--hit-floor)",
             background: "var(--surface-field)",
             color: "var(--foreground)",
-            border: 0,
+            border: "1px solid var(--text-muted)",
             boxShadow: "var(--lift-card)",
           }}
         />
