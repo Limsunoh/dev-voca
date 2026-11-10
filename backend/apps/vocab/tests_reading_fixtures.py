@@ -14,6 +14,9 @@ from django.test import SimpleTestCase
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
+# 파일마다 짝을 맞추는 이름 칸(load_readings 머리말).
+KEYS = {"readings_sentence.json": "slug", "readings_word.json": "term"}
+
 # 주소를 한 글자씩 푼 흔적. 규칙 7(ai_pipeline/prompts/korean-reading.md)은
 # 주소를 (주소) 로 적게 한다. 차례로 "://" 의 //, ".com", "localhost:",
 # 0 이 낀 IP("127.0.0.1", "10.0.1.20" - 강세 있고 없고 둘 다), IPv6 ":::3000"
@@ -35,32 +38,34 @@ class ReadingFixtureTest(SimpleTestCase):
         return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
     def test_rows_are_well_formed(self):
-        """pk 가 겹치지 않고, 발음이 비지 않았고, 강세 별표 짝이 맞는다.
+        """이름이 있고 겹치지 않고, 발음이 비지 않았고, 강세 별표 짝이 맞는다.
 
-        pk 가 겹치면 load_readings 에서 뒤 줄이 앞 줄을 경고 없이 덮는다.
+        이름이 겹치면 load_readings 에서 뒤 줄이 앞 줄을 경고 없이 덮는다.
+        pk 를 다시 적으면 DB 를 다시 만들 때 번호가 밀려 엉뚱한 곳에 붙는다.
         별표 짝이 안 맞으면 화면에서 엉뚱한 곳이 굵어진다(korean-reading.md
         확인 목록 7). 건수는 보지 않는다 - 발음을 새로 적을 때마다 늘어나는
         값이라 고정하면 멀쩡한 추가가 실패한다.
         """
-        for name in ("readings_sentence.json", "readings_word.json"):
+        for name, key in KEYS.items():
             rows = self.rows(name)
             with self.subTest(name):
-                pks = [row["pk"] for row in rows]
-                self.assertTrue(all(type(pk) is int for pk in pks), "pk 가 정수가 아니다")
-                self.assertEqual(len(pks), len(set(pks)), "pk 가 겹친다")
-                self.assertEqual([r["pk"] for r in rows if not r["reading"].strip()], [])
+                keys = [row.get(key) for row in rows]
+                self.assertTrue(all(isinstance(k, str) and k for k in keys), f"{key} 가 없다")
+                self.assertEqual(len(keys), len(set(keys)), f"{key} 가 겹친다")
+                self.assertEqual([r[key] for r in rows if "pk" in r], [], "pk 를 쓰지 않는다")
+                self.assertEqual([r[key] for r in rows if not r["reading"].strip()], [])
                 self.assertEqual(
-                    [r["pk"] for r in rows if r["reading"].count("**") % 2],
+                    [r[key] for r in rows if r["reading"].count("**") % 2],
                     [],
                     "별표 짝이 안 맞는다",
                 )
 
     def test_address_placeholder_is_written_exactly(self):
         """(주소) 는 괄호까지 한 덩어리다. 강세를 씌우거나 괄호를 빼면 다른 글자가 된다."""
-        for name in ("readings_sentence.json", "readings_word.json"):
+        for name, key in KEYS.items():
             for row in self.rows(name):
                 reading = row["reading"]
-                with self.subTest(name=name, pk=row["pk"]):
+                with self.subTest(name=name, key=row[key]):
                     self.assertNotIn("**(주소)", reading)
                     self.assertNotIn("(**주소**)", reading)
                     self.assertEqual(reading.count("주소"), reading.count("(주소)"))
@@ -78,10 +83,10 @@ class ReadingFixtureTest(SimpleTestCase):
         self.assertIn("투 (주소)", system)
 
     def test_addresses_are_not_spelled_out(self):
-        for name in ("readings_sentence.json", "readings_word.json"):
+        for name, key in KEYS.items():
             rows = json.loads((FIXTURES / name).read_text(encoding="utf-8"))
             spelled = [
-                row["pk"] for row in rows if any(mark in row["reading"] for mark in SPELLED_ADDRESS)
+                row[key] for row in rows if any(mark in row["reading"] for mark in SPELLED_ADDRESS)
             ]
             with self.subTest(name):
                 self.assertEqual(spelled, [], "주소를 한 글자씩 풀어 적었다 - (주소) 로 적는다")

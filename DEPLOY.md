@@ -173,6 +173,8 @@ railway ssh --service web "python backend/manage.py seed_word_aliases"
 railway ssh --service web "python backend/manage.py seed_sentences"
 railway ssh --service web "python backend/manage.py seed_sentences_more"
 railway ssh --service web "python backend/manage.py mark_exam_scope"
+railway ssh --service web "python backend/manage.py load_readings backend/apps/vocab/fixtures/readings_word.json --reviewed"
+railway ssh --service web "python backend/manage.py load_readings backend/apps/vocab/fixtures/readings_sentence.json --kind sentence --reviewed"
 railway ssh --service web "python backend/manage.py seed_phrases --reset"
 railway ssh --service web
 # 붙은 뒤 셸에서: /app/.venv/bin/python backend/manage.py createsuperuser
@@ -211,6 +213,15 @@ railway ssh --service web "python backend/manage.py seed_phrases --reset"
 (`seed_word_aliases.py`)의 값으로 덮어쓴다. 명령 파일에서 뺀 단어의 표기는
 `--reset` 으로도 안 지워지니 관리자 화면에서 비운다.
 Admin 에서 꺼 둔 표현의 글자를 소스에서 고쳤다면, 돌린 뒤 Admin 에서 다시 끈다.
+
+**한글 발음은 `load_readings` 가 채운다.** 시드 명령에는 발음이 없어서, 빠뜨리면
+단어·문장 화면에서 한글 발음만 에러 없이 안 보인다(2026-11 에 실제로 그랬다).
+단어 이름과 문장 시드 키로 짝을 맞추므로 단어·문장 시드 뒤라면 순서는 상관없다.
+위 블록의 두 줄을 돌리기 전에, 같은 줄을 `--reviewed` 대신 `--dry-run` 으로 먼저
+돌려 채워질 건수가 파일의 항목 수와 같고 "찾지 못했습니다" 가 없는지 본다.
+`--reviewed` 는 빈 DB 를 다시 만들 때만 붙인다. 이미 검수된 발음은 덮지 않지만,
+Admin 에서 검수를 풀어 둔 줄은 파일 값으로 덮고 바로 화면에 내보내기 때문이다.
+파일과 고치는 법은 `backend/apps/vocab/fixtures/README.md` 에 있다.
 
 ### 방법 2: 데이터를 살린다
 

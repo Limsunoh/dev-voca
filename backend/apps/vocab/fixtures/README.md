@@ -10,9 +10,13 @@ python manage.py load_readings apps/vocab/fixtures/readings_word.json --reviewed
 python manage.py load_readings apps/vocab/fixtures/readings_sentence.json --kind sentence --reviewed
 ```
 
-`seed_words` / `seed_sentences` 를 먼저 돌려 pk 가 있어야 한다. pk 로 짝을
-맞추므로 시드를 지우고 다시 넣어 pk 가 밀리면 엉뚱한 단어에 붙는다. 그때는
-`--dry-run` 으로 건수를 먼저 보고, 몇 개를 눈으로 확인한 뒤 반영한다.
+단어와 문장 시드를 먼저 돌려 행이 있어야 한다. 단어는 이름(`term`), 문장은
+시드 키(`slug`)로 짝을 맞추므로 시드 순서나 DB 번호와는 상관없다. 처음 넣을 때는
+`--dry-run` 으로 채워질 건수가 파일의 항목 수와 같은지 먼저 본다. "찾지 못했습니다" 가
+나오면 시드에서 그 단어나 문장이 빠지거나 이름이 바뀐 것이다.
+
+예전에는 pk 로 맞췄다. 2026-11 운영 DB 는 문장 번호가 이 파일을 만든 DB 와 달라서
+(200번이 다른 문장), 그대로 부었으면 엉뚱한 문장에 발음이 붙었다.
 
 ## 고쳐서 다시 넣기
 
@@ -20,13 +24,15 @@ python manage.py load_readings apps/vocab/fixtures/readings_sentence.json --kind
 바뀐다.** `load_readings` 가 검수된 발음을 덮지 않기 때문이다(사람이 Admin
 에서 고친 것을 지키려고). 그래서 셋을 차례로 한다.
 
-1. Admin 에서 고친 줄들의 발음 검수를 푼다. 고친 pk 만 걸러 보려면 목록
-   주소에 `?id__in=14,65,112` 처럼 붙인다. 전체 선택 뒤 동작 "선택한 문장의
+1. Admin 에서 고친 줄들의 발음 검수를 푼다. 고친 줄만 걸러 보려면 목록
+   주소에 이 파일의 이름을 그대로 붙인다. 단어는 `?term__in=cache,queue`, 문장은
+   `?slug__in=review-nice-catch,review-add-test` 다. 이름에 `+` 가 있으면(`N+1`)
+   주소에서 공백으로 읽히니 `N%2B1` 로 적는다. 전체 선택 뒤 동작 "선택한 문장의
    발음 검수를 취소"(단어는 "선택한 단어의 발음 검수를 취소")
 2. `--reviewed` 없이 다시 넣는다. 푼 줄만 채워지고 나머지는 "이미 검수됐습니다"
    로 건너뛴다. 먼저 `--dry-run` 으로 채워질 건수가 1 에서 푼 수와 같은지 본다.
    다르면 멈춘다 - 파일 안에 원래 미검수였던 다른 줄이 있으면 그 줄도 같이
-   덮이니, 어느 pk 가 더 잡혔는지부터 확인한다
+   덮이니, 어느 줄이 더 잡혔는지부터 확인한다
    ```
    python manage.py load_readings apps/vocab/fixtures/readings_sentence.json --kind sentence --dry-run
    python manage.py load_readings apps/vocab/fixtures/readings_sentence.json --kind sentence
