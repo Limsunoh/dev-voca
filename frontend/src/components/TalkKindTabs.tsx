@@ -82,7 +82,8 @@ export function TalkTabRow({
       aria-label={label}
       className={`${wrap ? "flex flex-wrap" : "inline-flex"} gap-1 p-1`}
       style={{
-        background: "var(--background-deep)",
+        // 바탕은 ContentTabs 와 같은 알약 색이다. 이유는 그쪽 주석에 있다.
+        background: "var(--surface-pill)",
         borderRadius: wrap
           ? "calc(var(--hit-floor) / 2 + 0.25rem)"
           : "var(--radius-pill)",
@@ -93,7 +94,8 @@ export function TalkTabRow({
           key={item.key}
           href={item.href}
           aria-current={item.active ? "page" : undefined}
-          className="flex items-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          // 띠 안 칸이라 포커스 테두리는 --focus-pill 이다(ContentTabs 와 같다).
+          className="flex items-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-pill"
           style={{
             minHeight: "var(--hit-floor)",
             borderRadius: "var(--radius-pill)",
