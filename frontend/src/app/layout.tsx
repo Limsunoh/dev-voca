@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Noto_Sans_KR } from "next/font/google";
 
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TabBar } from "@/components/TabBar";
 import "./globals.css";
 
@@ -71,6 +72,7 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
         {children}
         <TabBar />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
