@@ -1,0 +1,4 @@
+# 줄바꿈을 그대로 둔다. CRLF 로 바뀌면 manifest-checksum.txt 와 어긋나 빌드가 프로젝트를 다시 만들고 버전을 올린다.
+twa-manifest.json -text
+# 셸 스크립트라 Mac·Linux 에서 돌려면 LF 여야 한다.
+gradlew eol=lf
