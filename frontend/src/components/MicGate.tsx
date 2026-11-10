@@ -83,13 +83,13 @@ export function MicGate({
           type="button"
           onClick={copy.reload ? () => window.location.reload() : onAllow}
           disabled={pending}
-          // 이 화면의 유일한 코랄. 주된 동작이 하나여야 무엇을 눌러야 할지
+          // 이 화면의 유일한 갈색. 주된 동작이 하나여야 무엇을 눌러야 할지
           // 한눈에 보인다.
           className="dv-btn w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-8"
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               border: 0,
               // 두께는 인라인 boxShadow 로 주지 않는다. 그러면 :active 눌림이

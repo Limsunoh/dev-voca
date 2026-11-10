@@ -530,7 +530,7 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
           {/* 유형 때문에 못 낸 것이면 유형을 섞어서로 돌린다. "처음부터 다시"
               를 두면 점수를 지우고도 같은 유형이라 같은 안내가 또 뜬다 -
               분류·유형에 따라 이 화면에 곧바로 닿기 쉬워서 그 손해가 크다.
-              점수는 그대로 이어진다. 한 화면에 코랄은 하나라 둘 중 하나만. */}
+              점수는 그대로 이어진다. 한 화면에 갈색은 하나라 둘 중 하나만. */}
           {error === KIND_EXHAUSTED ? (
             <button
               type="button"
@@ -539,7 +539,7 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
               style={
                 {
                   minHeight: "var(--hit-min)",
-                  background: "var(--coral)",
+                  background: "var(--brand)",
                   color: "var(--text-on-color)",
                   borderRadius: "var(--radius-pill)",
                   fontWeight: "var(--weight-black)",
@@ -567,12 +567,12 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
                 setReaction({ fire: 0, correct: false });
                 void load();
               }}
-              // 이 화면의 유일한 동작이라 코랄을 준다.
+              // 이 화면의 유일한 동작이라 갈색을 준다.
               className="dv-btn mt-4 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               style={
                 {
                   minHeight: "var(--hit-min)",
-                  background: "var(--coral)",
+                  background: "var(--brand)",
                   color: "var(--text-on-color)",
                   borderRadius: "var(--radius-pill)",
                   fontWeight: "var(--weight-black)",
@@ -700,18 +700,19 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
             ref={nextButtonRef}
             type="button"
             onClick={() => void load()}
-            // 채점이 끝난 뒤 이 화면의 유일한 다음 동작이라 코랄이다.
-            // 한 화면에 코랄 버튼은 하나만 둔다 - 보기 넷은 종이라 겹치지 않는다.
+            // 채점이 끝난 뒤 이 화면의 유일한 다음 동작이라 갈색이다.
+            // 한 화면에 갈색 버튼은 하나만 둔다 - 보기 넷은 종이라 겹치지 않는다.
             className="dv-btn mt-6 w-full px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={
               {
                 minHeight: "var(--hit-min)",
-                background: "var(--coral)",
+                background: "var(--brand)",
                 color: "var(--text-on-color)",
                 borderRadius: "var(--radius-pill)",
-                // fontSize 를 여기 적지 않는다. globals.css 가 코랄 버튼
-                // 글자를 19px 로 올리는데(대비 때문), 인라인으로 크기를
-                // 걸면 그 규칙이 덮여서 16px 로 남는다.
+                // fontSize 를 여기 적지 않는다. globals.css 가 갈색 버튼
+                // 글자를 19px 로 올리는데(버튼 높이·줄바꿈이 이 크기에
+                // 맞춰져 있다), 인라인으로 크기를 걸면 그 규칙이 덮여서
+                // 16px 로 남는다.
                 fontWeight: "var(--weight-black)",
                 "--lift": "var(--lift-button)",
               } as React.CSSProperties
@@ -749,9 +750,9 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
             {combo >= 2 && (
               <span
                 key={combo}
-                // 연속은 초록이다. 코랄로 두면 "지금 여기"·오답과 같은 색이
-                // 되어, 잘 가고 있다는 표시가 경고처럼 보인다(가이드
-                // color-accent).
+                // 연속은 초록이다. 코랄로 두면 오답과 같은 색이 되어 잘 가고
+                // 있다는 표시가 경고처럼 보이고, 갈색으로 두면 누르는 버튼처럼
+                // 보인다(가이드 color-accent).
                 className="pop inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
                 style={{
                   background: "var(--green-soft)",
@@ -1063,10 +1064,9 @@ const WRONG_LIFT =
  *   correct  초록 채움 + 초록 두께
  *   wrong    채움이 아니라 코랄 테두리
  *
- * 마지막 줄이 이 시스템의 규칙이다(가이드 color-accent). 코랄이 "지금
- * 여기"(주요 버튼)와 "틀림" 을 겸하기 때문에, 오답까지 코랄로 채우면
- * 같은 화면의 코랄 버튼과 구분이 안 된다. 정답만 채우고 오답은 테두리로
- * 둔다.
+ * 마지막 줄이 이 시스템의 규칙이다(가이드 color-accent). 채움은 "누르는
+ * 것"(갈색 버튼)의 표시라, 오답을 채우면 누를 수 있는 것처럼 읽힌다. 색만으로
+ * 가르지도 않으려고 정답만 채우고 오답은 테두리로 둔다.
  *
  * 색만으로 가르지도 않는다 - "정답"·"오답" 글자가 항상 같이 간다.
  */
@@ -1239,7 +1239,7 @@ function Explanation({ result }: { result: GradeResult }) {
           흰 종이 위에서 이 줄이 본문과 같은 무게로 읽힌다.
 
           오답 쪽을 코랄로 채우지 않는 것은 보기 버튼과 같은 이유다 -
-          코랄 채움은 "누르는 것" 의 색이다(가이드 color-accent). */}
+          채움은 "누르는 것"(갈색 버튼)의 표시다(가이드 color-accent). */}
       <p
         className="inline-flex items-center rounded-full px-3 py-1.5 text-xs"
         style={{

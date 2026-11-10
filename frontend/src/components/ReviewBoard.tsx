@@ -529,14 +529,14 @@ function IdleCard({
           다시 보기에서 연속으로 맞혀야 빠집니다.
         </p>
         {/* 볼 것이 없는 화면이라 여기서 할 일은 문제를 푸는 것 하나다.
-            이 화면의 유일한 코랄 버튼. */}
+            이 화면의 유일한 갈색 버튼. */}
         <Link
           href={routes.testRound}
           className="dv-btn mx-auto mt-6 inline-flex items-center rounded-[var(--radius-pill)] px-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               fontWeight: "var(--weight-black)",
               "--lift": "var(--lift-button)",
@@ -587,7 +587,7 @@ function IdleCard({
       </p>
 
       <div>
-        {/* 이 화면의 주된 동작이라 코랄. 한 화면에 코랄 버튼은 하나다. */}
+        {/* 이 화면의 주된 동작이라 갈색. 한 화면에 갈색 버튼은 하나다. */}
         <button
           type="button"
           onClick={() => {
@@ -603,7 +603,7 @@ function IdleCard({
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               border: 0,
               fontWeight: "var(--weight-black)",
@@ -615,7 +615,7 @@ function IdleCard({
         </button>
         {/* 적어 둔 판을 버리고 새 판을 연다. 이게 없으면 그 사이 다른 곳에서
             새로 틀린 것이 생겨도 옛 판을 끝까지 풀어야 새 목록을 받는다.
-            새 판이 적어 둔 것을 덮어쓰므로 따로 지울 것은 없다. 코랄은 위
+            새 판이 적어 둔 것을 덮어쓰므로 따로 지울 것은 없다. 갈색은 위
             하나라 글자 버튼으로 둔다. block 으로 두는 이유: 데스크톱에서
             주 버튼이 제 폭(sm:w-auto)으로 줄면 인라인 버튼이 그 옆 같은 줄로
             붙어 높이가 어긋난다. 폰과 같이 늘 아래 줄에 둔다. */}
@@ -728,7 +728,7 @@ function PlayCard({
           borderRadius: "var(--radius-pill)",
         }}
       >
-        {/* 채워진 부분은 초록. 코랄은 "지금 눌러야 할 것" 이고 이건 이미
+        {/* 채워진 부분은 초록. 갈색은 "지금 눌러야 할 것" 이고 이건 이미
             지나온 것이라, 진행 점에서 done 을 초록으로 둔 것과 같다. */}
         <div
           className="h-full transition-[width] duration-300"
@@ -908,8 +908,8 @@ function DoneCard({
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-        {/* "이어서 더" 가 주된 동작이라 코랄. 홈으로는 흰 알약으로 물러난다 -
-            둘 다 코랄이면 여기서 뭘 해야 할지가 사라진다. */}
+        {/* "이어서 더" 가 주된 동작이라 갈색. 홈으로는 흰 알약으로 물러난다 -
+            둘 다 갈색이면 여기서 뭘 해야 할지가 사라진다. */}
         <button
           type="button"
           onClick={onAgain}
@@ -918,7 +918,7 @@ function DoneCard({
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               border: 0,
               fontWeight: "var(--weight-black)",

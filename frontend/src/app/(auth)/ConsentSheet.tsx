@@ -13,9 +13,9 @@ import { continueAsGuestAction } from "@/app/start/actions";
 export const BUTTON =
   "dv-btn flex w-full items-center justify-center rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-disabled:opacity-60";
 
-export const CORAL = {
+export const BRAND = {
   minHeight: "var(--hit-min)",
-  background: "var(--coral)",
+  background: "var(--brand)",
   color: "var(--text-on-color)",
   border: 0,
   "--lift": "var(--lift-button)",
@@ -133,7 +133,7 @@ export function GoogleStep({ titleId, onCancel }: StepProps) {
       <ConsentChecks {...consent} />
       <GoogleNameNote />
       {consent.ready ? (
-        <a href={googleConsentHref()} className={BUTTON} style={CORAL}>
+        <a href={googleConsentHref()} className={BUTTON} style={BRAND}>
           구글로 계속하기
         </a>
       ) : (
@@ -155,7 +155,7 @@ export function GuestStep({ titleId, onCancel }: StepProps) {
       <ConsentChecks {...consent} />
       {consent.ready ? (
         <form action={continueAsGuestAction}>
-          <button type="submit" className={BUTTON} style={CORAL}>
+          <button type="submit" className={BUTTON} style={BRAND}>
             둘러보기
           </button>
         </form>
@@ -197,7 +197,7 @@ function LockedButton({
       aria-disabled="true"
       onClick={onClick}
       className={BUTTON}
-      style={CORAL}
+      style={BRAND}
     >
       {children}
     </button>

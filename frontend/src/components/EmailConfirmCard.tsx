@@ -60,7 +60,7 @@ export function EmailConfirmCard({
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               border: 0,
               textDecoration: "none",
@@ -125,7 +125,7 @@ function ConfirmButton() {
       style={
         {
           minHeight: "var(--hit-min)",
-          background: "var(--coral)",
+          background: "var(--brand)",
           color: "var(--text-on-color)",
           border: 0,
           "--lift": "var(--lift-button)",

@@ -130,8 +130,8 @@ export function StudyCards({
   return (
     <section aria-labelledby="study-heading" className="flex flex-1 flex-col">
       <header className="flex items-baseline justify-between gap-3">
-        {/* 코랄을 안 쓴다. 이 화면의 코랄 하나는 아래 "다음"·"문제 풀기"
-            버튼이 갖는다 - 코랄은 "지금 눌러야 할 것" 이라, 누를 수 없는
+        {/* 갈색을 안 쓴다. 이 화면의 갈색 하나는 아래 "다음"·"문제 풀기"
+            버튼이 갖는다 - 갈색은 "지금 눌러야 할 것" 이라, 누를 수 없는
             제목에 쓰면 그 뜻이 흐려진다. */}
         <h2
           id="study-heading"
@@ -316,7 +316,7 @@ export function StudyCards({
             이전
           </button>
         )}
-        {/* 이 화면의 코랄 하나. 카드를 넘기는 것이 여기서 할 일의 전부다. */}
+        {/* 이 화면의 갈색 하나. 카드를 넘기는 것이 여기서 할 일의 전부다. */}
         <button
           type="button"
           onClick={() => (last ? onDone() : goTo(at + 1))}
@@ -324,7 +324,7 @@ export function StudyCards({
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               border: 0,
               borderRadius: "var(--radius-pill)",

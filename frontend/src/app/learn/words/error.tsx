@@ -36,14 +36,14 @@ export default function VocabError({
         단어를 불러오는 중 오류가 발생했습니다.
       </p>
 
-      {/* 이 화면의 유일한 동작이라 코랄을 준다. */}
+      {/* 이 화면의 유일한 동작이라 갈색을 준다. */}
       <button
         type="button"
         onClick={() => unstable_retry()}
         className="dv-btn mt-6 inline-flex items-center rounded-full px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         style={
           {
-            background: "var(--coral)",
+            background: "var(--brand)",
             color: "var(--text-on-color)",
             border: 0,
             minHeight: "var(--hit-min)",

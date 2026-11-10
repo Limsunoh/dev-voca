@@ -24,8 +24,8 @@ export function StatCard({
   label: string;
   value: ReactNode;
   unit?: string;
-  /** coral 이면 숫자가 코랄. 지금 손대야 할 것을 하나만 고를 때 쓴다. */
-  tone?: "ink" | "coral";
+  /** brand 면 숫자가 강조색(갈색). 지금 손대야 할 것을 하나만 고를 때 쓴다. */
+  tone?: "ink" | "brand";
   footer?: ReactNode;
 }) {
   return (
@@ -61,7 +61,7 @@ export function StatCard({
           fontSize: "var(--text-2xl)",
           fontWeight: "var(--weight-black)",
           letterSpacing: "var(--tracking-tight)",
-          color: tone === "coral" ? "var(--coral)" : "var(--foreground)",
+          color: tone === "brand" ? "var(--brand)" : "var(--foreground)",
         }}
       >
         {value}

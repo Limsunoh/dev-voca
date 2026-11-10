@@ -238,7 +238,7 @@ export default async function MistakesPage({ searchParams }: PageProps) {
             hasNext={Boolean(data.next)}
           />
 
-          {/* 이 화면의 유일한 코랄. 여기서 풀지 않으므로 나가는 길이
+          {/* 이 화면의 유일한 갈색. 여기서 풀지 않으므로 나가는 길이
               하나뿐이고, 그것이 주된 동작이다. */}
           <div className="mt-8">
             <Link
@@ -247,7 +247,7 @@ export default async function MistakesPage({ searchParams }: PageProps) {
               style={
                 {
                   minHeight: "var(--hit-min)",
-                  background: "var(--coral)",
+                  background: "var(--brand)",
                   color: "var(--text-on-color)",
                   border: 0,
                   borderRadius: "var(--radius-pill)",

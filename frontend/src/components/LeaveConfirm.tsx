@@ -124,7 +124,7 @@ export function LeaveConfirm({
       {note}
 
       <div className="mt-6 flex gap-2">
-        {/* 되돌아가는 쪽을 먼저, 코랄로 둔다. 실수로 연 사람이 대부분이라
+        {/* 되돌아가는 쪽을 먼저, 갈색으로 둔다. 실수로 연 사람이 대부분이라
             손가락이 먼저 닿는 자리에 그쪽이 있어야 한다. */}
         <button
           type="button"
@@ -133,7 +133,7 @@ export function LeaveConfirm({
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               border: 0,
               borderRadius: "var(--radius-pill)",
@@ -144,8 +144,9 @@ export function LeaveConfirm({
         >
           {cancelLabel}
         </button>
-        {/* 진행하는 쪽은 흰 알약에 코랄 글자. 채우면 코랄이 둘이 되어
-            어느 쪽을 권하는지 사라진다. */}
+        {/* 진행하는 쪽(나가기)은 흰 알약에 진한 코랄 글자. 되돌리기 어려운
+            동작이라 경고색을 쓰고, 채우지는 않는다 - 채우면 갈색 버튼과 무게가
+            같아져 어느 쪽을 권하는지 사라진다. */}
         <button
           type="button"
           onClick={() => {

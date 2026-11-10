@@ -198,7 +198,7 @@ export function DetailHero({
         // 형광펜은 홈의 "오늘의 단어" 와 같은 것을 쓴다. 두 화면 다 뜻을
         // 칠하는 자리라, 각자 그라디언트를 적으면 한쪽만 고쳐진다.
         //
-        // 색은 기본(초록)이다. 코랄은 "지금 여기" 와 주요 동작이 쓰는
+        // 색은 기본(초록)이다. 갈색은 "지금 여기" 와 주요 동작이 쓰는
         // 색이고 이 화면에서는 맨 아래 "문제 풀기" 버튼이 그것을 갖는다.
         <p
           className="rise mt-5 text-pretty [animation-delay:120ms]"
@@ -264,8 +264,8 @@ export function DetailCard({
         } as React.CSSProperties
       }
     >
-      {/* 라벨에 강조색을 쓰지 않는다. --coral 은 "지금 여기" 를 뜻하는
-          색이라(MetaBadge 참고) 고정 라벨에 쓰면 그 의미가 흐려진다.
+      {/* 라벨에 강조색을 쓰지 않는다. --brand 는 "지금 여기" 와 누르는 곳을
+          뜻하는 색이라 고정 라벨에 쓰면 그 의미가 흐려진다.
           uppercase 도 없다 - 한글에는 아무 효과가 없으면서 자간만 벌어져
           읽기 나빠진다. 대신 굵기(900)로 본문과 가른다. */}
       <h2
@@ -294,7 +294,7 @@ export function DetailCard({
 /**
  * 상세 맨 아래 주요 동작. "이 단어로 문제 풀기".
  *
- * 이 화면의 코랄 하나를 여기가 갖는다 - 읽고 나서 할 일이 그것뿐이고,
+ * 이 화면의 갈색 하나를 여기가 갖는다 - 읽고 나서 할 일이 그것뿐이고,
  * 없으면 상세가 막다른 화면이 된다(목록으로 되돌아가는 길만 있다).
  */
 export function DetailAction({
@@ -310,7 +310,7 @@ export function DetailAction({
       className="dv-btn rise mt-5 flex w-full items-center justify-center px-5 [animation-delay:440ms] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       style={
         {
-          background: "var(--coral)",
+          background: "var(--brand)",
           color: "var(--text-on-color)",
           borderRadius: "var(--radius-pill)",
           minHeight: "var(--hit-min)",

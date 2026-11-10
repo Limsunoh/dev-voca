@@ -76,16 +76,20 @@ const circleOf = (cell: El) => flatten(cell.props.children).find((el) => classOf
 
 describe("색 대비 4.5:1", () => {
   const PAIRS: [string, () => string, () => string][] = [
-    ["--coral-soft-text / --coral-soft", () => token("--coral-soft-text"), () => token("--coral-soft")],
-    ["흰색 / --coral-deep", () => WHITE, () => token("--coral-deep")],
+    ["--brand / --brand-soft", () => token("--brand"), () => token("--brand-soft")],
+    ["흰색 / --brand", () => WHITE, () => token("--brand")],
     ["--text-muted / 흰색", () => token("--text-muted"), () => WHITE],
     ["--foreground / --medal-1", () => token("--foreground"), () => token("--medal-1")],
     ["--foreground / --medal-2", () => token("--foreground"), () => token("--medal-2")],
     ["--foreground / --medal-3", () => token("--foreground"), () => token("--medal-3")],
-    // 내 줄이 4위 아래면 등수가 코랄 바탕 위 --text-muted 다.
-    ["--text-muted / --coral-soft", () => token("--text-muted"), () => token("--coral-soft")],
+    // 내 줄이 4위 아래면 등수가 옅은 갈색 바탕 위 --text-muted 다(4.65:1, 여유가 적다).
+    ["--text-muted / --brand-soft", () => token("--text-muted"), () => token("--brand-soft")],
     // 내정보·이메일·일상영어의 오류 상자와 문제풀기의 정답 안내가 쓰는 짝이다.
     ["--coral-deep / --wrong-soft", () => token("--coral-deep"), () => token("--wrong-soft")],
+    // 계정 삭제·나가기처럼 되돌리기 어려운 동작은 흰 알약에 진한 코랄 글자다.
+    ["--coral-deep / 흰색", () => token("--coral-deep"), () => WHITE],
+    // 크림 바탕에 바로 놓이는 오류 알림 글자(role="alert")가 쓰는 짝이다.
+    ["--coral-deep / --background", () => token("--coral-deep"), () => token("--background")],
   ];
 
   for (const [name, text, back] of PAIRS) {
@@ -97,12 +101,6 @@ describe("색 대비 4.5:1", () => {
 
   it("계산식이 맞다: 흑백은 21:1", () => {
     assert.equal(Math.round(contrast("#000000", WHITE)), 21);
-  });
-
-  it("--coral-soft-text 는 --coral-deep 과 다른 값이다", () => {
-    // --coral-deep 은 이 바탕에서 4.5 에 못 미쳐 따로 만든 토큰이다.
-    assert.notEqual(token("--coral-soft-text"), token("--coral-deep"));
-    assert.ok(contrast(token("--coral-deep"), token("--coral-soft")) < 4.5);
   });
 });
 
@@ -166,19 +164,19 @@ describe("순위표 줄의 등수", () => {
 describe("내 줄의 '나' 표시", () => {
   const me = (isMe: boolean) => row(5, isMe).find((el) => el.props.children === "나");
 
-  it("--coral-soft-text 로 쓴다", () => {
+  it("--brand 로 쓴다", () => {
     const mark = me(true);
     assert.ok(mark, "'나' 표시가 없다");
-    assert.equal(styleOf(mark).color, "var(--coral-soft-text)");
+    assert.equal(styleOf(mark).color, "var(--brand)");
   });
 
   it("내 줄이 아니면 안 그린다", () => {
     assert.equal(me(false), undefined);
   });
 
-  it("'나' 가 얹히는 바탕이 --coral-soft 다", () => {
+  it("'나' 가 얹히는 바탕이 --brand-soft 다", () => {
     const li = row(5, true).find((el) => el.type === "li") as El;
-    assert.equal(styleOf(li).background, "var(--coral-soft)");
+    assert.equal(styleOf(li).background, "var(--brand-soft)");
   });
 });
 
@@ -188,10 +186,10 @@ describe("필터 배지", () => {
       classOf(el).includes("min-w-[18px]"),
     );
 
-  it("바탕이 --coral-deep 이고 글자는 흰색 토큰이다", () => {
+  it("바탕이 --brand 이고 글자는 흰색 토큰이다", () => {
     const found = badge(["git"]);
     assert.ok(found, "배지가 없다");
-    assert.equal(styleOf(found).background, "var(--coral-deep)");
+    assert.equal(styleOf(found).background, "var(--brand)");
     assert.equal(styleOf(found).color, "var(--text-on-color)");
     assert.equal(token("--text-on-color").toLowerCase(), WHITE);
   });

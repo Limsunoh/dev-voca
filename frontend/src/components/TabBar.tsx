@@ -123,7 +123,23 @@ export function TabBar() {
         }}
       >
         {/* flex 로 두는 이유: 모드가 하나 열리면 tabs 가 저절로 늘어난다.
-          grid-cols-N 을 박아두면 그때 여기도 같이 고쳐야 한다. */}
+          grid-cols-N 을 박아두면 그때 여기도 같이 고쳐야 한다.
+
+          칸은 같은 너비(flex-1)가 아니라 글자 길이 + 남는 폭의 같은 몫
+          (flex-auto)이다. 같은 너비면 글자 가운데끼리는 같은 간격이지만,
+          라벨이 "홈"(1자)부터 "문제풀기"(4자)까지라 글자 사이 빈 칸이
+          달라진다. 390px 에서 홈-익히기 56px, 익히기-문제풀기 39px 이라
+          "익히기" 가 오른쪽으로 치우쳐 보였다(2026-11-11 사용자 지적).
+          flex-auto 면 남는 폭이 칸마다 똑같이 붙어 글자 사이가 모두 같아진다.
+          누르는 칸은 여전히 탭 줄 전체를 빈틈없이 덮는다.
+
+          가장 짧은 라벨의 칸이 가장 좁다. 기본 글자 크기, 5탭, 360px 에서
+          "홈" 칸이 50px 이다. 폰 글자 크기를 130% 로 키우면 43px 로 44px
+          아래가 되어(둘 다 2026-11-11 에 브라우저로 잼), 칸마다 min-w-[44px]
+          를 건다. --hit-floor(2.75rem)를 쓰지 않는 이유: rem 이라 글자를
+          키우면 같이 커진다. 계산상 200% 에서 다섯 칸 최소 폭 합이 440px
+          이라 360px 화면에서 탭 줄이 밖으로 밀린다.
+          탭이 6개가 되면 기본 글자 크기에서도 다시 잰다. */}
         <ul className="mx-auto flex max-w-md">
           {tabs.map((tab) => {
             const active = tab.segment === current;
@@ -131,19 +147,23 @@ export function TabBar() {
             // 아이콘 라이브러리를 넣지 않으려고 막대 하나로 지금 위치를
             // 표시한다. 색만으로 구분하면 색각 이상이 있을 때 구분이 안 되므로
             // 진하기도 같이 바꾼다.
-            // 크림에서는 이 막대가 켜졌을 때만 보이는 코랄 막대다(34x6).
+            // 크림에서는 이 막대가 켜졌을 때만 보이는 갈색 막대다(34x6).
             // 다크처럼 꺼진 탭도 40% 투명도로 남기면, 크림 바탕에서는 옅은
             // 회색 막대 다섯 개가 탭바 위에 눈금처럼 늘어서서 무엇이 켜진
             // 것인지 더 안 보인다. 꺼지면 자리만 남기고 색을 없앤다.
             //
             // 색만으로 구분하지 않는다는 규칙은 그대로다 - 켜진 탭은 글자도
-            // 코랄이고 aria-current 가 소리로 말한다. 막대는 훑을 때를 돕는
+            // 갈색이고 aria-current 가 소리로 말한다. 막대는 훑을 때를 돕는
             // 보조 수단이다.
             const marker = (
               <span
                 aria-hidden
-                className="block h-1.5 w-[34px] rounded-full"
-                style={{ background: active ? "var(--coral)" : "transparent" }}
+                // w-full + max-w 로 둔다. w-[34px] 로 박으면 막대가 칸의
+                // 내용 너비가 되어, 글자가 34px 보다 짧은 "홈" 칸이 글자가
+                // 아니라 막대 너비로 잡힌다. 그러면 flex-auto 가 글자 사이를
+                // 고르게 벌리지 못한다. 퍼센트 너비는 칸 크기를 정할 때 안 셈한다.
+                className="block h-1.5 w-full max-w-[34px] rounded-full"
+                style={{ background: active ? "var(--brand)" : "transparent" }}
               />
             );
 
@@ -162,7 +182,7 @@ export function TabBar() {
 
             if (!tab.ready) {
               return (
-                <li key={tab.key} className="flex-1">
+                <li key={tab.key} className="min-w-[44px] flex-auto">
                   {/* 링크가 아니라 span 이다. 갈 곳이 없는데 눌리면 아무 일도
                     안 일어나는 것을 매번 겪는다. 대신 자리를 남겨 이 서비스가
                     단어장 하나로 끝나지 않는다는 걸 알린다.
@@ -189,16 +209,15 @@ export function TabBar() {
             }
 
             return (
-              <li key={tab.key} className="flex-1">
+              <li key={tab.key} className="min-w-[44px] flex-auto">
                 <Link
                   href={tabHref(tab, pathname)}
                   aria-current={active ? "page" : undefined}
                   className={`${shape} focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus`}
                   style={{
-                    // 글자는 --coral-deep(4.93:1). 위 막대는 background 라
-                    // 비텍스트 3:1 기준이고 --coral(3.15:1)로 통과한다 -
-                    // 같은 색을 쓰지 않는 이유가 그것이다.
-                    color: active ? "var(--coral-deep)" : "var(--text-muted)",
+                    // 글자와 위 막대 모두 --brand 다. 흰 종이 위 9.46:1 이라
+                    // 글자 기준(4.5:1)과 막대 기준(3:1)을 함께 넘는다.
+                    color: active ? "var(--brand)" : "var(--text-muted)",
                     fontWeight: "var(--weight-bold)",
                   }}
                 >
