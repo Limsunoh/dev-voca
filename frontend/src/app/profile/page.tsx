@@ -177,8 +177,8 @@ export default async function ProfilePage() {
           />
         </div>
 
-        {/* 로그아웃은 흰 버튼이다. 코랄은 이 화면에서 저장 버튼이 가진다 -
-            둘 다 코랄이면 되돌릴 수 없는 쪽(로그아웃)이 주된 동작으로 보인다. */}
+        {/* 로그아웃은 흰 버튼이다. 갈색은 이 화면에서 저장 버튼이 가진다 -
+            둘 다 갈색이면 되돌릴 수 없는 쪽(로그아웃)이 주된 동작으로 보인다. */}
         <form action={logoutAction} className="mt-4">
           <button
             type="submit"

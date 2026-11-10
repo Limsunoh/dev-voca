@@ -131,14 +131,14 @@ export function SearchInput({
         />
       </div>
 
-      {/* 검색은 이 화면의 주된 동작이라 코랄 하나를 여기에 쓴다.
+      {/* 검색은 이 화면의 주된 동작이라 갈색 하나를 여기에 쓴다.
           dv-btn: 누르면 두께 4px 만큼 내려앉는다. */}
       <button
         type="submit"
         className="dv-btn shrink-0 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         style={
           {
-            background: "var(--coral)",
+            background: "var(--brand)",
             color: "var(--text-on-color)",
             borderRadius: "var(--radius-pill)",
             // 쉬는 두께는 --lift 로. 인라인 box-shadow 는 :active 를 이긴다.

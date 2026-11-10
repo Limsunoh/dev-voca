@@ -330,9 +330,9 @@ export function PasswordCard({
  * 는 form 안쪽 컴포넌트에서만 pending 을 읽는다. 같은 컴포넌트에 두면
  * 항상 false 다.
  *
- * fontSize 를 인라인으로 주지 않는다. 코랄 버튼은 globals.css 가
+ * fontSize 를 인라인으로 주지 않는다. 갈색 버튼은 globals.css 가
  * [style*="--lift-button)"] 로 골라 19px 로 올리는데, 인라인 font-size 가
- * 있으면 그 규칙이 덮여 16px 로 남고 흰 글자 대비가 3.37:1 이 된다.
+ * 있으면 그 규칙이 덮여 16px 로 남아 다른 강조 버튼과 크기가 달라진다.
  * boxShadow 도 같은 이유로 인라인에 두지 않는다. 누를 때 내려앉는
  * :active 가 죽는다. 두께는 --lift 변수로 넘긴다.
  */
@@ -344,8 +344,8 @@ function SubmitButton({ hasPassword }: { hasPassword: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      // 흰 버튼이다. 이 화면의 코랄은 위쪽 프로필 저장이 가진다 - 계정
-      // 절의 버튼까지 코랄이면 화면에 주된 동작이 셋이 되어 어느 것부터
+      // 흰 버튼이다. 이 화면의 갈색은 위쪽 프로필 저장이 가진다 - 계정
+      // 절의 버튼까지 갈색이면 화면에 주된 동작이 셋이 되어 어느 것부터
       // 할 일인지가 사라진다. 같은 절의 이메일 카드와도 이래야 짝이 맞는다.
       className="dv-btn w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-8"
       style={

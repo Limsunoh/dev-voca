@@ -56,13 +56,13 @@ export default function TestError({
         <button
           type="button"
           onClick={() => unstable_retry()}
-          // 화면의 주요 동작 하나. 코랄은 한 화면에 하나만 둔다 - 옆의
+          // 화면의 주요 동작 하나. 갈색은 한 화면에 하나만 둔다 - 옆의
           // "홈으로" 가 흰 버튼인 이유다.
           className="dv-btn flex-1 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               borderRadius: "var(--radius-pill)",
               fontWeight: "var(--weight-black)",

@@ -179,7 +179,7 @@ export function AuthForm({
       )}
 
       {/* 링크지만 버튼처럼 보인다. 누르면 구글 동의 화면으로 간다.
-          코랄이 아니라 흰 버튼인 이유: 한 화면에 코랄은 하나뿐이고,
+          갈색이 아니라 흰 버튼인 이유: 한 화면에 갈색은 하나뿐이고,
           그 자리는 아래 제출 버튼이 가진다.
 
           가입 화면에서 세 항목을 안 켰으면 링크 대신 잠긴 버튼을 그린다.
@@ -332,7 +332,7 @@ export function AuthForm({
           }
           className="underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={{
-            color: "var(--coral-deep)",
+            color: "var(--brand)",
             fontWeight: "var(--weight-bold)",
           }}
         >
@@ -534,12 +534,12 @@ function SubmitButton({
             }
           : undefined
       }
-      // 이 화면의 유일한 코랄. 주된 동작이 무엇인지 색 하나로 정한다.
+      // 이 화면의 유일한 갈색. 주된 동작이 무엇인지 색 하나로 정한다.
       className="dv-btn mt-2 w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 aria-disabled:opacity-60"
       style={
         {
           minHeight: "var(--hit-min)",
-          background: "var(--coral)",
+          background: "var(--brand)",
           color: "var(--text-on-color)",
           border: 0,
           "--lift": "var(--lift-button)",

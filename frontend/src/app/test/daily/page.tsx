@@ -65,7 +65,7 @@ export default async function DailyPage({
             : "잠시 뒤 다시 시도해주세요."}
         </p>
         <div className="mt-6">
-          {/* 여기서 갈 곳은 홈뿐이라 이 화면의 코랄 하나다. 되돌아가는
+          {/* 여기서 갈 곳은 홈뿐이라 이 화면의 갈색 하나다. 되돌아가는
               동작이지만 다른 선택지가 없으면 그것이 주된 동작이다. */}
           <Link
             href={routes.home}
@@ -73,7 +73,7 @@ export default async function DailyPage({
             style={
               {
                 minHeight: "var(--hit-min)",
-                background: "var(--coral)",
+                background: "var(--brand)",
                 color: "var(--text-on-color)",
                 borderRadius: "var(--radius-pill)",
                 fontWeight: "var(--weight-black)",

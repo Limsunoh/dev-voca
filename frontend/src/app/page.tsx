@@ -231,11 +231,8 @@ function DailyWord({ word }: { word: WordListItem }) {
           style={{
             fontWeight: "var(--weight-black)",
             letterSpacing: "var(--tracking-wide)",
-            // --coral 은 크림 위 3.15:1 이라 12px 글자에 못 쓴다. 배경으로
-            // 쓸 때(버튼·막대)는 비텍스트 3:1 이라 통과하지만 글자는
-            // 4.5:1 이 걸린다. --coral-deep 은 4.93:1 이고 같은 계열이라
-            // "코랄이 강조" 라는 인상은 그대로다.
-            color: "var(--coral-deep)",
+            // --brand 는 크림 위 8.84:1 이라 12px 글자에도 그대로 쓴다.
+            color: "var(--brand)",
           }}
         >
           오늘의 단어
@@ -318,14 +315,14 @@ function DailyWord({ word }: { word: WordListItem }) {
         style={{ background: "var(--background-deep)" }}
       >
         <Link
-          href={routes.wordDetail(word.id)}
+          href={routes.todayWord(word.id)}
           className="dv-btn flex flex-1 items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
               "--lift": "var(--lift-button)",
               minHeight: "var(--hit-min)",
               borderRadius: "var(--radius-pill)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               fontWeight: "var(--weight-black)",
               letterSpacing: "var(--tracking-tight)",
@@ -337,7 +334,7 @@ function DailyWord({ word }: { word: WordListItem }) {
         </Link>
         <Link
           href={routes.words}
-          // 이 화면의 코랄은 "더 보기" 하나다. 둘 다 코랄이면 어느 것이
+          // 이 화면의 갈색은 "더 보기" 하나다. 둘 다 갈색이면 어느 것이
           // 주된 동작인지 사라진다(가이드 color-accent). 이쪽은 흰 종이에
           // 두께로 "여기가 버튼" 을 알린다 - 테두리를 쓰지 않는 시스템이라
           // 두께가 그 역할을 대신한다.
@@ -405,7 +402,7 @@ function UpNext({ words }: { words: WordListItem[] }) {
         {words.map((word) => (
           <li key={word.id}>
             <LearningCard
-              href={routes.wordDetail(word.id)}
+              href={routes.todayWord(word.id)}
               title={word.term}
               subtitle={word.meaning}
               compact

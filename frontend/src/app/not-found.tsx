@@ -63,12 +63,12 @@ export default function NotFound() {
         주소를 잘못 입력했거나, 페이지가 옮겨졌을 수 있습니다.
       </p>
 
-      {/* 이 화면의 코랄 버튼 하나. 갈 곳이 홈뿐이라 코랄을 양보할 버튼이 없다
-          (`globals.css` 의 "한 화면에 코랄 버튼은 하나만 둔다"). `learn/` 의
-          not-found 둘과 `test/daily/page.tsx` 도 같은 자리에서 코랄을 쓴다.
+      {/* 이 화면의 갈색 버튼 하나. 갈 곳이 홈뿐이라 갈색을 양보할 버튼이 없다
+          (`globals.css` 의 "한 화면에 갈색 버튼은 하나만 둔다"). `learn/` 의
+          not-found 둘과 `test/daily/page.tsx` 도 같은 자리에서 갈색을 쓴다.
 
           다른 화면의 버튼 색을 선례로 삼으면 어긋난다. `board/not-found.tsx`
-          가 흰 알약인 것은 규칙이 달라서가 아니라 그쪽에 코랄을 양보할 순위표
+          가 흰 알약인 것은 규칙이 달라서가 아니라 그쪽에 갈색을 양보할 순위표
           세 갈래가 있어서다. `test/daily` 와 `test/review` 는 홈 링크 하나뿐인
           같은 자리인데 색이 다르다(`850e995` 전에는 두 `Link` 가 공백까지
           같았다). 둘 중 어느 쪽을 따라도 반대쪽과 어긋난다.
@@ -84,7 +84,7 @@ export default function NotFound() {
           className="dv-btn inline-flex items-center rounded-full px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               minHeight: "var(--hit-min)",
               fontWeight: "var(--weight-black)",

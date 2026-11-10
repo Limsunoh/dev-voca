@@ -46,7 +46,7 @@ function activeLabels(path: string): string[] {
   pathname = path;
   const html = renderToStaticMarkup(createElement(TabBar));
   return [...html.matchAll(/<a [^>]*aria-current="page"[^>]*>(.*?)<\/a>/g)].map(
-    // 앞의 코랄 막대(span)를 걷고 글자만 남긴다.
+    // 앞의 갈색 막대(span)를 걷고 글자만 남긴다.
     (m) => m[1].replace(/<[^>]+>/g, ""),
   );
 }
@@ -90,6 +90,39 @@ describe("TabBar 켜진 탭", () => {
   it("Object 속성 이름인 주소에서 예외 없이 아무 탭도 켜지 않는다", () => {
     for (const name of ["__proto__", "constructor", "toString", "valueOf"]) {
       assert.deepEqual(activeLabels(`/${name}`), [], name);
+    }
+  });
+});
+
+describe("TabBar 칸 너비", () => {
+  // 칸이 같은 너비(flex-1)면 글자 가운데끼리는 같은 간격이지만 글자 길이가
+  // 달라("홈" 1자, "문제풀기" 4자) 글자 사이 빈 칸이 달라진다. 390px 에서
+  // "익히기" 가 오른쪽으로 치우쳐 보였다(2026-11-11). 글자 길이 + 남는 폭의
+  // 같은 몫(flex-auto)이어야 글자 사이가 같다.
+  function render(): string {
+    pathname = "/";
+    return renderToStaticMarkup(createElement(TabBar));
+  }
+
+  it("칸은 flex-auto 이고 flex-1 이 아니다", () => {
+    const items = [...render().matchAll(/<li [^>]*class="([^"]*)"/g)].map((m) => m[1].split(/\s+/));
+    assert.ok(items.length >= 5, `탭이 ${items.length}개`);
+    for (const cls of items) {
+      assert.ok(cls.includes("flex-auto"), cls.join(" "));
+      assert.ok(!cls.includes("flex-1"), cls.join(" "));
+      // 폰 글자 크기를 키우면 "홈" 칸이 터치 기준 44px 아래로 줄던 것을 막는다.
+      assert.ok(cls.includes("min-w-[44px]"), cls.join(" "));
+    }
+  });
+
+  it("선택 막대는 고정 너비가 아니다 - 칸 너비 계산에 끼면 '홈' 칸이 막대 폭이 된다", () => {
+    const markers = [...render().matchAll(/<span aria-hidden="true" class="([^"]*h-1\.5[^"]*)"/g)].map((m) =>
+      m[1].split(/\s+/),
+    );
+    assert.ok(markers.length >= 1, "선택 막대를 못 찾았다");
+    for (const cls of markers) {
+      assert.ok(cls.includes("w-full") && cls.includes("max-w-[34px]"), cls.join(" "));
+      assert.ok(!cls.includes("w-[34px]"), cls.join(" "));
     }
   });
 });

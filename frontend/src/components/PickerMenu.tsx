@@ -63,13 +63,13 @@ export function pickerMenuStyle(maxHeight?: number): React.CSSProperties {
 export const PICKER_ITEM_CLASS =
   "flex items-center justify-between gap-2 px-3 text-sm transition-[background-color] duration-[120ms] ease-press focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus";
 
-/** 고른 것은 옅은 코랄 채움 + 코랄 글자. 회색 위 회색은 종이 위에서 대비가 안 남는다. */
+/** 고른 것은 옅은 갈색 채움 + 갈색 글자. 회색 위 회색은 종이 위에서 대비가 안 남는다. */
 export function pickerItemStyle(active: boolean): React.CSSProperties {
   return {
     minHeight: "var(--hit-floor)",
     borderRadius: "var(--radius-md)",
-    background: active ? "var(--coral-soft)" : "transparent",
-    color: active ? "var(--coral-soft-text)" : "var(--text-body)",
+    background: active ? "var(--brand-soft)" : "transparent",
+    color: active ? "var(--brand)" : "var(--text-body)",
     fontWeight: active ? "var(--weight-black)" : "var(--weight-medium)",
   };
 }

@@ -56,9 +56,9 @@ export default async function TestHubPage() {
       )}
 
       <Section id="hub-round" title="한 판">
-        {/* 이 화면의 유일한 코랄. 점수가 걸린 동작이라 가장 무겁다
-            (한 화면에 코랄 하나 - globals.css 의 --coral 주석). 다시 보기
-            숫자의 코랄 글자는 버튼이 아니라 홈 카드와 같은 표시다. */}
+        {/* 이 화면의 유일한 갈색. 점수가 걸린 동작이라 가장 무겁다
+            (한 화면에 갈색 하나 - globals.css 의 --brand 주석). 다시 보기
+            숫자의 갈색 글자는 버튼이 아니라 홈 카드와 같은 표시다. */}
         <Link
           href={routes.testRound}
           className="dv-btn flex items-center justify-between px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
@@ -67,7 +67,7 @@ export default async function TestHubPage() {
               "--lift": "var(--lift-button)",
               minHeight: "var(--hit-min)",
               borderRadius: "var(--radius-pill)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               fontWeight: "var(--weight-black)",
               letterSpacing: "var(--tracking-tight)",
@@ -78,8 +78,8 @@ export default async function TestHubPage() {
           한 판 풀기
           <span aria-hidden>→</span>
         </Link>
-        {/* 설명을 버튼 밖에 둔다. 코랄 위 흰 글자는 3:1 대라 굵고 큰
-            버튼 글자만 통과하고, 12px 설명은 못 읽힌다.
+        {/* 설명을 버튼 밖에 둔다. 버튼에는 동작 이름 한 줄만 두는 것이 이
+            앱의 버튼 모양이다(처음엔 코랄 위 흰 글자 대비 3:1 대 때문이었다).
 
             게스트 판은 순위표에 안 오른다. 똑같이 "오른다" 고 쓰면 풀고
             나서 이름을 찾게 된다. */}

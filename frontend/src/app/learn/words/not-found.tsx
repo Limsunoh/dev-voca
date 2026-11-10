@@ -20,13 +20,13 @@ export default function VocabNotFound() {
         주소가 잘못되었거나, 아직 공개되지 않은 단어입니다.
       </p>
 
-      {/* 이 화면의 유일한 동작이라 코랄을 준다. */}
+      {/* 이 화면의 유일한 동작이라 갈색을 준다. */}
       <Link
         href={routes.words}
         className="dv-btn mt-6 inline-flex items-center rounded-full px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         style={
           {
-            background: "var(--coral)",
+            background: "var(--brand)",
             color: "var(--text-on-color)",
             minHeight: "var(--hit-min)",
             fontWeight: "var(--weight-black)",

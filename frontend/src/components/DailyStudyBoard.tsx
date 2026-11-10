@@ -446,9 +446,9 @@ function ChooseCard({
             // 하다 만 판이 있으면 길이를 다시 고를 수 없다. 눌러봐야
             // 서버가 "이미 시작했다" 로 막는다.
             disabled={busy || (resuming !== null && !resuming.done)}
-            // 흰 카드 셋을 나란히 둔다. 코랄로 채우지 않는 이유: 셋 다
-            // 같은 자격의 선택지라, 하나만 코랄로 두면 그것을 권하는
-            // 것이 되고 셋 다 코랄이면 코랄이 하나라는 규칙이 깨진다.
+            // 흰 카드 셋을 나란히 둔다. 갈색으로 채우지 않는 이유: 셋 다
+            // 같은 자격의 선택지라, 하나만 갈색으로 두면 그것을 권하는
+            // 것이 되고 셋 다 갈색이면 갈색이 하나라는 규칙이 깨진다.
             // 고르는 자리에서는 카드가 맞다.
             className="dv-card dv-card-press flex items-center justify-between px-5 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
             style={
@@ -490,7 +490,7 @@ function ChooseCard({
                 </span>
               )}
               {one.questions}문제
-              {/* 보너스는 얻는 것이라 초록이다. 코랄은 "지금 눌러야 할 것"
+              {/* 보너스는 얻는 것이라 초록이다. 갈색은 "지금 눌러야 할 것"
                   이고 여기 셋은 다 같은 자격의 선택지다. */}
               <span
                 className="ml-2 whitespace-nowrap"
@@ -551,7 +551,7 @@ function PlayCard({
         >
           {answered} / {total}
         </span>
-        {/* 점수는 잉크로 둔다. 코랄은 이 화면에서 "이어서 익히기" 버튼이
+        {/* 점수는 잉크로 둔다. 갈색은 이 화면에서 "이어서 익히기" 버튼이
             갖고, 읽기만 하는 값에 강조색을 쓰면 그 뜻이 흐려진다. */}
         <span
           className="font-mono text-sm tabular-nums"
@@ -578,7 +578,7 @@ function PlayCard({
           borderRadius: "var(--radius-pill)",
         }}
       >
-        {/* 채워진 부분은 초록. 코랄은 "지금 눌러야 할 것" 이고 이건 이미
+        {/* 채워진 부분은 초록. 갈색은 "지금 눌러야 할 것" 이고 이건 이미
             지나온 것이라, 복습 화면·진행 점과 같게 둔다. */}
         <div
           className="h-full transition-[width] duration-300"
@@ -655,7 +655,7 @@ function PlayCard({
       {/* 다음 묶음이 기다릴 때만. 문제를 가려 두었으므로 이 버튼이 판을
           이어 가는 유일한 길이다. */}
       {onLearn && (
-        // 이 화면의 코랄 하나. 이 버튼이 떠 있는 동안 문제는 가려져
+        // 이 화면의 갈색 하나. 이 버튼이 떠 있는 동안 문제는 가려져
         // 있어서(위) 지금 누를 수 있는 것은 이것뿐이다.
         //
         // autoFocus: 방금 누른 보기가 문제와 함께 사라져 초점이 문서 처음
@@ -672,7 +672,7 @@ function PlayCard({
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               border: 0,
               borderRadius: "var(--radius-pill)",
@@ -752,7 +752,7 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
         {short ? "오늘은 여기까지" : "오늘 몫 완료"}
       </p>
       {/* 화면에서 가장 큰 숫자. 잉크로 둔다 - 결과는 읽는 것이고, 이
-          화면의 코랄은 아래 "순위표에서 확인" 버튼이 갖는다. 복습 결과
+          화면의 갈색은 아래 "순위표에서 확인" 버튼이 갖는다. 복습 결과
           화면이 같은 자리를 같은 방식으로 그린다. */}
       <p
         className="pop mt-2 font-mono text-5xl tabular-nums"
@@ -821,8 +821,8 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
       </div>
 
       <div className="mt-6 flex flex-col gap-2.5">
-        {/* 순위표가 주된 동작이라 코랄. 홈으로는 흰 알약으로 물러난다 -
-            둘 다 코랄이면 여기서 뭘 해야 할지가 사라진다.
+        {/* 순위표가 주된 동작이라 갈색. 홈으로는 흰 알약으로 물러난다 -
+            둘 다 갈색이면 여기서 뭘 해야 할지가 사라진다.
 
             꾸준함 탭으로 보낸다. 일일공부 점수는 하루 점수(DailyScore)에만
             쌓이고, 그것을 읽는 것은 꾸준함뿐이다. 이번 주·전체 순위표는
@@ -834,7 +834,7 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
           style={
             {
               minHeight: "var(--hit-min)",
-              background: "var(--coral)",
+              background: "var(--brand)",
               color: "var(--text-on-color)",
               borderRadius: "var(--radius-pill)",
               fontWeight: "var(--weight-black)",

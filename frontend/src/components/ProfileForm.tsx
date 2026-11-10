@@ -472,7 +472,7 @@ function fallbackAvatar(
  * 라디오 자체는 숨기고 그림을 라벨로 쓴다. 숨기되 sr-only 로 두는 이유:
  * display:none 이면 키보드 포커스가 안 가고 스크린 리더도 못 읽는다.
  *
- * 고른 것은 코랄 링으로 표시한다(디자이너 프로토타입과 같은 방식).
+ * 고른 것은 갈색 링으로 표시한다(디자이너 프로토타입과 같은 방식).
  * 테두리가 아니라 box-shadow 인 이유: 테두리는 안쪽 칸 크기를 바꿔서
  * 고를 때마다 그림이 2px 씩 움찔한다. 링은 바깥으로만 자란다.
  */
@@ -499,12 +499,12 @@ function AvatarOption({
            그래서 누를 때 사라지지 않는다(.dv-press-card 가 transform 만
            건드리는 이유).
 
-           링을 두 겹으로 두른다. 안쪽 크림 한 겹이 없으면 a3 처럼 아바타
-           바탕이 코랄 계열(#C13E22 = --coral-deep)인 것에서 링이 그림과
+           링을 두 겹으로 두른다. 안쪽 크림 한 겹이 없으면 a3(바탕
+           #C13E22)처럼 아바타 바탕이 진한 것에서 링이 그림과
            붙어 보여, 골랐는지 아닌지가 그 하나만 안 보인다. 아바타 색은
            디자인이 정한 것이라 링 쪽에서 해결한다. */
           "--lift": checked
-            ? "0 0 0 2px var(--background), 0 0 0 5px var(--coral)"
+            ? "0 0 0 2px var(--background), 0 0 0 5px var(--brand)"
             : "none",
         } as React.CSSProperties
       }
@@ -649,12 +649,12 @@ function SaveButton() {
     <button
       type="submit"
       disabled={pending}
-      // 이 화면의 유일한 코랄. 로그아웃은 흰 버튼으로 둔다(profile/page.tsx).
+      // 이 화면의 유일한 갈색. 로그아웃은 흰 버튼으로 둔다(profile/page.tsx).
       className="dv-btn w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-8"
       style={
         {
           minHeight: "var(--hit-min)",
-          background: "var(--coral)",
+          background: "var(--brand)",
           color: "var(--text-on-color)",
           border: 0,
           "--lift": "var(--lift-button)",

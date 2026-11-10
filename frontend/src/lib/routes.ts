@@ -79,6 +79,9 @@ export const routes = {
   home: "/",
   words: "/learn/words",
   wordDetail: (id: number | string) => `/learn/words/${id}`,
+  // 홈의 오늘의 개발영어에서 연 상세. 상세가 이 표시를 보고 묶음 안에서
+  // 이전·다음으로 넘기는 줄을 그리고, 되돌아가기를 홈으로 보낸다.
+  todayWord: (id: number | string) => `/learn/words/${id}?today=1`,
   sentences: "/learn/sentences",
   sentenceDetail: (id: number | string) => `/learn/sentences/${id}`,
   login: "/login",
