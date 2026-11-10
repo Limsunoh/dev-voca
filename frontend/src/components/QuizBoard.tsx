@@ -14,6 +14,17 @@ import {
   promptIsTerm,
 } from "@/lib/quiz-text";
 import { withWrapPoints } from "@/lib/wrap-points";
+import {
+  PICKER_BUTTON_CLASS,
+  PICKER_BUTTON_STYLE,
+  PICKER_ITEM_CLASS,
+  PICKER_MENU_CLASS,
+  PickerFace,
+  menuShift,
+  pickerItemStyle,
+  pickerMenuStyle,
+  usePickerMenu,
+} from "./PickerMenu";
 import { Reading } from "./Reading";
 import { useFocusNewQuestion } from "./useFocusNewQuestion";
 
@@ -248,11 +259,9 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
       try {
         let q = await ask();
         // 받는 도중에 유형을 바꿨으면 그 자리에서 다시 받는다. 겹치는
-        // 요청은 위에서 막으므로 changeKind 가 새로 부를 수 없다. Windows
-        // 크롬은 닫힌 select 에서 화살표를 누를 때마다 change 를 보내서,
-        // 키보드로 고르면 거의 매번 이 경우다. 안 하면 고르개는 "설명" 인데
-        // 문제는 섞어서로 받은 것이 뜬다. loading 을 쥔 채 도므로 그 사이
-        // 보기가 그려져 눌리는 틈도 없다.
+        // 요청은 위에서 막으므로 changeKind 가 새로 부를 수 없다. 안 하면
+        // 고르개는 "설명" 인데 문제는 섞어서로 받은 것이 뜬다. loading 을
+        // 쥔 채 도므로 그 사이 보기가 그려져 눌리는 틈도 없다.
         while (sentKind !== kindRef.current) {
           sentKind = kindRef.current;
           q = await ask();
@@ -808,13 +817,12 @@ const KINDS: Record<QuizContent, { value: string; label: string }[]> = {
 /**
  * 유형 고르개.
  *
- * 보이는 알약은 바로 옆 분류 고르개(CategoryPicker)와 같은 모양이다.
- * 흰 종이, "유형" 라벨, 고른 값, ▼. 한 화면에 고르개 둘이 다르게 생기면
- * 하나는 누르는 것이 아닌 줄 안다.
+ * 바로 옆 분류 고르개(CategoryPicker)와 같은 메뉴를 쓴다. 브라우저 기본 select 는
+ * 닫힌 모양을 맞춰도 누르면 운영체제의 창이 떠서 둘이 딴판으로 보인다.
  *
- * 그 위에 브라우저 기본 select 를 투명하게 덮는다. 목록이 서너 개뿐이라
- * CategoryPicker 같은 메뉴를 새로 만들 이유가 없고, 기본 select 는 폰에서
- * 운영체제의 고르기 창이 떠서 누르기 쉽다. 누르는 영역이 알약 전체가 된다.
+ * 항목이 링크가 아니라 버튼인 이유: 분류와 달리 판을 새로 만들지 않고 다음
+ * 문제부터 바꾸는 값이라 주소에 남기지 않는다. 그래서 확인 창도 없다.
+ *
  * "지금 문제의 유형" 은 바로 아래 질문("이 단어의 뜻은?")이 이미 말하므로
  * 알약에 따로 적지 않는다.
  */
@@ -827,50 +835,79 @@ function KindPicker({
   value: string;
   onChange: (next: string) => void;
 }) {
-  const current =
-    KINDS[content].find((one) => one.value === value)?.label ?? "섞어서";
+  const [open, setOpen] = useState(false);
+  const [shift, setShift] = useState(0);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const maxHeight = usePickerMenu(open, setOpen, boxRef, buttonRef);
+
+  const options = [{ value: "", label: "섞어서" }, ...KINDS[content]];
+  const label = options.find((one) => one.value === value)?.label ?? "섞어서";
+
+  // 연 채로 폰을 돌리거나 폴드를 접으면 화면 폭이 바뀐다. 그때 다시 민다.
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      if (buttonRef.current) setShift(menuShift(buttonRef.current));
+    };
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
+
+  const toggle = () => {
+    if (!open && buttonRef.current) setShift(menuShift(buttonRef.current));
+    setOpen(!open);
+  };
+
+  const pick = (next: string) => {
+    setOpen(false);
+    // 항목과 함께 초점이 사라지지 않게 여는 버튼으로 돌려준다.
+    buttonRef.current?.focus();
+    if (next !== value) onChange(next);
+  };
 
   return (
-    // 초점 표시는 알약에 그린다. select 는 투명해서 제 테두리가 안 보인다.
-    <label
-      className="dv-btn dv-press-card relative inline-flex items-center gap-2 rounded-full px-4 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus"
-      style={
-        {
-          minHeight: "var(--hit-floor)",
-          background: "var(--paper)",
-          color: "var(--foreground)",
-          fontWeight: "var(--weight-bold)",
-          "--lift": "var(--lift-card)",
-        } as React.CSSProperties
-      }
-    >
-      <span aria-hidden style={{ color: "var(--text-muted)" }}>
-        유형
-      </span>
-      <span aria-hidden>{current}</span>
-      <span
-        aria-hidden
-        className="text-xs"
-        style={{ color: "var(--text-dim)" }}
+    <div ref={boxRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls="kind-picker-menu"
+        className={PICKER_BUTTON_CLASS}
+        style={PICKER_BUTTON_STYLE}
       >
-        ▼
-      </span>
-      <select
-        aria-label="문제 유형"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        // text-base: iOS Safari 는 16px 보다 작은 입력칸을 누르면 화면을
-        // 확대한다. 투명해서 보이는 모양은 그대로다.
-        className="absolute inset-0 h-full w-full cursor-pointer text-base opacity-0"
-      >
-        <option value="">섞어서</option>
-        {KINDS[content].map((one) => (
-          <option key={one.value} value={one.value}>
-            {one.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        <PickerFace title="유형" label={label} open={open} />
+      </button>
+
+      {open && (
+        <div
+          id="kind-picker-menu"
+          role="group"
+          aria-label="유형 고르기"
+          className={PICKER_MENU_CLASS}
+          style={{ ...pickerMenuStyle(maxHeight), left: shift }}
+        >
+          {options.map((one) => {
+            const active = one.value === value;
+            return (
+              <button
+                key={one.value}
+                type="button"
+                onClick={() => pick(one.value)}
+                aria-current={active ? "true" : undefined}
+                // 분류 항목은 링크라 손가락 커서가 뜬다. 버튼도 맞춘다.
+                className={`${PICKER_ITEM_CLASS} w-full cursor-pointer`}
+                style={pickerItemStyle(active)}
+              >
+                {one.label}
+                {active && <span aria-hidden>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

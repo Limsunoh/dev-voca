@@ -102,7 +102,7 @@ beforeEach(() => {
   requested = [];
   statuses = [];
   grades = [];
-  (globalThis as { window?: unknown }).window = { scrollTo() {} };
+  (globalThis as { window?: unknown }).window = { scrollTo() {}, innerWidth: 390 };
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     if (init?.method === "POST") {
       const correct = grades.shift() ?? true;
@@ -169,7 +169,7 @@ function picker(tree: El): El {
   return found[0];
 }
 
-/** 유형을 바꾼다. 사용자가 select 에서 고른 것과 같다. */
+/** 유형을 바꾼다. 사용자가 메뉴에서 고른 것과 같다. */
 async function choose(props: Props, next: string) {
   const onChange = picker(render(props)).props.onChange as (v: string) => void;
   onChange(next);
@@ -198,18 +198,41 @@ async function next(props: Props) {
 /** 판 전체를 HTML 로. */
 function html(props: Props): string {
   const tree = render(props);
-  cursor = 0;
+  // 고르개의 훅 칸이 판의 칸을 덮지 않게 뒤에 붙인다.
+  cursor = slots.length;
   return renderToStaticMarkup(tree as never);
 }
 
-/** select 의 선택지 값과 고른 값. */
-function options(page: string): { values: string[]; selected: string | undefined } {
-  const select = /<select[^>]*aria-label="문제 유형"[^>]*>([\s\S]*?)<\/select>/.exec(page);
-  assert.ok(select, "문제 유형 select 가 없다");
-  const all = [...select[1].matchAll(/<option([^>]*)value="([^"]*)"([^>]*)>/g)];
+/** 유형 고르개만 따로 그린다. 훅 칸은 판 뒤에 붙인다. */
+function mountPicker(props: Props): () => El {
+  const el = picker(render(props));
+  const base = slots.length;
+  return () => {
+    cursor = base;
+    return (el.type as (p: unknown) => El)(el.props);
+  };
+}
+
+const trigger = (tree: El) => findAll(tree, (el) => el.type === "button")[0];
+
+function menuItems(tree: El): El[] {
+  const [menu] = findAll(tree, (el) => el.props.role === "group");
+  return menu ? findAll(menu, (el) => el.type === "button") : [];
+}
+
+function openMenu(draw: () => El): El {
+  (trigger(draw()).props.onClick as () => void)();
+  return draw();
+}
+
+const itemText = (el: El) => (el.props.children as unknown[])[0] as string;
+
+/** 메뉴의 항목 이름과 고른 항목. */
+function menu(props: Props): { labels: string[]; selected: string | undefined } {
+  const all = menuItems(openMenu(mountPicker(props)));
   return {
-    values: all.map((m) => m[2]),
-    selected: all.find((m) => /selected/.test(m[1] + m[3]))?.[2],
+    labels: all.map(itemText),
+    selected: all.filter((el) => el.props["aria-current"]).map(itemText)[0],
   };
 }
 
@@ -225,9 +248,9 @@ describe("유형 고르개 - 요청", () => {
     await start(WORDS);
     assert.deepEqual(kinds(), [null]);
     const page = html(WORDS);
-    assert.deepEqual(options(page), {
-      values: ["", "meaning", "term", "description"],
-      selected: "",
+    assert.deepEqual(menu(WORDS), {
+      labels: ["섞어서", "뜻 고르기", "단어 고르기", "설명 보고 맞히기"],
+      selected: "섞어서",
     });
     assert.match(page, />섞어서<\/span>/, "알약에 섞어서가 보여야 한다");
   });
@@ -237,7 +260,7 @@ describe("유형 고르개 - 요청", () => {
     await choose(WORDS, "term");
     assert.deepEqual(kinds(), [null, "term"]);
     assert.match(html(WORDS), />단어 고르기<\/span>/, "알약이 고른 유형을 보여야 한다");
-    assert.equal(options(html(WORDS)).selected, "term");
+    assert.equal(menu(WORDS).selected, "단어 고르기");
   });
 
   it("섞어서로 되돌리면 kind 가 빠진다(빈 값도 싣지 않는다)", async () => {
@@ -293,7 +316,7 @@ describe("유형 고르개 - 요청", () => {
 
     // 요청이 끝나면 load 가 유형이 바뀐 것을 보고 그 자리에서 한 번 더 받는다.
     // 답하지 않아도 고른 유형의 문제가 떠야 한다. 안 그러면 고르개는 "단어
-    // 고르기" 인데 화면은 섞어서로 받은 문제다(키보드 화살표로 고르면 늘 이렇다).
+    // 고르기" 인데 화면은 섞어서로 받은 문제다.
     assert.deepEqual(kinds(), [null, "term"]);
   });
 
@@ -330,7 +353,7 @@ describe("유형 고르개 - 요청", () => {
 
   it("문장 화면은 빈칸·상황만 고를 수 있고 content 와 함께 싣는다", async () => {
     await start(SENTENCES);
-    assert.deepEqual(options(html(SENTENCES)).values, ["", "blank", "situation"]);
+    assert.deepEqual(menu(SENTENCES).labels, ["섞어서", "빈칸 채우기", "상황 고르기"]);
     await choose(SENTENCES, "situation");
     assert.equal(requested[1].get("kind"), "situation");
     assert.equal(requested[1].get("content"), "sentences");
@@ -347,18 +370,129 @@ describe("유형 고르개 - 요청", () => {
   });
 });
 
+describe("유형 고르개 - 메뉴", () => {
+  it("브라우저 기본 select 를 쓰지 않는다", async () => {
+    await start(WORDS);
+    assert.doesNotMatch(html(WORDS), /<select/);
+  });
+
+  it("분류 고르개와 같은 버튼·메뉴·항목 모양을 쓴다", async () => {
+    const shared = await import("./PickerMenu");
+    await start(WORDS);
+    const tree = openMenu(mountPicker(WORDS));
+    assert.equal(trigger(tree).props.className, shared.PICKER_BUTTON_CLASS);
+    assert.equal(trigger(tree).props.style, shared.PICKER_BUTTON_STYLE);
+    const [panel] = findAll(tree, (el) => el.props.role === "group");
+    assert.equal(panel.props.className, shared.PICKER_MENU_CLASS);
+    assert.ok(String(menuItems(tree)[0].props.className).startsWith(shared.PICKER_ITEM_CLASS));
+  });
+
+  it("처음에는 닫혀 있고, 누르면 열린다", async () => {
+    await start(WORDS);
+    const draw = mountPicker(WORDS);
+    assert.equal(menuItems(draw()).length, 0);
+    assert.equal(menuItems(openMenu(draw)).length, 4);
+  });
+
+  it("항목을 누르면 그 유형으로 받고, 메뉴를 닫고, 초점을 여는 버튼으로 돌린다", async () => {
+    await start(WORDS);
+    const draw = mountPicker(WORDS);
+    const tree = openMenu(draw);
+    const focus = mock.fn();
+    (trigger(tree).props.ref as { current: unknown }).current = { focus };
+
+    (menuItems(tree)[2].props.onClick as () => void)();
+    await settle();
+
+    assert.deepEqual(kinds(), [null, "term"]);
+    assert.equal(menuItems(draw()).length, 0, "메뉴가 닫혀야 한다");
+    assert.equal(focus.mock.callCount(), 1);
+  });
+
+  it("이미 고른 항목을 누르면 닫기만 하고 새로 받지 않는다", async () => {
+    await start(WORDS);
+    const draw = mountPicker(WORDS);
+    const tree = openMenu(draw);
+
+    (menuItems(tree)[0].props.onClick as () => void)();
+    await settle();
+
+    assert.deepEqual(kinds(), [null]);
+    assert.equal(menuItems(draw()).length, 0);
+  });
+
+  // 화면 폭 390, 메뉴 폭 256(16rem), 여백 16.
+  for (const [where, left, width, expected] of [
+    ["넘치면 넘치는 만큼만 왼쪽으로 민다", 150, 390, -32],
+    ["넘치지 않으면 그대로 둔다", 20, 390, 0],
+    ["좁은 화면에서도 왼쪽 여백 밖으로는 밀지 않는다", 30, 200, -14],
+    ["메뉴가 화면보다 넓으면 줄어든 폭으로 계산한다", 60, 260, -44],
+  ] as const) {
+    it(`유형 메뉴: ${where}`, async (t) => {
+      await start(WORDS);
+      const g = globalThis as { document?: unknown; getComputedStyle?: unknown };
+      const real = { document: g.document, getComputedStyle: g.getComputedStyle };
+      g.document = { documentElement: { clientWidth: width } };
+      g.getComputedStyle = () => ({ fontSize: "16px" });
+      t.after(() => Object.assign(g, real));
+      const draw = mountPicker(WORDS);
+      (trigger(draw()).props.ref as { current: unknown }).current = {
+        getBoundingClientRect: () => ({ left, right: left + 124 }),
+      };
+
+      const [panel] = findAll(openMenu(draw), (el) => el.props.role === "group");
+
+      assert.equal((panel.props.style as { left: number }).left, expected);
+    });
+  }
+
+  it("메뉴를 연 채 화면 폭이 바뀌면 다시 민다", async (t) => {
+    await start(WORDS);
+    const g = globalThis as unknown as {
+      document?: unknown;
+      getComputedStyle?: unknown;
+      window: Record<string, unknown>;
+    };
+    const real = { document: g.document, getComputedStyle: g.getComputedStyle };
+    t.after(() => Object.assign(g, real));
+    const doc = { documentElement: { clientWidth: 1224 } };
+    g.document = doc;
+    g.getComputedStyle = () => ({ fontSize: "16px" });
+    let onResize = () => {};
+    g.window.addEventListener = (type: string, fn: () => void) => {
+      if (type === "resize") onResize = fn;
+    };
+    g.window.removeEventListener = () => {};
+
+    const draw = mountPicker(WORDS);
+    (trigger(draw()).props.ref as { current: unknown }).current = {
+      getBoundingClientRect: () => ({ left: 150, right: 274 }),
+    };
+    openMenu(draw);
+    for (const e of effects.filter((one) => one.deps?.length === 1 && one.deps[0] === true)) {
+      e.run();
+    }
+    // 펼친 폴드에서 열었으니 아직 밀지 않았다. 접어서 390 이 되면 넘친다.
+    doc.documentElement.clientWidth = 390;
+    onResize();
+
+    const [panel] = findAll(draw(), (el) => el.props.role === "group");
+    assert.equal((panel.props.style as { left: number }).left, -32);
+  });
+});
+
 describe("유형 고르개 - 가지가 바뀌어도 남는다", () => {
   it("가져오는 중에도 고르개가 있다", () => {
     const page = html(WORDS);
     assert.match(page, /문제를 가져오는 중/);
-    assert.match(page, /aria-label="문제 유형"/);
+    assert.match(page, />유형<\/span>/);
   });
 
   it("문제를 못 낸 안내 화면에도 고르개가 있고, 안내보다 앞에 선다", async () => {
     statuses = [404];
     await start(WORDS);
     const page = html(WORDS);
-    const at = page.indexOf('aria-label="문제 유형"');
+    const at = page.indexOf(">유형</span>");
     assert.ok(at >= 0, "안내 화면에 고르개가 없다");
     assert.ok(at < page.indexOf("다 풀었습니다"), "고르개가 안내보다 위에 있어야 한다");
   });
@@ -403,7 +537,7 @@ describe("유형 고르개 - 안내 문구", () => {
     assert.match(page, /문제를 불러오지 못했습니다/);
     assert.doesNotMatch(page, /이 유형으로/);
     // 버튼도 유형을 풀지 않는다. 섞어서로 풀기를 두면 고른 유형이 안내 없이
-    // 사라지고, 같은 값을 다시 골라도 select 는 change 를 안 보내 되돌릴
+    // 사라지고, 같은 값을 다시 골라도 아무 일이 안 일어나 되돌릴
     // 길이 없다.
     assert.doesNotMatch(page, /섞어서로 풀기/);
     assert.match(page, /처음부터 다시/);
@@ -424,7 +558,7 @@ describe("유형 고르개 - 안내 문구", () => {
     (mix[0].props.onClick as () => void)();
     await settle();
     assert.deepEqual(kinds(), [null, "description", null]);
-    assert.equal(options(html(WORDS)).selected, "");
+    assert.equal(menu(WORDS).selected, "섞어서");
   });
 });
 

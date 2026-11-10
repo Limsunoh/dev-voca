@@ -264,8 +264,9 @@ describe("QuizBoard 보기", () => {
   it("보기가 비어도 지문은 그리고 보기 버튼은 없다", async () => {
     const html = await board("term", "빈 보기 지문", []);
     assert.deepEqual(look(tagOf(html, "빈 보기 지문")), BODY);
-    // 판 안의 버튼은 보기와 "다음 문제" 뿐이고, 고르기 전이라 다음 문제도 없다.
-    assert.doesNotMatch(html, /<button/);
+    // 머리 줄의 유형 고르개를 빼면 판 안의 버튼은 보기와 "다음 문제" 뿐이고,
+    // 고르기 전이라 다음 문제도 없다.
+    assert.doesNotMatch(html.replace(/<button[^>]*kind-picker-menu[^>]*>/, ""), /<button/);
   });
 
   it("글자가 빈 보기도 그 유형의 글꼴을 받는다", async () => {
