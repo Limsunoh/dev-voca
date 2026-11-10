@@ -94,9 +94,13 @@ export function SearchInput({
 
           최소 높이 52px(--hit-min). py 로 잡으면 글자 크기를 키운 사용자에게
           더 커지기만 하고 줄어들지 않아 안전하지만, 이 줄은 오른쪽 버튼과
-          높이를 맞춰야 해서 둘 다 같은 토큰을 쓴다. */}
+          높이를 맞춰야 해서 둘 다 같은 토큰을 쓴다.
+
+          포커스 테두리는 입력칸이 아니라 이 흰 칸 전체에 그린다. 입력칸은
+          돋보기 옆 안쪽 영역이라 거기에 그리면 칸 안에 작은 상자가 하나 더
+          생긴다. 입력칸의 outline-none 은 그래서 남긴다. */}
       <div
-        className="flex min-w-0 flex-1 items-center gap-2.5 px-4"
+        className="flex min-w-0 flex-1 items-center gap-2.5 px-4 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus"
         style={{
           background: "var(--paper)",
           borderRadius: "var(--radius-xl)",
