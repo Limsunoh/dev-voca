@@ -94,8 +94,7 @@ export function TalkTabRow({
           key={item.key}
           href={item.href}
           aria-current={item.active ? "page" : undefined}
-          // 띠 안 칸이라 포커스 테두리는 --focus-pill 이다(ContentTabs 와 같다).
-          className="flex items-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-pill"
+          className="flex items-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={{
             minHeight: "var(--hit-floor)",
             borderRadius: "var(--radius-pill)",
