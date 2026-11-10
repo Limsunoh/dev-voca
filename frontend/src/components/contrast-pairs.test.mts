@@ -8,10 +8,9 @@
  * 그려서 본다. 값은 주석이 아니라 CSS 에서 읽는다.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { describe, it, mock } from "node:test";
-import { fileURLToPath } from "node:url";
+
+import { contrast, token } from "./contrast-helpers.mjs";
 
 mock.module("next/navigation", {
   namedExports: {
@@ -25,37 +24,6 @@ const { renderToStaticMarkup } = await import("react-dom/server");
 const { BoardRowItem } = await import("./BoardRow");
 const { FilterPanel } = await import("./FilterPanel");
 const { SearchInput } = await import("./SearchInput");
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(join(HERE, "..", "app", "globals.css"), "utf8").replace(
-  /\/\*[\s\S]*?\*\//g,
-  "",
-);
-
-/* ---- 계산 ---- */
-
-/** var() 를 끝까지 풀어 #rrggbb 를 돌려준다. */
-function token(name: string): string {
-  const found = new RegExp(`${name}\\s*:\\s*([^;]+);`).exec(css);
-  assert.ok(found, `${name} 가 globals.css 에 없다`);
-  const value = found[1].trim();
-  const ref = /^var\((--[\w-]+)\)$/.exec(value);
-  return ref ? token(ref[1]) : value;
-}
-
-function luminance(hex: string): number {
-  assert.match(hex, /^#[0-9a-f]{6}$/i, `${hex} 는 계산할 수 없는 값이다`);
-  const [r, g, b] = [1, 3, 5].map((at) => {
-    const channel = parseInt(hex.slice(at, at + 2), 16) / 255;
-    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
 
 const WHITE = "#ffffff";
 
