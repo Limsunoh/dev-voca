@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fff6e9">
+<title>인터넷 연결 없음 · dev-voca</title>
+<!-- 인터넷이 없을 때 뜨는 화면이라 글꼴·CSS·그림을 밖에서 받지 않는다. 색은 globals.css 와 같다.
+     이 파일을 고치면 sw.js 의 CACHE 이름을 올려야 이미 설치된 폰에도 바뀐 화면이 간다. -->
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    display: grid; place-items: center;
+    padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+    box-sizing: border-box;
+    background: #fff6e9; color: #191512;
+    font-family: system-ui, -apple-system, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+    text-align: center;
+  }
+  main { max-width: 22rem; }
+  h1 { font-size: 1.25rem; margin: 0; text-wrap: balance; }
+  p { margin: 12px 0 0; color: #3d352e; line-height: 1.6; }
+  button {
+    margin-top: 24px; min-height: 3.25rem; padding: 0 32px;
+    border: 0; border-radius: 9999px;
+    background: #c13e22; color: #ffffff;
+    font: inherit; font-weight: 800; cursor: pointer;
+  }
+  button:focus-visible { outline: 2px solid #c13e22; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>인터넷에 연결되어 있지 않아요</h1>
+  <p>연결을 확인한 뒤 다시 시도해 주세요.</p>
+  <button type="button" onclick="location.reload()">다시 시도</button>
+</main>
+</body>
+</html>
