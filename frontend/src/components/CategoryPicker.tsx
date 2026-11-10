@@ -5,6 +5,16 @@ import { useEffect, useRef, useState } from "react";
 
 import type { ChoiceOption } from "@/lib/api/client";
 
+import {
+  PICKER_BUTTON_CLASS,
+  PICKER_BUTTON_STYLE,
+  PICKER_ITEM_CLASS,
+  PICKER_MENU_CLASS,
+  PickerFace,
+  pickerItemStyle,
+  pickerMenuStyle,
+  usePickerMenu,
+} from "./PickerMenu";
 import { useLeaveGuard } from "./useLeaveGuard";
 
 /**
@@ -74,120 +84,10 @@ export function CategoryPicker({
     buttonRef.current?.focus();
   }, []);
 
-  /**
-   * 메뉴가 쓸 수 있는 최대 높이. 열 때 재고 화면이 바뀌면 다시 잰다.
-   *
-   * 고정값(전에는 288px)을 쓰면 그 숫자가 실제 여유와 어긋나 항목이 숨거나
-   * 메뉴가 화면을 넘는다. 이 버튼은 문제 카드 위에 얹히는 자리라 위치가
-   * 화면마다 다르고 스크롤에 따라서도 움직인다. 같은 화면의 QuizBoard 도
-   * 탭바 높이를 상수로 두지 않고 재는데 이유가 같다.
-   *
-   * undefined 로 시작하고 effect 가 페인트 뒤에 채우므로, 제한 없이
-   * 그려지는 첫 프레임이 있다. 지금은 분류가 여덟 개여서 어떤 측정값보다
-   * 작아 눈에 안 보인다. 분류가 늘어 화면을 넘기면 그 프레임이 드러나므로,
-   * 그때는 useLayoutEffect 로 바꿔야 한다.
-   */
-  const [maxHeight, setMaxHeight] = useState<number | undefined>();
+  const maxHeight = usePickerMenu(open, setOpen, boxRef, buttonRef);
 
   const current = options.find((o) => o.value === selected);
   const label = current ? current.label : "전체";
-
-  // 바깥을 누르거나 포커스가 나가면 닫는다. 열어둔 채로 두면 이 메뉴가
-  // 첫째·둘째 보기 버튼을 덮는다 - 포커스가 그 뒤로 가면 지금 무엇을
-  // 고르는지 안 보인 채로 Enter 를 누르게 된다.
-  useEffect(() => {
-    if (!open) return;
-
-    function onPointerDown(event: PointerEvent) {
-      if (!boxRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    // Esc 로도 닫는다. 키보드로 연 사람에게 닫을 방법이 없으면 갇힌다.
-    function onKeyDown(event: KeyboardEvent) {
-      // 확인 창 안에서 누른 Esc 는 창만 닫는다. 여기까지 올라와 메뉴도
-      // 닫으면, 창이 포커스를 돌려줄 링크가 메뉴와 함께 사라져 포커스가
-      // 문서 맨 앞으로 떨어진다.
-      if ((event.target as Element | null)?.closest?.("dialog")) return;
-      if (event.key === "Escape") {
-        setOpen(false);
-        // 메뉴 항목에 있던 초점이 항목과 함께 사라지지 않게 돌려준다.
-        buttonRef.current?.focus();
-      }
-    }
-    // Tab 으로 메뉴 밖으로 나가면 닫는다. pointerdown 만 들으면 마우스로는
-    // 닫히는데 키보드로는 열린 채 남아서, 가려진 버튼 위에 포커스가 선다.
-    function onFocusIn(event: FocusEvent) {
-      if (!boxRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("focusin", onFocusIn);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("focusin", onFocusIn);
-    };
-  }, [open]);
-
-  // 버튼 아래로 남은 높이를 잰다. 24px 은 메뉴 아래에 남기는 틈이다.
-  // 0 으로 두면 마지막 항목이 화면 맨 끝에 붙어 더 없다는 것이 안 보인다.
-  //
-  // resize 를 듣는 이유: 폰을 돌리면 높이가 절반으로 줄어드는데, 그때 잰
-  // 값이 그대로면 메뉴가 화면을 넘어 아래쪽 항목에 닿지 못한다.
-  //
-  // scroll 도 듣는다. 이 화면은 스스로 문서를 내린다. 보기를 고르면
-  // 해설이 붙고 QuizBoard 가 "다음 문제" 버튼이 보이도록 스크롤한다. 그때
-  // 버튼이 위로 올라가는데 잰 값이 그대로면 메뉴가 화면 아래로 넘친다.
-  // 채점은 분류를 바꾸지 않으니(page.tsx 의 key 는 분류에만 걸린다) 그 사이
-  // 메뉴가 열린 채 남을 수 있다.
-  //
-  // 스로틀은 안 걸었다. 도는 것이 rect 읽기 한 번이다.
-  useEffect(() => {
-    if (!open) return;
-
-    function measure() {
-      const box = boxRef.current;
-      if (!box) return;
-      // 메뉴는 버튼 바로 아래(mt-2 = 8px)에 붙는다. 그 클래스를 바꾸면
-      // 이 숫자도 같이 바꿔야 한다 - 어긋나도 에러는 안 난다.
-      const top = box.getBoundingClientRect().bottom + 8;
-      // innerHeight 를 안 쓰는 이유: iOS 사파리는 주소창이 펴진 높이를
-      // 주므로 그 차이만큼 메뉴 아래가 주소창에 가려 눌리지 않는다.
-      //
-      // offsetTop 을 더하는 것은 좌표계를 맞추기 위해서다. 위 rect 는
-      // 레이아웃 기준인데 visualViewport 의 height 는 "보이는 영역" 만의
-      // 높이여서, 핀치 줌이나 키보드로 그 영역이 안에서 밀리면 두 값의
-      // 기준점이 달라진다. offsetTop 을 더하면 "보이는 영역의 아래 끝" 을
-      // 레이아웃 좌표로 말한 값이 되어 rect 와 같은 자를 쓴다.
-      const vv = window.visualViewport;
-      const vh = vv ? vv.offsetTop + vv.height : window.innerHeight;
-      // 하한 120px: 가로로 눕힌 폰처럼 화면이 낮으면 남은 높이가 0 에
-      // 가까워져 메뉴가 없는 것처럼 보인다. 대신 이 창이 화면을 넘으면
-      // 넘친 만큼은 어떤 스크롤로도 안 보인다(메뉴 안 스크롤은 창 안에서만
-      // 움직이고 absolute 라 문서 높이에도 기여하지 않는다). 키보드로
-      // 넘어간 항목에 포커스가 가면 안 보이는 채로 Enter 를 누르게 된다.
-      // 항목 두어 개라도 보이는 쪽을 택한 대가다.
-      setMaxHeight(Math.max(120, vh - top - 24));
-    }
-
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, { passive: true });
-    // 주소창이 접히고 펴지는 순간은 window 의 resize 를 안 쏘는 기기가 있다.
-    // 높이를 visualViewport 에서 읽으니 리스너도 그쪽에 붙여야 짝이 맞다.
-    // scroll 까지 듣는 이유는 위에서 쓰는 offsetTop 이 그때 바뀌기 때문이다.
-    // vv 쪽 scroll 에 passive 를 안 붙인 것은 빠뜨린 게 아니다 - 취소할 수
-    // 없는 이벤트라 붙여도 같다.
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", measure);
-    vv?.addEventListener("scroll", measure);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure);
-      vv?.removeEventListener("resize", measure);
-      vv?.removeEventListener("scroll", measure);
-    };
-  }, [open]);
 
   const href = (value?: string) =>
     value ? `${basePath}?category=${encodeURIComponent(value)}` : basePath;
@@ -202,32 +102,10 @@ export function CategoryPicker({
         // 무엇이 펼쳐지는지 연결한다. aria-expanded 만 있으면 "열렸다" 는
         // 알지만 무엇이 열렸는지는 모른다.
         aria-controls="category-picker-menu"
-        // dv-btn: 누르면 두께가 0 이 되고 그만큼 내려앉는다. :active 는
-        // 인라인 style 로 못 써서 globals.css 의 공통 클래스가 맡는다.
-        className="dv-btn flex items-center gap-2 rounded-full px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-        style={
-          {
-            minHeight: "var(--hit-floor)",
-            background: "var(--paper)",
-            color: "var(--foreground)",
-            fontWeight: "var(--weight-bold)",
-            "--lift": "var(--lift-card)",
-          } as React.CSSProperties
-        }
+        className={PICKER_BUTTON_CLASS}
+        style={PICKER_BUTTON_STYLE}
       >
-        {/* --text-dim 은 흰 종이 위 3.85:1 로 본문 대비에 못 미친다. */}
-        <span style={{ color: "var(--text-muted)" }}>분류</span>
-        <span>{label}</span>
-        {/* 화살표가 열림 상태를 말한다. 글자만으로는 눌러야 뭐가 되는지 모른다. */}
-        <span
-          aria-hidden
-          className={`text-xs transition-transform duration-[120ms] ease-press ${
-            open ? "rotate-180" : ""
-          }`}
-          style={{ color: "var(--text-dim)" }}
-        >
-          ▼
-        </span>
+        <PickerFace title="분류" label={label} open={open} />
       </button>
 
       {open && (
@@ -240,18 +118,8 @@ export function CategoryPicker({
         <nav
           id="category-picker-menu"
           aria-label="분류 고르기"
-          // 흐린 그림자·글래스를 쓰지 않는다(가이드 shape-lift). 떠 있는
-          // 판이라 두께는 카드보다 한 급 두꺼운 --lift-sheet 를 쓴다 -
-          // 아래 보기 버튼(--lift-card)과 같은 두께면 어느 쪽이 위인지
-          // 안 보인다. 눌리는 판이 아니라 정적이라 인라인 boxShadow 로 둔다.
-          className="absolute top-full left-0 z-20 mt-2 w-64 overflow-y-auto p-1.5"
-          style={{
-            background: "var(--paper)",
-            borderRadius: "var(--radius-xl)",
-            boxShadow: "var(--lift-sheet)",
-            // 고정 높이를 쓰지 않는 이유는 위 maxHeight 선언에 있다.
-            maxHeight,
-          }}
+          className={PICKER_MENU_CLASS}
+          style={pickerMenuStyle(maxHeight)}
         >
           <PickerItem
             href={href()}
@@ -311,16 +179,8 @@ function PickerItem({
       // "page" 인 이유: 이 링크를 누르면 그 분류 화면으로 가고, 지금 그
       // 화면에 있다는 뜻이다. ContentTabs 도 같은 값을 쓴다.
       aria-current={active ? "page" : undefined}
-      className="flex items-center justify-between gap-2 px-3 text-sm transition-[background-color] duration-[120ms] ease-press focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-      style={{
-        minHeight: "var(--hit-floor)",
-        borderRadius: "var(--radius-md)",
-        // 고른 것은 옅은 코랄 채움 + 코랄 글자. 회색 위 회색으로 두면
-        // 종이 위에서 대비가 거의 안 남는다.
-        background: active ? "var(--coral-soft)" : "transparent",
-        color: active ? "var(--coral-soft-text)" : "var(--text-body)",
-        fontWeight: active ? "var(--weight-black)" : "var(--weight-medium)",
-      }}
+      className={PICKER_ITEM_CLASS}
+      style={pickerItemStyle(active)}
     >
       {children}
       {/* 색만으로 고른 것을 표시하지 않는다. 색각 이상이 있으면 구분이 안 된다. */}
