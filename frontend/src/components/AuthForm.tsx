@@ -330,7 +330,7 @@ export function AuthForm({
               ? `${copy.switchHref}?next=${encodeURIComponent(next)}`
               : copy.switchHref
           }
-          className="underline underline-offset-4"
+          className="underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={{
             color: "var(--coral-deep)",
             fontWeight: "var(--weight-bold)",

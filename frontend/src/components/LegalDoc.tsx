@@ -20,7 +20,9 @@ export function ContactEmail() {
  * 처리방침과 약관이 같이 쓰는 틀.
  *
  * 글이 길어서 문단마다 클래스를 달지 않고 바깥 한 곳에서 p·ul·ol 의 모양을
- * 정한다. 로그인 없이 열려야 하므로 서버에서 아무것도 읽지 않는다.
+ * 정한다. 링크(목차, 메일 주소, 홈·다른 문서로 가기)의 밑줄과 키보드 포커스
+ * 테두리도 같은 곳에서 준다. 본문에 링크가 새로 들어와도 빠지지 않는다.
+ * 로그인 없이 열려야 하므로 서버에서 아무것도 읽지 않는다.
  */
 export function LegalDoc({
   title,
@@ -35,7 +37,7 @@ export function LegalDoc({
 }) {
   return (
     <main
-      className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 text-base leading-7 [overflow-wrap:anywhere] [&_a]:underline [&_a]:underline-offset-4 [&_code]:font-mono [&_code]:text-sm [&_h3]:mt-5 [&_h3]:font-bold [&_h3]:text-balance [&_p]:mt-3 [&_section_ol]:mt-3 [&_section_ol]:list-decimal [&_section_ol]:space-y-2 [&_section_ol]:pl-5 [&_section_ul]:mt-3 [&_section_ul]:list-disc [&_section_ul]:space-y-2 [&_section_ul]:pl-5"
+      className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 text-base leading-7 [overflow-wrap:anywhere] [&_a]:underline [&_a]:underline-offset-4 [&_a:focus-visible]:outline [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-focus [&_code]:font-mono [&_code]:text-sm [&_h3]:mt-5 [&_h3]:font-bold [&_h3]:text-balance [&_p]:mt-3 [&_section_ol]:mt-3 [&_section_ol]:list-decimal [&_section_ol]:space-y-2 [&_section_ol]:pl-5 [&_section_ul]:mt-3 [&_section_ul]:list-disc [&_section_ul]:space-y-2 [&_section_ul]:pl-5"
       style={{ color: "var(--text-body)" }}
     >
       <Link
