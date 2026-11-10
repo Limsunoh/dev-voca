@@ -74,11 +74,7 @@ export function ContentTabs({
             // 세그먼트가 두꺼워져 제목 줄과 균형이 깨지는데, 눌리는 넓이는
             // 보이는 넓이와 달라도 된다. FilterChip 이 같은 자리에서 같은
             // 방법을 쓴다.
-            //
-            // 포커스 테두리는 띠 안쪽 여백(p-1) 위에 그려져서, 공통
-            // --focus 대신 띠 위에서도 보이는 --focus-pill 을 쓴다(이유는
-            // globals.css 의 포커스 링 절).
-            className="relative rounded-full px-4 py-2 text-sm after:absolute after:inset-x-0 after:-inset-y-1 after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-pill"
+            className="relative rounded-full px-4 py-2 text-sm after:absolute after:inset-x-0 after:-inset-y-1 after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={
               active
                 ? {

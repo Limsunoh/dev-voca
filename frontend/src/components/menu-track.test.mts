@@ -148,7 +148,7 @@ const SCREEN = token("--background");
  *  토큰에서 읽지 않고 그때 값을 적어 둔다. */
 const OLD_TRACK = "#fbf3e4";
 
-/** 포커스 테두리 색. 칸의 class(outline-focus, outline-focus-pill)에서 읽는다. */
+/** 포커스 테두리 색. 칸의 class(outline-focus 등)에서 토큰 이름을 읽는다. */
 function focusColor(className: string): string {
   const found = /(?:^|\s)focus-visible:outline-(focus(?:-[\w-]+)?)(?=\s|$)/.exec(className);
   assert.ok(found, "포커스 테두리 색이 없다");
@@ -221,13 +221,5 @@ describe("알약 탭 띠", () => {
     // 위 1.1 기준이 옛 값을 거르지 못하면 이 테스트 묶음은 회귀를 못 잡는다.
     assert.ok(contrast(OLD_TRACK, SCREEN) < 1.1);
     assert.ok(contrast(token("--paper"), OLD_TRACK) < 1.15);
-  });
-
-  it("앱 공통 포커스 색은 새 띠 위에서 3:1 에 못 미친다 - 진한 코랄을 쓴 이유", () => {
-    // 이게 3:1 을 넘게 되면(--focus 를 바꾸면) 탭만 따로 둘 이유가 없다.
-    assert.ok(
-      contrast(token("--focus"), token("--surface-pill")) < 3,
-      "--focus 가 sand 위에서 3:1 을 넘었다 - --focus-pill 예외를 지울 때다",
-    );
   });
 });

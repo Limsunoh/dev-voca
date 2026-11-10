@@ -138,6 +138,29 @@ describe("색 대비 4.5:1", () => {
   });
 });
 
+describe("포커스 테두리 3:1", () => {
+  // 앱 전체가 outline-focus 하나를 쓴다(--focus). 테두리는 칸 밖에 그려지므로
+  // 그 칸을 둘러싼 바탕 넷과 각각 잰다. 글자가 아닌 표시라 기준은 3:1 이다.
+  // 두께가 있는 버튼의 아랫변은 예외다(globals.css 포커스 링 주석).
+  const BACKS: [string, () => string][] = [
+    ["크림 화면 바탕(--background)", () => token("--background")],
+    ["흰 종이(--paper)", () => token("--paper")],
+    ["입력칸·카드 띠(--background-deep)", () => token("--background-deep")],
+    ["탭 줄(--surface-pill)", () => token("--surface-pill")],
+  ];
+
+  for (const [name, back] of BACKS) {
+    it(name, () => {
+      const ratio = contrast(token("--focus"), back());
+      assert.ok(ratio >= 3, `--focus / ${name} 는 ${ratio.toFixed(2)}:1 이다`);
+    });
+  }
+
+  it("밝은 코랄로 되돌리면 탭 줄 위에서 기준에 못 미친다 - 기준이 실제로 거른다", () => {
+    assert.ok(contrast(token("--coral"), token("--surface-pill")) < 3);
+  });
+});
+
 describe("순위표 줄의 등수", () => {
   for (const rank of [1, 2, 3]) {
     it(`${rank}위 숫자는 잉크색이고 메달 색은 동그라미 바탕에만 쓴다`, () => {
