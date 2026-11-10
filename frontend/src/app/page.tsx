@@ -293,7 +293,7 @@ function DailyWord({ word }: { word: WordListItem }) {
         style={{ background: "var(--background-deep)" }}
       >
         <Link
-          href={routes.wordDetail(word.id)}
+          href={routes.todayWord(word.id)}
           className="dv-btn flex flex-1 items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
@@ -380,7 +380,7 @@ function UpNext({ words }: { words: WordListItem[] }) {
         {words.map((word) => (
           <li key={word.id}>
             <LearningCard
-              href={routes.wordDetail(word.id)}
+              href={routes.todayWord(word.id)}
               title={word.term}
               subtitle={word.meaning}
               compact
