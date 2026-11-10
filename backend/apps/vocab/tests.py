@@ -11,6 +11,7 @@ from django.urls import reverse
 
 from .management.commands.seed_exam_words import EXAM_WORDS
 from .management.commands.seed_words import WORDS
+from .management.commands.seed_words_launch import WORDS as LAUNCH_WORDS
 from .management.commands.seed_words_more import WORDS as MORE_WORDS
 from .models import Word
 
@@ -57,7 +58,7 @@ ALL_SEEDED: list[dict] = [
     }
     for r in EXAM_WORDS
 ] + [
-    # seed_words_more 는 seed_words 와 열 순서가 같다. 그래도 이름을 붙여
+    # seed_words_more 와 seed_words_launch 는 seed_words 와 열 순서가 같다. 그래도 이름을 붙여
     # 담는다 - 같다는 것을 눈으로 확인하고 적는 것이 이 목록의 요점이다.
     {
         "term": r[0],
@@ -69,7 +70,7 @@ ALL_SEEDED: list[dict] = [
         "example": r[6],
         "example_translation": r[7],
     }
-    for r in MORE_WORDS
+    for r in (*MORE_WORDS, *LAUNCH_WORDS)
 ]
 
 
@@ -117,6 +118,7 @@ SHORT_IPA_OK = {
     "/sid/",   # seed
     "/ki/",    # key
     "/kju/",   # queue
+    "/hip/",   # heap
 }
 
 
@@ -284,7 +286,7 @@ class SeedWordsTest(TestCase):
                 # 못 잡는다 - 한글 코드포인트가 없기 때문이다.
                 #
                 # ASCII 만으로 되어 있다고 로마자로 단정할 수는 없다. 아래
-                # SHORT_IPA_OK 의 여덟 개는 실제 IPA 인데 짧아서 로마자와
+                # SHORT_IPA_OK 에 든 것은 실제 IPA 인데 짧아서 로마자와
                 # 모양이 같다. 길이로 열어두면(len <= 5) /kaesi/ 같은 진짜
                 # 로마자까지 함께 통과하므로 목록으로 적어 둔다. 새 항목을
                 # 추가할 때 목록에 한 줄 넣는 것이 "사람이 봤다" 는 표시가 된다.
