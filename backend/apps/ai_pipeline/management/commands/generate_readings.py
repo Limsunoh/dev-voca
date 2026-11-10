@@ -179,8 +179,8 @@ class Command(BaseCommand):
         # pk 를 모른다) 짝을 못 지을 바에는 그 이름을 전부 빼고 그 사실을
         # 알린다.
         #
-        # load_readings 는 pk 로 맞춰서 이 문제가 없다. 그쪽은 사람이 파일을
-        # 만들어 pk 를 넣을 수 있기 때문이다.
+        # load_readings 는 이 문제가 없다. 단어 이름은 DB 가 겹치지 않게 막고,
+        # 문장은 본문이 아니라 겹치지 않는 시드 키(slug)로 맞춘다.
         seen: dict[str, int] = {}
         for o in targets:
             key = self.key_of(o)
