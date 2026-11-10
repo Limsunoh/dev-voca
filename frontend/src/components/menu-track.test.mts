@@ -15,13 +15,12 @@
  * 토큰으로 돌아가도 초록불이다.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { describe, it, mock } from "node:test";
-import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+
+import { contrast, luminance, resolve, token } from "./contrast-helpers.mjs";
 
 mock.module("next/navigation", {
   namedExports: {
@@ -58,44 +57,6 @@ const { ContentTabs } = await import("./ContentTabs");
 const { TalkKindTabs } = await import("./TalkKindTabs");
 const { TalkLevelTabs } = await import("./TalkLevelTabs");
 const { TalkSceneTabs } = await import("./TalkSceneTabs");
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(join(HERE, "..", "app", "globals.css"), "utf8").replace(
-  /\/\*[\s\S]*?\*\//g,
-  "",
-);
-
-/* ---- 계산 (contrast-pairs.test.mts 와 같은 식) ---- */
-
-/** var() 를 끝까지 풀어 #rrggbb 를 돌려준다. */
-function token(name: string): string {
-  const found = new RegExp(`${name}\\s*:\\s*([^;]+);`).exec(css);
-  assert.ok(found, `${name} 가 globals.css 에 없다`);
-  const value = found[1].trim();
-  const ref = /^var\((--[\w-]+)\)$/.exec(value);
-  return ref ? token(ref[1]) : value;
-}
-
-/** "var(--x)" 를 #rrggbb 로. 바탕이 var 가 아니면 계산할 수 없어 실패시킨다. */
-function resolve(value: string): string {
-  const ref = /^var\((--[\w-]+)\)$/.exec(value.trim());
-  assert.ok(ref, `${value} 는 토큰이 아니다`);
-  return token(ref[1]);
-}
-
-function luminance(hex: string): number {
-  assert.match(hex, /^#[0-9a-f]{6}$/i, `${hex} 는 계산할 수 없는 값이다`);
-  const [r, g, b] = [1, 3, 5].map((at) => {
-    const channel = parseInt(hex.slice(at, at + 2), 16) / 255;
-    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
 
 /* ---- 그리기 ---- */
 
