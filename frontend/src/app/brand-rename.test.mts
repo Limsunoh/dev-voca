@@ -92,6 +92,7 @@ describe("서비스 이름 바꾸기", () => {
     assert.deepEqual(
       [...cookiesInCode()].sort(),
       [
+        "devvoca_daily_length",
         "devvoca_guest",
         "devvoca_oauth_consent",
         "devvoca_oauth_next",

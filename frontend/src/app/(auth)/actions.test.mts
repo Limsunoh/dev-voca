@@ -68,6 +68,8 @@ mock.module("@/lib/session", {
     async getToken() {
       return cookieJar.get("devvoca_token");
     },
+    // 게스트 때 고른 하루 공부량을 계정으로 옮긴다. 여기서는 옮길 것이 없다.
+    async carryGuestDailyLength() {},
   },
 });
 

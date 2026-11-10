@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { loadToday, TodayCards } from "@/components/TodayCards";
+import { loadToday, OtherLengthLink, TodayCards } from "@/components/TodayCards";
 import { routes } from "@/lib/routes";
 import { getCurrentUser, getToken } from "@/lib/session";
 
@@ -44,6 +44,7 @@ export default async function TestHubPage() {
       {user && (
         <Section id="hub-today" title="오늘 할 것">
           <TodayCards {...today} />
+          <OtherLengthLink length={user.daily_length} daily={today.daily} />
           {/* 오답 노트는 푸는 곳이 아니라 틀린 것을 모아 보는 곳이다(푸는
               자리는 다시 보기). 그래서 연습이 아니라 다시 보기 옆에 둔다.
               로그인해야 보는 화면이라 이 절 안에 있으면 게스트가 눌렀다

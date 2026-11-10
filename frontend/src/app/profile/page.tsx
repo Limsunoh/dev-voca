@@ -11,6 +11,8 @@ import {
   uploadPhotoAction,
 } from "@/app/profile/actions";
 import { DeleteAccount } from "@/app/profile/DeleteAccount";
+import { saveDailyLengthAction } from "@/app/start/daily/actions";
+import { DailyLengthPicker } from "@/components/DailyLengthPicker";
 import { EmailCard } from "@/components/EmailCard";
 import { PasswordCard } from "@/components/PasswordCard";
 import { MyHistory } from "@/components/MyHistory";
@@ -75,6 +77,31 @@ export default async function ProfilePage() {
           deletePhoto={deletePhotoAction}
           uploadedPhoto={user.uploaded_photo}
         />
+      </section>
+
+      {/* 하루 공부량. 처음 들어올 때 고른 값을 여기서 바꾼다. 일일공부가
+          이 길이로 바로 시작하므로, 바꾸면 다음 일일공부부터 그 길이다. */}
+      <section className="mt-8" aria-labelledby="daily-length">
+        <h2
+          id="daily-length"
+          className="text-xs tracking-[var(--tracking-wide)]"
+          style={{
+            color: "var(--text-dim)",
+            fontWeight: "var(--weight-black)",
+          }}
+        >
+          하루 공부량
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+          일일공부가 이 길이로 바로 시작합니다.
+        </p>
+        <div className="mt-3">
+          <DailyLengthPicker
+            action={saveDailyLengthAction}
+            current={user.daily_length ?? null}
+            from="profile"
+          />
+        </div>
       </section>
 
       {/* 구획선(border-t)을 쓰지 않는다. 이 디자인은 영역을 선이 아니라

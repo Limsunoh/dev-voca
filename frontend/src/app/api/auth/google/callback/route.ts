@@ -5,7 +5,7 @@ import { logInWithGoogle } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
 import { callbackUrl } from "@/lib/google";
 import { safeNext } from "@/lib/routes";
-import { setToken } from "@/lib/session";
+import { carryGuestDailyLength, setToken } from "@/lib/session";
 import { CONSENT_COOKIE, NEXT_COOKIE, STATE_COOKIE } from "../route";
 
 /**
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { token } = await logInWithGoogle({
+    const { token, user } = await logInWithGoogle({
       code,
       // 구글이 코드를 발급할 때 쓴 주소와 같아야 한다. 백엔드가 구글에
       // 확인을 요청할 때 이 값을 함께 보낸다.
@@ -62,6 +62,7 @@ export async function GET(request: Request) {
         : {}),
     });
     await setToken(token);
+    await carryGuestDailyLength(token, user);
   } catch (error) {
     // 새 계정인데 동의 값이 없는 경우. 실패가 아니라 가입 화면으로 안내한다.
     // 계정은 만들어지지 않았다.

@@ -20,9 +20,17 @@ export const metadata: Metadata = {
  * 로그인이 필요하다. 진행이 서버에 남아야 이어서 풀 수 있는 기능이라
  * 게스트에게는 이어 볼 자리가 없다. 90초 한 판이 게스트를 받는 것과 다르다.
  */
-export default async function DailyPage() {
+export default async function DailyPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+} = {}) {
   const token = await getToken();
   if (!token) redirect(`/login?next=${routes.testDaily}`);
+
+  // 문제풀기 허브의 "오늘만 다른 길이로" 로 왔으면(?choose=1) 하루 공부량으로
+  // 바로 시작하지 않고 고르는 화면을 보인다.
+  const choose = (await searchParams)?.choose === "1";
 
   let status;
   try {
@@ -85,7 +93,7 @@ export default async function DailyPage() {
       {/* 진행이 서버에 있는 화면이라 뒤로 가기로 옛 응답을 그리면 이미 푼
           문제가 다시 뜬다. */}
       <RefreshOnBack renderId={crypto.randomUUID()}>
-        <DailyStudyBoard status={status} />
+        <DailyStudyBoard status={status} choose={choose} />
       </RefreshOnBack>
     </main>
   );

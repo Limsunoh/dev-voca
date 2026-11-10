@@ -126,6 +126,8 @@ class UserSerializer(serializers.ModelSerializer):
             "has_password",
             "uploaded_photo",
             "is_staff",
+            # 하루 공부량. 화면이 이름·아바타와 같은 PATCH 로 바꾼다.
+            "daily_length",
         ]
         # 이메일은 여기서 바꾸지 않는다. 로그인 키라 본인 확인이 먼저인데,
         # 그 절차는 EmailChangeRequestView 가 따로 갖고 있다(새 주소로 간
