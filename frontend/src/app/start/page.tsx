@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import logo from "@/app/start/logo.webp";
 import { StartChoices } from "@/app/start/StartChoices";
 import { getCurrentUser, isGuestChosen } from "@/lib/session";
 
@@ -72,14 +74,12 @@ export default async function StartPage({
         >
           개발자를 위한 영어
         </p>
-        <h1
-          className="rise mt-3 font-mono text-[2.75rem] leading-none tracking-[var(--tracking-tighter)] [animation-delay:80ms]"
-          style={{
-            color: "var(--foreground)",
-            fontWeight: "var(--weight-black)",
-          }}
-        >
-          devvoca
+        {/* 로고 그림의 바탕을 화면 바탕(--background)과 같은 색으로 칠해 둬서
+            그림의 테두리가 안 보인다. 최적화를 끈 것도 그래서다 - 다시 손실
+            압축하면 바탕색이 한두 단계 어긋나 네모가 비친다. 파일은 160px 의
+            3배로 만들어 둔 것이라 줄일 필요도 없다. */}
+        <h1 className="rise mt-4 [animation-delay:80ms]">
+          <Image src={logo} alt="devvoca" width={160} loading="eager" unoptimized />
         </h1>
         <p
           className="rise mt-4 text-lg leading-relaxed [animation-delay:160ms]"
