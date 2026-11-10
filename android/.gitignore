@@ -1,0 +1,17 @@
+# 빌드 결과물. 스토어에 올릴 파일은 이 PC 에서 만들어 Play Console 에 직접 올린다.
+*.apk
+*.aab
+*.idsig
+build/
+app/build/
+.gradle/
+local.properties
+# Bubblewrap 은 실패하면 서명 명령을 비밀번호째 찍는다. 로그는 남기지 않는다.
+*.log
+# 서명 키는 저장소에 넣지 않는다. 사용자 PC 의 ~/.devvoca-android 에 있다.
+*.jks
+*.keystore
+# Android Studio 로 열면 생기는 파일
+.idea/
+*.iml
+captures/

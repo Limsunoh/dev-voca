@@ -9,7 +9,7 @@ import { getCurrentUser, isGuestChosen } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "dev-voca",
-  description: "개발하면서 마주치는 영어, 매일 보다보면 익숙해집니다.",
+  description: "개발하면서 마주치는 영어, 매일 보다 보면 익숙해집니다.",
 };
 
 /**
@@ -100,7 +100,7 @@ export default async function StartPage({
         >
           개발하면서 마주치는 영어,
           <br />
-          매일 보다보면 익숙해집니다.
+          매일 보다 보면 익숙해집니다.
         </p>
       </div>
 

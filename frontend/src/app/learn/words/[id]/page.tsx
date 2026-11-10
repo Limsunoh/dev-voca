@@ -8,7 +8,8 @@ import {
   DetailShell,
 } from "@/components/DetailLayout";
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
-import { getWord } from "@/lib/api/vocab";
+import { TodayWordNav } from "@/components/TodayWordNav";
+import { getDailyWords, getWord, HOME_WORDS } from "@/lib/api/vocab";
 import { routes, safeListUrl } from "@/lib/routes";
 
 import { canonicalId } from "../../canonical-id";
@@ -45,16 +46,35 @@ export default async function WordDetailPage({
   const canonical = canonicalId(id);
   if (canonical) redirect(routes.wordDetail(canonical));
 
+  const query = await searchParams;
+  const fromToday = query.today === "1";
+
+  // 홈의 오늘의 개발영어에서 왔으면 그 묶음 안에서 몇 번째인지 찾는다.
+  // 홈과 같은 함수로 받아서 순서가 같다. 단어와 동시에 받는다 - 차례로
+  // 기다리면 "다음" 을 누를 때마다 왕복이 하나씩 더 쌓인다.
+  const todayPromise = fromToday
+    ? getDailyWords(HOME_WORDS).catch((error: unknown) => {
+        console.error("오늘의 단어를 불러오지 못했습니다.", error);
+        return [];
+      })
+    : Promise.resolve([]);
+
   const word = await getWord(id);
 
   // 검수 안 된 단어도 백엔드가 404 를 주므로 여기로 온다.
   if (!word) notFound();
 
-  const backToList = safeListUrl((await searchParams).from, routes.words);
+  const today = await todayPromise;
+  // 자정이 지났거나 그사이 단어 수가 바뀌어 묶음에 없으면 넘기는 줄은
+  // 그리지 않는다. 되돌아가기는 그래도 홈이다 - 홈에서 들어온 사람이다.
+  const todayIndex = today.findIndex((one) => one.id === word.id);
+  const back = fromToday
+    ? { href: routes.home, label: "홈" }
+    : { href: safeListUrl(query.from, routes.words), label: "단어장" };
 
   return (
     <DetailShell>
-      <DetailBack href={backToList} label="단어장" />
+      <DetailBack href={back.href} label={back.label} />
 
       <DetailHero
         title={word.term}
@@ -177,6 +197,8 @@ export default async function WordDetailPage({
           )}
         </DetailCard>
       )}
+
+      {todayIndex >= 0 && <TodayWordNav words={today} index={todayIndex} />}
 
       {/* 읽고 나서 할 일. 없으면 이 화면에서 나가는 길이 "뒤로" 하나뿐이다.
           첫 문제를 이 단어로 낸다 - 방금 읽은 것을 확인하려고 누른 버튼이다. */}
