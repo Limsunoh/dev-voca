@@ -8,8 +8,8 @@ import { StartChoices } from "@/app/start/StartChoices";
 import { getCurrentUser, isGuestChosen } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "devvoca",
-  description: "개발하면서 마주치는 영어, 하나씩 익혀봅니다.",
+  title: "dev-voca",
+  description: "개발하면서 마주치는 영어, 매일 보다보면 익숙해집니다.",
 };
 
 /**
@@ -63,7 +63,9 @@ export default async function StartPage({
         </p>
       )}
 
-      <div className="flex flex-1 flex-col justify-center">
+      {/* 가운데 정렬. 앱 첫 화면이라 왼쪽 정렬이면 오른쪽이 비어 한쪽으로 쏠려 보인다.
+          운영자가 정했다(2026-11-11). design-taste-frontend 의 "첫 화면은 가운데 정렬을 피한다" 의 예외다. */}
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
         <p
           className="rise text-sm"
           // 12px 글자라 --coral(3.15:1)이 아니라 --coral-deep(4.93:1).
@@ -76,10 +78,19 @@ export default async function StartPage({
         </p>
         {/* 로고 그림의 바탕을 화면 바탕(--background)과 같은 색으로 칠해 둬서
             그림의 테두리가 안 보인다. 최적화를 끈 것도 그래서다 - 다시 손실
-            압축하면 바탕색이 한두 단계 어긋나 네모가 비친다. 파일은 160px 의
-            3배로 만들어 둔 것이라 줄일 필요도 없다. */}
-        <h1 className="rise mt-4 [animation-delay:80ms]">
-          <Image src={logo} alt="devvoca" width={160} loading="eager" unoptimized />
+            압축하면 바탕색이 한두 단계 어긋나 네모가 비친다.
+
+            폭은 내용 폭을 채우되, 높이가 화면 높이의 30% 를 넘지 않게
+            한다. 세로가 짧은 폰(375x667, 폴드 접은 416x657)에서 아래 버튼이
+            화면 밖으로 밀리지 않게 하는 상한이다. 808/694 는 그림의 가로세로 비다. */}
+        <h1 className="rise mt-4 w-full [animation-delay:80ms]">
+          <Image
+            src={logo}
+            alt="dev-voca"
+            loading="eager"
+            unoptimized
+            className="mx-auto h-auto w-[min(100%,calc(30svh*808/694))]"
+          />
         </h1>
         <p
           className="rise mt-4 text-lg leading-relaxed [animation-delay:160ms]"
@@ -87,7 +98,7 @@ export default async function StartPage({
         >
           개발하면서 마주치는 영어,
           <br />
-          하나씩 익혀봅니다.
+          매일 보다보면 익숙해집니다.
         </p>
       </div>
 

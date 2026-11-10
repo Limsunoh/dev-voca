@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandName } from "@/components/BrandName";
 import type { MicState } from "@/lib/speech";
 
 /**
@@ -72,7 +73,7 @@ export function MicGate({
           }}
         >
           말한 내용은 브라우저가 글자로 바꿉니다. 그 과정에서 음성이 브라우저
-          제공 업체(크롬은 구글 등)의 서버를 거칩니다. devvoca 서버에는 바뀐
+          제공 업체(크롬은 구글 등)의 서버를 거칩니다. <BrandName /> 서버에는 바뀐
           글자만 오고 목소리는 저장하지 않습니다.
         </p>
       )}

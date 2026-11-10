@@ -21,7 +21,7 @@ import { fetchMyStandings } from "@/lib/api/leaderboards";
 import { getCurrentUser, getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "내정보 · devvoca",
+  title: "내정보 · dev-voca",
 };
 
 /**
