@@ -16,10 +16,12 @@ learning 에 둔 이유: accounts 는 다른 앱을 부르지 않는다. learnin
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from apps.accounts import purge
-from apps.accounts.mail import MailNotConfigured
+from apps.accounts.gmail_api import GmailSendError, check_token
+from apps.accounts.mail import GMAIL_BACKEND, MailNotConfigured
 from apps.accounts.throttles import sweep_expired_counters
 from apps.learning.session import expired_steps
 
@@ -56,6 +58,21 @@ class Command(BaseCommand):
             sent, failed = purge.send_notices()
         except MailNotConfigured as exc:
             raise CommandError(str(exc)) from exc
+
+        # Gmail API 로 보낼 때, 안내할 회원이 없던 날은 토큰을 한 번 써 본다.
+        # 구글은 6개월 동안 안 쓴 갱신 토큰을 풀어 버린다. 서비스를 연 직후에는
+        # 1년 미접속 회원이 없어 몇 달씩 한 통도 안 보내므로, 그대로 두면 첫 안내
+        # 날에야 토큰이 죽은 걸 알고 그날 안내가 전부 실패한다. 보낸 날은 그
+        # 발송이 이미 토큰을 썼으니 다시 묻지 않는다. 먼저 물으면 확인이 한 번
+        # 일시 실패한 날 안내를 통째로 건너뛴다.
+        if not sent and not failed and settings.EMAIL_BACKEND.endswith(GMAIL_BACKEND):
+            try:
+                check_token()
+            except GmailSendError as exc:
+                raise CommandError(
+                    f"{exc}. invalid_grant 면 토큰이 풀린 것이다. DEPLOY.md 의 "
+                    "'메일 발송 (Gmail API)' 대로 gmail_token 을 다시 돌려 새 토큰을 넣는다."
+                ) from exc
 
         if failed and not sent:
             raise CommandError(
