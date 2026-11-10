@@ -5,11 +5,21 @@ import { Avatar } from "@/components/Avatar";
 import { Highlight } from "@/components/Highlight";
 import { LearningCard } from "@/components/LearningCard";
 import { Reading } from "@/components/Reading";
-import { loadToday, type Today, TodayCards } from "@/components/TodayCards";
+import {
+  loadToday,
+  OtherLengthLink,
+  type Today,
+  TodayCards,
+} from "@/components/TodayCards";
 import type { User } from "@/lib/api/accounts";
 import { getDailyWords, HOME_WORDS, type WordListItem } from "@/lib/api/vocab";
 import { routes } from "@/lib/routes";
-import { getCurrentUser, getToken, isGuestChosen } from "@/lib/session";
+import {
+  getCurrentUser,
+  getGuestDailyLength,
+  getToken,
+  isGuestChosen,
+} from "@/lib/session";
 
 /**
  * 홈.
@@ -32,9 +42,23 @@ export default async function Home() {
   //
   // 홈에서만 보는 이유: 앱의 진입점이 홈이다. 다른 경로로 바로 들어온
   // 사람(공유 링크 등)까지 막으면 그 링크가 안 열린다.
-  if (!(await getCurrentUser()) && !(await isGuestChosen())) {
+  const signedIn = await getCurrentUser();
+  if (!signedIn && !(await isGuestChosen())) {
     redirect("/start");
   }
+
+  // 하루 공부량을 아직 안 골랐으면 한 번 묻는다. 로그인한 사람은 계정에,
+  // 게스트는 이 기기 쿠키에 있다. 이 기능 전에 가입한 사람도 여기서 한 번 고른다.
+  //
+  // 묻지 않는 경우 둘:
+  // - 계정에 이 칸이 없다(undefined). 배포가 엇갈려 옛 백엔드가 답한 것이라,
+  //   물어도 저장이 안 되고 이 화면으로 되돌아오기만 한다.
+  // - 토큰은 있는데 사람을 못 받았다. 백엔드가 잠깐 안 받는 것이지 안 고른 것이
+  //   아니다. 묻는 화면에는 탭바가 없어 저장이 실패하면 거기 갇힌다.
+  const askLength = signedIn
+    ? signedIn.daily_length === ""
+    : !(await getToken()) && !(await getGuestDailyLength());
+  if (askLength) redirect(routes.startDaily);
 
   // 두 요청을 동시에 띄운다. 순서대로 기다리면 두 번의 왕복이 그대로
   // 대기 시간이 되고, 그게 앱을 열자마자 보이는 시간이다.
@@ -89,6 +113,7 @@ export default async function Home() {
         {user && (
           <div className="mt-4">
             <TodayCards {...today} />
+            <OtherLengthLink length={user.daily_length} daily={today.daily} />
           </div>
         )}
 

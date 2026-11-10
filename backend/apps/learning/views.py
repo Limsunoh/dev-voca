@@ -291,6 +291,10 @@ class DailyStudyStartView(APIView):
                     for value, label in StudyLength.choices
                 ],
                 "today": _study_body(study) if study else None,
+                # 하루 공부량. 비어 있으면 아직 안 골랐다. 화면은 오늘 시작
+                # 전이고 이 값이 있으면 고르는 화면 없이 이 길이로 시작한다.
+                # 사람 정보(/me)를 따로 묻지 않아도 되게 여기 같이 싣는다.
+                "daily_length": request.user.daily_length,
                 "token": token,
                 "question": question,
                 # 이번 묶음의 학습 카드. 비어 있으면 문제를 풀 차례다.

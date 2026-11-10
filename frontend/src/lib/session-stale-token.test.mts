@@ -360,10 +360,14 @@ describe("쿠키 지우기", () => {
     assert.equal(jar.get("devvoca_guest"), "1");
   });
 
-  it("clearToken 은 토큰·게스트 쿠키를 둘 다 지운다", async () => {
+  it("clearToken 은 토큰·게스트 쿠키와 게스트가 고른 공부량을 모두 지운다", async () => {
     loggedIn();
     await session.clearToken();
-    assert.deepEqual([...deleted].sort(), ["devvoca_guest", "devvoca_token"]);
+    assert.deepEqual([...deleted].sort(), [
+      "devvoca_daily_length",
+      "devvoca_guest",
+      "devvoca_token",
+    ]);
     assert.equal(jar.size, 0);
   });
 });

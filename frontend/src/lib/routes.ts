@@ -106,6 +106,8 @@ export const routes = {
   testRound: "/test/round",
   /** 하루 한 번 일일공부. 로그인이 필요하다. */
   testDaily: "/test/daily",
+  // 하루 공부량을 처음 한 번 묻는 화면. 홈이 아직 안 고른 사람을 보낸다.
+  startDaily: "/start/daily",
   /** 틀린 것 다시 풀기. 점수가 없고 로그인이 필요하다. */
   testReview: "/test/review",
   /**

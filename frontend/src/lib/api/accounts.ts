@@ -1,3 +1,4 @@
+import type { DailyLength } from "../daily-length";
 import { ApiError, apiBase, request } from "./client";
 
 /**
@@ -48,6 +49,14 @@ export type User = {
    */
   uploaded_photo: string;
   is_staff: boolean;
+  /**
+   * 하루 공부량. 빈 문자열이면 아직 안 골랐다(lib/daily-length.ts).
+   *
+   * 칸 자체가 없을 수 있다. 이 칸이 생기기 전 백엔드(배포가 엇갈린 사이)는 안
+   * 보낸다. 그때를 "안 골랐다" 로 읽으면 고르고 저장해도 옛 백엔드가 버려서
+   * 고르는 화면으로 끝없이 되돌아간다. 그래서 묻는 조건은 === "" 다.
+   */
+  daily_length?: DailyLength | "";
 };
 
 /** 가입·로그인 응답. 토큰과 사용자 정보가 함께 온다. */
@@ -110,11 +119,11 @@ export function getMe(token: string): Promise<User> {
  * 내 프로필 수정.
  *
  * 이메일과 권한은 서버가 읽기 전용으로 막는다. 여기서 보낼 수 있는 것은
- * 이름과 아바타뿐이다.
+ * 이름, 아바타, 하루 공부량이다.
  */
 export function updateMe(
   token: string,
-  body: { display_name?: string; avatar?: string },
+  body: { display_name?: string; avatar?: string; daily_length?: DailyLength | "" },
 ): Promise<User> {
   return request("/api/accounts/me/", { method: "PATCH", body, token });
 }

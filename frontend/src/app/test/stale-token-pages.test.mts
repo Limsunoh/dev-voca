@@ -61,8 +61,12 @@ let forgets: boolean[] = [];
 mock.module("@/lib/session", {
   namedExports: {
     getToken: async () => cookie,
-    getCurrentUser: async () => (cookie === LIVE ? { id: 1, email: "a@b.c" } : null),
+    // 하루 공부량은 이미 고른 것으로 둔다. 비어 있으면 홈이 고르는 화면
+    // (/start/daily)으로 보내서, 여기서 보려는 홈 화면이 안 그려진다.
+    getCurrentUser: async () =>
+      cookie === LIVE ? { id: 1, email: "a@b.c", daily_length: "10m" } : null,
     isGuestChosen: async () => true,
+    getGuestDailyLength: async () => "10m",
     forgetToken: async () => {
       throw new Error("화면을 그리는 중에는 쿠키를 지울 수 없다");
     },

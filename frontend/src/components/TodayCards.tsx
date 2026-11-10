@@ -1,7 +1,10 @@
+import Link from "next/link";
+
 import { ProgressDots, StatCard } from "@/components/StatCard";
 import { ApiError } from "@/lib/api/client";
 import { fetchDailyStatus, type StudyProgress } from "@/lib/api/daily";
 import { fetchDue, type ReviewDue } from "@/lib/api/review";
+import { dailyLengthLabel } from "@/lib/daily-length";
 import { routes } from "@/lib/routes";
 
 /** 카드 두 장이 그릴 값. loadToday 가 채운다. */
@@ -93,6 +96,34 @@ export function TodayCards({ daily, due }: Today) {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * "하루 10분 · 오늘만 다른 길이로" 링크. 홈과 문제풀기 허브가 오늘 할 일 카드
+ * 아래에 둔다.
+ *
+ * 일일공부는 하루 공부량으로 바로 시작하고, 시작한 뒤에는 길이를 바꿀 수 없다.
+ * 그래서 그날만 다른 길이로 하려면 들어가기 전에 이 링크로 가야 한다. 오늘 이미
+ * 시작했거나 공부량을 안 골랐으면 그리지 않는다.
+ */
+export function OtherLengthLink({
+  length,
+  daily,
+}: {
+  length: string | undefined;
+  daily: StudyProgress | null;
+}) {
+  const label = length ? dailyLengthLabel(length) : null;
+  if (!label || daily) return null;
+  return (
+    <Link
+      href={`${routes.testDaily}?choose=1`}
+      className="mt-1 inline-flex min-h-11 items-center text-sm underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      style={{ color: "var(--text-muted)" }}
+    >
+      하루 {label} · 오늘만 다른 길이로
+    </Link>
   );
 }
 

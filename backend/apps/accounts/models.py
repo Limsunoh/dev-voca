@@ -21,6 +21,8 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
 
+from apps.learning.models import StudyLength
+
 from .forbidden_names import name_is_forbidden
 
 # 지금 약관·처리방침의 버전. 동의할 때 이 값을 함께 남긴다. 문서 내용이나 가입
@@ -459,6 +461,22 @@ class User(AbstractUser):
 
     # 파기 안내 메일을 보낸 시각. 다시 이용하면 비운다.
     purge_notice_sent_at = models.DateTimeField("파기 안내 시각", null=True, blank=True)
+
+    # 하루 공부량. 일일공부가 이 길이로 바로 시작한다. 비어 있으면 아직 안
+    # 고른 것이고, 화면이 처음 들어올 때 한 번 묻는다. 그날만 다른 길이로
+    # 하는 것은 일일공부 화면에서 고르고, 여기 값은 바뀌지 않는다.
+    #
+    # db_default 를 둔다. 이 칸을 모르는 코드(배포 중 잠깐 남는 옛 서버, 같은
+    # 로컬 DB 를 쓰는 다른 브랜치)가 가입을 넣으면 이 칸이 빠진 INSERT 가 되는데,
+    # DB 에 기본값이 없으면 NOT NULL 에 걸려 가입이 실패한다.
+    daily_length = models.CharField(
+        "하루 공부량",
+        max_length=8,
+        choices=StudyLength.choices,
+        blank=True,
+        default="",
+        db_default="",
+    )
 
     # 가입일은 AbstractUser 의 date_joined 를 그대로 쓴다. 따로 만들면
     # 컬럼이 둘이 되고, Admin 은 이쪽을 Django 기본 기능은 저쪽을 보게 된다.

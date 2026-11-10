@@ -3,8 +3,9 @@ import "server-only";
 import { cookies } from "next/headers";
 import { cache } from "react";
 
-import { getMe, type User } from "./api/accounts";
+import { getMe, updateMe, type User } from "./api/accounts";
 import { ApiError } from "./api/client";
+import { type DailyLength, isDailyLength } from "./daily-length";
 
 /**
  * 로그인 상태 보관. 서버에서만 쓴다.
@@ -19,6 +20,8 @@ import { ApiError } from "./api/client";
 
 const COOKIE_NAME = "devvoca_token";
 const GUEST_COOKIE = "devvoca_guest";
+// 게스트가 고른 하루 공부량. 로그인하면 계정으로 옮기고 지운다.
+const GUEST_LENGTH_COOKIE = "devvoca_daily_length";
 
 // 30일. 학습 앱이라 자주 로그인시킬 이유가 없다. 백엔드 토큰 자체는
 // 만료가 없고 로그아웃할 때 지워지므로, 이 값은 "이 브라우저에서
@@ -60,6 +63,9 @@ export async function clearToken(): Promise<void> {
   // 나가는 문만 있고 들어오는 문이 없는 상태가 된다.
   const store = await cookies();
   store.delete(GUEST_COOKIE);
+  // 게스트 때 고른 공부량도 지운다. 같은 기기로 다른 사람이 로그인하면
+  // 앞사람이 고른 값이 그 계정에 옮겨 간다.
+  store.delete(GUEST_LENGTH_COOKIE);
 }
 
 /**
@@ -86,6 +92,49 @@ export async function setGuest(): Promise<void> {
 export async function isGuestChosen(): Promise<boolean> {
   const store = await cookies();
   return store.get(GUEST_COOKIE)?.value === "1";
+}
+
+/** 게스트가 고른 하루 공부량. 저장할 곳이 계정이 없어 이 기기 쿠키에 둔다. */
+export async function setGuestDailyLength(length: DailyLength): Promise<void> {
+  const store = await cookies();
+  store.set(GUEST_LENGTH_COOKIE, length, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: MAX_AGE,
+  });
+}
+
+export async function getGuestDailyLength(): Promise<DailyLength | null> {
+  const store = await cookies();
+  const value = store.get(GUEST_LENGTH_COOKIE)?.value;
+  return isDailyLength(value) ? value : null;
+}
+
+/**
+ * 게스트 때 고른 하루 공부량을 방금 로그인한 계정으로 옮긴다.
+ *
+ * 로그인을 마친 곳(이메일 로그인·가입, 구글 콜백)에서 부른다. 계정에 이미
+ * 값이 있으면 덮지 않는다 - 다른 기기에서 정해 둔 값이 이 기기의 게스트 선택에
+ * 밀리면 안 된다. 옮겼든 계정 값을 두었든 쿠키는 지운다. 계정에 이 칸이 아예
+ * 없을 때(옛 백엔드)만 쿠키를 남긴다.
+ *
+ * 실패해도 로그인은 막지 않는다. 옮기지 못하면 홈이 계정에 값이 없는 것을 보고
+ * 한 번 더 묻는다.
+ */
+export async function carryGuestDailyLength(token: string, user: User): Promise<void> {
+  const length = await getGuestDailyLength();
+  // 칸이 없으면(옛 백엔드) 옮기지도 지우지도 않는다. 보내 봐야 버려지고, 쿠키를
+  // 지우면 게스트가 고른 값이 사라진다. 다음 로그인 때 다시 옮긴다.
+  if (!length || user.daily_length === undefined) return;
+  try {
+    if (user.daily_length === "") await updateMe(token, { daily_length: length });
+    const store = await cookies();
+    store.delete(GUEST_LENGTH_COOKIE);
+  } catch (error) {
+    console.error("하루 공부량을 계정으로 옮기지 못했습니다.", error);
+  }
 }
 
 export async function getToken(): Promise<string | null> {

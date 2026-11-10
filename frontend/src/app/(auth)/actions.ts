@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { logIn, logOut, signUp } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
 import { safeNext } from "@/lib/routes";
-import { clearToken, getToken, setToken } from "@/lib/session";
+import { carryGuestDailyLength, clearToken, getToken, setToken } from "@/lib/session";
 
 /**
  * 로그인·가입·로그아웃 처리.
@@ -61,8 +61,9 @@ export async function loginAction(
   }
 
   try {
-    const { token } = await logIn({ email, password });
+    const { token, user } = await logIn({ email, password });
     await setToken(token);
+    await carryGuestDailyLength(token, user);
   } catch (error) {
     return { error: messageOf(error), values: { email } };
   }
@@ -95,7 +96,7 @@ export async function signUpAction(
   }
 
   try {
-    const { token } = await signUp({
+    const { token, user } = await signUp({
       email,
       password,
       ...(displayName ? { display_name: displayName } : {}),
@@ -104,6 +105,7 @@ export async function signUpAction(
       age_confirmed: formData.get("age_confirmed") === "on",
     });
     await setToken(token);
+    await carryGuestDailyLength(token, user);
   } catch (error) {
     return { error: messageOf(error), values: kept };
   }

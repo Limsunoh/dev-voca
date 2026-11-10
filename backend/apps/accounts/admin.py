@@ -88,7 +88,7 @@ class UserAdmin(BaseUserAdmin):
         (
             "정보",
             {
-                "fields": ("display_name", "avatar", "google_picture"),
+                "fields": ("display_name", "avatar", "google_picture", "daily_length"),
                 # google_picture 는 구글이 주는 값이라 손으로 고칠 것이
                 # 아니지만, 사진이 안 뜬다는 문의가 왔을 때 무엇이 저장돼
                 # 있는지 봐야 해서 열어둔다.

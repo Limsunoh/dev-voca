@@ -12,6 +12,7 @@ import type {
   StudyProgress,
 } from "@/lib/api/daily";
 import type { RoundQuestion, RoundResult } from "@/lib/api/rounds";
+import { dailyLengthLabel } from "@/lib/daily-length";
 import { routes } from "@/lib/routes";
 
 import { Burst } from "./Burst";
@@ -58,7 +59,18 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function DailyStudyBoard({ status }: { status: DailyStatus }) {
+export function DailyStudyBoard({
+  status,
+  choose = false,
+}: {
+  status: DailyStatus;
+  /**
+   * 그날만 다른 길이로 하려고 들어왔나(?choose=1). 아니면 하루 공부량
+   * (status.daily_length)이 있을 때 고르는 화면 없이 그 길이로 바로 시작한다.
+   */
+  choose?: boolean;
+}) {
+  const savedLength = choose ? "" : (status.daily_length ?? "");
   // 오늘 이미 다 한 사람은 결과부터, 하다 만 사람은 이어서 푸는 화면부터
   // 본다. 길이는 시작할 때 정해져 바꿀 수 없으므로 고르기로 돌아가지
   // 않는다 - 돌아가봐야 어느 길이를 눌러도 "이미 시작했다" 로 막힌다.
@@ -142,12 +154,25 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
       setPhase(started.learning.length > 0 ? "learning" : "playing");
     } catch (err) {
       if (!aliveRef.current) return;
-      setError(err instanceof Error ? err.message : "시작하지 못했습니다.");
+      // 빈 메시지로 두지 않는다. 하루 공부량으로 바로 시작하는 중에는 error 가
+      // 비어 있는 동안 "준비하고 있습니다" 를 그려서, 비면 그 화면에 남는다.
+      setError((err instanceof Error && err.message) || "시작하지 못했습니다.");
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
   };
+
+  // 저장한 공부량으로 바로 시작. 오늘 시작한 적이 없을 때만이다 - 하다 만
+  // 판이나 끝낸 판이 있으면 그 화면이 먼저다(initial). 한 번만 시도한다.
+  // 실패하면 고르는 화면에 오류와 함께 남아 직접 누를 수 있다.
+  const autoStartRef = useRef(false);
+  useEffect(() => {
+    if (autoStartRef.current || !savedLength || status.today !== null) return;
+    autoStartRef.current = true;
+    // start 는 매 렌더마다 새로 만들어지지만 이 효과는 한 번만 돈다(ref).
+    void start(savedLength);
+  }, [savedLength, status.today]);
 
   const send = async (choiceId: number) => {
     if (busyRef.current || !tokenRef.current) return;
@@ -284,6 +309,21 @@ export function DailyStudyBoard({ status }: { status: DailyStatus }) {
           // 틀렸는지를 못 보고 화면이 튄다.
           onLearn={cards.length > 0 ? () => setPhase("learning") : undefined}
         />
+      );
+    }
+
+    // 하루 공부량으로 바로 시작하는 중. 고르는 카드를 그리면 시작 요청이 끝날
+    // 때까지 눌리는 버튼 셋이 보여서 "고르는 화면 없이" 가 아니게 된다.
+    // 실패하면 error 가 생겨 아래 고르는 카드로 떨어지고 직접 누를 수 있다.
+    if (savedLength && status.today === null && !error) {
+      return (
+        <p
+          role="status"
+          className="py-16 text-center"
+          style={{ color: "var(--text-muted)", fontWeight: "var(--weight-bold)" }}
+        >
+          {dailyLengthLabel(savedLength) ?? "오늘"} 공부를 준비하고 있습니다.
+        </p>
       );
     }
 
