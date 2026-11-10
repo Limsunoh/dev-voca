@@ -17,6 +17,7 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 
+from .gmail_api import GmailSendError
 from .mail import MailNotConfigured, _really_sends, send_account_mail
 
 logger = logging.getLogger(__name__)
@@ -92,11 +93,13 @@ def send_notices() -> tuple[int, int]:
         try:
             send_account_mail(to=email, subject=subject, body=body)
         except (OSError, ValueError) as exc:
-            # 예외 메시지에 주소가 들어 있을 수 있어 종류만 남긴다.
+            # 예외 메시지에 주소가 들어 있을 수 있어 종류만 남긴다. GmailSendError
+            # 는 상태 코드와 구글 오류 이름만 담으므로 문구까지 남긴다. 그래야
+            # "토큰이 풀렸다(invalid_grant)" 를 로그에서 바로 안다.
             logger.error(
                 "파기 안내 메일을 보내지 못했습니다. user=%s reason=%s",
                 pk,
-                type(exc).__name__,
+                str(exc) if isinstance(exc, GmailSendError) else type(exc).__name__,
             )
             failed += 1
             continue

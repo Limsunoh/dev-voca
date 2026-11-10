@@ -18,16 +18,24 @@ class MailNotConfigured(RuntimeError):
     """발송 계정이 없다. 보내려는 순간에 터진다."""
 
 
+# 실제로 메일을 내보내는 백엔드. Gmail API 쪽은 Railway Hobby 가 SMTP 를
+# 막아서 더했다(gmail_api.py 머리 주석). daily_cleanup 도 GMAIL_BACKEND 로
+# 토큰 확인 여부를 정한다. 클래스 이름을 바꾸면 여기와 settings.py 메일 절
+# 두 곳을 고친다(settings 는 앱 모듈을 가져올 수 없어 전체 경로를 따로 적는다).
+GMAIL_BACKEND = "gmail_api.GmailApiBackend"
+REAL_BACKENDS = ("smtp.EmailBackend", GMAIL_BACKEND)
+
+
 def _really_sends() -> bool:
     """정말로 메일이 나가는 백엔드인가.
 
-    "console 이면 안 나간다" 가 아니라 "smtp 여야 나간다" 로 판정한다.
+    "console 이면 안 나간다" 가 아니라 "이 목록에 있어야 나간다" 로 판정한다.
     앞의 방식은 목록에 없는 백엔드를 전부 통과시킨다. dummy(전부 버림)나
     locmem(메모리에 쌓기)로 두면 send_mail 이 에러 없이 성공하고, 화면은
     "보냈습니다" 인데 메일은 어디에도 없다. 이 모듈이 막으려는 상황이
     다른 이름으로 들어온다.
     """
-    return settings.EMAIL_BACKEND.endswith("smtp.EmailBackend")
+    return settings.EMAIL_BACKEND.endswith(REAL_BACKENDS)
 
 
 def send_account_mail(*, to: str, subject: str, body: str) -> None:
@@ -47,7 +55,7 @@ def send_account_mail(*, to: str, subject: str, body: str) -> None:
     if not _really_sends() and not settings.DEBUG:
         raise MailNotConfigured(
             "발송 계정이 설정되지 않아 메일을 보낼 수 없습니다. "
-            "EMAIL_HOST_USER 와 EMAIL_HOST_PASSWORD 를 확인하세요."
+            "EMAIL_HOST_USER 와 GMAIL_* 세 값(또는 EMAIL_HOST_PASSWORD)을 확인하세요."
         )
 
     # fail_silently 를 끄고 둔다. 켜면 SMTP 가 거절해도 아무 일 없었던 듯
