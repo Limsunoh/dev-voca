@@ -146,7 +146,7 @@ function Check({
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
         className="h-5 w-5 flex-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-        style={{ accentColor: "var(--coral-deep)" }}
+        style={{ accentColor: "var(--brand)" }}
       />
       <span>{children}</span>
     </label>
@@ -167,7 +167,7 @@ function DocLink({
       rel="noreferrer"
       className="underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       style={{
-        color: "var(--coral-deep)",
+        color: "var(--brand)",
         fontWeight: "var(--weight-bold)",
       }}
     >

@@ -25,7 +25,7 @@ export default function BoardNotFound() {
       </p>
       <div className="mt-6">
         {/* 흰 알약 + 두께. 이 화면에는 할 일이 하나뿐이지만 막다른 곳에서
-            돌아가는 동작이라 코랄까지 쓰지 않는다 - 코랄은 앞으로 나아가는
+            돌아가는 동작이라 갈색까지 쓰지 않는다 - 갈색은 앞으로 나아가는
             자리(빈 순위표의 문제 풀러 가기·로그인하기)에 남긴다. */}
         <Link
           href={routes.board()}

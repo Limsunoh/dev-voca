@@ -76,8 +76,8 @@ export function MyStandings({
               채우지 않는다. 그쪽은 절의 주된 동작이고 이쪽은 곁들이 카드 안의
               안내다.
 
-              흰 알약인 이유: 이 화면의 코랄은 프로필 저장 버튼이 갖고 있다
-              (한 화면에 코랄 하나). 판을 시작하는 동작이라 코랄이 어울리지만
+              흰 알약인 이유: 이 화면의 갈색은 프로필 저장 버튼이 갖고 있다
+              (한 화면에 갈색 하나). 판을 시작하는 동작이라 갈색이 어울리지만
               그쪽을 밀어낼 자리는 아니다.
 
               문장과 버튼 사이를 mt-4 로 둔다. 카드 안 제목-문장 간격(mt-3)과
@@ -158,12 +158,12 @@ function StandingCell({ kind, row }: { kind: BoardKind; row?: BoardRow }) {
               {labels.scoreUnit}
             </span>
           </span>
-          {/* 순위는 코랄. 점수와 같은 색이면 두 줄이 한 덩어리로 읽혀
+          {/* 순위는 갈색. 점수와 같은 색이면 두 줄이 한 덩어리로 읽혀
               무엇이 점수고 무엇이 등수인지 헷갈린다. */}
           <span
             className="mt-0.5 block text-xs tabular-nums"
             style={{
-              color: rank === null ? "var(--text-muted)" : "var(--coral-deep)",
+              color: rank === null ? "var(--text-muted)" : "var(--brand)",
               fontWeight: "var(--weight-bold)",
             }}
           >

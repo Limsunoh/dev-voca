@@ -14,7 +14,7 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 | 스택 | Next.js 16.4.5 + React 19.2.4 + Tailwind v4 |
 | 런타임 의존성 | `next`, `react`, `react-dom` **셋뿐** |
 | 폰트 | Noto Sans KR(본문) + JetBrains Mono(영어 용어·에러 메시지), `next/font/google` |
-| 팔레트 | 크림 바탕(`--background` #fff6e9) + 흰 카드(`--paper`) + 코랄 강조(`--coral` #ef5b3c) + 잉크(`--foreground` #191512) |
+| 팔레트 | 크림 바탕(`--background` #fff6e9) + 흰 카드(`--paper`) + 갈색 강조(`--brand` #683a24, 로고의 d) + 잉크(`--foreground` #191512). 코랄(`--coral` #ef5b3c)은 틀림·오류·되돌리기 어려운 동작·급한 남은 시간에만 쓴다(2026-11-11 사용자 결정). 로고 주황(`--brand-orange`)은 장식에만 |
 | 다크 모드 | 없다. 테마는 크림 하나다(이유는 `globals.css` 머리 주석) |
 | 디자인 토큰 | `globals.css` 의 `:root` 에 색·글자 크기·굵기·간격·모서리·그림자(`--lift-*`)·연출 시간까지 있다. 토큰 밖 값을 새로 쓰지 않는다 |
 
@@ -36,7 +36,7 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 
 - **Persuade 에만** `design-taste-frontend` 나 `hallmark` 를 쓴다. 둘을 같은 작업에 함께 부르지 않는다. 둘 다 "대시보드·제품 UI 아님" 쪽이라 다른 화면에 부르면 안 맞는 조언이 나온다.
   - `hallmark audit` 은 읽기만 하니 점검에 써도 된다.
-  - `hallmark` 기본 동작이나 `redesign` 은 21개 테마 중 하나를 새로 고르려 든다. 크림·코랄 토큰과 Noto Sans KR 을 그대로 쓰라고 먼저 못박는다.
+  - `hallmark` 기본 동작이나 `redesign` 은 21개 테마 중 하나를 새로 고르려 든다. 크림·갈색 토큰과 Noto Sans KR 을 그대로 쓰라고 먼저 못박는다.
 - **`/start` 는 로고와 문구를 가운데 정렬한다.** 운영자가 정했다(2026-11-11). design-taste-frontend 의 "첫 화면은 가운데 정렬을 피한다" 의 예외로 둔다. 로고는 폭을 내용 폭까지 쓰고 높이는 화면의 30% 까지다.
 - **Operate·Read·Form 에는** `impeccable` 을 쓴다. `critique`, `layout`, `typeset`, `adapt` 위주.
 - **Play 의 움직임은** 애니메이션 스킬(`animate`, `review-animations`, `emil-design-eng`)을 쓴다. 채점 연출 길이는 `--duration-verdict` 하나에서 읽는다.
@@ -111,7 +111,7 @@ Ionic 팀이 만든 Next.js 스타터조차 `next export` 로 SPA 를 뽑고 라
 
 전역 `design-references`의 통과 목록 중 devvoca에 실제로 쓸 만한 것:
 
-- **[Shapefest](https://shapefest.com/)** — 빈 상태(검색 결과 없음, 아직 문장 없음) 일러스트에 쓸 수 있다. 512px 무료, 상업 사용 허용. 이미지 한 장이라 의존성이 늘지 않는다. 다만 3D 클레이 렌더는 지금의 크림·코랄 톤과 결이 다르니, 쓰려면 홈이나 빈 상태처럼 국한된 자리에만 둔다.
+- **[Shapefest](https://shapefest.com/)** — 빈 상태(검색 결과 없음, 아직 문장 없음) 일러스트에 쓸 수 있다. 512px 무료, 상업 사용 허용. 이미지 한 장이라 의존성이 늘지 않는다. 다만 3D 클레이 렌더는 지금의 크림·갈색 톤과 결이 다르니, 쓰려면 홈이나 빈 상태처럼 국한된 자리에만 둔다.
 - **[Vengeance UI](https://github.com/Ashutoshx7/VengeanceUI)** (MIT) — 검색 모달, 내비게이션 같은 실용 컴포넌트의 **구조를 읽는 용도**. 코드가 전부 공개돼 있다. framer-motion 의존 부분은 걷어내고 마크업과 상태 처리만 참고한다.
 
 나머지(Spline, Getlayers, Animmaster Lib, Skiper UI, Craftwork)는 탈락시켰다. 사유는 전역 스킬에 적어뒀으니 다시 조사하지 않는다.

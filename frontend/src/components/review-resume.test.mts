@@ -391,8 +391,9 @@ describe("복습 이어 풀기 - 적어 둔 판을 편다", () => {
     const card = (idle.type as (p: unknown) => unknown)(idle.props);
     const html = draw(card);
     assert.match(html, /<button[^>]*>새로 시작<\/button>/);
-    // 코랄은 "이어서 풀기" 하나다.
-    assert.equal((html.match(/var\(--coral\)/g) ?? []).length, 1);
+    // 갈색으로 채운 버튼(주된 동작)은 "이어서 풀기" 하나다. 글자도 --brand 를
+    // 쓰므로 배경으로 칠한 것만 센다.
+    assert.equal((html.match(/background:var\(--brand\)/g) ?? []).length, 1);
 
     const again = findNamed(card, "새로 시작");
     assert.ok(again, "'새로 시작' 버튼이 없다");

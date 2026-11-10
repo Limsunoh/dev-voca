@@ -224,8 +224,8 @@ function SendButton() {
     <button
       type="submit"
       disabled={pending}
-      // 흰 버튼이다. 이 화면의 코랄은 위쪽 프로필 저장이 가진다 - 둘 다
-      // 코랄이면 가끔 쓰는 이메일 변경이 주된 동작으로 보인다.
+      // 흰 버튼이다. 이 화면의 갈색은 위쪽 프로필 저장이 가진다 - 둘 다
+      // 갈색이면 가끔 쓰는 이메일 변경이 주된 동작으로 보인다.
       className="dv-btn w-full rounded-[var(--radius-pill)] px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60 sm:w-auto sm:justify-self-start sm:px-8"
       style={
         {

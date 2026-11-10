@@ -88,7 +88,7 @@ export function TodayCards({ daily, due }: Today) {
           label="다시 보기"
           value={due.due}
           unit="개"
-          tone="coral"
+          tone="brand"
           footer={<StatNote>틀린 것부터</StatNote>}
         />
       )}

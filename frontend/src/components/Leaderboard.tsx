@@ -129,7 +129,7 @@ export function Leaderboard({ board, isGuest }: Props) {
             href={loginToBoard(board.kind)}
             className="underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={{
-              color: "var(--coral-deep)",
+              color: "var(--brand)",
               fontWeight: "var(--weight-bold)",
             }}
           >
@@ -223,7 +223,7 @@ function EmptyBoard({ kind, isGuest }: { kind: BoardKind; isGuest: boolean }) {
           : "한 판만 풀어도 이 자리에 이름이 올라갑니다."}
       </p>
 
-      {/* 이 화면에서 코랄 버튼은 여기 하나뿐이다 - 빈 순위표에서 할 일은
+      {/* 이 화면에서 갈색 버튼은 여기 하나뿐이다 - 빈 순위표에서 할 일은
           하나라(게스트는 로그인, 로그인했으면 문제 풀기) 그것이 주된
           동작이다. 아래 게스트 안내 줄은 표가 비면 안 그려져 겹치지 않는다. */}
       <Link
@@ -232,7 +232,7 @@ function EmptyBoard({ kind, isGuest }: { kind: BoardKind; isGuest: boolean }) {
         style={
           {
             minHeight: "var(--hit-floor)",
-            background: "var(--coral)",
+            background: "var(--brand)",
             color: "var(--text-on-color)",
             fontWeight: "var(--weight-black)",
             "--lift": "var(--lift-button)",

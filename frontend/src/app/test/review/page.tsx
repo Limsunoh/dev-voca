@@ -53,7 +53,7 @@ export default async function ReviewPage() {
             : "잠시 뒤 다시 시도해주세요."}
         </p>
         <div className="mt-6">
-          {/* 흰 알약. 실패해서 물러나는 자리라 코랄을 쓰지 않는다. */}
+          {/* 흰 알약. 실패해서 물러나는 자리라 갈색을 쓰지 않는다. */}
           <Link
             href={routes.home}
             className="dv-btn inline-flex items-center rounded-[var(--radius-pill)] px-5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"

@@ -12,7 +12,7 @@
  *    그러면 테두리가 글자색(currentColor)으로 조용히 바뀌어 위 계산이
  *    그 칸에서는 아무것도 지키지 못한다.
  * 2. 안쪽 테두리(-outline-offset)는 칸 밖이 아니라 칸 자기 바탕 위에
- *    그려진다. 고르개의 고른 칸은 --coral-soft 라 바깥 바탕 넷에 없다.
+ *    그려진다. 고르개의 고른 칸은 --brand-soft 라 바깥 바탕 넷에 없다.
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
@@ -85,7 +85,7 @@ describe("고르개 칸의 안쪽 포커스 테두리 3:1", () => {
   });
 
   for (const active of [true, false]) {
-    it(active ? "고른 칸(--coral-soft) 위" : "안 고른 칸(투명, 메뉴 종이) 위", () => {
+    it(active ? "고른 칸(--brand-soft) 위" : "안 고른 칸(투명, 메뉴 종이) 위", () => {
       const own = pickerItemStyle(active).background;
       const back = own === "transparent" ? pickerMenuStyle().background : own;
       const ratio = contrast(token("--focus"), resolve(back));
@@ -93,7 +93,7 @@ describe("고르개 칸의 안쪽 포커스 테두리 3:1", () => {
     });
   }
 
-  it("밝은 코랄이면 고른 칸 위에서 3:1 에 못 미친다 - 기준이 실제로 거른다", () => {
+  it("밝은 코랄로 바꾸면 고른 칸 위에서 3:1 에 못 미친다 - 기준이 실제로 거른다", () => {
     assert.ok(contrast(token("--coral"), resolve(pickerItemStyle(true).background)) < 3);
   });
 });

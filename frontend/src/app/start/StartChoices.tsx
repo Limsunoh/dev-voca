@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import {
   BUTTON,
-  CORAL,
+  BRAND,
   ConsentSheet,
   PAPER,
   type SheetChoice,
@@ -25,7 +25,7 @@ export function StartChoices() {
         type="button"
         onClick={() => setChoice("google")}
         className={BUTTON}
-        style={CORAL}
+        style={BRAND}
       >
         구글로 시작하기
       </button>

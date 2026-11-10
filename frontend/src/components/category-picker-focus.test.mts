@@ -392,10 +392,10 @@ describe("분류 고르개 확인 창", () => {
 });
 
 describe("분류 고르개 고른 항목의 색", () => {
-  it("고른 항목은 --coral-soft 바탕에 --coral-soft-text 글자다", () => {
+  it("고른 항목은 --brand-soft 바탕에 --brand 글자다", () => {
     const style = item(openPicker("git"), "Git").props.style as Record<string, string>;
-    assert.equal(style.background, "var(--coral-soft)");
-    assert.equal(style.color, "var(--coral-soft-text)");
+    assert.equal(style.background, "var(--brand-soft)");
+    assert.equal(style.color, "var(--brand)");
   });
 
   it("안 고른 항목은 그 색을 쓰지 않는다", () => {

@@ -376,7 +376,7 @@ export function TalkBoard({
         {phase === "listening" && (
           <p
             className="text-sm"
-            style={{ color: "var(--coral-deep)", fontWeight: "var(--weight-black)" }}
+            style={{ color: "var(--brand)", fontWeight: "var(--weight-black)" }}
           >
             {STAGE_LABEL[stage]}
           </p>
@@ -417,7 +417,7 @@ export function TalkBoard({
 
       <div className="grid gap-2 sm:flex sm:justify-center">
         {/* 읽을 것을 못 받았으면(error && !prompt) 읽기를 빼고 아래
-            "다시 불러오기" 만 남긴다. 잠긴 코랄이 옆에 있으면 누를 수 없는
+            "다시 불러오기" 만 남긴다. 잠긴 갈색이 옆에 있으면 누를 수 없는
             쪽이 먼저 눈에 든다. 마이크가 막혔으면 "새로고침" 은 남긴다 -
             문장을 받아 와도 새로고침 전에는 읽을 수 없다. */}
         {phase === "listening" ? (
@@ -445,13 +445,13 @@ export function TalkBoard({
             // "허용으로 바꾸고 새로고침" 이라 주 버튼도 같은 말을 한다.
             onClick={micBlocked ? () => window.location.reload() : listen}
             disabled={!micBlocked && (busy || !prompt)}
-            // 이 화면의 유일한 코랄. 주된 동작이 하나여야 무엇을 눌러야
+            // 이 화면의 유일한 갈색. 주된 동작이 하나여야 무엇을 눌러야
             // 할지 한눈에 보인다.
             className="dv-btn rounded-[var(--radius-pill)] px-8 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
             style={
               {
                 minHeight: "var(--hit-min)",
-                background: "var(--coral)",
+                background: "var(--brand)",
                 color: "var(--text-on-color)",
                 border: 0,
                 "--lift": "var(--lift-button)",

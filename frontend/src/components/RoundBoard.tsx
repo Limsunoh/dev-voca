@@ -564,8 +564,8 @@ function StartCard({
           순서대로 걸린다.
 
           잉크로 둔다. 다크에서는 호박이었는데 크림 위의 --amber 는 2.2:1
-          이라 큰 글자여도 흐리게 뜬다. 코랄로 바꾸지도 않는다 - 이 카드의
-          코랄 하나는 아래 "시작" 버튼이 갖고, 읽는 숫자와 누르는 버튼이
+          이라 큰 글자여도 흐리게 뜬다. 갈색으로 바꾸지도 않는다 - 이 카드의
+          갈색 하나는 아래 "시작" 버튼이 갖고, 읽는 숫자와 누르는 버튼이
           같은 색이면 어느 쪽이 동작인지 사라진다. */}
       <p
         className="font-mono text-4xl tabular-nums sm:text-5xl"
@@ -614,7 +614,7 @@ function StartCard({
         </p>
       )}
 
-      {/* 이 화면의 코랄 하나. 여기서 할 일은 판을 여는 것뿐이다. */}
+      {/* 이 화면의 갈색 하나. 여기서 할 일은 판을 여는 것뿐이다. */}
       <button
         type="button"
         onClick={onStart}
@@ -623,7 +623,7 @@ function StartCard({
         style={
           {
             minHeight: "var(--hit-min)",
-            background: "var(--coral)",
+            background: "var(--brand)",
             color: "var(--text-on-color)",
             border: 0,
             borderRadius: "var(--radius-pill)",
@@ -754,7 +754,7 @@ function PlayCard({
           누를 자리가 움직이면 헛손질한다. 아래 주석이 "사라지면 버튼 줄이
           움직인다" 로 경계하는 것과 같은 이유다. */}
       <div className="flex min-h-11 items-center justify-between gap-3">
-        {/* 흰 알약으로 물러난다. 코랄은 보기를 고르는 쪽에 있어야 하고,
+        {/* 흰 알약으로 물러난다. 갈색은 보기를 고르는 쪽에 있어야 하고,
             넘기기는 세 번뿐인 도피구다. 눈에 띄게 두면 그걸 먼저 쓴다.
             횟수를 다 쓰면 흐려지지만 사라지지는 않는다. 사라지면 버튼 줄
             전체가 움직여 옆의 채점 결과가 다른 자리로 뛴다.
@@ -898,7 +898,7 @@ function RoundResultCard({
       {summary ? (
         <>
           {/* 이 화면에서 가장 큰 숫자. 잉크로 둔다 - 일일공부·복습 결과가
-              같은 자리를 같은 방식으로 그리고, 코랄은 아래 "순위표에서
+              같은 자리를 같은 방식으로 그리고, 갈색은 아래 "순위표에서
               확인" 이 갖는다. */}
           <p
             className="pop mt-2 font-mono text-5xl tabular-nums"
@@ -931,7 +931,7 @@ function RoundResultCard({
           {/* 기록됐을 때만 순위 얘기를 한다. 게스트에게 "17위" 를 보여주면
               다음에 왔을 때 그 등수가 사라져 있다. */}
           {summary.recorded ? (
-            // 기록이 남은 사람에게는 순위표가 다음에 할 일이라 코랄.
+            // 기록이 남은 사람에게는 순위표가 다음에 할 일이라 갈색.
             // 아래 "한 판 더" 는 흰 알약으로 물러난다.
             <Link
               href={routes.board()}
@@ -939,7 +939,7 @@ function RoundResultCard({
               style={
                 {
                   minHeight: "var(--hit-min)",
-                  background: "var(--coral)",
+                  background: "var(--brand)",
                   color: "var(--text-on-color)",
                   borderRadius: "var(--radius-pill)",
                   fontWeight: "var(--weight-black)",
@@ -964,14 +964,14 @@ function RoundResultCard({
                 }}
               >
                 로그인하면 다음 판부터 순위표에 올라갑니다.{" "}
-                {/* 게스트에게는 로그인이 이 화면의 코랄 하나다 - 위
+                {/* 게스트에게는 로그인이 이 화면의 갈색 하나다 - 위
                     "순위표에서 확인" 이 안 그려지는 갈래라 겹치지 않는다.
                     밑줄을 남긴다: 문장 안의 링크는 색만으로 알리지 않는다. */}
                 <Link
                   href={`/login?next=${routes.testRound}`}
                   className="underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                   style={{
-                    color: "var(--coral-deep)",
+                    color: "var(--brand)",
                     fontWeight: "var(--weight-black)",
                   }}
                 >
@@ -986,7 +986,7 @@ function RoundResultCard({
           <p className="mt-3" style={{ color: "var(--text-body)" }}>
             {error || "결과를 불러오지 못했습니다."}
           </p>
-          {/* 이 판의 점수를 살리는 유일한 길이라 코랄이다. 아래 "한 판 더" 는
+          {/* 이 판의 점수를 살리는 유일한 길이라 갈색이다. 아래 "한 판 더" 는
               새 판을 열어 이 판의 점수를 버린다. */}
           <button
             type="button"
@@ -996,7 +996,7 @@ function RoundResultCard({
             style={
               {
                 minHeight: "var(--hit-min)",
-                background: "var(--coral)",
+                background: "var(--brand)",
                 color: "var(--text-on-color)",
                 border: 0,
                 borderRadius: "var(--radius-pill)",
@@ -1027,7 +1027,7 @@ function RoundResultCard({
       )}
 
       <div className="mt-6">
-        {/* 흰 알약. 위의 "순위표에서 확인" 이나 "다시 저장" 이 코랄이라 여기는
+        {/* 흰 알약. 위의 "순위표에서 확인" 이나 "다시 저장" 이 갈색이라 여기는
             물러난다. */}
         <button
           type="button"

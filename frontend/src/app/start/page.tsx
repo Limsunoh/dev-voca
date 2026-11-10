@@ -68,9 +68,9 @@ export default async function StartPage({
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         <p
           className="rise text-sm"
-          // 12px 글자라 --coral(3.15:1)이 아니라 --coral-deep(4.93:1).
+          // 12px 글자도 --brand(크림 위 8.84:1)면 충분하다.
           style={{
-            color: "var(--coral-deep)",
+            color: "var(--brand)",
             fontWeight: "var(--weight-bold)",
           }}
         >
@@ -119,7 +119,7 @@ export default async function StartPage({
             href="/login"
             className="underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={{
-              color: "var(--coral-deep)",
+              color: "var(--brand)",
               fontWeight: "var(--weight-bold)",
             }}
           >

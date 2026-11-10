@@ -187,7 +187,7 @@ function DeleteDialog({
             style={
               {
                 minHeight: "var(--hit-min)",
-                background: "var(--coral)",
+                background: "var(--brand)",
                 color: "var(--text-on-color)",
                 border: 0,
                 borderRadius: "var(--radius-pill)",

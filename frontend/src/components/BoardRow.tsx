@@ -16,7 +16,7 @@ import { BOARD_LABELS, shownRank } from "@/lib/api/leaderboards";
  * 1~3위 표시. 숫자 뒤의 색 동그라미와 숫자 크기로 가른다.
  *
  * 메달 색을 글자색으로 쓰지 않는다. 금색 글자는 흰 줄에서 2.00:1, 내 줄의
- * 코랄 바탕에서 1.61:1 이라 등수가 읽히지 않는다. 숫자는 잉크로 두고
+ * 옅은 갈색 바탕에서 1.63:1 이라 등수가 읽히지 않는다. 숫자는 잉크로 두고
  * 색은 바탕으로만 쓴다.
  *
  * 크림에서 줄을 두르는 링(ring)을 버렸다. 다크에서는 색 있는 테두리로 상위 셋을 갈랐지만
@@ -53,10 +53,10 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
   const medal = rank === null ? undefined : MEDALS[rank];
   const { unit, scoreUnit } = BOARD_LABELS[kind];
 
-  // 내 줄은 옅은 코랄로 채운다(번들 identity/BoardRow.jsx). 스무 줄이 전부
+  // 내 줄은 옅은 갈색으로 채운다(번들 identity/BoardRow.jsx). 스무 줄이 전부
   // 흰 종이라 채움 하나만 달라도 눈이 바로 찾는다.
   //
-  // 두께도 코랄 계열로 같이 바꾼다. 흰 줄과 같은 잉크 두께를 두면 채움만
+  // 두께도 갈색 계열로 같이 바꾼다. 흰 줄과 같은 잉크 두께를 두면 채움만
   // 뜨고 판은 그대로라 색을 덧칠한 것처럼 보인다.
   const mine = row.is_me;
 
@@ -67,12 +67,14 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
       className="rise flex items-center gap-3 px-3.5 py-3 dv-card sm:gap-4 sm:px-4"
       style={
         {
-          background: mine ? "var(--coral-soft)" : "var(--paper)",
+          background: mine ? "var(--brand-soft)" : "var(--paper)",
           borderRadius: "var(--radius-xl)",
           // 누를 수 없는 줄이라 dv-card-press 를 안 건다. 그래도 두께는
           // --lift 로 넘긴다. .dv-card 가 box-shadow: var(--lift) 를
           // 그리므로 변수를 안 주면 그림자가 사라진다.
-          "--lift": mine ? "0 3px 0 rgb(193 62 34 / 0.25)" : "var(--lift-card)",
+          "--lift": mine
+            ? "0 3px 0 color-mix(in srgb, var(--brand-deep) 25%, transparent)"
+            : "var(--lift-card)",
           // 스무 줄이 동시에 뜨면 화면이 한 번 번쩍인다. 40ms 씩 밀어 위에서
           // 아래로 흐르게 한다. 마지막 줄이 0.8초라 기다린다는 느낌은 없다.
           animationDelay: pinned ? undefined : `${index * 40}ms`,
@@ -119,7 +121,7 @@ export function BoardRowItem({ row, kind, index = 0, pinned = false }: Props) {
           <span
             className="ml-1.5 text-xs"
             style={{
-              color: "var(--coral-soft-text)",
+              color: "var(--brand)",
               fontWeight: "var(--weight-black)",
             }}
           >
