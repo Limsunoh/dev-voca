@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { BrandName } from "@/components/BrandName";
 import { ContactEmail, LegalDoc, type LegalSection } from "@/components/LegalDoc";
 
 export const metadata: Metadata = {
-  title: "계정 삭제 안내 · devvoca",
-  description: "devvoca 계정과 학습 기록을 지우는 방법과, 지워지는 것과 남는 것을 안내합니다.",
+  title: "계정 삭제 안내 · dev-voca",
+  description: "dev-voca 계정과 학습 기록을 지우는 방법과, 지워지는 것과 남는 것을 안내합니다.",
 };
 
 /*
@@ -97,7 +98,7 @@ const SECTIONS: LegalSection[] = [
           </li>
         </ul>
         <p>
-          구글로 가입했다면 devvoca 계정을 지워도 구글 계정과의 연결은 남습니다.
+          구글로 가입했다면 <BrandName /> 계정을 지워도 구글 계정과의 연결은 남습니다.
           구글 계정 설정의 &quot;타사 앱 및 서비스&quot; 에서 해제할 수 있습니다.
         </p>
       </>
@@ -108,10 +109,10 @@ const SECTIONS: LegalSection[] = [
 export default function DeleteAccountPage() {
   return (
     <LegalDoc
-      title="devvoca 계정 삭제 안내"
+      title="dev-voca 계정 삭제 안내"
       intro={
         <p>
-          devvoca 계정과 학습 기록을 지우는 방법입니다. 로그인하지 않아도 이
+          <BrandName /> 계정과 학습 기록을 지우는 방법입니다. 로그인하지 않아도 이
           페이지를 볼 수 있습니다.
         </p>
       }

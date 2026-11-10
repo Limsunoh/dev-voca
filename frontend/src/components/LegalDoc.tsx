@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { BrandName } from "@/components/BrandName";
+
 export type LegalSection = { id: string; title: string; body: ReactNode };
 
 // 가입할 때 저장하는 backend/apps/accounts/models.py 의 TERMS_VERSION 과 같아야
@@ -48,7 +50,11 @@ export function LegalDoc({
         className="inline-flex items-center text-sm"
         style={{ minHeight: "var(--hit-floor)", color: "var(--text-muted)" }}
       >
-        devvoca 홈으로
+        {/* 링크가 flex 라 이름과 " 홈으로" 를 그대로 두면 서로 다른 칸이 되고,
+            칸 맨 앞 공백이 지워져 "dev-voca홈으로" 로 붙는다. 한 칸으로 묶는다. */}
+        <span>
+          <BrandName /> 홈으로
+        </span>
       </Link>
 
       <h1

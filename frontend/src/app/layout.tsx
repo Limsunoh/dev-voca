@@ -35,7 +35,7 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "devvoca",
+  title: "dev-voca",
   description: "개발할 때 마주치는 영어를 익히는 학습 서비스",
 };
 

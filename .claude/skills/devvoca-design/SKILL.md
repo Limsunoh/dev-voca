@@ -37,6 +37,7 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 - **Persuade 에만** `design-taste-frontend` 나 `hallmark` 를 쓴다. 둘을 같은 작업에 함께 부르지 않는다. 둘 다 "대시보드·제품 UI 아님" 쪽이라 다른 화면에 부르면 안 맞는 조언이 나온다.
   - `hallmark audit` 은 읽기만 하니 점검에 써도 된다.
   - `hallmark` 기본 동작이나 `redesign` 은 21개 테마 중 하나를 새로 고르려 든다. 크림·코랄 토큰과 Noto Sans KR 을 그대로 쓰라고 먼저 못박는다.
+- **`/start` 는 로고와 문구를 가운데 정렬한다.** 운영자가 정했다(2026-11-11). design-taste-frontend 의 "첫 화면은 가운데 정렬을 피한다" 의 예외로 둔다. 로고는 폭을 내용 폭까지 쓰고 높이는 화면의 30% 까지다.
 - **Operate·Read·Form 에는** `impeccable` 을 쓴다. `critique`, `layout`, `typeset`, `adapt` 위주.
 - **Play 의 움직임은** 애니메이션 스킬(`animate`, `review-animations`, `emil-design-eng`)을 쓴다. 채점 연출 길이는 `--duration-verdict` 하나에서 읽는다.
 - 팔레트·폰트 후보를 **찾을 때만** `ui-ux-pro-max`. 예: `py ~/.claude/skills/ui-ux-pro-max/scripts/search.py "learning app education vocabulary" --domain color`

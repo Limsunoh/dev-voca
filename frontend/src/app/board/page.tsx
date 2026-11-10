@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { BoardScreen } from "@/app/board/BoardScreen";
 
 export const metadata: Metadata = {
-  title: "순위표 · devvoca",
+  title: "순위표 · dev-voca",
   description: "이번 주 최고점, 전체 최고점, 꾸준함 순위.",
 };
 
