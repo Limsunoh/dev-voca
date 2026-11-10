@@ -233,9 +233,15 @@
   --duration-verdict: 1000ms;
 
   /* ---- 포커스 링 ----
-     크림 바탕 위에서 코랄이 4.5:1 을 넘는다. 다크였을 때 민트를 쓴 것과
-     같은 이유로, 어느 화면에서나 보이는 값 하나로 둔다. */
+     다크였을 때 민트를 쓴 것과 같은 이유로, 어느 화면에서나 보이는 값
+     하나로 둔다. 테두리 기준은 3:1 이고, 코랄은 크림 위 3.15:1, 흰 종이
+     위 3.37:1, --background-deep 위 3.06:1 로 넘는다(여유는 적다). */
   --focus: var(--coral);
+
+  /* 알약 띠(--surface-pill) 안 칸의 포커스 링. 링이 띠 위에 그려지는데
+     코랄은 sand 위에서 2.82:1 이라 기준에 못 미친다. 진한 코랄은 4.41:1.
+     ContentTabs 와 TalkTabRow 가 쓴다. --focus 를 진하게 바꾸면 지운다. */
+  --focus-pill: var(--coral-deep);
 
   /* --focus 를 배경으로 깐 버튼 위의 글자색. 리터럴로 박아두면 --focus 를
      바꿨을 때 이 대비가 따라오지 않고 깨진다. */
@@ -246,6 +252,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-focus: var(--focus);
+  --color-focus-pill: var(--focus-pill);
   --color-focus-on: var(--focus-on);
   --font-sans: var(--font-noto-kr);
   --font-mono: var(--font-jetbrains-mono);
