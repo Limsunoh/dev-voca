@@ -20,6 +20,7 @@ from django.test import TestCase
 from .management.commands.seed_sentences import SENTENCES as BASE_SENTENCES
 from .management.commands.seed_sentences_more import SENTENCES as MORE_SENTENCES
 from .management.commands.seed_words import WORDS as BASE_WORDS
+from .management.commands.seed_words_launch import WORDS as LAUNCH_WORDS
 from .management.commands.seed_words_more import WORDS as MORE_WORDS
 from .models import LearningItem, Sentence, SentenceKind, Word
 
@@ -622,6 +623,8 @@ class PronunciationConsistencyTest(TestCase):
     JUSTIFIED = {
         # 동사 /kəˈmɪt/ 가 명사가 되며 /ˈkɑmɪt/. 기존 "merge commit" 도 같다.
         ("signed commit", "commit"),
+        ("atomic commit", "commit"),
+        ("initial commit", "commit"),
     }
 
     def _strip_stress(self, pron: str) -> str:
@@ -630,12 +633,16 @@ class PronunciationConsistencyTest(TestCase):
         return re.sub(r"[ˈˌ]", "", pron)
 
     def test_phrase_reuses_the_same_spelling_as_the_standalone_word(self):
-        standalone = {
-            row[0].lower(): row[1] for row in BASE_WORDS if row[1]
-        }
+        every = (*BASE_WORDS, *MORE_WORDS, *LAUNCH_WORDS)
+        standalone = {row[0].lower(): row[1] for row in every if row[1]}
+        # 구는 뒤에 더한 묶음만 본다. seed_words 의 구 넷(query string,
+        # media query, merge commit, WIP limit)이 단독 표기와 이미 갈려 있어서
+        # 그쪽을 함께 고치기 전에는 넣을 수 없다. 낱말 수와 발음 조각 수가
+        # 다른 구(SSH key 처럼 약어를 풀어 읽는 것)는 짝을 못 지어 건너뛴다.
+        phrases = (*MORE_WORDS, *LAUNCH_WORDS)
 
         mismatches = []
-        for term, pron, *_ in MORE_WORDS:
+        for term, pron, *_ in phrases:
             if not pron:
                 continue
             parts = term.lower().split()

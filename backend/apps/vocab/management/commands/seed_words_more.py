@@ -391,6 +391,9 @@ WORDS: list[tuple[str, str, str, str, int, str, str, str]] = [
 
 class Command(BaseCommand):
     help = "단어 데이터를 추가로 넣습니다(seed_words 의 뒤를 잇는 묶음)."
+    # 넣는 방식은 묶음마다 같다. seed_words_launch 가 목록과 출처만 바꿔 물려받는다.
+    words: list[tuple[str, str, str, str, int, str, str, str]] = WORDS
+    source = "직접 작성"
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
@@ -406,7 +409,7 @@ class Command(BaseCommand):
         created = 0
         skipped = 0
 
-        for row in WORDS:
+        for row in self.words:
             (
                 term,
                 pronunciation,
@@ -432,8 +435,9 @@ class Command(BaseCommand):
                     description=description,
                     example=example,
                     example_translation=example_translation,
-                    source="직접 작성",
-                    # 사람이 쓴 것은 검수 대기를 안 거친다. seed_words 와 같다.
+                    source=self.source,
+                    # 시드는 검수 대기를 안 거친다. seed_words 와 같다. 근거는 각
+                    # 명령 머리말에 적는다.
                     is_reviewed=True,
                 )
             created += 1
