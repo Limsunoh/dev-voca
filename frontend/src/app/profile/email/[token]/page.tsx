@@ -5,7 +5,7 @@ import { EmailConfirmCard } from "@/components/EmailConfirmCard";
 import { confirmEmailChangeAction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "이메일 변경 확인 · devvoca",
+  title: "이메일 변경 확인 · dev-voca",
 };
 
 /**

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Noto_Sans_KR } from "next/font/google";
 
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TabBar } from "@/components/TabBar";
 import "./globals.css";
 
@@ -35,7 +36,7 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "devvoca",
+  title: "dev-voca",
   description: "개발할 때 마주치는 영어를 익히는 학습 서비스",
 };
 
@@ -71,6 +72,7 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
         {children}
         <TabBar />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

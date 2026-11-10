@@ -29,10 +29,10 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params;
   const word = await getWord(id);
-  if (!word) return { title: "단어를 찾을 수 없습니다 · devvoca" };
+  if (!word) return { title: "단어를 찾을 수 없습니다 · dev-voca" };
 
   return {
-    title: `${word.term} · devvoca`,
+    title: `${word.term} · dev-voca`,
     description: word.meaning,
   };
 }
