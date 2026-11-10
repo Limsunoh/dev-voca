@@ -19,7 +19,10 @@
   color-scheme: light;
 
   /* ---- 바탕과 잉크 ---- */
-  --background: #fff6e9; /* 크림. 화면 바탕 */
+  /* 크림. 화면 바탕. 같은 값이 세 곳에 더 있다 - layout.tsx 와 profile/layout.tsx 의
+     themeColor, 시작 화면 로고 그림(start/logo.webp)의 바탕. 바꾸면 themeColor 둘은
+     같이 고치고, 그림은 바탕을 새 값으로 다시 만든다(안 그러면 네모가 비친다). */
+  --background: #fff6e9;
   --background-deep: #fbf3e4; /* 카드 안 하단 띠, 입력칸 바탕 */
   --foreground: #191512; /* 잉크. 제목·본문 */
   --paper: #ffffff; /* 카드 */

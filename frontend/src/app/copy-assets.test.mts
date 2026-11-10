@@ -5,9 +5,8 @@
  *
  *     마이크 안내   음성이 가는 곳을 한 회사로 단정하지 않는다
  *     한 판 메타    순위표에 오르려면 로그인이 필요하다고 말한다
- *     아이콘        favicon.ico 대신 도형만 쓴 icon.svg. 글꼴과 외부 파일에
- *                   기대지 않아야 어디서든 같게 보인다
- *     안 쓰는 자산  Next 시작 템플릿의 SVG 5개가 다시 생기거나 참조되지 않는다
+ *     안 쓰는 자산  Next 시작 템플릿의 SVG 5개가 다시 생기거나 참조되지 않는다.
+ *                   로고 전 임시 아이콘 icon.svg 도 참조되지 않는다
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -42,41 +41,6 @@ function roundDescription(): string {
   return found[1];
 }
 
-/** XML 주석을 뺀 아이콘 원문. 주석 속 글자로 오탐하지 않게 한다. */
-function iconSource(): string {
-  return read(join(HERE, "icon.svg")).replace(/<!--[\s\S]*?-->/g, "");
-}
-
-type Tag = { name: string; attrs: Record<string, string> };
-
-/** 짝이 맞는 XML 인지 보고 태그 목록을 돌려준다. 노드에 XML 파서가 없어 직접 센다. */
-function parseTags(source: string): Tag[] {
-  const pattern = /<(\/?)([A-Za-z][\w:-]*)((?:\s+[\w:-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>/g;
-  const tags: Tag[] = [];
-  const open: string[] = [];
-  let roots = 0;
-
-  const rest = source.replace(pattern, (_all, closing, name, attrs, selfClosing) => {
-    if (closing) {
-      assert.equal(open.pop(), name, `닫는 태그 ${name} 의 짝이 안 맞는다`);
-      return "";
-    }
-    if (open.length === 0) roots += 1;
-    const parsed: Record<string, string> = {};
-    for (const [, key, double, single] of attrs.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
-      parsed[key] = double ?? single;
-    }
-    tags.push({ name, attrs: parsed });
-    if (!selfClosing) open.push(name);
-    return "";
-  });
-
-  assert.equal(open.length, 0, `안 닫힌 태그: ${open.join(", ")}`);
-  assert.equal(roots, 1, "루트 요소가 하나가 아니다");
-  assert.equal(rest.trim(), "", `태그로 해석되지 않는 글자가 남았다: ${rest.trim()}`);
-  return tags;
-}
-
 function sourceFiles(dir: string): string[] {
   const found: string[] = [];
   for (const name of readdirSync(dir)) {
@@ -107,45 +71,6 @@ describe("한 판 메타 설명", () => {
   });
 });
 
-describe("앱 아이콘", () => {
-  it("favicon.ico 가 없다", () => {
-    assert.equal(existsSync(join(HERE, "favicon.ico")), false);
-  });
-
-  it("icon.svg 가 짝이 맞는 SVG 다", () => {
-    const [root] = parseTags(iconSource());
-    assert.equal(root.name, "svg");
-    assert.equal(root.attrs.xmlns, "http://www.w3.org/2000/svg");
-    const box = (root.attrs.viewBox ?? "").trim().split(/\s+/).map(Number);
-    assert.equal(box.length, 4, "viewBox 가 없거나 네 값이 아니다");
-    assert.ok(box.every(Number.isFinite), "viewBox 가 숫자가 아니다");
-    assert.ok(box[2] > 0 && box[3] > 0, "viewBox 크기가 0 이다");
-  });
-
-  it("글꼴에 기대는 요소가 없다", () => {
-    const tags = parseTags(iconSource());
-    for (const tag of tags) {
-      assert.doesNotMatch(tag.name, /^(text|tspan|textPath|foreignObject|style)$/i);
-      assert.equal(tag.attrs["font-family"], undefined, "font-family 가 있다");
-    }
-  });
-
-  it("외부를 참조하지 않는다", () => {
-    const tags = parseTags(iconSource());
-    for (const tag of tags) {
-      assert.doesNotMatch(tag.name, /^(image|script|a)$/i);
-      for (const [key, value] of Object.entries(tag.attrs)) {
-        if (key === "href" || key === "xlink:href") {
-          assert.match(value, /^#/, `외부 참조: ${value}`);
-        }
-        if (key !== "xmlns") {
-          assert.doesNotMatch(value, /https?:|\/\/|url\(\s*(?!#)/, `외부 참조: ${key}=${value}`);
-        }
-      }
-    }
-  });
-});
-
 describe("지운 자산", () => {
   for (const name of REMOVED_SVGS) {
     it(`public/${name} 가 없다`, () => {
@@ -154,8 +79,9 @@ describe("지운 자산", () => {
   }
 
   it("src 어디서도 지운 파일을 참조하지 않는다", () => {
-    const pattern = /(?<![\w-])(?:file|globe|next|vercel|window)\.svg\b|favicon\.ico/;
-    const files = sourceFiles(SRC).filter((path) => path !== THIS_FILE);
+    const pattern = /(?<![\w-])(?:file|globe|next|vercel|window|icon)\.svg\b|favicon\.ico/;
+    // 테스트 파일은 "없어야 한다" 를 확인하려고 지운 이름을 일부러 적는다.
+    const files = sourceFiles(SRC).filter((path) => !/\.test\.m?ts$/.test(path));
     assert.ok(files.length > 100, `훑은 파일이 너무 적다: ${files.length}`);
 
     const offenders = files.filter((path) => pattern.test(read(path)));
