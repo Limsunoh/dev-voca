@@ -10,15 +10,26 @@ generate_readings 와 짝이다. 저쪽은 Claude API 로 만들고 이쪽은 �
 직접 적었을 때 쓴다 - API 키 없이도 채울 수 있고, 규칙을 만든 쪽이 적으므로
 일관성이 높다.
 
-파일 형식은 `[{"pk": 1, "reading": "**캐**sh", "note": "..."}]`.
+파일 형식은 단어 `[{"term": "cache", "reading": "**캐**sh", "note": "..."}]`,
+문장 `[{"slug": "review-rebase-request", "reading": "..."}]`.
 
-pk 로 짝을 맞춘다. 단어로 맞추면 같은 철자가 둘 있을 때 엉뚱한 곳에
-들어가고, 순서로 맞추면 하나만 빠져도 그 뒤가 전부 밀린다.
+단어는 이름(term), 문장은 시드 키(slug)로 짝을 맞춘다. 둘 다 DB 가 겹치지 않게
+막는다. 문장 본문(text)은 겹칠 수 있어 키로 못 쓴다.
+
+pk 로 맞추면 DB 를 비우고 시드를 다시 넣을 때 순서가 달라 번호가 밀린다. 2026-11
+운영 DB 는 문장 200번이 로컬과 다른 문장이어서, 그대로 부으면 엉뚱한 문장에 발음이
+붙을 뻔했다. 순서로 맞추면 하나만 빠져도 그 뒤가 전부 밀린다.
+
+손으로 만든 작은 파일은 예전처럼 `{"pk": 1, ...}` 로도 적을 수 있다. Admin 에서
+넣은 문장은 slug 가 비어 있어 pk 로만 찾는다. 이름 칸이 있으면 그것만 보고 pk 는
+보지 않는다. 다른 종류의 이름 칸(단어를 넣는데 slug)이 있는 줄도 pk 로 넘어가지
+않는다. --kind 를 빠뜨린 것이라 넘어가면 같은 번호의 다른 행에 붙는다.
 """
 
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError, CommandParser
@@ -86,9 +97,7 @@ class Command(BaseCommand):
             )
             return
 
-        self.stdout.write(
-            self.style.SUCCESS(f"{filled}개 채웠습니다. ({skipped}개 건너뜀)")
-        )
+        self.stdout.write(self.style.SUCCESS(f"{filled}개 채웠습니다. ({skipped}개 건너뜀)"))
         if not filled:
             return
 
@@ -127,17 +136,50 @@ class Command(BaseCommand):
             problems.append(f"항목 {broken}개가 객체가 아니라 건너뜁니다.")
             skipped += broken
 
-        # pk 를 한 번에 끌어와 항목마다 쿼리하지 않는다.
+        # 짝을 맞출 이름 칸. 모듈 머리말 참고. 다른 종류의 이름 칸이 있는 줄은
+        # --kind 를 잘못 준 것이다. pk 로 넘어가면 단어 발음이 같은 번호의
+        # 문장에 붙으므로 찾지 않는다.
+        key = "term" if model is Word else "slug"
+        other = "slug" if key == "term" else "term"
+
+        # 파일 안에서 같은 이름이 둘 이상이면 그 이름은 전부 건너뛴다. 하나를
+        # 고르면 --reviewed 를 붙였는지에 따라 앞 줄이 남기도 하고 뒤 줄이
+        # 남기도 한다. generate_readings 의 같은 이름 처리와 같다.
+        counts = Counter(r[key] for r in usable if isinstance(r.get(key), str))
+        repeated = {name for name, n in counts.items() if n > 1}
+
+        # 한 번에 끌어와 항목마다 쿼리하지 않는다.
         #
         # isinstance 가 아니라 type() 을 쓰는 이유: 파이썬에서 bool 은 int 의
         # 하위라 isinstance(True, int) 가 참이고, dict 에서도 True 가 1 과
         # 같은 자리를 집는다. 그대로 두면 {"pk": true} 가 pk=1 인 단어에
         # 엉뚱한 발음을 심고, 에러도 경고도 안 뜬다.
-        wanted = [r["pk"] for r in usable if type(r.get("pk")) is int]
-        found = {o.pk: o for o in model.objects.filter(pk__in=wanted)}
+        names = [r[key] for r in usable if isinstance(r.get(key), str) and r[key]]
+        by_name = {getattr(o, key): o for o in model.objects.filter(**{f"{key}__in": names})}
+        wanted = [
+            r["pk"] for r in usable if key not in r and other not in r and type(r.get("pk")) is int
+        ]
+        by_pk = {o.pk: o for o in model.objects.filter(pk__in=wanted)}
 
         for row in usable:
-            pk = row.get("pk")
+            if key in row:
+                name = row[key]
+                label = f"{key}={name}"
+                if isinstance(name, str) and name in repeated:
+                    problems.append(f"{label} 가 파일에 두 번 이상 있습니다. 건너뜁니다.")
+                    skipped += 1
+                    continue
+                obj = by_name.get(name) if isinstance(name, str) and name else None
+            elif other in row:
+                problems.append(
+                    f"{other}={row[other]} 는 다른 종류의 줄입니다. --kind 를 확인하세요."
+                )
+                skipped += 1
+                continue
+            else:
+                pk = row.get("pk")
+                label = f"pk={pk}"
+                obj = by_pk.get(pk) if type(pk) is int else None
             # 문자열이 아닌 값은 .strip() 에서 죽는다. 숫자·배열·객체가
             # 전부 truthy 라 `or ""` 로는 못 막는다.
             raw = row.get("reading")
@@ -145,9 +187,8 @@ class Command(BaseCommand):
             raw_note = row.get("note")
             note = raw_note.strip() if isinstance(raw_note, str) else ""
 
-            obj = found.get(pk) if type(pk) is int else None
             if obj is None:
-                problems.append(f"pk={pk} 를 찾지 못했습니다.")
+                problems.append(f"{label} 를 찾지 못했습니다.")
                 skipped += 1
                 continue
 
@@ -158,7 +199,7 @@ class Command(BaseCommand):
                 continue
 
             if obj.reading_reviewed:
-                problems.append(f"pk={pk} 는 이미 검수됐습니다. 건너뜁니다.")
+                problems.append(f"{label} 는 이미 검수됐습니다. 건너뜁니다.")
                 skipped += 1
                 continue
 
@@ -166,7 +207,7 @@ class Command(BaseCommand):
             # 강제 여부가 달라 결과가 갈린다. Sentence.reading 은 TextField 라
             # 상한이 없다(READING_MAX 는 Word 것).
             if isinstance(obj, Word) and len(text) > READING_MAX:
-                problems.append(f"pk={pk} 발음이 {READING_MAX}자를 넘습니다.")
+                problems.append(f"{label} 발음이 {READING_MAX}자를 넘습니다.")
                 skipped += 1
                 continue
 
@@ -188,7 +229,7 @@ class Command(BaseCommand):
                     obj.save(update_fields=fields)
                 filled += 1
             except DatabaseError as exc:
-                problems.append(f"pk={pk} 저장 실패: {exc}")
+                problems.append(f"{label} 저장 실패: {exc}")
                 skipped += 1
 
         return filled, skipped, problems

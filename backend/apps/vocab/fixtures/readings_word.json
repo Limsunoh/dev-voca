@@ -1,2266 +1,2266 @@
 [
  {
-  "pk": 1,
+  "term": "commit",
   "reading": "커**믿**"
  },
  {
-  "pk": 2,
+  "term": "merge",
   "reading": "**멀j**"
  },
  {
-  "pk": 3,
+  "term": "rebase",
   "reading": "리**베이s**"
  },
  {
-  "pk": 4,
+  "term": "stash",
   "reading": "s**때**sh"
  },
  {
-  "pk": 5,
+  "term": "revert",
   "reading": "리**v얼t**"
  },
  {
-  "pk": 6,
+  "term": "squash",
   "reading": "s**꽈**sh"
  },
  {
-  "pk": 7,
+  "term": "refactor",
   "reading": "리**f액**털r"
  },
  {
-  "pk": 8,
+  "term": "deprecated",
   "reading": "**데**프러케이딛"
  },
  {
-  "pk": 9,
+  "term": "edge case",
   "reading": "**엗j** 케이s"
  },
  {
-  "pk": 10,
+  "term": "trade-off",
   "reading": "**트뤠읻** 어f"
  },
  {
-  "pk": 11,
+  "term": "boilerplate",
   "reading": "**보일**럴플레읻"
  },
  {
-  "pk": 12,
+  "term": "endpoint",
   "reading": "**엔드**포인t"
  },
  {
-  "pk": 13,
+  "term": "payload",
   "reading": "**페이**로욷"
  },
  {
-  "pk": 14,
+  "term": "idempotent",
   "reading": "아이**뎀**퍼턴t"
  },
  {
-  "pk": 15,
+  "term": "throttle",
   "reading": "**th롸**들"
  },
  {
-  "pk": 16,
+  "term": "pagination",
   "reading": "패저**네이**sh언"
  },
  {
-  "pk": 17,
+  "term": "serialize",
   "reading": "**씨**리얼라이z"
  },
  {
-  "pk": 18,
+  "term": "migration",
   "reading": "마이**그뤠이**sh언"
  },
  {
-  "pk": 19,
+  "term": "constraint",
   "reading": "컨s**트뤠인t**"
  },
  {
-  "pk": 20,
+  "term": "index",
   "reading": "**인**덱s"
  },
  {
-  "pk": 21,
+  "term": "rollback",
   "reading": "**로울**백"
  },
  {
-  "pk": 22,
+  "term": "query",
   "reading": "**퀘**리"
  },
  {
-  "pk": 23,
+  "term": "deploy",
   "reading": "드**플로이**"
  },
  {
-  "pk": 24,
+  "term": "rollout",
   "reading": "**로울**라욷"
  },
  {
-  "pk": 25,
+  "term": "environment variable",
   "reading": "인**v아이**런먼t **v에**리어블"
  },
  {
-  "pk": 26,
+  "term": "downtime",
   "reading": "**다운**타임"
  },
  {
-  "pk": 27,
+  "term": "fallback",
   "reading": "**f올**백"
  },
  {
-  "pk": 28,
+  "term": "stack trace",
   "reading": "s**땍** 트뤠이s"
  },
  {
-  "pk": 29,
+  "term": "reproduce",
   "reading": "리프러**두s**"
  },
  {
-  "pk": 30,
+  "term": "race condition",
   "reading": "**뤠이s** 컨디sh언"
  },
  {
-  "pk": 31,
+  "term": "regression",
   "reading": "리**그뤠**sh언"
  },
  {
-  "pk": 32,
+  "term": "branch",
   "reading": "b**뢘**ch"
  },
  {
-  "pk": 33,
+  "term": "checkout",
   "reading": "**ch엑**아욷"
  },
  {
-  "pk": 34,
+  "term": "switch",
   "reading": "s**윋**ch"
  },
  {
-  "pk": 35,
+  "term": "clone",
   "reading": "k**로운**"
  },
  {
-  "pk": 36,
+  "term": "fork",
   "reading": "**f올k**"
  },
  {
-  "pk": 37,
+  "term": "pull request",
   "reading": "**뿔** 리퀘s트"
  },
  {
-  "pk": 38,
+  "term": "cherry-pick",
   "reading": "**ch에**리 픽"
  },
  {
-  "pk": 39,
+  "term": "bisect",
   "reading": "바이**쎅t**"
  },
  {
-  "pk": 40,
+  "term": "worktree",
   "reading": "**월k** 트리"
  },
  {
-  "pk": 41,
+  "term": "remote",
   "reading": "리**모욷**"
  },
  {
-  "pk": 42,
+  "term": "origin",
   "reading": "**오**리진"
  },
  {
-  "pk": 43,
+  "term": "upstream",
   "reading": "**업**s트림"
  },
  {
-  "pk": 44,
+  "term": "fetch",
   "reading": "**f에**ch"
  },
  {
-  "pk": 45,
+  "term": "pull",
   "reading": "**뿔**"
  },
  {
-  "pk": 46,
+  "term": "push",
   "reading": "**뿌**sh"
  },
  {
-  "pk": 47,
+  "term": "force push",
   "reading": "**f올s** 뿌sh"
  },
  {
-  "pk": 48,
+  "term": "HEAD",
   "reading": "**헫**"
  },
  {
-  "pk": 49,
+  "term": "detached HEAD",
   "reading": "디**택t** 헫"
  },
  {
-  "pk": 50,
+  "term": "staging area",
   "reading": "s**떼이**징 에리어"
  },
  {
-  "pk": 51,
+  "term": "working tree",
   "reading": "**월**킹 트리"
  },
  {
-  "pk": 52,
+  "term": "untracked",
   "reading": "언t**뢕t**"
  },
  {
-  "pk": 53,
+  "term": "gitignore",
   "reading": "**긷** 이그노r"
  },
  {
-  "pk": 54,
+  "term": "diff",
   "reading": "**딮**"
  },
  {
-  "pk": 55,
+  "term": "patch",
   "reading": "**패**ch"
  },
  {
-  "pk": 56,
+  "term": "blame",
   "reading": "b**레임**"
  },
  {
-  "pk": 57,
+  "term": "tag",
   "reading": "**택**"
  },
  {
-  "pk": 58,
+  "term": "submodule",
   "reading": "**썹**마줄"
  },
  {
-  "pk": 59,
+  "term": "conflict",
   "reading": "**칸**f릭t"
  },
  {
-  "pk": 60,
+  "term": "fast-forward",
   "reading": "**f애**s트 **f올**월r드"
  },
  {
-  "pk": 61,
+  "term": "amend",
   "reading": "어**멘드**"
  },
  {
-  "pk": 62,
+  "term": "reset",
   "reading": "리**쎋**"
  },
  {
-  "pk": 63,
+  "term": "reflog",
   "reading": "**뤠f**로그"
  },
  {
-  "pk": 64,
+  "term": "hook",
   "reading": "**훅**"
  },
  {
-  "pk": 65,
+  "term": "prune",
   "reading": "p**룬**"
  },
  {
-  "pk": 66,
+  "term": "shallow clone",
   "reading": "**sh애**로우 k로운"
  },
  {
-  "pk": 67,
+  "term": "tracking branch",
   "reading": "t**뢕**킹 b뢘ch"
  },
  {
-  "pk": 68,
+  "term": "merge commit",
   "reading": "**멀j** 카믿"
  },
  {
-  "pk": 69,
+  "term": "monorepo",
   "reading": "**마**노우리포우"
  },
  {
-  "pk": 70,
+  "term": "changelog",
   "reading": "**ch에인j**로그"
  },
  {
-  "pk": 71,
+  "term": "semantic versioning",
   "reading": "씨**맨**틱 **v얼**저닝"
  },
  {
-  "pk": 72,
+  "term": "release",
   "reading": "릴**리s**"
  },
  {
-  "pk": 73,
+  "term": "hotfix",
   "reading": "**핱**f익s"
  },
  {
-  "pk": 74,
+  "term": "restore",
   "reading": "리s**또r**"
  },
  {
-  "pk": 75,
+  "term": "commit message",
   "reading": "커**믿** 메씨j"
  },
  {
-  "pk": 76,
+  "term": "history rewrite",
   "reading": "**히**s터리 리라읻"
  },
  {
-  "pk": 77,
+  "term": "nit",
   "reading": "**닡**"
  },
  {
-  "pk": 78,
+  "term": "LGTM",
   "reading": "엘 지 티 **엠**"
  },
  {
-  "pk": 79,
+  "term": "blocking comment",
   "reading": "b**락**킹 카멘t"
  },
  {
-  "pk": 80,
+  "term": "request changes",
   "reading": "리**퀘s트** ch에인지z"
  },
  {
-  "pk": 81,
+  "term": "approve",
   "reading": "어p**루v**"
  },
  {
-  "pk": 82,
+  "term": "coupling",
   "reading": "**커**플링"
  },
  {
-  "pk": 83,
+  "term": "cohesion",
   "reading": "코우**히**전"
  },
  {
-  "pk": 84,
+  "term": "technical debt",
   "reading": "**텍**니클 뎉"
  },
  {
-  "pk": 85,
+  "term": "code smell",
   "reading": "**코욷** s멜"
  },
  {
-  "pk": 86,
+  "term": "standup",
   "reading": "s**땐**덥"
  },
  {
-  "pk": 87,
+  "term": "sprint",
   "reading": "s프**린t**"
  },
  {
-  "pk": 88,
+  "term": "backlog",
   "reading": "**백**로그"
  },
  {
-  "pk": 89,
+  "term": "retrospective",
   "reading": "뤠트러s**펙**티v"
  },
  {
-  "pk": 90,
+  "term": "on-call",
   "reading": "**안** 콜"
  },
  {
-  "pk": 91,
+  "term": "postmortem",
   "reading": "포우s트**모r**텀"
  },
  {
-  "pk": 92,
+  "term": "blameless",
   "reading": "b**레임**러s"
  },
  {
-  "pk": 93,
+  "term": "ticket",
   "reading": "**티**킽"
  },
  {
-  "pk": 94,
+  "term": "scope creep",
   "reading": "s**꼬웊** k맆"
  },
  {
-  "pk": 95,
+  "term": "out of scope",
   "reading": "아욷 어v s**꼬웊**"
  },
  {
-  "pk": 96,
+  "term": "follow-up",
   "reading": "**f알**로우 업"
  },
  {
-  "pk": 97,
+  "term": "blocker",
   "reading": "b**락**컬r"
  },
  {
-  "pk": 98,
+  "term": "WIP",
   "reading": "더블유 아이 **피**"
  },
  {
-  "pk": 99,
+  "term": "ETA",
   "reading": "이 티 **에이**"
  },
  {
-  "pk": 100,
+  "term": "bikeshedding",
   "reading": "**바이k**sh에딩"
  },
  {
-  "pk": 101,
+  "term": "rubber duck",
   "reading": "**뤄**벌r 덕"
  },
  {
-  "pk": 102,
+  "term": "pair programming",
   "reading": "**페어r** 프로우그래밍"
  },
  {
-  "pk": 103,
+  "term": "onboarding",
   "reading": "**안**보r딩"
  },
  {
-  "pk": 104,
+  "term": "handoff",
   "reading": "**핸드**어f"
  },
  {
-  "pk": 105,
+  "term": "stakeholder",
   "reading": "s**떼익**호울덜r"
  },
  {
-  "pk": 106,
+  "term": "action item",
   "reading": "**액**sh언 아이텀"
  },
  {
-  "pk": 107,
+  "term": "spec",
   "reading": "s**펙**"
  },
  {
-  "pk": 108,
+  "term": "design doc",
   "reading": "디**z아인** 닥"
  },
  {
-  "pk": 109,
+  "term": "RFC",
   "reading": "아r 에f **씨**"
  },
  {
-  "pk": 110,
+  "term": "MVP",
   "reading": "엠 v이 **피**"
  },
  {
-  "pk": 111,
+  "term": "dogfooding",
   "reading": "**도그**f우딩"
  },
  {
-  "pk": 112,
+  "term": "definition of done",
   "reading": "데f이**니**sh언 어v 던"
  },
  {
-  "pk": 113,
+  "term": "story point",
   "reading": "s**또**리 포인t"
  },
  {
-  "pk": 114,
+  "term": "velocity",
   "reading": "v어**라**써티"
  },
  {
-  "pk": 115,
+  "term": "code freeze",
   "reading": "**코욷** f리z"
  },
  {
-  "pk": 116,
+  "term": "kickoff",
   "reading": "**킥**어f"
  },
  {
-  "pk": 117,
+  "term": "readability",
   "reading": "리더**빌**러티"
  },
  {
-  "pk": 118,
+  "term": "maintainability",
   "reading": "메인테이너**빌**러티"
  },
  {
-  "pk": 119,
+  "term": "legacy code",
   "reading": "**레**거씨 코욷"
  },
  {
-  "pk": 120,
+  "term": "premature optimization",
   "reading": "프리머**추r** 압티머**z에이**sh언"
  },
  {
-  "pk": 121,
+  "term": "DRY",
   "reading": "d**롸이**"
  },
  {
-  "pk": 122,
+  "term": "YAGNI",
   "reading": "**야**그니"
  },
  {
-  "pk": 123,
+  "term": "status code",
   "reading": "s**떼이**터s 코욷"
  },
  {
-  "pk": 124,
+  "term": "header",
   "reading": "**헤**덜r"
  },
  {
-  "pk": 125,
+  "term": "cookie",
   "reading": "**쿠**키"
  },
  {
-  "pk": 126,
+  "term": "CORS",
   "reading": "**코r z**"
  },
  {
-  "pk": 127,
+  "term": "preflight",
   "reading": "p**리**f라읻"
  },
  {
-  "pk": 128,
+  "term": "token",
   "reading": "**토우**컨"
  },
  {
-  "pk": 129,
+  "term": "bearer",
   "reading": "**베**럴r"
  },
  {
-  "pk": 130,
+  "term": "JWT",
   "reading": "**잗**"
  },
  {
-  "pk": 131,
+  "term": "OAuth",
   "reading": "**오우**어th"
  },
  {
-  "pk": 132,
+  "term": "refresh token",
   "reading": "리f**뤠**sh 토우컨"
  },
  {
-  "pk": 133,
+  "term": "session",
   "reading": "**쎄**sh언"
  },
  {
-  "pk": 134,
+  "term": "REST",
   "reading": "**뤠s트**"
  },
  {
-  "pk": 135,
+  "term": "GraphQL",
   "reading": "g**뢔f** 큐 엘"
  },
  {
-  "pk": 136,
+  "term": "rate limit",
   "reading": "**뤠읻** 리밑"
  },
  {
-  "pk": 137,
+  "term": "backoff",
   "reading": "**백**어f"
  },
  {
-  "pk": 138,
+  "term": "retry",
   "reading": "**리**트롸이"
  },
  {
-  "pk": 139,
+  "term": "timeout",
   "reading": "**타임**아욷"
  },
  {
-  "pk": 140,
+  "term": "circuit breaker",
   "reading": "**썰**킽 브뤠이컬r"
  },
  {
-  "pk": 141,
+  "term": "webhook",
   "reading": "**웹**훅"
  },
  {
-  "pk": 142,
+  "term": "polling",
   "reading": "**포울**링"
  },
  {
-  "pk": 143,
+  "term": "WebSocket",
   "reading": "**웹**싸킽"
  },
  {
-  "pk": 144,
+  "term": "endpoint versioning",
   "reading": "**엔드**포인t v얼저닝"
  },
  {
-  "pk": 145,
+  "term": "breaking change",
   "reading": "b**뤠이**킹 ch에인j"
  },
  {
-  "pk": 146,
+  "term": "payload size",
   "reading": "**페이**로욷 싸이z"
  },
  {
-  "pk": 147,
+  "term": "content type",
   "reading": "**칸**텐t 타잎"
  },
  {
-  "pk": 148,
+  "term": "query string",
   "reading": "**퀴**리 s트링"
  },
  {
-  "pk": 149,
+  "term": "path parameter",
   "reading": "**패th** 퍼래미털r"
  },
  {
-  "pk": 150,
+  "term": "request body",
   "reading": "리**퀘s트** 바디"
  },
  {
-  "pk": 151,
+  "term": "gateway",
   "reading": "**게읻**웨이"
  },
  {
-  "pk": 152,
+  "term": "TLS",
   "reading": "티 엘 **에s**"
  },
  {
-  "pk": 153,
+  "term": "certificate",
   "reading": "썰**티**f이컽"
  },
  {
-  "pk": 154,
+  "term": "API key",
   "reading": "에이 피 **아이** 키"
  },
  {
-  "pk": 155,
+  "term": "scope",
   "reading": "s**꼬웊**"
  },
  {
-  "pk": 156,
+  "term": "CSRF",
   "reading": "씨 에s 아r **에f**"
  },
  {
-  "pk": 157,
+  "term": "redirect",
   "reading": "리더**뤡t**"
  },
  {
-  "pk": 158,
+  "term": "cache",
   "reading": "**캐**sh"
  },
  {
-  "pk": 159,
+  "term": "ETag",
   "reading": "**이**택"
  },
  {
-  "pk": 160,
+  "term": "stateless",
   "reading": "s**떼읻**러s"
  },
  {
-  "pk": 161,
+  "term": "cursor",
   "reading": "**컬**썰r"
  },
  {
-  "pk": 162,
+  "term": "429",
   "reading": "f오r 투 **나인**"
  },
  {
-  "pk": 163,
+  "term": "401",
   "reading": "f오r 오우 **원**"
  },
  {
-  "pk": 164,
+  "term": "403",
   "reading": "f오r 오우 **th리**"
  },
  {
-  "pk": 165,
+  "term": "502",
   "reading": "f아이v 오우 **투**"
  },
  {
-  "pk": 166,
+  "term": "504",
   "reading": "f아이v 오우 **f오r**"
  },
  {
-  "pk": 167,
+  "term": "content negotiation",
   "reading": "**칸**텐t 니고우sh이**에이**sh언"
  },
  {
-  "pk": 168,
+  "term": "OpenAPI",
   "reading": "**오우**픈 에이 피 아이"
  },
  {
-  "pk": 169,
+  "term": "schema",
   "reading": "s**끼**머"
  },
  {
-  "pk": 170,
+  "term": "primary key",
   "reading": "p**롸이**메리 키"
  },
  {
-  "pk": 171,
+  "term": "foreign key",
   "reading": "**f오**런 키"
  },
  {
-  "pk": 172,
+  "term": "join",
   "reading": "**조인**"
  },
  {
-  "pk": 173,
+  "term": "left join",
   "reading": "**레f트** 조인"
  },
  {
-  "pk": 174,
+  "term": "normalization",
   "reading": "노r멀러**z에이**sh언"
  },
  {
-  "pk": 175,
+  "term": "denormalization",
   "reading": "디노r멀러**z에이**sh언"
  },
  {
-  "pk": 176,
+  "term": "N+1",
   "reading": "엔 플러s **원**"
  },
  {
-  "pk": 177,
+  "term": "explain",
   "reading": "익s프**레인**"
  },
  {
-  "pk": 178,
+  "term": "full scan",
   "reading": "**f울** s깬"
  },
  {
-  "pk": 179,
+  "term": "connection pool",
   "reading": "커**넥**sh언 뿔"
  },
  {
-  "pk": 180,
+  "term": "transaction",
   "reading": "트뢘**z액**sh언"
  },
  {
-  "pk": 181,
+  "term": "isolation level",
   "reading": "아이써**레이**sh언 레v을"
  },
  {
-  "pk": 182,
+  "term": "dirty read",
   "reading": "**덜**티 맀"
  },
  {
-  "pk": 183,
+  "term": "deadlock",
   "reading": "**뎓**락"
  },
  {
-  "pk": 184,
+  "term": "ACID",
   "reading": "**애**씯"
  },
  {
-  "pk": 185,
+  "term": "lock",
   "reading": "**락**"
  },
  {
-  "pk": 186,
+  "term": "optimistic locking",
   "reading": "압티**미s**틱 라킹"
  },
  {
-  "pk": 187,
+  "term": "replication",
   "reading": "뤠플리**케이**sh언"
  },
  {
-  "pk": 188,
+  "term": "replica",
   "reading": "**뤠**플리커"
  },
  {
-  "pk": 189,
+  "term": "sharding",
   "reading": "**sh아r**딩"
  },
  {
-  "pk": 190,
+  "term": "partition",
   "reading": "파r**티**sh언"
  },
  {
-  "pk": 191,
+  "term": "cascade",
   "reading": "캐s**께읻**"
  },
  {
-  "pk": 192,
+  "term": "null",
   "reading": "**널**"
  },
  {
-  "pk": 193,
+  "term": "unique",
   "reading": "유**닠**"
  },
  {
-  "pk": 194,
+  "term": "group by",
   "reading": "g**룹** 바이"
  },
  {
-  "pk": 195,
+  "term": "having",
   "reading": "**해**v잉"
  },
  {
-  "pk": 196,
+  "term": "subquery",
   "reading": "**썹**퀴리"
  },
  {
-  "pk": 197,
+  "term": "view",
   "reading": "**v유**"
  },
  {
-  "pk": 198,
+  "term": "materialized view",
   "reading": "머**티**리얼라이z드 v유"
  },
  {
-  "pk": 199,
+  "term": "stored procedure",
   "reading": "s**또r드** 프러**씨**절r"
  },
  {
-  "pk": 200,
+  "term": "trigger",
   "reading": "t**뤼**걸r"
  },
  {
-  "pk": 201,
+  "term": "ORM",
   "reading": "오우 아r **엠**"
  },
  {
-  "pk": 202,
+  "term": "lazy loading",
   "reading": "**레이**지 로우딩"
  },
  {
-  "pk": 203,
+  "term": "eager loading",
   "reading": "**이**걸r 로우딩"
  },
  {
-  "pk": 204,
+  "term": "upsert",
   "reading": "**업**썰t"
  },
  {
-  "pk": 205,
+  "term": "soft delete",
   "reading": "**쏘f트** 딜맀"
  },
  {
-  "pk": 206,
+  "term": "dump",
   "reading": "**덤p**"
  },
  {
-  "pk": 207,
+  "term": "seed",
   "reading": "**앁**"
  },
  {
-  "pk": 208,
+  "term": "cardinality",
   "reading": "카r디**낼**러티"
  },
  {
-  "pk": 209,
+  "term": "collation",
   "reading": "커**레이**sh언"
  },
  {
-  "pk": 210,
+  "term": "auto increment",
   "reading": "**오**토우 잉크러먼t"
  },
  {
-  "pk": 211,
+  "term": "NoSQL",
   "reading": "노우 **씨**퀄"
  },
  {
-  "pk": 212,
+  "term": "eventual consistency",
   "reading": "이**v엔**추얼 컨**씨**s턴씨"
  },
  {
-  "pk": 213,
+  "term": "image",
   "reading": "**이**미j"
  },
  {
-  "pk": 214,
+  "term": "container",
   "reading": "컨**테이**널r"
  },
  {
-  "pk": 215,
+  "term": "volume",
   "reading": "**v알**륨"
  },
  {
-  "pk": 216,
+  "term": "registry",
   "reading": "**뤠**지s트리"
  },
  {
-  "pk": 217,
+  "term": "orchestration",
   "reading": "오r키s**트뤠이**sh언"
  },
  {
-  "pk": 218,
+  "term": "cluster",
   "reading": "k**러**s털r"
  },
  {
-  "pk": 219,
+  "term": "node",
   "reading": "**노욷**"
  },
  {
-  "pk": 220,
+  "term": "pipeline",
   "reading": "**파이p**라인"
  },
  {
-  "pk": 221,
+  "term": "artifact",
   "reading": "**아r**티f액t"
  },
  {
-  "pk": 222,
+  "term": "staging",
   "reading": "s**떼이**징"
  },
  {
-  "pk": 223,
+  "term": "production",
   "reading": "프러**덕**sh언"
  },
  {
-  "pk": 224,
+  "term": "backward compatible",
   "reading": "**백**월r드 컴**패**터블"
  },
  {
-  "pk": 225,
+  "term": "blue-green",
   "reading": "블루 g**린**"
  },
  {
-  "pk": 226,
+  "term": "canary",
   "reading": "커**네**리"
  },
  {
-  "pk": 227,
+  "term": "rolling update",
   "reading": "**로울**링 업데읻"
  },
  {
-  "pk": 228,
+  "term": "health check",
   "reading": "**헬th** ch엑"
  },
  {
-  "pk": 229,
+  "term": "graceful shutdown",
   "reading": "g**뤠이s**f을 sh엍다운"
  },
  {
-  "pk": 230,
+  "term": "zero downtime",
   "reading": "**z이**로우 다운타임"
  },
  {
-  "pk": 231,
+  "term": "feature flag",
   "reading": "**f이**철r f랙"
  },
  {
-  "pk": 232,
+  "term": "load balancer",
   "reading": "**로욷** 밸런썰r"
  },
  {
-  "pk": 233,
+  "term": "reverse proxy",
   "reading": "리**v얼s** p락씨"
  },
  {
-  "pk": 234,
+  "term": "CDN",
   "reading": "씨 디 **엔**"
  },
  {
-  "pk": 235,
+  "term": "metric",
   "reading": "**메**트릭"
  },
  {
-  "pk": 236,
+  "term": "tracing",
   "reading": "t**뤠이**씽"
  },
  {
-  "pk": 237,
+  "term": "observability",
   "reading": "업z얼v어**빌**러티"
  },
  {
-  "pk": 238,
+  "term": "alert",
   "reading": "얼**럴t**"
  },
  {
-  "pk": 239,
+  "term": "SLA",
   "reading": "에s 엘 **에이**"
  },
  {
-  "pk": 240,
+  "term": "SLO",
   "reading": "에s 엘 **오우**"
  },
  {
-  "pk": 241,
+  "term": "uptime",
   "reading": "**업**타임"
  },
  {
-  "pk": 242,
+  "term": "incident",
   "reading": "**인**씨던t"
  },
  {
-  "pk": 243,
+  "term": "runbook",
   "reading": "**뤈**북"
  },
  {
-  "pk": 244,
+  "term": "latency",
   "reading": "**레읻**은씨"
  },
  {
-  "pk": 245,
+  "term": "throughput",
   "reading": "**th루**뿥"
  },
  {
-  "pk": 246,
+  "term": "bottleneck",
   "reading": "**바**틀넥"
  },
  {
-  "pk": 247,
+  "term": "autoscaling",
   "reading": "**오**토우s께일링"
  },
  {
-  "pk": 248,
+  "term": "horizontal scaling",
   "reading": "호리**z안**털 s께일링"
  },
  {
-  "pk": 249,
+  "term": "vertical scaling",
   "reading": "**v얼**티클 s께일링"
  },
  {
-  "pk": 250,
+  "term": "provisioning",
   "reading": "프러**v이**저닝"
  },
  {
-  "pk": 251,
+  "term": "infrastructure as code",
   "reading": "**인**f러s트럭철r 어z 코욷"
  },
  {
-  "pk": 252,
+  "term": "secret",
   "reading": "**씨**크맅"
  },
  {
-  "pk": 253,
+  "term": "cron",
   "reading": "k**롼**"
  },
  {
-  "pk": 254,
+  "term": "worker",
   "reading": "**월**컬r"
  },
  {
-  "pk": 255,
+  "term": "quota",
   "reading": "k**워우**터"
  },
  {
-  "pk": 256,
+  "term": "retention",
   "reading": "리**텐**sh언"
  },
  {
-  "pk": 257,
+  "term": "smoke test",
   "reading": "s**모욱** 테s트"
  },
  {
-  "pk": 258,
+  "term": "unit test",
   "reading": "**유**닡 테s트"
  },
  {
-  "pk": 259,
+  "term": "integration test",
   "reading": "인티g**뤠이**sh언 테s트"
  },
  {
-  "pk": 260,
+  "term": "end-to-end test",
   "reading": "엔d 터 **엔d** 테s트"
  },
  {
-  "pk": 261,
+  "term": "mock",
   "reading": "**막**"
  },
  {
-  "pk": 262,
+  "term": "stub",
   "reading": "s**떱**"
  },
  {
-  "pk": 263,
+  "term": "fixture",
   "reading": "**f익s**철r"
  },
  {
-  "pk": 264,
+  "term": "coverage",
   "reading": "**커**v어리j"
  },
  {
-  "pk": 265,
+  "term": "flaky",
   "reading": "f**레이**키"
  },
  {
-  "pk": 266,
+  "term": "assertion",
   "reading": "어**썰**sh언"
  },
  {
-  "pk": 267,
+  "term": "breakpoint",
   "reading": "b**뤠익**포인t"
  },
  {
-  "pk": 268,
+  "term": "step over",
   "reading": "s**뗍** 오우v얼r"
  },
  {
-  "pk": 269,
+  "term": "watch",
   "reading": "**와**ch"
  },
  {
-  "pk": 270,
+  "term": "profiling",
   "reading": "p**로우**f아일링"
  },
  {
-  "pk": 271,
+  "term": "memory leak",
   "reading": "**메**머리 맄"
  },
  {
-  "pk": 272,
+  "term": "null pointer",
   "reading": "**널** 포인털r"
  },
  {
-  "pk": 273,
+  "term": "off-by-one",
   "reading": "어f 바이 **원**"
  },
  {
-  "pk": 274,
+  "term": "heisenbug",
   "reading": "**하이**z은벅"
  },
  {
-  "pk": 275,
+  "term": "root cause",
   "reading": "**룯** 코z"
  },
  {
-  "pk": 276,
+  "term": "exception",
   "reading": "익**쎕**sh언"
  },
  {
-  "pk": 277,
+  "term": "swallow",
   "reading": "s**와**로우"
  },
  {
-  "pk": 278,
+  "term": "finally",
   "reading": "**f아이**널리"
  },
  {
-  "pk": 279,
+  "term": "segmentation fault",
   "reading": "쎄그멘**테이**sh언 f올t"
  },
  {
-  "pk": 280,
+  "term": "panic",
   "reading": "**패**닉"
  },
  {
-  "pk": 281,
+  "term": "lint",
   "reading": "**린t**"
  },
  {
-  "pk": 282,
+  "term": "static analysis",
   "reading": "s**때**틱 어**낼**러씨s"
  },
  {
-  "pk": 283,
+  "term": "type error",
   "reading": "**타잎** 에럴r"
  },
  {
-  "pk": 284,
+  "term": "syntax error",
   "reading": "**씬**택s 에럴r"
  },
  {
-  "pk": 285,
+  "term": "runtime error",
   "reading": "**뤈**타임 에럴r"
  },
  {
-  "pk": 286,
+  "term": "silent failure",
   "reading": "**싸이**런t f에일열r"
  },
  {
-  "pk": 287,
+  "term": "happy path",
   "reading": "**해**피 패th"
  },
  {
-  "pk": 288,
+  "term": "boundary value",
   "reading": "**바운**드리 v앨류"
  },
  {
-  "pk": 289,
+  "term": "regression test",
   "reading": "리g**뤠**sh언 테s트"
  },
  {
-  "pk": 290,
+  "term": "snapshot test",
   "reading": "s**냎**sh앝 테s트"
  },
  {
-  "pk": 291,
+  "term": "TDD",
   "reading": "티 디 **디**"
  },
  {
-  "pk": 292,
+  "term": "load test",
   "reading": "**로욷** 테s트"
  },
  {
-  "pk": 293,
+  "term": "stress test",
   "reading": "s트**뤠s** 테s트"
  },
  {
-  "pk": 294,
+  "term": "verbose",
   "reading": "v얼r**보우s**"
  },
  {
-  "pk": 295,
+  "term": "reproducible",
   "reading": "리프러**두**써블"
  },
  {
-  "pk": 296,
+  "term": "debug log",
   "reading": "**디**벅 로그"
  },
  {
-  "pk": 297,
+  "term": "sanity check",
   "reading": "**쌔**너티 ch엑"
  },
  {
-  "pk": 298,
+  "term": "postcondition",
   "reading": "포우s트컨**디**sh언"
  },
  {
-  "pk": 299,
+  "term": "core dump",
   "reading": "**코r** 덤p"
  },
  {
-  "pk": 300,
+  "term": "warning",
   "reading": "**워r**닝"
  },
  {
-  "pk": 301,
+  "term": "component",
   "reading": "컴**포우**넌t"
  },
  {
-  "pk": 302,
+  "term": "props",
   "reading": "p**뢉s**"
  },
  {
-  "pk": 303,
+  "term": "state",
   "reading": "s**떼읻**"
  },
  {
-  "pk": 304,
+  "term": "lifecycle",
   "reading": "**라이f**싸이클"
  },
  {
-  "pk": 305,
+  "term": "render",
   "reading": "**뤤**덜r"
  },
  {
-  "pk": 306,
+  "term": "virtual DOM",
   "reading": "**v얼**추얼 담"
  },
  {
-  "pk": 307,
+  "term": "reconciliation",
   "reading": "뤠컨씰리**에이**sh언"
  },
  {
-  "pk": 308,
+  "term": "key",
   "reading": "**키**"
  },
  {
-  "pk": 309,
+  "term": "SSR",
   "reading": "에s 에s **아r**"
  },
  {
-  "pk": 310,
+  "term": "CSR",
   "reading": "씨 에s **아r**"
  },
  {
-  "pk": 311,
+  "term": "hydration",
   "reading": "하이d**뤠이**sh언"
  },
  {
-  "pk": 312,
+  "term": "bundle",
   "reading": "**번**들"
  },
  {
-  "pk": 313,
+  "term": "code splitting",
   "reading": "**코욷** s쁠리팅"
  },
  {
-  "pk": 314,
+  "term": "tree shaking",
   "reading": "**트리** sh에이킹"
  },
  {
-  "pk": 315,
+  "term": "minify",
   "reading": "**미**니f아이"
  },
  {
-  "pk": 316,
+  "term": "source map",
   "reading": "**쏘r s** 맾"
  },
  {
-  "pk": 317,
+  "term": "transpile",
   "reading": "트뢘s**빠일**"
  },
  {
-  "pk": 318,
+  "term": "polyfill",
   "reading": "**팔**리f일"
  },
  {
-  "pk": 319,
+  "term": "DOM",
   "reading": "**담**"
  },
  {
-  "pk": 320,
+  "term": "event bubbling",
   "reading": "이**v엔t** 버블링"
  },
  {
-  "pk": 321,
+  "term": "event delegation",
   "reading": "이**v엔t** 데러**게이**sh언"
  },
  {
-  "pk": 322,
+  "term": "reflow",
   "reading": "**리**f로우"
  },
  {
-  "pk": 323,
+  "term": "repaint",
   "reading": "리**페인t**"
  },
  {
-  "pk": 324,
+  "term": "layout shift",
   "reading": "**레이**아욷 sh이f트"
  },
  {
-  "pk": 325,
+  "term": "viewport",
   "reading": "**v유**포r트"
  },
  {
-  "pk": 326,
+  "term": "media query",
   "reading": "**미**디어 퀴리"
  },
  {
-  "pk": 327,
+  "term": "responsive",
   "reading": "리s**빤**씨v"
  },
  {
-  "pk": 328,
+  "term": "specificity",
   "reading": "s뻬씨**f이**써티"
  },
  {
-  "pk": 329,
+  "term": "box model",
   "reading": "**박s** 마들"
  },
  {
-  "pk": 330,
+  "term": "z-index",
   "reading": "**z이** 인덱s"
  },
  {
-  "pk": 331,
+  "term": "flexbox",
   "reading": "f**렉s**박s"
  },
  {
-  "pk": 332,
+  "term": "grid",
   "reading": "g**뤼d**"
  },
  {
-  "pk": 333,
+  "term": "accessibility",
   "reading": "억쎄써**빌**러티"
  },
  {
-  "pk": 334,
+  "term": "semantic HTML",
   "reading": "씨**맨**틱 에이ch 티 엠 엘"
  },
  {
-  "pk": 335,
+  "term": "ARIA",
   "reading": "**아**리어"
  },
  {
-  "pk": 336,
+  "term": "controlled component",
   "reading": "컨t**로울드** 컴포우넌t"
  },
  {
-  "pk": 337,
+  "term": "prop drilling",
   "reading": "p**뢉** d릴링"
  },
  {
-  "pk": 338,
+  "term": "memoization",
   "reading": "메모우이**z에이**sh언"
  },
  {
-  "pk": 339,
+  "term": "debounce",
   "reading": "디**바운s**"
  },
  {
-  "pk": 340,
+  "term": "SPA",
   "reading": "에s 피 **에이**"
  },
  {
-  "pk": 341,
+  "term": "client-side routing",
   "reading": "k**라이**언t 싸읻 **루**팅"
  },
  {
-  "pk": 342,
+  "term": "localStorage",
   "reading": "**로우**클 s또리j"
  },
  {
-  "pk": 343,
+  "term": "event loop",
   "reading": "이**v엔t** 뤂"
  },
  {
-  "pk": 344,
+  "term": "promise",
   "reading": "p**롸**미s"
  },
  {
-  "pk": 345,
+  "term": "CSP",
   "reading": "씨 에s **피**"
  },
  {
-  "pk": 346,
+  "term": "service worker",
   "reading": "**썰**v이s 월컬r"
  },
  {
-  "pk": 347,
+  "term": "stack",
   "reading": "s**땍**"
  },
  {
-  "pk": 348,
+  "term": "queue",
   "reading": "**큐**"
  },
  {
-  "pk": 349,
+  "term": "hash table",
   "reading": "**해**sh 테이블"
  },
  {
-  "pk": 350,
+  "term": "linked list",
   "reading": "링k트 **리s트**"
  },
  {
-  "pk": 351,
+  "term": "array",
   "reading": "어**뤠이**"
  },
  {
-  "pk": 352,
+  "term": "binary tree",
   "reading": "**바이**너리 트리"
  },
  {
-  "pk": 353,
+  "term": "binary search",
   "reading": "**바이**너리 썰ch"
  },
  {
-  "pk": 354,
+  "term": "recursion",
   "reading": "리**컬**전"
  },
  {
-  "pk": 355,
+  "term": "time complexity",
   "reading": "**타임** 컴p**렉**써티"
  },
  {
-  "pk": 356,
+  "term": "big O",
   "reading": "빅 **오우**"
  },
  {
-  "pk": 357,
+  "term": "greedy",
   "reading": "g**뤼**디"
  },
  {
-  "pk": 358,
+  "term": "dynamic programming",
   "reading": "다이**내**믹 p**로우**그래밍"
  },
  {
-  "pk": 359,
+  "term": "process",
   "reading": "p**롸**쎄s"
  },
  {
-  "pk": 360,
+  "term": "thread",
   "reading": "**th렏**"
  },
  {
-  "pk": 361,
+  "term": "concurrency",
   "reading": "컨**컬**런씨"
  },
  {
-  "pk": 362,
+  "term": "parallelism",
   "reading": "**패**러렐리즘"
  },
  {
-  "pk": 363,
+  "term": "context switch",
   "reading": "**칸**텍s트 s윋ch"
  },
  {
-  "pk": 364,
+  "term": "mutex",
   "reading": "**뮤**텍s"
  },
  {
-  "pk": 365,
+  "term": "semaphore",
   "reading": "**쎄**머f오r"
  },
  {
-  "pk": 366,
+  "term": "scheduling",
   "reading": "s**께**줄링"
  },
  {
-  "pk": 367,
+  "term": "virtual memory",
   "reading": "**v얼**추얼 **메**머리"
  },
  {
-  "pk": 368,
+  "term": "paging",
   "reading": "**페이**징"
  },
  {
-  "pk": 369,
+  "term": "kernel",
   "reading": "**컬**늘"
  },
  {
-  "pk": 370,
+  "term": "system call",
   "reading": "**씨**s텀 콜"
  },
  {
-  "pk": 371,
+  "term": "garbage collection",
   "reading": "**가r**비j 컬**렉**sh언"
  },
  {
-  "pk": 372,
+  "term": "TCP",
   "reading": "티 씨 **피**"
  },
  {
-  "pk": 373,
+  "term": "UDP",
   "reading": "유 디 **피**"
  },
  {
-  "pk": 374,
+  "term": "three-way handshake",
   "reading": "th리 웨이 **핸d**sh에익"
  },
  {
-  "pk": 375,
+  "term": "DNS",
   "reading": "디 엔 **에s**"
  },
  {
-  "pk": 376,
+  "term": "port",
   "reading": "**포r t**"
  },
  {
-  "pk": 377,
+  "term": "socket",
   "reading": "**싸**킽"
  },
  {
-  "pk": 378,
+  "term": "subnet",
   "reading": "**썹**넫"
  },
  {
-  "pk": 379,
+  "term": "firewall",
   "reading": "**f아이**얼r월"
  },
  {
-  "pk": 380,
+  "term": "encryption",
   "reading": "인k**맆**sh언"
  },
  {
-  "pk": 381,
+  "term": "hashing",
   "reading": "**해**sh잉"
  },
  {
-  "pk": 382,
+  "term": "salt",
   "reading": "**쏠t**"
  },
  {
-  "pk": 383,
+  "term": "public key",
   "reading": "**퍼**블릭 키"
  },
  {
-  "pk": 384,
+  "term": "SQL injection",
   "reading": "에s 큐 **엘** 인**젝**sh언"
  },
  {
-  "pk": 385,
+  "term": "XSS",
   "reading": "엑s 에s **에s**"
  },
  {
-  "pk": 386,
+  "term": "authentication",
   "reading": "오th엔티**케이**sh언"
  },
  {
-  "pk": 387,
+  "term": "authorization",
   "reading": "오th어러**z에이**sh언"
  },
  {
-  "pk": 388,
+  "term": "compiler",
   "reading": "컴**빠**일럴r"
  },
  {
-  "pk": 389,
+  "term": "interpreter",
   "reading": "인**털**프러털r"
  },
  {
-  "pk": 390,
+  "term": "abstraction",
   "reading": "앱s**트뢕**sh언"
  },
  {
-  "pk": 391,
+  "term": "encapsulation",
   "reading": "인캡써**레이**sh언"
  },
  {
-  "pk": 392,
+  "term": "polymorphism",
   "reading": "팔리**모r**f이즘"
  },
  {
-  "pk": 393,
+  "term": "singleton",
   "reading": "**씽**글턴"
  },
  {
-  "pk": 394,
+  "term": "MVC",
   "reading": "엠 v이 **씨**"
  },
  {
-  "pk": 395,
+  "term": "ERD",
   "reading": "이 아r **디**"
  },
  {
-  "pk": 396,
+  "term": "UTF-8",
   "reading": "유 티 에f **에읻**"
  },
  {
-  "pk": 397,
+  "term": "overflow",
   "reading": "**오우**v얼rf로우"
  },
  {
-  "pk": 398,
+  "term": "floating point",
   "reading": "f**로우**팅 포인t"
  },
  {
-  "pk": 399,
+  "term": "SHA",
   "reading": "**sh아**"
  },
  {
-  "pk": 400,
+  "term": "VCS",
   "reading": "v이 씨 **에s**"
  },
  {
-  "pk": 401,
+  "term": "DVCS",
   "reading": "디 v이 씨 **에s**"
  },
  {
-  "pk": 402,
+  "term": "LFS",
   "reading": "엘 에f **에s**"
  },
  {
-  "pk": 403,
+  "term": "MR",
   "reading": "엠 **아r**"
  },
  {
-  "pk": 404,
+  "term": "DAG",
   "reading": "**댁**"
  },
  {
-  "pk": 405,
+  "term": "CLA",
   "reading": "씨 엘 **에이**"
  },
  {
-  "pk": 406,
+  "term": "SCM",
   "reading": "에s 씨 **엠**"
  },
  {
-  "pk": 407,
+  "term": "DDD",
   "reading": "디 디 **디**"
  },
  {
-  "pk": 408,
+  "term": "SOLID",
   "reading": "**쌀**릳"
  },
  {
-  "pk": 409,
+  "term": "SRP",
   "reading": "에s 아r **피**"
  },
  {
-  "pk": 410,
+  "term": "OCP",
   "reading": "오우 씨 **피**"
  },
  {
-  "pk": 411,
+  "term": "LSP",
   "reading": "엘 에s **피**"
  },
  {
-  "pk": 412,
+  "term": "ISP",
   "reading": "아이 에s **피**"
  },
  {
-  "pk": 413,
+  "term": "DIP",
   "reading": "**딮**"
  },
  {
-  "pk": 414,
+  "term": "DI",
   "reading": "디 **아이**"
  },
  {
-  "pk": 415,
+  "term": "IoC",
   "reading": "아이 오우 **씨**"
  },
  {
-  "pk": 416,
+  "term": "CQRS",
   "reading": "씨 큐 아r **에s**"
  },
  {
-  "pk": 417,
+  "term": "SOA",
   "reading": "에s 오우 **에이**"
  },
  {
-  "pk": 418,
+  "term": "KISS",
   "reading": "**키s**"
  },
  {
-  "pk": 419,
+  "term": "POC",
   "reading": "피 오우 **씨**"
  },
  {
-  "pk": 420,
+  "term": "PTAL",
   "reading": "피 티 에이 **엘**"
  },
  {
-  "pk": 421,
+  "term": "TL;DR",
   "reading": "티 엘 디 **아r**"
  },
  {
-  "pk": 422,
+  "term": "FYI",
   "reading": "에f 와이 **아이**"
  },
  {
-  "pk": 423,
+  "term": "OKR",
   "reading": "오우 케이 **아r**"
  },
  {
-  "pk": 424,
+  "term": "KPI",
   "reading": "케이 피 **아이**"
  },
  {
-  "pk": 425,
+  "term": "PRD",
   "reading": "피 아r **디**"
  },
  {
-  "pk": 426,
+  "term": "WIP limit",
   "reading": "**윞** 리밑"
  },
  {
-  "pk": 427,
+  "term": "API",
   "reading": "에이 피 **아이**"
  },
  {
-  "pk": 428,
+  "term": "TTL",
   "reading": "티 티 **엘**"
  },
  {
-  "pk": 429,
+  "term": "SSE",
   "reading": "에s 에s **이**"
  },
  {
-  "pk": 430,
+  "term": "SSO",
   "reading": "에s 에s **오우**"
  },
  {
-  "pk": 431,
+  "term": "OIDC",
   "reading": "오우 아이 디 **씨**"
  },
  {
-  "pk": 432,
+  "term": "SAML",
   "reading": "**쌔**믈"
  },
  {
-  "pk": 433,
+  "term": "MFA",
   "reading": "엠 에f **에이**"
  },
  {
-  "pk": 434,
+  "term": "TOTP",
   "reading": "티 오우 티 **피**"
  },
  {
-  "pk": 435,
+  "term": "RBAC",
   "reading": "**아r**백"
  },
  {
-  "pk": 436,
+  "term": "ACL",
   "reading": "에이 씨 **엘**"
  },
  {
-  "pk": 437,
+  "term": "CRUD",
   "reading": "k**뤋**"
  },
  {
-  "pk": 438,
+  "term": "HTTP",
   "reading": "에이ch 티 티 **피**"
  },
  {
-  "pk": 439,
+  "term": "HTTPS",
   "reading": "에이ch 티 티 피 **에s**"
  },
  {
-  "pk": 440,
+  "term": "URL",
   "reading": "유 아r **엘**"
  },
  {
-  "pk": 441,
+  "term": "URI",
   "reading": "유 아r **아이**"
  },
  {
-  "pk": 442,
+  "term": "JSON",
   "reading": "**제이**싼"
  },
  {
-  "pk": 443,
+  "term": "XML",
   "reading": "엑s 엠 **엘**"
  },
  {
-  "pk": 444,
+  "term": "YAML",
   "reading": "**야**믈"
  },
  {
-  "pk": 445,
+  "term": "MIME",
   "reading": "**마임**"
  },
  {
-  "pk": 446,
+  "term": "gRPC",
   "reading": "지 아r 피 **씨**"
  },
  {
-  "pk": 447,
+  "term": "RPC",
   "reading": "아r 피 **씨**"
  },
  {
-  "pk": 448,
+  "term": "SOAP",
   "reading": "**쏘웊**"
  },
  {
-  "pk": 449,
+  "term": "QPS",
   "reading": "큐 피 **에s**"
  },
  {
-  "pk": 450,
+  "term": "CRLF",
   "reading": "씨 아r 엘 **에f**"
  },
  {
-  "pk": 451,
+  "term": "SQL",
   "reading": "**씨**퀄"
  },
  {
-  "pk": 452,
+  "term": "DBMS",
   "reading": "디 비 엠 **에s**"
  },
  {
-  "pk": 453,
+  "term": "RDBMS",
   "reading": "아r 디 비 엠 **에s**"
  },
  {
-  "pk": 454,
+  "term": "DDL",
   "reading": "디 디 **엘**"
  },
  {
-  "pk": 455,
+  "term": "DML",
   "reading": "디 엠 **엘**"
  },
  {
-  "pk": 456,
+  "term": "DCL",
   "reading": "디 씨 **엘**"
  },
  {
-  "pk": 457,
+  "term": "PK",
   "reading": "피 **케이**"
  },
  {
-  "pk": 458,
+  "term": "FK",
   "reading": "에f **케이**"
  },
  {
-  "pk": 459,
+  "term": "WAL",
   "reading": "**월**"
  },
  {
-  "pk": 460,
+  "term": "MVCC",
   "reading": "엠 v이 씨 **씨**"
  },
  {
-  "pk": 461,
+  "term": "CTE",
   "reading": "씨 티 **이**"
  },
  {
-  "pk": 462,
+  "term": "OLTP",
   "reading": "오우 엘 티 **피**"
  },
  {
-  "pk": 463,
+  "term": "OLAP",
   "reading": "**오울**랲"
  },
  {
-  "pk": 464,
+  "term": "ETL",
   "reading": "이 티 **엘**"
  },
  {
-  "pk": 465,
+  "term": "BLOB",
   "reading": "b**랍**"
  },
  {
-  "pk": 466,
+  "term": "UUID",
   "reading": "유 유 아이 **디**"
  },
  {
-  "pk": 467,
+  "term": "CAP",
   "reading": "**캪**"
  },
  {
-  "pk": 468,
+  "term": "BASE",
   "reading": "**베이s**"
  },
  {
-  "pk": 469,
+  "term": "CI",
   "reading": "씨 **아이**"
  },
  {
-  "pk": 470,
+  "term": "CD",
   "reading": "씨 **디**"
  },
  {
-  "pk": 471,
+  "term": "IaC",
   "reading": "아이 에이 **씨**"
  },
  {
-  "pk": 472,
+  "term": "VM",
   "reading": "v이 **엠**"
  },
  {
-  "pk": 473,
+  "term": "K8s",
   "reading": "**케이**츠"
  },
  {
-  "pk": 474,
+  "term": "IaaS",
   "reading": "**아이** 애s"
  },
  {
-  "pk": 475,
+  "term": "PaaS",
   "reading": "**패s**"
  },
  {
-  "pk": 476,
+  "term": "SaaS",
   "reading": "**쌔s**"
  },
  {
-  "pk": 477,
+  "term": "VPN",
   "reading": "v이 피 **엔**"
  },
  {
-  "pk": 478,
+  "term": "WAF",
   "reading": "**왚**"
  },
  {
-  "pk": 479,
+  "term": "RPO",
   "reading": "아r 피 **오우**"
  },
  {
-  "pk": 480,
+  "term": "RTO",
   "reading": "아r 티 **오우**"
  },
  {
-  "pk": 481,
+  "term": "MTTR",
   "reading": "엠 티 티 **아r**"
  },
  {
-  "pk": 482,
+  "term": "MTBF",
   "reading": "엠 티 비 **에f**"
  },
  {
-  "pk": 483,
+  "term": "SRE",
   "reading": "에s 아r **이**"
  },
  {
-  "pk": 484,
+  "term": "APM",
   "reading": "에이 피 **엠**"
  },
  {
-  "pk": 485,
+  "term": "SSH",
   "reading": "에s 에s **에이ch**"
  },
  {
-  "pk": 486,
+  "term": "PID",
   "reading": "피 아이 **디**"
  },
  {
-  "pk": 487,
+  "term": "IOPS",
   "reading": "**아이**압s"
  },
  {
-  "pk": 488,
+  "term": "HA",
   "reading": "에이ch **에이**"
  },
  {
-  "pk": 489,
+  "term": "DR",
   "reading": "디 **아r**"
  },
  {
-  "pk": 490,
+  "term": "QA",
   "reading": "큐 **에이**"
  },
  {
-  "pk": 491,
+  "term": "UAT",
   "reading": "유 에이 **티**"
  },
  {
-  "pk": 492,
+  "term": "BDD",
   "reading": "비 디 **디**"
  },
  {
-  "pk": 493,
+  "term": "RCA",
   "reading": "아r 씨 **에이**"
  },
  {
-  "pk": 494,
+  "term": "NPE",
   "reading": "엔 피 **이**"
  },
  {
-  "pk": 495,
+  "term": "OOM",
   "reading": "오우 오우 **엠**"
  },
  {
-  "pk": 496,
+  "term": "EOF",
   "reading": "이 오우 **에f**"
  },
  {
-  "pk": 497,
+  "term": "SIGTERM",
   "reading": "**씩**털m"
  },
  {
-  "pk": 498,
+  "term": "SIGKILL",
   "reading": "**씩**킬"
  },
  {
-  "pk": 499,
+  "term": "REPL",
   "reading": "**뤠**쁠"
  },
  {
-  "pk": 500,
+  "term": "MRE",
   "reading": "엠 아r **이**"
  },
  {
-  "pk": 501,
+  "term": "HTML",
   "reading": "에이ch 티 엠 **엘**"
  },
  {
-  "pk": 502,
+  "term": "CSS",
   "reading": "씨 에s **에s**"
  },
  {
-  "pk": 503,
+  "term": "SVG",
   "reading": "에s v이 **지**"
  },
  {
-  "pk": 504,
+  "term": "SEO",
   "reading": "에s 이 **오우**"
  },
  {
-  "pk": 505,
+  "term": "LCP",
   "reading": "엘 씨 **피**"
  },
  {
-  "pk": 506,
+  "term": "CLS",
   "reading": "씨 엘 **에s**"
  },
  {
-  "pk": 507,
+  "term": "INP",
   "reading": "아이 엔 **피**"
  },
  {
-  "pk": 508,
+  "term": "FCP",
   "reading": "에f 씨 **피**"
  },
  {
-  "pk": 509,
+  "term": "TTFB",
   "reading": "티 티 에f **비**"
  },
  {
-  "pk": 510,
+  "term": "PWA",
   "reading": "피 더블유 **에이**"
  },
  {
-  "pk": 511,
+  "term": "WASM",
   "reading": "**와**z음"
  },
  {
-  "pk": 512,
+  "term": "JSX",
   "reading": "제이 에s **엑s**"
  },
  {
-  "pk": 513,
+  "term": "npm",
   "reading": "엔 피 **엠**"
  },
  {
-  "pk": 514,
+  "term": "HMR",
   "reading": "에이ch 엠 **아r**"
  },
  {
-  "pk": 515,
+  "term": "SSG",
   "reading": "에s 에s **지**"
  },
  {
-  "pk": 516,
+  "term": "ISR",
   "reading": "아이 에s **아r**"
  },
  {
-  "pk": 517,
+  "term": "UI",
   "reading": "유 **아이**"
  },
  {
-  "pk": 518,
+  "term": "UX",
   "reading": "유 **엑s**"
  },
  {
-  "pk": 519,
+  "term": "i18n",
   "reading": "아이 에이틴 **엔**"
  },
  {
-  "pk": 520,
+  "term": "l10n",
   "reading": "엘 텐 **엔**"
  },
  {
-  "pk": 521,
+  "term": "a11y",
   "reading": "에이 이**레**v은 와이"
  },
  {
-  "pk": 522,
+  "term": "SPA fallback",
   "reading": "에s 피 **에이** f올백"
  },
  {
-  "pk": 523,
+  "term": "OSI",
   "reading": "오우 에s **아이**"
  },
  {
-  "pk": 524,
+  "term": "RAID",
   "reading": "**뤠읻**"
  },
  {
-  "pk": 525,
+  "term": "CPU",
   "reading": "씨 피 **유**"
  },
  {
-  "pk": 526,
+  "term": "GPU",
   "reading": "지 피 **유**"
  },
  {
-  "pk": 527,
+  "term": "RAM",
   "reading": "**뢤**"
  },
  {
-  "pk": 528,
+  "term": "ROM",
   "reading": "**롬**"
  },
  {
-  "pk": 529,
+  "term": "SSD",
   "reading": "에s 에s **디**"
  },
  {
-  "pk": 530,
+  "term": "I/O",
   "reading": "아이 **오우**"
  },
  {
-  "pk": 531,
+  "term": "OS",
   "reading": "오우 **에s**"
  },
  {
-  "pk": 532,
+  "term": "IP",
   "reading": "아이 **피**"
  },
  {
-  "pk": 533,
+  "term": "IPv4",
   "reading": "아이 피 **v이** f오r"
  },
  {
-  "pk": 534,
+  "term": "IPv6",
   "reading": "아이 피 **v이** 씩s"
  },
  {
-  "pk": 535,
+  "term": "CIDR",
   "reading": "**싸이**덜r"
  },
  {
-  "pk": 536,
+  "term": "MAC",
   "reading": "**맥**"
  },
  {
-  "pk": 537,
+  "term": "ARP",
   "reading": "**아r p**"
  },
  {
-  "pk": 538,
+  "term": "DHCP",
   "reading": "디 에이ch 씨 **피**"
  },
  {
-  "pk": 539,
+  "term": "ICMP",
   "reading": "아이 씨 엠 **피**"
  },
  {
-  "pk": 540,
+  "term": "NAT",
   "reading": "**낻**"
  },
  {
-  "pk": 541,
+  "term": "LAN",
   "reading": "**랜**"
  },
  {
-  "pk": 542,
+  "term": "WAN",
   "reading": "**완**"
  },
  {
-  "pk": 543,
+  "term": "VLAN",
   "reading": "**v이**랜"
  },
  {
-  "pk": 544,
+  "term": "FIFO",
   "reading": "**f아이**f오우"
  },
  {
-  "pk": 545,
+  "term": "LIFO",
   "reading": "**라이**f오우"
  },
  {
-  "pk": 546,
+  "term": "LRU",
   "reading": "엘 아r **유**"
  },
  {
-  "pk": 547,
+  "term": "FCFS",
   "reading": "에f 씨 에f **에s**"
  },
  {
-  "pk": 548,
+  "term": "SJF",
   "reading": "에s 제이 **에f**"
  },
  {
-  "pk": 549,
+  "term": "BFS",
   "reading": "비 에f **에s**"
  },
  {
-  "pk": 550,
+  "term": "DFS",
   "reading": "디 에f **에s**"
  },
  {
-  "pk": 551,
+  "term": "AES",
   "reading": "에이 이 **에s**"
  },
  {
-  "pk": 552,
+  "term": "RSA",
   "reading": "아r 에s **에이**"
  },
  {
-  "pk": 553,
+  "term": "MD5",
   "reading": "엠 디 **f아이v**"
  },
  {
-  "pk": 554,
+  "term": "PKI",
   "reading": "피 케이 **아이**"
  },
  {
-  "pk": 555,
+  "term": "CA",
   "reading": "씨 **에이**"
  },
  {
-  "pk": 556,
+  "term": "OOP",
   "reading": "오우 오우 **피**"
  },
  {
-  "pk": 557,
+  "term": "AOP",
   "reading": "에이 오우 **피**"
  },
  {
-  "pk": 558,
+  "term": "JVM",
   "reading": "제이 v이 **엠**"
  },
  {
-  "pk": 559,
+  "term": "IDE",
   "reading": "아이 디 **이**"
  },
  {
-  "pk": 560,
+  "term": "ASCII",
   "reading": "**애**s키"
  },
  {
-  "pk": 561,
+  "term": "CRC",
   "reading": "씨 아r **씨**"
  },
  {
-  "pk": 562,
+  "term": "P2P",
   "reading": "피 터 **피**"
  },
  {
-  "pk": 563,
+  "term": "UML",
   "reading": "유 엠 **엘**"
  },
  {
-  "pk": 564,
+  "term": "DFD",
   "reading": "디 에f **디**"
  },
  {
-  "pk": 565,
+  "term": "SDLC",
   "reading": "에s 디 엘 **씨**"
  },
  {
-  "pk": 566,
+  "term": "WBS",
   "reading": "더블유 비 **에s**"
  }
 ]
