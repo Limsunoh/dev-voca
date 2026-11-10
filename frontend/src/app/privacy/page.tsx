@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { BrandName } from "@/components/BrandName";
 import {
   ContactEmail,
   EFFECTIVE_DATE,
@@ -9,8 +10,8 @@ import {
 } from "@/components/LegalDoc";
 
 export const metadata: Metadata = {
-  title: "개인정보 처리방침 · devvoca",
-  description: "devvoca 가 개인정보를 어떻게 처리하는지 안내합니다.",
+  title: "개인정보 처리방침 · dev-voca",
+  description: "dev-voca 가 개인정보를 어떻게 처리하는지 안내합니다.",
 };
 
 const SECTIONS: LegalSection[] = [
@@ -522,7 +523,7 @@ export default function PrivacyPage() {
       title="개인정보 처리방침"
       intro={
         <p>
-          devvoca 운영자(개인, 이하 &quot;운영자&quot;)는 devvoca(이하
+          <BrandName /> 운영자(개인, 이하 &quot;운영자&quot;)는 <BrandName />(이하
           &quot;서비스&quot;) 이용자의 개인정보를 「개인정보 보호법」에 따라
           처리하며, 다음과 같이 처리방침을 공개합니다.
         </p>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { BrandName } from "@/components/BrandName";
 import {
   ContactEmail,
   EFFECTIVE_DATE,
@@ -8,8 +9,8 @@ import {
 } from "@/components/LegalDoc";
 
 export const metadata: Metadata = {
-  title: "이용약관 · devvoca",
-  description: "devvoca 서비스 이용 조건을 안내합니다.",
+  title: "이용약관 · dev-voca",
+  description: "dev-voca 서비스 이용 조건을 안내합니다.",
 };
 
 const SECTIONS: LegalSection[] = [
@@ -18,8 +19,8 @@ const SECTIONS: LegalSection[] = [
     title: "제1조 (목적)",
     body: (
       <p>
-        이 약관은 devvoca 운영자(개인, 이하 &quot;운영자&quot;)가 제공하는 개발
-        영어 학습 서비스 devvoca(이하 &quot;서비스&quot;)의 이용 조건과 절차,
+        이 약관은 <BrandName /> 운영자(개인, 이하 &quot;운영자&quot;)가 제공하는 개발
+        영어 학습 서비스 <BrandName />(이하 &quot;서비스&quot;)의 이용 조건과 절차,
         운영자와 이용자의 권리·의무를 정합니다.
       </p>
     ),
@@ -336,7 +337,7 @@ const SECTIONS: LegalSection[] = [
     title: "제15조 (연락처)",
     body: (
       <ul>
-        <li>운영자: devvoca (개인 운영, 사업자등록 없음)</li>
+        <li>운영자: <BrandName /> (개인 운영, 사업자등록 없음)</li>
         <li>
           문의: <ContactEmail />
         </li>
