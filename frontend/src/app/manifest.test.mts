@@ -77,6 +77,39 @@ describe("앱 설치 정보", () => {
   });
 });
 
+describe("Android 앱(TWA)과 웹을 잇는 확인 파일", () => {
+  const twa = JSON.parse(readFileSync(join(HERE, "../../../android/twa-manifest.json"), "utf8"));
+  const links = JSON.parse(readFileSync(join(PUBLIC, ".well-known/assetlinks.json"), "utf8"));
+
+  it("assetlinks.json 의 패키지 이름이 Android 앱과 같다", () => {
+    // 다르면 앱 위에 주소창이 뜬다. 패키지 이름은 스토어에 올린 뒤 못 바꾼다.
+    assert.equal(links[0].target.package_name, twa.packageId);
+    assert.equal(twa.packageId, "com.devvoca.app");
+  });
+
+  it("서명 지문이 SHA-256 형식이다", () => {
+    const prints: string[] = links[0].target.sha256_cert_fingerprints;
+    assert.ok(prints.length >= 1);
+    for (const p of prints) assert.match(p, /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
+  });
+
+  // 지금은 업로드 키 지문 하나다. Play 에서 받은 앱은 Play 앱 서명 키로 서명되어,
+  // 그 지문이 없으면 앱 위에 주소창이 뜬다. 더하면 이 줄을 지운다.
+  it.todo("Play 앱 서명 키 지문을 assetlinks.json 에 더한다 (android/README.md)");
+
+  it("Android 앱이 이 웹의 이름·시작 주소를 쓴다", () => {
+    assert.equal(twa.host, "dev-voca.vercel.app");
+    assert.equal(twa.startUrl, data.start_url);
+    assert.equal(twa.name, data.name);
+    assert.equal(twa.backgroundColor.toLowerCase(), data.background_color);
+    assert.equal(twa.themeColor.toLowerCase(), data.theme_color);
+    // 웹은 밝은 화면만 있다. 폰이 다크 모드여도 앱 테두리가 검게 바뀌지 않아야 한다.
+    assert.equal(twa.themeColorDark, twa.themeColor);
+    assert.equal(twa.navigationColorDark, twa.navigationColor);
+    assert.equal(twa.navigationDividerColorDark, twa.navigationDividerColor);
+  });
+});
+
 describe("끊김 안내 service worker", () => {
   const sw = readFileSync(join(PUBLIC, "sw.js"), "utf8");
 
