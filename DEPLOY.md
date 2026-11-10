@@ -346,7 +346,7 @@ python backend/manage.py daily_cleanup --apply    # 실제로 보내고 지운�
 ```
 
 하루 한 번 돌도록 Railway 의 Cron Schedule 에 등록한다. 웹 서비스와 같은 코드와
-환경변수(`DATABASE_URL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` 포함)를 쓰는 별도
+환경변수(`DATABASE_URL`, 아래 "메일 발송" 의 값 포함)를 쓰는 별도
 서비스로 두고, 시작 명령은 `python backend/manage.py daily_cleanup --apply`,
 일정은 `0 18 * * *`(UTC, 한국 새벽 3시)다. 처음 등록하기 전에 운영 DB 로 건수를 본다.
 
@@ -354,7 +354,7 @@ python backend/manage.py daily_cleanup --apply    # 실제로 보내고 지운�
 railway ssh --service web "python backend/manage.py daily_cleanup"
 ```
 
-`EMAIL_HOST_USER`·`EMAIL_HOST_PASSWORD` 는 이메일 변경 확인 메일에도 쓰이니 웹 서비스에도
+메일 값은 이메일 변경 확인 메일에도 쓰이니 웹 서비스에도
 넣는다. 안내할 회원이 있는데 발송 계정이 비어 있거나 한 통도 못 보내면 명령이 실패로
 끝난다. 안내할 회원이 없는 날은 계정이 비어 있어도 성공으로 끝나므로, 공개 직후에는
 이메일 변경으로 메일이 실제로 나가는지 한 번 확인한다. 정지한 계정(`is_active=False`)은
@@ -362,6 +362,48 @@ railway ssh --service web "python backend/manage.py daily_cleanup"
 
 **등록하지 않으면 1년 파기는 돌지 않는다.** 처리방침에 적힌 내용과 달라지므로
 정식 공개 전에 등록한다.
+
+### 메일 발송 (Gmail API)
+
+Railway 는 Hobby 요금제에서 바깥으로 나가는 SMTP 를 막는다. 앱 비밀번호
+(`EMAIL_HOST_PASSWORD`)를 넣어도 연결이 안 된다. 그래서 운영은 Gmail API 로 HTTPS 를 써서 보낸다.
+web 서비스와 정리 Cron 서비스 둘 다에 넷을 넣는다. Cron 쪽에 하나라도 빠지면 토큰 확인(아래)이 조용히 꺼진다.
+
+| 변수 | 값 |
+|---|---|
+| `EMAIL_HOST_USER` | 보내는 Gmail 주소. 처리방침의 문의 주소와 같다 |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` | Google Cloud 프로젝트 `devvoca-mail` 의 "데스크톱 앱" 클라이언트 |
+| `GMAIL_REFRESH_TOKEN` | 아래 명령으로 받는다 |
+
+`devvoca-mail` 은 구글 로그인용 프로젝트와 따로 둔다. Gmail 보내기 권한은 구글 검수를 안
+받은 권한이라, 로그인용 프로젝트에 섞지 않는다. 동의 화면은 "프로덕션" 으로 게시해 둔다.
+"테스트" 로 두면 갱신 토큰이 7일 뒤에 풀린다.
+
+갱신 토큰은 로컬 PC 에서 받는다. `.env` 에 클라이언트 ID·비밀을 넣고 돌리면 브라우저가 열린다.
+보내는 Gmail 로 허락하면 `.env` 의 `GMAIL_REFRESH_TOKEN` 줄이 채워진다. 화면에는 값을 찍지 않는다.
+
+```
+python backend/manage.py gmail_token --sender 보내는주소@gmail.com
+```
+
+허락할 때 쓴 구글 계정이 보내는 주소가 된다. `--sender` 와 다른 계정으로 허락하면 `.env` 를
+건드리지 않고 실패로 멈춘다. `--sender` 에는 Railway 의 `EMAIL_HOST_USER` 와 같은 주소를 넣는다.
+명령은 Railway 값을 모르므로, 둘이 다르면 보내는 주소가 바뀐다. 로컬 `.env` 에는
+`EMAIL_HOST_USER` 를 넣지 않는다. 넣으면 토큰이 있는 로컬 개발 서버가 실제 주소로 메일을 보낸다.
+
+**토큰이 풀리는 경우는 둘이다.** 구글 계정 비밀번호를 바꿨을 때와, 6개월 동안 한 번도 안 썼을 때다.
+풀리면 메일이 `invalid_grant` 로 실패한다. 이메일 변경은 웹 로그에, 정리 Cron 은 그 실행의 로그에
+원인이 남는다. 위 명령을 다시 돌려 새 토큰을 Railway 에 넣는다. 6개월 쪽은 정리 Cron 이 막는다.
+`daily_cleanup --apply` 가 안내할 회원이 없는 날 토큰을 한 번 써 보고, 풀렸으면 그날 실패로
+끝난다. 그래서 정리 Cron 을 등록해야 이 확인도 돈다.
+
+서버에서 메일을 보내지 않고 토큰만 확인하려면 아래를 Git Bash 에서 돌린다.
+
+```
+railway ssh --service web "python backend/manage.py shell -c 'from apps.accounts.gmail_api import check_token; check_token(); print(\"Gmail OK\")'"
+```
+
+실패하면 `GmailSendError` 와 함께 원인(`invalid_grant` 등)이 찍힌다.
 
 ## 아직 안 한 것
 

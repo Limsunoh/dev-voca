@@ -37,12 +37,14 @@ export function TabBar() {
   //
   // /privacy, /terms 는 가입 화면에서 새 탭으로 열리는 읽을거리다. 긴 글의
   // 마지막 줄을 탭바가 가리지 않게 하고, 나가는 길은 문서 맨 위 링크로 둔다.
+  // /delete-account 도 같은 틀의 읽을거리다. 스토어의 링크로 바로 들어온다.
   if (
     pathname === "/login" ||
     pathname === "/signup" ||
     pathname === "/start" ||
     pathname === "/privacy" ||
-    pathname === "/terms"
+    pathname === "/terms" ||
+    pathname === "/delete-account"
   ) {
     return null;
   }

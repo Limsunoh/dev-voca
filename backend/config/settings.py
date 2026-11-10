@@ -113,8 +113,9 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstr
 # 못 쓰는 것이 아니라, 확인 링크가 안 가는데 화면은 "보냈습니다" 라고
 # 말하는 상태가 되어, 사용자는 스팸함만 뒤지게 된다.
 #
-# 서비스를 코드에 박지 않고 환경변수로 갈아끼우게 둔다. 지금은 Gmail SMTP
-# 지만 하루 500통 제한이 있어, 사용자가 늘면 전용 서비스로 옮겨야 한다.
+# 서비스를 코드에 박지 않고 환경변수로 갈아끼우게 둔다. 지금은 Gmail(운영은
+# Gmail API, 아래 GMAIL_* 참고)이지만 하루 500통 제한이 있어, 사용자가 늘면
+# 전용 서비스로 옮겨야 한다.
 # 그때 고칠 곳이 .env 하나가 되도록 한다.
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
@@ -134,10 +135,20 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 # 스팸으로 분류하므로 기본값을 보내는 계정으로 둔다.
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 
+# Gmail API(HTTPS)로 보낼 때 쓰는 값. Railway Hobby 는 바깥으로 나가는
+# SMTP 를 막아서 운영은 이쪽으로 보낸다(apps/accounts/gmail_api.py 머리 주석).
+# 클라이언트 ID·비밀은 Google Cloud 의 "데스크톱 앱" 클라이언트이고, 갱신
+# 토큰은 `manage.py gmail_token` 을 로컬에서 한 번 돌려 받는다.
+GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID", "")
+GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET", "")
+GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN", "")
+
 # 메일이 실제로 나가는지 여부.
 #
-# 계정이 설정돼 있으면 SMTP 로 보내고, 없으면 콘솔에 찍는다. 개발할 때
-# 앱 비밀번호 없이도 확인 링크를 볼 수 있어야 하기 때문이다.
+# Gmail API 값이 다 있으면 그쪽, 앱 비밀번호가 있으면 SMTP, 둘 다 없으면
+# 콘솔에 찍는다. 개발할 때 발송 계정 없이도 확인 링크를 볼 수 있어야 하기
+# 때문이다. 보내는 주소(EMAIL_HOST_USER)는 어느 쪽이든 있어야 한다. 없으면
+# From 이 webmaster@localhost 가 되어 Gmail 이 다른 주소로 바꿔 보낸다.
 #
 # 여기서 기동을 막지 않는다. SECRET_KEY 처럼 없으면 죽게 만들고 싶지만,
 # CI 는 운영과 같은 조건(DEBUG=False)으로 `manage.py check` 와
@@ -149,7 +160,9 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 # 비어 있으면 메일을 보내려는 순간 오류가 나고, 화면은 "메일을 보낼 수 없다"
 # 고 정확히 말한다. 메일이 콘솔로 빠져 사용자가 스팸함을 뒤지는 상황만
 # 막으면 되고, 그것은 발송 시점에 막는 것으로 충분하다.
-if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+if EMAIL_HOST_USER and GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN:
+    EMAIL_BACKEND = "apps.accounts.gmail_api.GmailApiBackend"
+elif EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

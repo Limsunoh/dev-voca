@@ -10,7 +10,8 @@
  *    빠졌다.
  * 2. 로그인·가입 화면 아래 "가입하기"/"로그인" 전환 링크. 클래스가 없으면
  *    브라우저 기본 테두리가 나와 앱의 다른 링크와 색이 달라진다.
- * 3. 처리방침·약관(/privacy, /terms)의 링크 전부. 링크마다 클래스를 달지 않고
+ * 3. 처리방침·약관·계정 삭제 안내(/privacy, /terms, /delete-account)의
+ *    링크 전부. 링크마다 클래스를 달지 않고
  *    LegalDoc 의 바깥 main 이 [&_a:focus-visible] 로 안쪽 a 전부에 준다.
  *    그래서 "main 에 클래스가 있다" 와 "모든 링크가 그 main 안에 있다" 를
  *    같이 본다. 본문에 끼워 넣는 ContactEmail 같은 링크도 여기서 덮인다.
@@ -39,6 +40,7 @@ const { AuthForm } = await import("./AuthForm");
 const { SearchInput } = await import("./SearchInput");
 const { default: TermsPage } = await import("../app/terms/page");
 const { default: PrivacyPage } = await import("../app/privacy/page");
+const { default: DeleteAccountPage } = await import("../app/delete-account/page");
 
 /** 여는 태그 하나의 class 를 낱말 목록으로. */
 function classesOf(tag: string): string[] {
@@ -118,12 +120,15 @@ describe("로그인·가입 전환 링크의 포커스 테두리", () => {
 });
 
 describe("처리방침·약관 링크의 포커스 테두리", () => {
-  const PAGES: Array<[string, () => unknown]> = [
-    ["/terms", TermsPage],
-    ["/privacy", PrivacyPage],
+  // 셋째 값은 링크 수의 하한이다. 페이지가 비어 그려지는 것을 잡는다.
+  // 계정 삭제 안내는 글이 짧아 10개다(홈, 목차 4, 본문 3, 아래 2).
+  const PAGES: Array<[string, () => unknown, number]> = [
+    ["/terms", TermsPage, 15],
+    ["/privacy", PrivacyPage, 15],
+    ["/delete-account", DeleteAccountPage, 10],
   ];
 
-  for (const [path, Page] of PAGES) {
+  for (const [path, Page, minLinks] of PAGES) {
     describe(path, () => {
       const html = renderToStaticMarkup(createElement(Page as () => null));
       const mainOpen = /<main[^>]*>/.exec(html);
@@ -138,7 +143,7 @@ describe("처리방침·약관 링크의 포커스 테두리", () => {
       });
 
       it("링크가 실제로 있다 - 목차·메일 주소·글꼴 라이선스까지", () => {
-        assert.ok(anchors.length >= 15, `링크 ${anchors.length}개`);
+        assert.ok(anchors.length >= minLinks, `링크 ${anchors.length}개`);
         assert.ok(anchors.some((m) => m[0].includes('href="mailto:')), "메일 주소 링크가 없다");
         assert.ok(anchors.some((m) => m[0].includes('href="#')), "목차 링크가 없다");
         assert.ok(anchors.some((m) => m[0].includes("openfontlicense.org")), "글꼴 라이선스 링크가 없다");
