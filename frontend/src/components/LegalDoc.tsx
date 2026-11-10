@@ -17,7 +17,7 @@ export function ContactEmail() {
 }
 
 /**
- * 처리방침과 약관이 같이 쓰는 틀.
+ * 처리방침, 약관, 계정 삭제 안내가 같이 쓰는 틀.
  *
  * 글이 길어서 문단마다 클래스를 달지 않고 바깥 한 곳에서 p·ul·ol 의 모양을
  * 정한다. 링크(목차, 메일 주소, 홈·다른 문서로 가기)의 밑줄과 키보드 포커스
@@ -29,11 +29,14 @@ export function LegalDoc({
   intro,
   sections,
   other,
+  showVersion = true,
 }: {
   title: string;
   intro?: ReactNode;
   sections: LegalSection[];
   other: { href: string; label: string };
+  /** 동의를 받는 문서(처리방침·약관)만 버전을 보인다. 안내 글에는 없다. */
+  showVersion?: boolean;
 }) {
   return (
     <main
@@ -57,9 +60,11 @@ export function LegalDoc({
       >
         {title}
       </h1>
-      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        버전 {DOC_VERSION} · 시행일 {EFFECTIVE_DATE}
-      </p>
+      {showVersion && (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          버전 {DOC_VERSION} · 시행일 {EFFECTIVE_DATE}
+        </p>
+      )}
       {intro}
 
       <nav aria-label="목차" className="mt-6">

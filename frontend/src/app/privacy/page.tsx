@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   ContactEmail,
@@ -152,6 +153,8 @@ const SECTIONS: LegalSection[] = [
     ),
   },
   {
+    // 이 절과 4절의 기간은 계정 삭제 안내(app/delete-account)에도 옮겨 적었다.
+    // 여기를 고치면 그쪽도 고친다.
     id: "retention",
     title: "3. 보유·이용 기간",
     body: (
@@ -371,7 +374,8 @@ const SECTIONS: LegalSection[] = [
             확인 메일)을 바꿀 수 있습니다.
           </li>
           <li>
-            삭제: 올린 프로필 사진과 계정은 내정보 화면에서 지울 수 있습니다.
+            삭제: 올린 프로필 사진과 계정은 내정보 화면에서 지울 수
+            있습니다(<Link href="/delete-account">계정 삭제 안내</Link>).
             계정을 삭제하지 않고 구글 프로필 사진 주소만 지우려면 아래 연락처로
             요청합니다. 지운 뒤 다시 구글로 로그인하면 사진 주소가 다시
             저장됩니다.

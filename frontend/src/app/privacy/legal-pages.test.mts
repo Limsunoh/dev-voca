@@ -1,5 +1,5 @@
 /**
- * 처리방침·약관에 쓰면 안 되는 것이 남지 않았는지 본다.
+ * 처리방침·약관·계정 삭제 안내에 쓰면 안 되는 것이 남지 않았는지 본다.
  *
  * 실행: cd frontend && npm test
  *
@@ -25,13 +25,15 @@ mock.module("next/link", {
 const { DOC_VERSION } = await import("../../components/LegalDoc");
 const { default: TermsPage } = await import("../terms/page");
 const { default: PrivacyPage } = await import("./page");
+const { default: DeleteAccountPage } = await import("../delete-account/page");
 
 const pages = {
   privacy: renderToStaticMarkup(createElement(PrivacyPage)),
   terms: renderToStaticMarkup(createElement(TermsPage)),
+  "delete-account": renderToStaticMarkup(createElement(DeleteAccountPage)),
 };
 
-describe("처리방침·약관 화면", () => {
+describe("처리방침·약관·계정 삭제 안내 화면", () => {
   for (const [name, html] of Object.entries(pages)) {
     it(`${name}: 초안의 표시와 부록이 남지 않는다`, () => {
       assert.doesNotMatch(html, /\[(확인 필요|주의|법률 검토)|부록|게시 전|초안 v/);
@@ -62,6 +64,16 @@ describe("처리방침·약관 화면", () => {
     ]) {
       assert.ok(pages.privacy.includes(contact), contact);
     }
+  });
+
+  it("계정 삭제 안내가 앱 이름과 요청 연락처를 적는다", () => {
+    // Google Play 가 요구하는 웹 주소의 조건이다. 동의를 받는 문서가 아니라
+    // 버전 줄은 없다.
+    const html = pages["delete-account"];
+    assert.match(html, /devvoca 계정 삭제 안내/);
+    assert.match(html, /mailto:/);
+    assert.doesNotMatch(html, /버전 v/);
+    assert.match(pages.privacy, /href="\/delete-account"/);
   });
 
   it("문서 버전이 가입할 때 저장하는 버전과 같다", () => {
