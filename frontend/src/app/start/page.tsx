@@ -82,14 +82,16 @@ export default async function StartPage({
 
             폭은 내용 폭을 채우되, 높이가 화면 높이의 30% 를 넘지 않게
             한다. 세로가 짧은 폰(375x667, 폴드 접은 416x657)에서 아래 버튼이
-            화면 밖으로 밀리지 않게 하는 상한이다. 808/694 는 그림의 가로세로 비다. */}
+            화면 밖으로 밀리지 않게 하는 상한이다. 757/509 는 그림의 가로세로 비다.
+
+            그림은 탭 아이콘과 같은 글자 없는 dv 마크다(운영자 결정, 2026-11-11). */}
         <h1 className="rise mt-4 w-full [animation-delay:80ms]">
           <Image
             src={logo}
             alt="dev-voca"
             loading="eager"
             unoptimized
-            className="mx-auto h-auto w-[min(100%,calc(30svh*808/694))]"
+            className="mx-auto h-auto w-[min(100%,calc(30svh*757/509))]"
           />
         </h1>
         <p
