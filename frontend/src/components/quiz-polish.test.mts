@@ -243,7 +243,8 @@ function screen() {
   const tree = render();
   const burst = findAll(tree, named("Burst"))[0];
   const reaction = findAll(tree, named("Reaction"))[0];
-  cursor = 0;
+  // 유형 고르개의 훅 칸이 판의 칸을 읽지 않게 뒤에 붙인다.
+  cursor = slots.length;
   const page = renderToStaticMarkup(tree as never);
   const score = /(\d+)문제 중 (\d+)개/.exec(page);
   const combo = /연속<\/span>(\d+)/.exec(page);
