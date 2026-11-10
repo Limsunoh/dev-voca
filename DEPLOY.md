@@ -168,11 +168,15 @@ CREATE SCHEMA public;
 ```
 railway ssh --service web "python backend/manage.py seed_words"
 railway ssh --service web "python backend/manage.py seed_words_more"
+railway ssh --service web "python backend/manage.py seed_exam_words"
+railway ssh --service web "python backend/manage.py seed_word_aliases"
 railway ssh --service web "python backend/manage.py seed_sentences"
 railway ssh --service web "python backend/manage.py seed_sentences_more"
+railway ssh --service web "python backend/manage.py mark_exam_scope"
 railway ssh --service web "python backend/manage.py seed_phrases --reset"
 railway ssh --service web
-# 붙은 뒤 셸에서: python backend/manage.py createsuperuser
+# 붙은 뒤 셸에서: /app/.venv/bin/python backend/manage.py createsuperuser
+# 대화형 셸에서는 python 이 PATH 에 없다. 명령을 바로 넘기는 위 형태는 python 으로 된다.
 ```
 
 **`seed_phrases` 를 빠뜨리면 일상영어 탭이 반만 돈다.** 개발 용어 갈래는
@@ -193,6 +197,19 @@ railway ssh --service web "python backend/manage.py seed_phrases --reset"
 형태와 새 형태가 둘 다 남아 한 뜻에 두 표현이 출제되고, 뜻만 고친 표현은 옛
 뜻 그대로다. `--reset` 은 Admin 에서 검수를 끈 표현을 다시 켜지 않는다. 단
 **글자를 바꾼 표현은 새 행이라 검수된 채로 다시 들어온다**(옛 행은 지워진다).
+
+**정처기 범위는 `seed_exam_words` 와 `mark_exam_scope` 가 채운다.**
+`seed_exam_words` 는 정처기 범위인데 단어장에 없던 용어 15개를 더하고,
+`mark_exam_scope` 는 이미 있는 단어와 문장에 과목 표시를 단다. 표시는 행이 있어야
+붙으니 문장 시드까지 끝난 뒤에 돌린다. 둘 다 여러 번 돌려도 안전하다.
+
+**`seed_word_aliases` 는 단어 시드 뒤에 돌린다.** 이미 있는 단어에 검색용 한글
+표기("커밋, 커미트")를 채우는 명령이라, 단어가 없으면 "없음" 으로 건너뛴다.
+정처기 용어도 표기가 있어 `seed_exam_words` 뒤에 둔다. 빠뜨려도 단어장 화면은
+그대로이고 "커밋" 같은 한글 검색만 조용히 안 맞는다. 평소에는 빈 칸만 채워
+관리자가 고친 표기를 덮어쓰지 않고, `--reset` 을 주면 명령 파일
+(`seed_word_aliases.py`)의 값으로 덮어쓴다. 명령 파일에서 뺀 단어의 표기는
+`--reset` 으로도 안 지워지니 관리자 화면에서 비운다.
 Admin 에서 꺼 둔 표현의 글자를 소스에서 고쳤다면, 돌린 뒤 Admin 에서 다시 끈다.
 
 ### 방법 2: 데이터를 살린다
@@ -219,7 +236,7 @@ DELETE FROM django_migrations WHERE app='admin';
 
 ```
 railway ssh --service web
-# 붙은 뒤 셸에서: python backend/manage.py createsuperuser
+# 붙은 뒤 셸에서: /app/.venv/bin/python backend/manage.py createsuperuser
 ```
 
 ### 배포 후 확인
