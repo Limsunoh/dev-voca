@@ -85,7 +85,7 @@
  },
  {
   "term": "query",
-  "reading": "**퀴**리"
+  "reading": "**쿼**리"
  },
  {
   "term": "deploy",
@@ -589,7 +589,7 @@
  },
  {
   "term": "query string",
-  "reading": "**퀴**리 s트링"
+  "reading": "**쿼**리 s트링"
  },
  {
   "term": "path parameter",
@@ -781,7 +781,7 @@
  },
  {
   "term": "subquery",
-  "reading": "**썹**퀴리"
+  "reading": "**썹**쿼리"
  },
  {
   "term": "view",
@@ -1301,7 +1301,7 @@
  },
  {
   "term": "media query",
-  "reading": "**미**디어 퀴리"
+  "reading": "**미**디어 쿼리"
  },
  {
   "term": "responsive",
@@ -3553,8 +3553,8 @@
  },
  {
   "term": "slow query",
-  "reading": "s**l로**우 퀴리",
-  "note": "sl 은 s 뒤에 혀끝을 붙인 l 이 바로 이어진다. query 는 '쿼리'보다 '퀴리'에 가깝다."
+  "reading": "s**l로**우 쿼리",
+  "note": "sl 은 s 뒤에 혀끝을 붙인 l 이 바로 이어진다."
  },
  {
   "term": "super key",

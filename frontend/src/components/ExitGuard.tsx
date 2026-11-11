@@ -25,7 +25,29 @@ import { LeaveConfirm } from "./LeaveConfirm";
  * 풀기")와 같은 창을 쓴다. 따로 두면 문구가 어긋난다.
  * 제목만 다르게 둔다. 다른 출구는 새 판으로 옮기는 것이라 "판을
  * 끝낼까요?" 이고, 여기는 문제풀기를 떠나는 것이라 "나가시겠습니까?" 다.
+ *
+ * 폰의 뒤로 가기(Android 의 뒤로 버튼·제스처)도 같은 창으로 묻는다. 앱(TWA)
+ * 에는 이 버튼 말고 그 출구가 늘 있어서, 안 막으면 한 판 도중에 뒤로 한 번
+ * 눌러 점수가 소리 없이 사라진다. 아래 navigate 리스너 참고.
  */
+
+/**
+ * Navigation API 중 여기서 쓰는 것만. TypeScript 5.9 의 dom 정의에 아직 없다.
+ * API 는 Chrome 102 부터 있고, 뒤로 가기를 취소할 수 있게 된 것은 그보다
+ * 나중이다. 2026-11 Chromium(Playwright chromium-1248)에서 취소되는 것을 쟀다.
+ * Chrome 은 사용자가 화면을 누른 뒤 한 번만 취소를 허락한다.
+ */
+type TraverseEvent = Event & {
+  navigationType: "push" | "replace" | "reload" | "traverse";
+  destination: { key: string };
+};
+type NavigationLike = EventTarget & {
+  traverseTo(key: string): { committed: Promise<unknown>; finished: Promise<unknown> };
+};
+
+function navigationApi(): NavigationLike | undefined {
+  return (window as { navigation?: NavigationLike }).navigation;
+}
 export function ExitGuard({
   to,
   label = "나가기",
@@ -88,7 +110,13 @@ export function ExitGuard({
   //
   // RoundBoard 의 busyRef 도 같은 문제를 같은 방식으로 다룬다.
   const leavingRef = useRef(false);
+  // 뒤로 가기를 막고 창을 열었을 때 원래 가려던 기록 자리. 버튼으로 열면 null.
+  const backToRef = useRef<string | null>(null);
+  // 창에서 나가기를 골라 막았던 뒤로 가기를 다시 할 때, 아래 리스너가 또
+  // 막지 않게 한다.
+  const passRef = useRef(false);
   const open = () => {
+    backToRef.current = null;
     setAsked(solvedNow());
     openRef.current?.();
   };
@@ -154,6 +182,76 @@ export function ExitGuard({
       leavingRef.current = false;
     };
   }, [pathname]);
+
+  // 폰의 뒤로 가기를 막고 버튼과 같은 창을 띄운다.
+  //
+  // Next 는 화면을 옮길 때 문서를 새로 열지 않고 기록만 쌓는다. 그래서 뒤로
+  // 가기가 같은 문서 안의 이동이 되어 beforeunload(setUnloadWarning)가 안
+  // 뜨고, 막을 수 있는 곳은 이 navigate 이벤트뿐이다. 기록에 가짜 칸을 하나
+  // 더 넣고 popstate 로 되돌리는 방식은 쓰지 않는다. Chrome 이 사용자 조작 없이
+  // 넣은 칸을 뒤로 가기에서 건너뛰어 막히지 않을 때가 있고, 다른 출구로 나간
+  // 뒤에도 그 칸이 남아 뒤로 가기를 한 번 더 눌러야 한다.
+  //
+  // 막지 못하는 경우는 그대로 둔다(e.cancelable 이 false). Chrome 은 막은 뒤
+  // 사용자가 다시 화면을 누르기 전에는 또 막지 못하게 한다. 그래서 창이 뜬
+  // 뒤 뒤로 가기를 거듭 누른 사람은 나간다. 일부러 나가려는 사람을 가두지
+  // 않는다. Navigation API 가 없는 브라우저도 예전처럼 그냥 나간다. 앞 기록이
+  // 다른 문서일 때(주소로 바로 들어왔거나 새로고침한 뒤)도 막을 수 없고,
+  // beforeunload 만 남는다.
+  //
+  // traverse 라 앞으로 가기도 같이 막는다. 그쪽도 판을 떠나는 것이라 같다.
+  useEffect(() => {
+    if (!confirm && !confirmWhenSolved) return;
+    const nav = navigationApi();
+    if (!nav) return;
+
+    const onNavigate = (event: Event) => {
+      const e = event as TraverseEvent;
+      if (e.navigationType !== "traverse" || !e.cancelable || passRef.current) return;
+      // 이미 나가기로 골라 장막이 내려오는 중(220ms)이면 막지 않는다. 막으면 창이
+      // 장막 위에 다시 뜨고, 예약한 이동이 사용자의 뒤로 가기를 덮는다. 그냥 두면
+      // 위 pathname effect 가 예약을 취소해 뒤로 가기가 이긴다. 경로가 같은
+      // 기록(분류만 다른 문제풀기)으로 가는 뒤로 가기는 cleanup 이 안 돌아
+      // 예약대로 to 로 간다. 이미 나가기로 고른 사람이라 손해는 없다.
+      if (leavingRef.current) return;
+      // 버튼과 같은 기준이다. 문제풀기는 푼 것이 없으면 잃을 것도 없다.
+      if (!confirm && solvedNow() === 0) return;
+      e.preventDefault();
+      backToRef.current = e.destination.key;
+      setAsked(solvedNow());
+      openRef.current?.();
+    };
+    nav.addEventListener("navigate", onNavigate);
+    return () => nav.removeEventListener("navigate", onNavigate);
+  }, [confirm, confirmWhenSolved]);
+
+  // 창에서 나가기를 골랐을 때. 뒤로 가기로 연 창이면 막았던 그 자리로 가고,
+  // 버튼으로 연 창이면 버튼의 목적지(to)로 간다.
+  const confirmLeave = () => {
+    const key = backToRef.current;
+    backToRef.current = null;
+    const nav = navigationApi();
+    if (key === null || !nav) {
+      leave();
+      return;
+    }
+    passRef.current = true;
+    const moving = nav.traverseTo(key);
+    // 이동이 아예 안 일어났으면(그 기록이 사라졌다든지) 버튼의 목적지로 간다.
+    // finished 의 실패로 보지 않는 이유: 이동은 됐는데 뒤이은 다른 이동에
+    // 끊겨도 finished 가 실패한다. 그때 to 로 보내면 이미 도착한 사람을 다시
+    // 밀어낸다.
+    moving.committed.catch(() => {
+      passRef.current = false;
+      leave();
+    });
+    // 같은 경로 안의 이동(검색 조건만 다른 기록)이면 이 컴포넌트가 남으므로
+    // 다음 뒤로 가기를 다시 막을 수 있게 푼다.
+    const release = () => {
+      passRef.current = false;
+    };
+    moving.finished.then(release, release);
+  };
 
   return (
     <>
@@ -247,7 +345,7 @@ export function ExitGuard({
             )
           }
           confirmLabel="나가기"
-          onConfirm={leave}
+          onConfirm={confirmLeave}
         />
       )}
     </>

@@ -12,6 +12,7 @@ import type {
   StudyProgress,
 } from "@/lib/api/daily";
 import type { RoundQuestion, RoundResult } from "@/lib/api/rounds";
+import { fetchOrExplain, jsonOrExplain } from "@/lib/connection";
 import { dailyLengthLabel } from "@/lib/daily-length";
 import { routes } from "@/lib/routes";
 
@@ -45,7 +46,7 @@ import { useFocusNewQuestion } from "./useFocusNewQuestion";
 type Phase = "choosing" | "learning" | "playing" | "done";
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
-  const res = await fetch("/api/daily", {
+  const res = await fetchOrExplain("/api/daily", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -56,7 +57,7 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
     const data = await res.json().catch(() => null);
     throw new Error(data?.detail ?? "요청이 실패했습니다.");
   }
-  return res.json() as Promise<T>;
+  return jsonOrExplain<T>(res);
 }
 
 export function DailyStudyBoard({
