@@ -10,8 +10,8 @@ import {
 } from "@/components/LegalDoc";
 
 export const metadata: Metadata = {
-  title: "개인정보 처리방침 · dev-voca",
-  description: "dev-voca 가 개인정보를 어떻게 처리하는지 안내합니다.",
+  title: "개인정보 처리방침 · DeVoca",
+  description: "DeVoca 가 개인정보를 어떻게 처리하는지 안내합니다.",
 };
 
 const SECTIONS: LegalSection[] = [

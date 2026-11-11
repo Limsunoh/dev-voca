@@ -9,8 +9,8 @@ import {
 } from "@/components/LegalDoc";
 
 export const metadata: Metadata = {
-  title: "이용약관 · dev-voca",
-  description: "dev-voca 서비스 이용 조건을 안내합니다.",
+  title: "이용약관 · DeVoca",
+  description: "DeVoca 서비스 이용 조건을 안내합니다.",
 };
 
 const SECTIONS: LegalSection[] = [

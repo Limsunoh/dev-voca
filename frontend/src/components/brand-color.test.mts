@@ -132,6 +132,7 @@ describe("끊김 안내 화면(offline.html)", () => {
     // 올리고, 아래 표에 새 이름과 새 지문을 적는다.
     const SEEN: Record<string, string> = {
       "offline-v2": "89a5709b06506326630957a9d4326c63cda70c89",
+      "offline-v3": "5ea0676f3eca8178638f3b8717f268b579b02e00",
     };
     const sw = readText(join(PUBLIC, "sw.js"));
     const cache = /const CACHE = "([^"]+)";/.exec(sw)?.[1];

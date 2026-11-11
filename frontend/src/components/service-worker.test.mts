@@ -217,34 +217,34 @@ function req(path: string, mode: string, init: RequestInit = {}) {
 const offline = () => Promise.reject(new TypeError("Failed to fetch"));
 
 describe("sw.js 설치와 정리", () => {
-  it("install 에서 offline.html 을 HTTP 캐시를 거치지 않고 offline-v2 캐시에 넣고 대기를 건너뛴다", async () => {
+  it("install 에서 offline.html 을 HTTP 캐시를 거치지 않고 offline-v3 캐시에 넣고 대기를 건너뛴다", async () => {
     const w = loadWorker({ network: offline });
     await w.dispatch("install");
-    assert.deepEqual(w.log, ["add offline-v2 /offline.html cache=reload"]);
+    assert.deepEqual(w.log, ["add offline-v3 /offline.html cache=reload"]);
     assert.equal(w.self.skipWaiting.mock.callCount(), 1);
   });
 
   it("activate 는 옛 안내 화면 캐시만 지우고 다른 기능의 캐시는 남긴 뒤에 화면을 넘겨받는다", async () => {
     const w = loadWorker({
       network: offline,
-      cacheNames: ["offline-v1", "offline-v2", "something-else"],
+      cacheNames: ["offline-v1", "offline-v2", "offline-v3", "something-else"],
     });
     await w.dispatch("activate");
-    assert.deepEqual([...w.stored.keys()], ["offline-v2", "something-else"]);
+    assert.deepEqual([...w.stored.keys()], ["offline-v3", "something-else"]);
     // 지우기가 다 끝난 다음에 claim 해야 한다.
     assert.equal(w.log.at(-1), "claim");
-    assert.deepEqual(w.log.filter((l) => l.startsWith("delete")), ["delete offline-v1"]);
+    assert.deepEqual(w.log.filter((l) => l.startsWith("delete")), ["delete offline-v1", "delete offline-v2"]);
   });
 
   it("activate 는 navigation preload 를 켠다", async () => {
     const enable = mock.fn(async () => {});
-    const w = loadWorker({ network: offline, cacheNames: ["offline-v2"], navigationPreload: { enable } });
+    const w = loadWorker({ network: offline, cacheNames: ["offline-v3"], navigationPreload: { enable } });
     await w.dispatch("activate");
     assert.equal(enable.mock.callCount(), 1);
   });
 
   it("activate 는 지울 캐시가 없어도 화면을 넘겨받는다", async () => {
-    const w = loadWorker({ network: offline, cacheNames: ["offline-v2"] });
+    const w = loadWorker({ network: offline, cacheNames: ["offline-v3"] });
     await w.dispatch("activate");
     assert.deepEqual(w.log, ["claim"]);
   });

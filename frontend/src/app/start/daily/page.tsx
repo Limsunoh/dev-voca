@@ -7,7 +7,7 @@ import { getCurrentUser, getGuestDailyLength, isGuestChosen } from "@/lib/sessio
 import { saveDailyLengthAction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "하루 공부량 · dev-voca",
+  title: "하루 공부량 · DeVoca",
   description: "일일공부를 몇 분씩 할지 고릅니다.",
 };
 

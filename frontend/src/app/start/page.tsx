@@ -8,7 +8,7 @@ import { StartChoices } from "@/app/start/StartChoices";
 import { getCurrentUser, isGuestChosen } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "dev-voca",
+  title: "DeVoca",
   description: "개발하면서 마주치는 영어, 매일 보다 보면 익숙해집니다.",
 };
 
@@ -88,7 +88,7 @@ export default async function StartPage({
         <h1 className="rise mt-4 w-full [animation-delay:80ms]">
           <Image
             src={logo}
-            alt="dev-voca"
+            alt="DeVoca"
             loading="eager"
             unoptimized
             className="mx-auto h-auto w-[min(100%,calc(30svh*757/509))]"

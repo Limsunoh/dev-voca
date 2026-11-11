@@ -4,7 +4,7 @@ import { RoundBoard } from "@/components/RoundBoard";
 import { getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "한 판 · dev-voca",
+  title: "한 판 · DeVoca",
   description: "90초 안에 몇 문제나 맞히는지. 로그인하면 점수가 순위표에 오릅니다.",
 };
 

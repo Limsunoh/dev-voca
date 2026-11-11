@@ -1,12 +1,13 @@
-"""서비스 이름을 dev-voca 로 바꾼 뒤에도 지켜야 할 것.
+"""서비스 이름을 바꾼 뒤에도 지켜야 할 것. devvoca -> dev-voca -> DeVoca(2026-11-11).
 
 메일은 회원이 받아 보는 글이라 화면과 이름이 달라지면 사칭 메일처럼 읽힌다.
 두 계정 메일(이메일 변경 확인, 휴면 삭제 안내)을 실제 경로로 만들게 해서
 locmem 함에 쌓인 것을 본다. build_* 함수만 부르면 views 나 purge 가 다른
 문구를 쓰게 바뀌어도 모른다.
 
-이름 거름망은 하이픈을 넣은 새 표기로 운영자를 흉내 내는 것을 막는지 본다.
-화면에 "dev-voca" 가 나오므로 이제 이 표기가 가장 그럴듯한 사칭이다.
+이름 거름망은 지금 이름 DeVoca 와 그 변형으로 운영자를 흉내 내는 것을 막는지
+본다. 화면에 "DeVoca" 가 나오므로 이 표기가 가장 그럴듯한 사칭이다. 옛 이름
+dev-voca 도 계속 막는다.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from .tests import CONSENT, EMAIL_CHANGE_URL, PASSWORD, SIGNUP_URL
 
 User = get_user_model()
 
-BRAND_PREFIX = "[dev-voca]"
+BRAND_PREFIX = "[DeVoca]"
 FORBIDDEN_MESSAGE = ["쓸 수 없는 이름입니다. 다른 이름을 입력해주세요."]
 
 # 하이픈 자리에 올 수 있는 글자들. 화면에서는 모두 비슷한 가로줄로 보인다.
@@ -52,10 +53,13 @@ class BrandMailAssertions:
             message.subject.startswith(BRAND_PREFIX),
             f"제목이 {BRAND_PREFIX} 로 시작하지 않는다: {message.subject}",
         )
-        self.assertIn("dev-voca", message.body)
+        self.assertIn("DeVoca", message.body)
         for text in (message.subject, message.body):
-            # 대소문자를 바꾼 옛 표기(DevVoca)도 남으면 안 된다.
-            self.assertNotIn("devvoca", text.casefold())
+            # 옛 표기는 대소문자를 바꾼 것(DevVoca, Dev-Voca)도 남으면 안 된다.
+            # 웹 주소 dev-voca.vercel.app 은 이름이 아니라 그대로다.
+            folded = text.casefold().replace("dev-voca.vercel.app", "")
+            self.assertNotIn("devvoca", folded)
+            self.assertNotIn("dev-voca", folded)
 
 
 class EmailChangeMailBrandTest(BrandMailAssertions, TestCase):
@@ -105,7 +109,55 @@ class PurgeNoticeMailBrandTest(BrandMailAssertions, PurgeTestBase):
 
 
 class BrandNameImpersonationTest(SimpleTestCase):
-    """새 표기와 그 변형으로 운영자를 흉내 내는 이름을 막는다."""
+    """서비스 이름과 그 변형으로 운영자를 흉내 내는 이름을 막는다."""
+
+    def test_지금_이름과_그_변형을_막는다(self):
+        for name in (
+            "DeVoca",
+            "devoca",
+            "DEVOCA",
+            "De Voca",
+            "De.Voca",
+            "d-e-v-o-c-a",
+            "ｄｅｖｏｃａ",
+            "De\u200bVoca",
+            "De\u00adVoca",
+            "De\u3164Voca",
+            "DeVoca 공식",
+            "DeVoca운영자",
+            "공식DeVoca",
+            "official devoca",
+            "OfficialDeVoca",
+            "TeamDeVoca",
+            "DeVocaTeam",
+            "DeVoca_official",
+            "DEVOCAteam",
+            "kim_devoca",
+            "DeVoca123",
+            "데보카",
+            "데 보 카",
+            "공식데보카",
+        ):
+            with self.subTest(name=name):
+                self.assertTrue(name_is_forbidden(name))
+
+    def test_devoca_를_품은_평범한_이름은_막지_않는다(self):
+        """다른 낱말에 붙어 devoca 가 되는 이름. 단어장 앱이라 vocab 이 흔하다."""
+        for name in (
+            "codevocab",
+            "CodeVocab",
+            "code vocab",
+            "code_vocal",
+            "MadeVocal",
+            "dev_ocaml",
+            "Dev Ocampo",
+            "devocalize",
+            "de vocab",
+            "DEV_OCAML",
+            "DEVOCALIZE",
+        ):
+            with self.subTest(name=name):
+                self.assertFalse(name_is_forbidden(name))
 
     def test_하이픈_닮은_글자를_넣은_표기를_모두_막는다(self):
         for dash in HYPHEN_LOOKALIKES:
@@ -113,7 +165,7 @@ class BrandNameImpersonationTest(SimpleTestCase):
                 with self.subTest(name=name, code=f"U+{ord(dash):04X}"):
                     self.assertTrue(name_is_forbidden(name))
 
-    def test_새_표기에_말을_덧붙여도_막는다(self):
+    def test_옛_표기_dev_voca_에_말을_덧붙여도_막는다(self):
         for name in (
             "Dev-Voca 공식",
             "dev-voca운영자",
@@ -138,13 +190,21 @@ class BrandNameImpersonationTest(SimpleTestCase):
 
 
 class SignUpBrandNameTest(TestCase):
-    """가입 경로에서도 새 표기가 400 으로 막히고 계정이 안 생긴다."""
+    """가입 경로에서도 서비스 이름이 400 으로 막히고 계정이 안 생긴다."""
 
     def setUp(self):
         cache.clear()
 
-    def test_새_표기로_가입하면_400(self):
-        names = ("dev-voca", "Dev-Voca 공식", "dev‐voca", "dev–voca")
+    def test_서비스_이름으로_가입하면_400(self):
+        names = (
+            "DeVoca",
+            "DeVoca 공식",
+            "데보카",
+            "dev-voca",
+            "Dev-Voca 공식",
+            "dev‐voca",
+            "dev–voca",
+        )
         for number, name in enumerate(names):
             # 주소를 따로 둔다. 하나가 뚫려 계정이 생기면 다음 시도가 "이미 쓰는
             # 주소" 로 막혀 거름망이 막은 것처럼 보이기 때문이다.

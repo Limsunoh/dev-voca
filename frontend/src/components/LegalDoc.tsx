@@ -51,7 +51,7 @@ export function LegalDoc({
         style={{ minHeight: "var(--hit-floor)", color: "var(--text-muted)" }}
       >
         {/* 링크가 flex 라 이름과 " 홈으로" 를 그대로 두면 서로 다른 칸이 되고,
-            칸 맨 앞 공백이 지워져 "dev-voca홈으로" 로 붙는다. 한 칸으로 묶는다. */}
+            칸 맨 앞 공백이 지워져 "DeVoca홈으로" 로 붙는다. 한 칸으로 묶는다. */}
         <span>
           <BrandName /> 홈으로
         </span>

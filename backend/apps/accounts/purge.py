@@ -61,12 +61,12 @@ def due_for_delete() -> QuerySet:
 def build_notice_mail() -> tuple[str, str]:
     """안내 메일의 (제목, 본문). 광고 문구를 섞지 않는다."""
     days = DELETE_AFTER_NOTICE_DAYS
-    subject = f"[dev-voca] 오래 이용하지 않은 계정을 {days}일 뒤 삭제합니다"
+    subject = f"[DeVoca] 오래 이용하지 않은 계정을 {days}일 뒤 삭제합니다"
     body = (
-        "dev-voca 계정을 오랫동안 이용하지 않으셔서 안내드립니다.\n\n"
+        "DeVoca 계정을 오랫동안 이용하지 않으셔서 안내드립니다.\n\n"
         f"{days}일 안에 이용하지 않으시면 계정과 학습 기록(점수, 오답 노트, 복습 기록)이 "
         "삭제되며 되돌릴 수 없습니다.\n\n"
-        f"계속 쓰시려면 {days}일 안에 dev-voca 에 로그인해 주세요. 이용하시면 이 안내는 "
+        f"계속 쓰시려면 {days}일 안에 DeVoca 에 로그인해 주세요. 이용하시면 이 안내는 "
         "취소됩니다.\n"
     )
     return subject, body
