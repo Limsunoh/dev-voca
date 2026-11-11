@@ -21,12 +21,33 @@ Google 의 Bubblewrap 1.27 로 만들었다. 이름·색·아이콘 주소는 �
 ## 웹과 앱을 잇는 확인 파일
 
 `frontend/public/.well-known/assetlinks.json` 에 앱 서명 지문이 있어야 앱 위에
-주소창이 안 보인다. 지문은 둘이다.
+주소창이 안 보인다. 지문은 넷이고 모두 넣었다(2026-11-12).
 
-- 업로드 키 지문: 이 PC 에서 서명해 폰에 직접 설치할 때 쓰인다. 이미 넣었다.
-- Play 앱 서명 키 지문: Play 에서 내려받은 앱에 쓰인다. Play Console 의
-  "설정 > 앱 서명" 에 나온다. **앱을 만든 뒤 이 파일에 더해야 한다.** 빠지면
-  직접 설치한 앱은 멀쩡한데 Play 에서 받은 앱에만 주소창이 떠서 놓치기 쉽다.
+- 업로드 키(`55:46:…`): 이 PC 에서 서명해 폰에 직접 설치한 앱.
+- Play 앱 서명 키 세 개: Play 에서 내려받은 앱은 Google 이 가진 키로 다시
+  서명된다. Play 는 새 앱에 양자 내성 하이브리드 서명을 기본으로 켜서 키가
+  세 개이고, 폰의 Android 버전마다 확인하는 키가 다르다.
+  - Android 16 이하용 키(`E4:B3:…`): Play Console 의 앱 서명 화면이 보여 주는
+    Digital Asset Links JSON 에 들어 있는 값이다. 인증서 파일은 받지 않아
+    화면 값을 그대로 옮겼다.
+  - 하이브리드 RSA 키(`81:C5:…`)와 ML-DSA-65 키(`2C:0E:…`): Android 17 이상용.
+    같은 화면에서 받은 인증서 파일 `hybrid_classical_cert.der`,
+    `hybrid_pqc_cert.der` 의 SHA-256 이다. 아래 명령으로 다시 뽑을 수 있다.
+
+```bash
+openssl x509 -inform DER -in hybrid_pqc_cert.der -noout -fingerprint -sha256
+```
+
+Play Console 이 보여 주는 JSON 에는 첫 키 하나만 있다. 그것만 넣으면 Android
+17 이상 폰에서 Play 로 받은 앱에만 주소창이 뜰 수 있어 놓치기 쉽다. Google 의
+Play 앱 서명 도움말(https://support.google.com/googleplay/android-developer/answer/9842756)
+도 하이브리드 서명이면 키 세 개를 모두 등록하라고 한다.
+
+Play 가 키를 바꾸거나 올리면 이 파일과 `frontend/src/app/manifest.test.mts` 의
+지문 표를 같이 고친다. `assetlinks.json` 은 손으로 관리한다.
+`twa-manifest.json` 의 `fingerprints` 는 비어 있어서, `bubblewrap fingerprint
+generateAssetLinks` 가 만드는 파일은 지문이 빈 채로 나온다. 그 결과로 이 파일을
+바꾸지 않는다.
 
 ## 다시 빌드하기
 
