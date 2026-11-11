@@ -23,8 +23,8 @@
  *   3. 일일공부·복습: 쿠키 토큰(getToken)으로 바로 묻는다. 토큰이 없거나
  *      백엔드가 401 이면 /login?next=... 로 보낸다. 다른 오류는 실패 화면.
  *   4. 오늘 카드(loadToday): 토큰이 없으면 묻지 않고 둘 다 null. 실패하면
- *      null 로 바꾸되 401 은 로그를 안 남기고 그 밖의 실패만 남긴다. 홈은
- *      getToken 을 그대로 넘긴다.
+ *      null 로 바꾸되 401 은 로그를 안 남기고 그 밖의 실패만 남긴다. 홈과
+ *      문제풀기 허브(/test)는 getToken 을 그대로 넘긴다.
  */
 import assert from "node:assert/strict";
 import { after, beforeEach, describe, it, mock } from "node:test";
@@ -131,6 +131,8 @@ const RoundPage = (await import("./round/page")).default;
 const DailyPage = (await import("./daily/page")).default;
 const ReviewPage = (await import("./review/page")).default;
 const Home = (await import("../page")).default;
+// 허브는 (hub) 묶음 안에 있다(대기 화면을 허브에만 두려고). 주소는 그대로 /test 다.
+const TestHub = (await import("./(hub)/page")).default;
 const { BoardScreen } = await import("../board/BoardScreen");
 const { loadToday } = await import("../../components/TodayCards");
 
@@ -318,6 +320,24 @@ describe("홈", () => {
     const today = calls.filter((c) => isToday(c.path));
     assert.equal(today.length, 2, JSON.stringify(calls));
     assert.ok(today.every((c) => c.auth === `Token ${DEAD}`));
+    assert.deepEqual(logged, []);
+  });
+});
+
+describe("문제풀기 허브(/test)", () => {
+  it("쿠키의 토큰을 오늘 카드 두 조회에 그대로 싣는다", async () => {
+    liveCookie();
+    await TestHub();
+    const today = calls.filter((c) => isToday(c.path));
+    assert.equal(today.length, 2, JSON.stringify(calls));
+    assert.ok(today.every((c) => c.auth === `Token ${LIVE}`));
+  });
+
+  it("죽은 토큰이어도 허브가 뜨고 오늘 카드의 401 은 로그에 안 남는다", async () => {
+    deadCookie();
+    const tree = await TestHub();
+    assert.match(textOf(tree), /문제풀기/);
+    assert.equal(calls.filter((c) => isToday(c.path)).length, 2, JSON.stringify(calls));
     assert.deepEqual(logged, []);
   });
 });

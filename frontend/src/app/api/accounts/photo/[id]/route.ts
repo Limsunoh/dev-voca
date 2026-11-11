@@ -1,4 +1,4 @@
-import { apiBase } from "@/lib/api/client";
+import { apiBase, readTimeout } from "@/lib/api/client";
 
 /**
  * 올린 프로필 사진 중계.
@@ -44,6 +44,9 @@ export async function GET(
           : {}),
       },
       cache: "no-store",
+      // 늦으면 끊는다(client.ts 의 readTimeout). 끊겨도 화면은 아래와
+      // 같이 아바타로 떨어진다.
+      signal: readTimeout(),
     });
   } catch {
     // 백엔드가 안 떠 있는 경우. 화면은 이 그림이 안 뜨면 아바타로
