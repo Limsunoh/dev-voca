@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Burst } from "@/components/Burst";
 import { Reaction } from "@/components/Reaction";
 import type { GradeResult, QuizContent, Question } from "@/lib/api/quiz";
+import { ConnectionLost, fetchOrExplain, jsonOrExplain } from "@/lib/connection";
 import { clearSolved, markSolved } from "@/lib/quiz-progress";
 import {
   choicesAreTerms,
@@ -48,9 +49,9 @@ async function fetchQuestion(params: {
   if (params.kind) query.set("kind", params.kind);
   if (params.content !== "words") query.set("content", params.content);
 
-  const res = await fetch(`/api/quiz?${query}`, { cache: "no-store" });
+  const res = await fetchOrExplain(`/api/quiz?${query}`, { cache: "no-store" });
   if (!res.ok) throw new Error(String(res.status));
-  return res.json();
+  return jsonOrExplain<Question>(res);
 }
 
 async function submitAnswer(
@@ -132,6 +133,12 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
   const [picked, setPicked] = useState<number | null>(null);
   const [result, setResult] = useState<GradeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 문제를 못 받은 것이 잠깐의 일(연결 끊김, 서버 오류)인가. 그러면 오류 화면의
+   * 버튼이 점수를 지우는 "처음부터 다시" 가 아니라 "다시 시도" 다. 지하철에서
+   * 한 번 끊겼다고 그때까지 푼 것을 버리게 하지 않는다.
+   */
+  const [retryable, setRetryable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [score, setScore] = useState({ solved: 0, correct: 0 });
 
@@ -239,6 +246,7 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
 
       setLoading(true);
       setError(null);
+      setRetryable(false);
       setPicked(null);
       setResult(null);
       questionSeqRef.current += 1;
@@ -280,6 +288,9 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
         // 때는 남겨 둬서, 다시 누르면 원래 청한 항목이 나온다.
         const itemRejected = Boolean(wanted) && (notFound || status === "400");
         if (itemRejected) itemRef.current = undefined;
+        // 끊김과 서버 오류(5xx)만 다시 누르면 될 수 있어 점수를 지키는 쪽
+        // 버튼을 준다. 404·400(잘못된 분류 등)은 다시 보내도 같은 답이 온다.
+        setRetryable(e instanceof ConnectionLost || Number(status) >= 500);
         // 유형을 골랐으면 그것을 문구에 적는다. 설명 문제는 설명이
         // 있는 단어로만, 빈칸 문제는 용어가 든 문장으로만 낼 수 있어서
         // 유형 하나로는 금방 바닥난다. "다 풀었습니다" 만 뜨면 분류만
@@ -291,7 +302,9 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
               ? KIND_EXHAUSTED
               : notFound
                 ? "낼 수 있는 문제를 다 풀었습니다. 분류를 넓히거나 처음부터 다시 시작해보세요."
-                : "문제를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+                : e instanceof ConnectionLost
+                  ? e.message
+                  : "문제를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
         );
       } finally {
         setLoading(false);
@@ -530,7 +543,7 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
           {/* 유형 때문에 못 낸 것이면 유형을 섞어서로 돌린다. "처음부터 다시"
               를 두면 점수를 지우고도 같은 유형이라 같은 안내가 또 뜬다 -
               분류·유형에 따라 이 화면에 곧바로 닿기 쉬워서 그 손해가 크다.
-              점수는 그대로 이어진다. 한 화면에 갈색은 하나라 둘 중 하나만. */}
+              점수는 그대로 이어진다. 한 화면에 갈색은 하나라 셋 중 하나만. */}
           {error === KIND_EXHAUSTED ? (
             <button
               type="button"
@@ -548,6 +561,26 @@ export function QuizBoard({ category, content = "words", item, picker }: Props) 
               }
             >
               섞어서로 풀기
+            </button>
+          ) : retryable ? (
+            // 잠깐 못 받은 것이면 같은 요청을 다시 보낸다. 점수, 푼 목록, 상세에서
+            // 청한 항목(itemRef)을 그대로 둔다.
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="dv-btn mt-4 px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              style={
+                {
+                  minHeight: "var(--hit-min)",
+                  background: "var(--brand)",
+                  color: "var(--text-on-color)",
+                  borderRadius: "var(--radius-pill)",
+                  fontWeight: "var(--weight-black)",
+                  "--lift": "var(--lift-button)",
+                } as React.CSSProperties
+              }
+            >
+              다시 시도
             </button>
           ) : (
             <button

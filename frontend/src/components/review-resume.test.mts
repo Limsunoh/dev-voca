@@ -29,6 +29,7 @@ import { after, beforeEach, describe, it, mock } from "node:test";
 
 import type { RoundQuestion } from "@/lib/api/rounds";
 import type { ReviewAnswered, ReviewQuestion, ReviewStarted } from "@/lib/api/review";
+import { connectionLostMessage } from "@/lib/connection";
 
 const realReact = await import("react");
 
@@ -512,7 +513,8 @@ describe("복습 이어 풀기 - 답이 거절되거나 실패하면", () => {
       const html = draw(createElement(ReviewBoard, { due: DUE, userId: 7 }));
       assert.ok(html.includes(SAVED.question.prompt));
       assert.match(html, />3 \/ 5</);
-      const shown = reply instanceof Error ? reply.message : reply.detail;
+      // 끊김은 브라우저의 영어 문구가 아니라 사람이 읽을 문구로 보인다.
+      const shown = reply instanceof Error ? connectionLostMessage() : reply.detail;
       assert.ok(html.includes(shown), "오류 문구가 안 보인다");
 
       // 같은 토큰으로 다시 보내면 이어진다.
@@ -796,7 +798,8 @@ describe("복습 이어 풀기 - '새로 시작' 과 겹치는 조작", () => {
       assert.equal(storage.data.get(KEY), before, "새 판을 못 열었는데 옛 판이 바뀌었다");
       const html = draw(createElement(ReviewBoard, { due: DUE, userId: 7 }));
       assert.match(html, /이어서 풀기/);
-      const shown = reply instanceof Error ? reply.message : reply.detail;
+      // 끊김은 브라우저의 영어 문구가 아니라 사람이 읽을 문구로 보인다.
+      const shown = reply instanceof Error ? connectionLostMessage() : reply.detail;
       assert.ok(html.includes(shown), "실패 문구가 안 보인다");
 
       // 이어 풀면 오류 문구가 걷히고 적어 둔 토큰으로 답한다.
