@@ -11,6 +11,7 @@ import type {
   ReviewStarted,
 } from "@/lib/api/review";
 import type { RoundChoice } from "@/lib/api/rounds";
+import { fetchOrExplain, jsonOrExplain } from "@/lib/connection";
 import { routes } from "@/lib/routes";
 
 import { Burst } from "./Burst";
@@ -966,7 +967,7 @@ function DoneCard({
 }
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
-  const res = await fetch("/api/review", {
+  const res = await fetchOrExplain("/api/review", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -977,5 +978,5 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
     const data = await res.json().catch(() => null);
     throw new CallError(data?.detail ?? "요청이 실패했습니다.", res.status);
   }
-  return res.json() as Promise<T>;
+  return jsonOrExplain<T>(res);
 }

@@ -15,6 +15,7 @@ import type {
   RoundStarted,
   RoundSummary,
 } from "@/lib/api/rounds";
+import { fetchOrExplain, jsonOrExplain } from "@/lib/connection";
 import { setUnloadWarning } from "@/lib/quiz-progress";
 import { routes } from "@/lib/routes";
 import { useFocusNewQuestion } from "@/components/useFocusNewQuestion";
@@ -37,7 +38,7 @@ type Phase = "idle" | "playing" | "done";
 
 /** 중계에 보낼 것. action 으로 세 동작이 갈린다. */
 async function call<T>(body: Record<string, unknown>): Promise<T> {
-  const res = await fetch("/api/rounds", {
+  const res = await fetchOrExplain("/api/rounds", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -48,7 +49,7 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
     const data = await res.json().catch(() => null);
     throw new Error(data?.detail ?? "요청이 실패했습니다.");
   }
-  return res.json() as Promise<T>;
+  return jsonOrExplain<T>(res);
 }
 
 export function RoundBoard({ isGuest }: { isGuest: boolean }) {
