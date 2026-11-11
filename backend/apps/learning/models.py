@@ -222,6 +222,35 @@ class RoundStep(models.Model):
     step = models.PositiveIntegerField("순번")
     created_at = models.DateTimeField("만든 때", auto_now_add=True)
 
+    # 이 순번에 받은 답("choice:12" 나 "skip")과 그때 돌려준 응답.
+    #
+    # 응답만 끊긴 사람(지하철)이 같은 토큰·같은 답을 다시 보내면 이 응답을
+    # 그대로 돌려준다(session.answer). 새로 채점하지 않으므로 경과 시간도
+    # 처음 것이다. 다른 답이면 지금처럼 거절한다 - 보기 넷을 동시에 보내
+    # 맞은 것만 남기는 길은 유일 제약이 하나만 통과시키는 것으로 그대로 막힌다.
+    #
+    # 응답을 행과 한 INSERT 로 넣는다. 나중에 채우면 같은 답이 동시에 두 번
+    # 왔을 때 진 쪽이 빈 응답을 보고 거절된다.
+    #
+    # 복습(review.py)은 쓰지 않아 빈 값이다. 응답에 판 토큰이 들어 있어 행이
+    # 수 KB 가 된다(토큰은 압축해 서명한다, session._sign). 판 토큰 수명(10분)이
+    # 지난 행은 판을 열 때 가끔(session._SWEEP_CHANCE)과 매일 정리
+    # (daily_cleanup)가 지운다. 판이 뜸하면 하루까지 남는다.
+    #
+    # 돌려주는 응답은 처음 처리할 때 만든 것이다. 그 사이(최대 10분) 관리자가
+    # 단어 검수를 취소해도 다시 보낸 사람에게는 그때의 정답·다음 문제가 나간다.
+    # 이미 화면에 뜬 문제가 검수 취소로 사라지지 않는 것과 같은 범위다.
+    #
+    # choice 에 db_default 를 둔다. 이 칸을 모르는 코드(배포 중 잠깐 남는 옛
+    # 서버, 백엔드를 되돌린 경우, 같은 로컬 DB 를 쓰는 다른 브랜치)가 행을 넣으면
+    # 이 칸이 빠진 INSERT 가 된다. DB 에 기본값이 없으면 NOT NULL 에 걸리고,
+    # 옛 _take_step 은 그 IntegrityError 를 되돌리기로 읽어 모든 답을 거절한다
+    # (accounts.User.daily_length 와 같은 이유).
+    choice = models.CharField(
+        "받은 답", max_length=32, blank=True, default="", db_default=""
+    )
+    reply = models.JSONField("돌려준 응답", null=True, blank=True, default=None)
+
     class Meta:
         verbose_name = "판 진행 표시"
         verbose_name_plural = "판 진행 표시"

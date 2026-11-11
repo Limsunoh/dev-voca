@@ -338,23 +338,46 @@ class ReplayTest(TestCase):
         1. 아무거나 골라 보낸다 -> 응답이 정답을 알려준다
         2. 원래 토큰 + 알아낸 정답으로 다시 보낸다 -> 제한 시간 안이라 +1
         """
-        saved, question = session.start()
-
-        _, first, _ = session.answer(saved, self._wrong_choice(question))
+        # 첫 보기가 오답인 판을 고른다. 첫 보기가 우연히 정답이면 2 번이 같은
+        # 답의 재전송이라 처음 응답이 그대로 온다(session._take_step) - 그때는
+        # 이미 +1 을 받았으니 캐낼 것이 없다. 보기가 넷이라 대개 한두 판이면 된다.
+        for _ in range(30):
+            saved, question = session.start()
+            picked = self._wrong_choice(question)
+            _, first, _ = session.answer(saved, picked)
+            if first.answer_id != picked:
+                break
+        else:
+            self.fail("첫 보기가 오답인 판을 30번 안에 못 만났다")
 
         with self.assertRaises(session.SessionError):
             session.answer(saved, first.answer_id)
 
     def test_replay_cannot_reset_skips(self):
-        """넘기기를 다 쓴 뒤 옛 토큰으로 되돌려 다시 넘길 수 없다."""
+        """넘기기를 다 쓴 뒤 옛 토큰으로 되돌려 다시 넘길 수 없다.
+
+        옛 토큰으로 같은 넘기기를 다시 보내면 거절 대신 처음 응답이 온다(응답만
+        끊긴 사람을 위한 것, session._take_step). 그 응답의 토큰은 넘기기를
+        이미 한 번 쓴 것이고, 거기서 이어 넘겨도 처음과 같은 토큰만 다시 온다.
+        넷째 넘기기는 끝까지 막힌다.
+        """
         token, _ = session.start()
         before_skips = token
+        issued = []
 
         for _ in range(session.MAX_SKIPS):
             token, _, _ = session.answer(token, None, skip=True)
+            issued.append(token)
+
+        replayed, _, _ = session.answer(before_skips, None, skip=True)
+        self.assertEqual(replayed, issued[0])
+
+        for expected in issued[1:]:
+            replayed, _, _ = session.answer(replayed, None, skip=True)
+            self.assertEqual(replayed, expected)
 
         with self.assertRaises(session.SessionError):
-            session.answer(before_skips, None, skip=True)
+            session.answer(replayed, None, skip=True)
 
     def test_normal_play_is_not_affected(self):
         """정상 진행은 그대로 이어져야 한다."""
@@ -440,12 +463,16 @@ class ReplayTest(TestCase):
         방어는 표(RoundStep)에 있으므로 캐시와 무관해야 한다.
         """
         saved, question = session.start()
-        _, first, _ = session.answer(saved, question["choices"][0]["id"])
+        picked = question["choices"][0]["id"]
+        _, first, _ = session.answer(saved, picked)
 
         cache.clear()  # cull 이 전부 쓸어간 최악의 경우
 
+        # 처음과 다른 답으로 되돌린다. 첫 보기가 우연히 정답이면 정답을 보내는
+        # 것이 같은 답의 재전송이라 처음 응답이 온다(session._take_step).
+        other = first.answer_id if first.answer_id != picked else question["choices"][1]["id"]
         with self.assertRaises(session.SessionError):
-            session.answer(saved, first.answer_id)
+            session.answer(saved, other)
 
     def _sweep_now(self):
         """확률을 걷어내고 sweep 을 실제로 돌린다.

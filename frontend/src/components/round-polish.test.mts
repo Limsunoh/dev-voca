@@ -650,9 +650,11 @@ describe("고른 보기 표시", () => {
     assert.equal(pickedNow(), null);
   });
 
-  it("채점이 실패해도 지워진다", async () => {
+  it("채점이 거절돼도 지워진다", async () => {
+    // 4xx 는 서버가 거절한 것이라 다시 보낼 답이 없다. 5xx 나 연결 끊김은
+    // 같은 답을 다시 보내야 해서 표시를 남긴다(round-answer-retry.test.mts).
     await openRound();
-    replies.push({ fail: 500, detail: "x" });
+    replies.push({ fail: 400, detail: "x" });
     await pick(1);
     assert.equal(pickedNow(), null);
   });
