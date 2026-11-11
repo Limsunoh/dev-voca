@@ -3,11 +3,13 @@
 비밀값과 환경별 값은 프로젝트 루트의 .env 에서 읽는다. (.env.example 참고)
 """
 
+import copy
 import os
 import sys
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.log import DEFAULT_LOGGING
 from dotenv import load_dotenv
 
 # backend/config/settings.py -> backend/ -> devvoca/
@@ -166,6 +168,22 @@ elif EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# 운영에서 500 이 나면 보내는 계정(운영자 Gmail)으로 알린다. 그동안은 ADMINS 가
+# 없어서 오류가 나도 아무도 몰랐다. 받는 곳을 따로 두지 않고 보내는 계정으로
+# 하는 이유: 운영자가 한 사람이고, 새 환경변수를 두면 Railway 설정을 또 맞춰야
+# 한다. 보내는 계정이 없으면(로컬·CI) 비워서 아무 데도 안 보낸다.
+ADMINS = [("DeVoca", EMAIL_HOST_USER)] if EMAIL_HOST_USER else []
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+EMAIL_SUBJECT_PREFIX = "[DeVoca 오류] "
+
+# Django 기본 로그 설정을 그대로 쓰고, 오류 메일을 보내는 처리기만 바꾼다. 바꾼
+# 처리기는 처리하지 못한 예외만, 같은 것은 한 시간에 한 통, 회원 정보 없는 짧은
+# 알림으로 보낸다. 이유는 apps/accounts/error_mail.py 머리 주석.
+LOGGING = copy.deepcopy(DEFAULT_LOGGING)
+LOGGING["handlers"]["mail_admins"]["class"] = (
+    "apps.accounts.error_mail.ThrottledAdminEmailHandler"
+)
 
 
 INSTALLED_APPS = [
