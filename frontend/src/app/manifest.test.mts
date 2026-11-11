@@ -93,9 +93,21 @@ describe("Android 앱(TWA)과 웹을 잇는 확인 파일", () => {
     for (const p of prints) assert.match(p, /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
   });
 
-  // 지금은 업로드 키 지문 하나다. Play 에서 받은 앱은 Play 앱 서명 키로 서명되어,
-  // 그 지문이 없으면 앱 위에 주소창이 뜬다. 더하면 이 줄을 지운다.
-  it.todo("Play 앱 서명 키 지문을 assetlinks.json 에 더한다 (android/README.md)");
+  it("업로드 키와 Play 앱 서명 키 셋의 지문이 모두 있다", () => {
+    // Play 에서 받은 앱은 Google 의 키로 다시 서명되고, 폰의 Android 버전마다
+    // 확인하는 키가 다르다(android/README.md). 하나가 빠지면 그 버전의 폰에서만
+    // 앱 위에 주소창이 떠서 놓치기 쉽다.
+    const prints: string[] = links[0].target.sha256_cert_fingerprints;
+    const keys = {
+      upload: "55:46:6F:41:B6:46:8B:C8:8B:52:A9:C5:17:F3:28:70:EE:B7:A6:96:09:EA:5E:C9:D1:D1:1D:4C:50:1D:9A:91",
+      playAndroid16AndLower: "E4:B3:A1:EF:96:40:98:87:3B:AD:05:EB:DF:82:B9:41:C4:27:05:71:C7:11:19:54:B6:06:97:8E:07:00:F6:98",
+      playHybridClassical: "81:C5:6F:3A:67:9D:5C:EC:A6:A5:9B:CD:FA:33:1F:21:3A:55:08:25:86:23:8E:57:A1:BB:ED:ED:4B:DB:CB:5C",
+      playHybridPqc: "2C:0E:86:C1:CC:F6:23:70:A4:46:94:28:8A:90:D3:1D:2F:47:9E:CE:B1:1C:BB:20:4F:FC:DE:79:05:9F:A4:62",
+    };
+    for (const [name, print] of Object.entries(keys)) {
+      assert.ok(prints.includes(print), `${name} 지문이 빠졌다`);
+    }
+  });
 
   it("Android 앱이 이 웹의 이름·시작 주소를 쓴다", () => {
     assert.equal(twa.host, "dev-voca.vercel.app");
