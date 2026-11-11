@@ -189,15 +189,52 @@ function loginToBoard(kind: BoardKind): string {
 }
 
 /**
+ * 빈 표에서 첫 사람을 부르는 말. 탭마다 오르는 조건이 다르다.
+ *
+ * 최고점 두 표는 한 문제라도 답한 판을 끝내면 오른다(음수도 0점으로 오른다,
+ * backend leaderboards._best_by_user, views.RoundFinishView 의 answered > 0).
+ * 꾸준함은 하루 점수가 1점 이상인 날이 있어야 오른다(_streak_by_user 가 0일을
+ * 뺀다). 하루 점수는 그날 가장 높은 판과 일일공부 점수의 합이라, 일일공부로
+ * 점수를 얻어도 그날 판이 음수면 0점이 될 수 있다. 그래서 꾸준함에는 "한 판"
+ * 이나 "점수를 얻으면" 이라고 하지 않고 하루 점수로 말한다. 하루 점수는 내
+ * 학습 기록(MyHistory)에 나오는 말이다.
+ *
+ * 게스트 문구도 탭마다 둔다. 하나로 쓰면 꾸준함 탭에서 다시 너무 넓게 약속한다.
+ *
+ * 출시 첫날만의 말로 쓰지 않는다. 이번 주 표는 매주 월요일에 다시 빈다.
+ */
+const EMPTY_TEXT: Record<
+  BoardKind,
+  { headline: string; member: string; guest: string }
+> = {
+  weekly: {
+    headline: "이번 주 1등 자리가 비어 있습니다.",
+    member: "지금 한 판을 끝내면 이번 주 1등으로 올라갑니다.",
+    guest: "로그인하고 한 판을 끝내면 이번 주 1등으로 올라갑니다.",
+  },
+  all_time: {
+    headline: "전체 1등 자리가 비어 있습니다.",
+    member: "지금 한 판을 끝내면 1등으로 올라갑니다.",
+    guest: "로그인하고 한 판을 끝내면 1등으로 올라갑니다.",
+  },
+  streak: {
+    headline: "꾸준함 1등 자리가 비어 있습니다.",
+    member: "오늘 하루 점수를 1점 이상 모으면 1등으로 올라갑니다.",
+    guest: "로그인하고 하루 점수를 1점 이상 모으면 1등으로 올라갑니다.",
+  },
+};
+
+/**
  * 아직 아무도 없을 때.
  *
  * 0 을 채운 가짜 줄을 두지 않는다 - 0 은 "아직 아무도 안 함" 이 아니라
  * "누군가 0점을 냈다" 로 읽힌다.
  *
  * 게스트에게는 로그인을 권한다. 게스트가 푼 판은 순위표에 오르지 않아서,
- * "한 판만 풀어도 올라간다" 를 믿고 풀면 다 풀고도 여전히 빈 표를 본다.
+ * "한 판을 끝내면 올라간다" 를 믿고 풀면 다 풀고도 여전히 빈 표를 본다.
  */
 function EmptyBoard({ kind, isGuest }: { kind: BoardKind; isGuest: boolean }) {
+  const text = EMPTY_TEXT[kind];
   return (
     <div
       className="mt-6 px-5 py-10 text-center dv-card"
@@ -215,12 +252,10 @@ function EmptyBoard({ kind, isGuest }: { kind: BoardKind; isGuest: boolean }) {
           fontWeight: "var(--weight-bold)",
         }}
       >
-        아직 아무도 오르지 않았습니다.
+        {text.headline}
       </p>
       <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-        {isGuest
-          ? "로그인하고 한 판을 풀면 이 자리에 이름이 올라갑니다."
-          : "한 판만 풀어도 이 자리에 이름이 올라갑니다."}
+        {isGuest ? text.guest : text.member}
       </p>
 
       {/* 이 화면에서 갈색 버튼은 여기 하나뿐이다 - 빈 순위표에서 할 일은
