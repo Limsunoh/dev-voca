@@ -27,6 +27,7 @@ SENTENCE_FILE = FIXTURES / "readings_sentence.json"
 DEPLOY_ORDER = (
     "seed_words",
     "seed_words_more",
+    "seed_words_launch",
     "seed_exam_words",
     "seed_word_aliases",
     "seed_sentences",
@@ -155,6 +156,7 @@ class ShuffledSeedOrderRebuildTest(RebuildMixin, TestCase):
         "seed_sentences_more",
         "seed_sentences",
         "seed_exam_words",
+        "seed_words_launch",
         "seed_words_more",
         "seed_words",
         "seed_word_aliases",

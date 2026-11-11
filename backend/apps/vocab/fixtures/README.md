@@ -1,7 +1,10 @@
 # 발음 데이터
 
-`readings_word.json` (566건) / `readings_sentence.json` (380건).
-`prompts/korean-reading.md` 의 표기 규칙대로 손으로 적은 한글 발음이다.
+`readings_word.json` (1,045건) / `readings_sentence.json` (380건).
+`prompts/korean-reading.md` 의 표기 규칙대로 적은 한글 발음이다. 단어 앞쪽 566건은
+손으로 적은 `seed_words` 단어다. 뒤쪽 479건은 `seed_words_launch` 428개,
+`seed_words_more` 36개, `seed_exam_words` 15개 단어로, `generate_readings` 로 만든 뒤
+사람이 Admin 에서 검수해 승인한 값을 옮겼다.
 
 ## 복원
 
