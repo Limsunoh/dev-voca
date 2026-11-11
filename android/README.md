@@ -1,4 +1,4 @@
-# dev-voca Android 앱 (TWA)
+# DeVoca Android 앱 (TWA)
 
 Google Play 에 올리는 Android 앱의 껍데기다. 화면은 없다. 폰의 Chrome 이
 `https://dev-voca.vercel.app/` 을 주소창 없이 띄운다(Trusted Web Activity).
