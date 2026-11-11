@@ -1801,13 +1801,18 @@ class StepSweepClockTest(TestCase):
     def test_free_round_replay_is_still_refused_after_a_sweep(self):
         """자유 문제풀이 되돌리기 방어는 그대로다. 청소가 돌아도 토큰이 사는 동안 막힌다."""
         token, question = session.start()
-        _, first, _ = session.answer(token, question["choices"][0]["id"])
+        picked = question["choices"][0]["id"]
+        _, first, _ = session.answer(token, picked)
         with self._later(session.TOKEN_MAX_AGE - 5):
             self._sweep()
         self.assertEqual(RoundStep.objects.count(), 1)
+        # 처음과 다른 답을 보낸다. 첫 보기가 우연히 정답이면 정답이 곧 처음
+        # 답이라, 그대로 보내면 같은 답의 재전송이 되어 처음 응답이 온다
+        # (session._take_step). 되돌리기 공격은 다른 답으로 보내는 것이다.
+        other = first.answer_id if first.answer_id != picked else question["choices"][1]["id"]
         # 시계를 돌린 채 답하면 90초 마감에 먼저 걸려 무엇이 막았는지 모른다.
         with self.assertRaisesMessage(SessionError, "이미"):
-            session.answer(token, first.answer_id)
+            session.answer(token, other)
 
     def test_sweep_does_not_run_on_most_calls(self):
         """확률 문을 지나지 못하면 아무것도 안 지운다(오래된 행도)."""

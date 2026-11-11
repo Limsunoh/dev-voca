@@ -15,7 +15,7 @@ import type {
   RoundStarted,
   RoundSummary,
 } from "@/lib/api/rounds";
-import { fetchOrExplain, jsonOrExplain } from "@/lib/connection";
+import { ConnectionLost, fetchOrExplain, jsonOrExplain } from "@/lib/connection";
 import { setUnloadWarning } from "@/lib/quiz-progress";
 import { routes } from "@/lib/routes";
 import { useFocusNewQuestion } from "@/components/useFocusNewQuestion";
@@ -36,6 +36,17 @@ import { useFocusNewQuestion } from "@/components/useFocusNewQuestion";
 
 type Phase = "idle" | "playing" | "done";
 
+/** 중계가 4xx 로 답했다. status 로 서버가 확실히 거절한 것(400)인지 가른다. */
+class RequestFailed extends Error {
+  name = "RequestFailed";
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 /** 중계에 보낼 것. action 으로 세 동작이 갈린다. */
 async function call<T>(body: Record<string, unknown>): Promise<T> {
   const res = await fetchOrExplain("/api/rounds", {
@@ -47,9 +58,32 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
 
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new Error(data?.detail ?? "요청이 실패했습니다.");
+    const detail = data?.detail ?? "요청이 실패했습니다.";
+    // 5xx 는 서버가 처리했는지 알 수 없다(백엔드는 채점을 마쳤는데 중계가 늦게
+    // 끊었을 수 있다). 연결이 끊긴 것과 같이 다룬다. 4xx 는 status 를 실어
+    // 보내고, 답하기(send)가 400 만 확실한 거절로 본다.
+    if (res.status >= 500) throw new ConnectionLost(detail);
+    throw new RequestFailed(detail, res.status);
   }
   return jsonOrExplain<T>(res);
+}
+
+type Tally = { answered: number; correct: number; score: number; late: number };
+
+/** 답 하나를 판 집계에 더한다. 답하기(send)와 끊긴 답을 닫으며 다시 보낼 때가 같이 쓴다. */
+function counted(prev: Tally, result: RoundResult): Tally {
+  return {
+    // 넘긴 것도 센다. 서버가 그렇게 집계하므로(session.finish),
+    // 여기서 빼면 진행 중 "3/3" 이던 것이 결과에서 "5문제 중 3개"
+    // 로 뛴다. 같은 판인데 분모가 달라 보인다.
+    answered: prev.answered + 1,
+    correct: prev.correct + (result.correct ? 1 : 0),
+    score: prev.score + result.score,
+    // 맞혔는데 시간이 지나 0 점이 된 것. 결과에서 "2개 맞혔는데 왜
+    // 0점?" 을 설명하는 데 쓴다. 서버 요약(finish)에는 이 수가 없어서
+    // 여기서 센다 - 채점 응답마다 in_time 이 오므로 셀 수 있다.
+    late: prev.late + (result.correct && !result.in_time ? 1 : 0),
+  };
 }
 
 export function RoundBoard({ isGuest }: { isGuest: boolean }) {
@@ -68,12 +102,21 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
    * 눌렸는지 모른 채 다음 문제가 뜬다.
    */
   const [pickedId, setPickedId] = useState<number | null>(null);
+  /**
+   * 응답을 못 받은 답이 있는가. 있으면 보기를 잠그고 "다시 시도" 만 둔다.
+   *
+   * 지하철처럼 서버가 채점을 마친 뒤 응답만 끊기면, 다른 보기를 눌러 보낼 때
+   * 서버가 "이미 처리한 답입니다" 로 거절해 판을 이어갈 수 없다. 같은 답을
+   * 다시 보내면 서버가 처음 응답을 그대로 돌려준다(backend session._take_step).
+   * 요청이 서버에 닿지도 못했으면 그 답이 그대로 처음 채점된다.
+   */
+  const [lost, setLost] = useState(false);
 
   const [left, setLeft] = useState(0);
   const [skipsLeft, setSkipsLeft] = useState(0);
   // 서버가 정한 한 판 길이. 막대 분모와 aria 값에 함께 쓴다.
   const [seconds, setSeconds] = useState(90);
-  const [tally, setTally] = useState({
+  const [tally, setTally] = useState<Tally>({
     answered: 0,
     correct: 0,
     score: 0,
@@ -117,6 +160,8 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
   const tokenRef = useRef("");
   const busyRef = useRef(false);
   const aliveRef = useRef(true);
+  /** 응답을 못 받은 답(위 lost). 타이머와 send 가 렌더와 상관없이 읽는다. */
+  const lostRef = useRef<{ choiceId: number | null; skip: boolean } | null>(null);
 
   // 화면을 떠난 뒤 도착한 응답으로 상태를 건드리지 않는다. 떠난 화면의
   // send 가 이어서 finish 를 부르면 요청이 한 번 더 나간다.
@@ -157,6 +202,49 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     }
   }, []);
 
+  /**
+   * 응답을 못 받은 답(lost)이 남은 채로 판을 닫는다. 마감이 지났을 때와 결과
+   * 화면의 "다시 저장" 이 부른다.
+   *
+   * 그 답을 먼저 다시 보낸다. 서버가 이미 처리했으면 처음 응답과 새 토큰이
+   * 오고, 그 토큰으로 닫는다. 들고 있는 토큰으로 바로 닫으면 지난 순번이라
+   * 거절되고 판 전체가 안 남는다.
+   *
+   * 다시 보내기도 실패하면 들고 있는 토큰으로 닫아 본다. 서버가 그 답을
+   * 처리하지 못했으면(요청이 안 닿았거나 서버 오류가 계속되면) 이 토큰이
+   * 아직 살아 있어 닫힌다. 처리했으면 거절되어 결과 화면에 "다시 저장" 이
+   * 남고, 누르면 이 길을 다시 탄다. 안 닫고 기다리기만 하면 서버 오류가
+   * 계속될 때 판이 영영 안 닫힌다.
+   *
+   * busyRef 를 쥔다. 다시 보내는 동안 타이머가 또 부르거나 보기가 눌리지 않게.
+   */
+  const closeLost = useCallback(async () => {
+    const pending = lostRef.current;
+    if (!pending || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      try {
+        const answered = await call<RoundAnswered>({
+          action: "answer",
+          token: tokenRef.current,
+          choice_id: pending.choiceId,
+          skip: pending.skip,
+        });
+        if (!aliveRef.current) return;
+        tokenRef.current = answered.token;
+        lostRef.current = null;
+        setLost(false);
+        setPickedId(null);
+        setTally((prev) => counted(prev, answered.result));
+      } catch {
+        if (!aliveRef.current) return;
+      }
+      await finish(tokenRef.current);
+    } finally {
+      busyRef.current = false;
+    }
+  }, [finish]);
+
   // 답을 하나라도 한 판은 새로고침·탭 닫기 전에 브라우저가 묻는다. 서버가
   // 판을 안 닫아 점수가 사라진다. 저장에 실패한 결과 화면도 같다. 거기서
   // 떠나면 "다시 저장" 으로 살릴 수 있던 점수가 없어진다.
@@ -182,13 +270,17 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       setLeft(remain);
       // 답이 오가는 중이면 미룬다. 지금 닫으면 서버가 방금 태운
       // 순번 때문에 옛 토큰을 거절한다. send 가 끝나며 마감을 다시 본다.
-      if (remain === 0 && !busyRef.current) finish(tokenRef.current);
+      // 응답을 못 받은 답이 있으면 그 답부터 다시 보내고 닫는다(closeLost).
+      if (remain === 0 && !busyRef.current) {
+        if (lostRef.current) closeLost();
+        else finish(tokenRef.current);
+      }
     };
 
     tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [phase, finish]);
+  }, [phase, finish, closeLost]);
 
   const start = async () => {
     if (busyRef.current) return;
@@ -254,6 +346,11 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       setReaction({ fire: 0, correct: false });
       setResult(null);
       setSummary(null);
+      // 지난 판에서 응답을 못 받은 답을 지운다. 남기면 새 판이 보기가 잠긴 채
+      // 시작하고, "다시 시도" 가 지난 판의 보기를 새 판 토큰으로 보낸다.
+      lostRef.current = null;
+      setLost(false);
+      setPickedId(null);
       setPhase("playing");
     } catch (err) {
       if (!aliveRef.current) return;
@@ -268,6 +365,13 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
     // ref 로 막는다. state 로 보면 한 틱 안에 들어온 두 클릭이 둘 다
     // busy=false 를 읽고 둘 다 나가, 뒤엣것이 이미 태운 순번으로 거절된다.
     if (busyRef.current || !tokenRef.current) return;
+    // 응답을 못 받은 답이 있으면 그 답만 다시 보낸다(위 lost). 보기는 잠겨
+    // 있지만, 잠기기 전에 들어온 누름이 있어도 다른 답으로 나가지 않게 한다.
+    const pending = lostRef.current;
+    if (pending) {
+      choiceId = pending.choiceId;
+      skip = pending.skip;
+    }
     busyRef.current = true;
     setBusy(true);
     setError("");
@@ -282,22 +386,11 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       });
       if (!aliveRef.current) return;
 
+      lostRef.current = null;
+      setLost(false);
       tokenRef.current = answered.token;
       setResult(answered.result);
-      setTally((prev) => ({
-        // 넘긴 것도 센다. 서버가 그렇게 집계하므로(session.finish),
-        // 여기서 빼면 진행 중 "3/3" 이던 것이 결과에서 "5문제 중 3개"
-        // 로 뛴다. 같은 판인데 분모가 달라 보인다.
-        answered: prev.answered + 1,
-        correct: prev.correct + (answered.result.correct ? 1 : 0),
-        score: prev.score + answered.result.score,
-        // 맞혔는데 시간이 지나 0 점이 된 것. 결과에서 "2개 맞혔는데 왜
-        // 0점?" 을 설명하는 데 쓴다. 서버 요약(finish)에는 이 수가 없어서
-        // 여기서 센다 - 채점 응답마다 in_time 이 오므로 셀 수 있다.
-        late:
-          prev.late +
-          (answered.result.correct && !answered.result.in_time ? 1 : 0),
-      }));
+      setTally((prev) => counted(prev, answered.result));
       if (answered.result.skipped) setSkipsLeft((n) => Math.max(0, n - 1));
 
       // 맞혔을 때 조각이 터진다. 넘긴 것은 제외한다 - 서버가 skipped 를
@@ -360,6 +453,19 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
       setQuestion(answered.question);
     } catch (err) {
       if (!aliveRef.current) return;
+      // 서버가 이 답을 확실히 거절한 것(400)이 아니면, 처리됐는지 모르는 것으로
+      // 보고 같은 답을 다시 보낼 수 있게 남긴다. 연결 끊김, 5xx 만이 아니다.
+      // 429(요청 제한)나 401(로그인 만료)은 이번 요청이 처리 안 됐다는 뜻일 뿐,
+      // 다시 보내기였다면 처음 답은 이미 처리됐을 수 있다. 여기서 버리면 다른
+      // 보기도, 들고 있는 토큰으로 닫기도 거절돼 판 전체를 잃는다. 같은 답을 다시
+      // 보내는 것은 늘 안전하다(처음 응답이 오거나 처음 채점된다).
+      // 판을 닫는 중이면 남기지 않는다. 닫기가 끝나면 이 판은 끝이라 다시 보낼
+      // 곳이 없고, 남기면 다음 판으로 넘어간다.
+      const refused = err instanceof RequestFailed && err.status === 400;
+      const unsure = !refused && !closingRef.current;
+      lostRef.current = unsure ? { choiceId, skip } : null;
+      setLost(unsure);
+
       // 판을 닫는 중이면 이 답의 실패는 알리지 않는다. 닫기가 성공한 뒤에 도착하면
       // 정상 결과 아래에 오류가 떠서 점수가 저장되지 않은 것으로 읽힌다. 닫기가
       // 실패하면 그쪽이 자기 문구를 넣는다.
@@ -367,21 +473,26 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
         setError(err instanceof Error ? err.message : "채점하지 못했습니다.");
       }
 
-      // 여기서도 마감을 본다. 답이 실패한 사이 90초가 끝났으면,
+      // 여기서도 마감을 본다. 답이 거절된 사이 90초가 끝났으면,
       // 그냥 두면 타이머가 갱신 안 된 옛 토큰으로 판을 닫으려 하고
       // 서버가 거절해 다 푼 판 전체가 기록되지 않는다.
-      // 토큰은 실패했으므로 아직 안 태워졌고, 그래서 이걸로 닫을 수 있다.
+      // 거절된 토큰은 아직 안 태워졌고, 그래서 이걸로 닫을 수 있다.
+      // 연결이 끊긴 것이면 여기서 닫지 않는다. 서버가 이미 처리했으면 이 토큰은
+      // 지난 순번이라 닫기도 거절된다. busyRef 를 푼 뒤 타이머가 closeLost 로
+      // 그 답을 다시 보내고 닫는다.
       // busyRef 를 여기서 풀지 않는다. finish 를 기다리는 동안 풀어두면
       // 그 사이 보기 버튼이 다시 눌려 같은 토큰으로 답이 한 번 더 나간다.
       // 성공 경로도 busyRef 를 쥔 채 finish 를 부르고 finally 에서만 푼다.
-      if (Date.now() >= deadlineRef.current) {
+      if (!unsure && Date.now() >= deadlineRef.current) {
         await finish(tokenRef.current);
         return;
       }
     } finally {
       busyRef.current = false;
       setBusy(false);
-      setPickedId(null);
+      // 응답을 못 받은 답은 표시를 남긴다. "다시 시도" 가 무엇을 다시 보내는지
+      // 보여야 한다.
+      if (!lostRef.current) setPickedId(null);
     }
   };
 
@@ -392,6 +503,13 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
   // 온 응답이 새 판을 지난 판의 결과로 덮고 토큰도 새 판 것으로 바뀌어 있다.
   const retrySave = async () => {
     if (busyRef.current) return;
+    // 응답을 못 받은 답이 남아 있으면 그 답부터 다시 보낸다(closeLost 주석).
+    if (lostRef.current) {
+      setSaving(true);
+      await closeLost();
+      setSaving(false);
+      return;
+    }
     busyRef.current = true;
     setSaving(true);
     await finish(tokenRef.current);
@@ -519,9 +637,11 @@ export function RoundBoard({ isGuest }: { isGuest: boolean }) {
           skipsLeft={skipsLeft}
           tally={tally}
           busy={busy}
+          lost={lost}
           error={error}
           onPick={(id) => send(id)}
           onSkip={() => send(null, true)}
+          onRetry={() => send(null)}
         />
       </>
     );
@@ -651,9 +771,11 @@ function PlayCard({
   skipsLeft,
   tally,
   busy,
+  lost,
   error,
   onPick,
   onSkip,
+  onRetry,
 }: {
   question: RoundQuestion | null;
   result: RoundResult | null;
@@ -664,11 +786,23 @@ function PlayCard({
   skipsLeft: number;
   tally: { answered: number; correct: number; score: number };
   busy: boolean;
+  /** 응답을 못 받은 답이 있다. 보기와 넘기기를 잠그고 "다시 시도" 를 보인다. */
+  lost: boolean;
   error: string;
   onPick: (id: number) => void;
   onSkip: () => void;
+  /** 응답을 못 받은 답을 그대로 다시 보낸다. 무슨 답인지는 보드가 들고 있다. */
+  onRetry: () => void;
 }) {
   const cardRef = useFocusNewQuestion(question, error);
+  // 보기가 잠기는 순간 "다시 시도" 로 포커스를 옮긴다. 버튼이 카드 맨 아래라
+  // 세로가 짧은 폰(416x657)에서는 화면 밖에 있어, 보기는 잠겼는데 누를 것이
+  // 안 보인다. 포커스가 화면 안으로 끌어오고 낭독기에도 알린다. 방금 누른
+  // 보기가 잠기며 포커스를 잃는 것도 같이 메운다.
+  const retryRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (lost) retryRef.current?.focus();
+  }, [lost]);
   const seconds = Math.ceil(left / 1000);
   // 10초 아래로 내려가면 색이 바뀐다. 숫자만으로는 급한 줄 모른다.
   const urgent = seconds <= 10;
@@ -743,7 +877,7 @@ function PlayCard({
           내므로 같은 모양이어야 한다. */}
       <QuestionCard
         question={question}
-        busy={busy}
+        busy={busy || lost}
         onPick={onPick}
         cardRef={cardRef}
         pickedId={pickedId}
@@ -766,7 +900,7 @@ function PlayCard({
         <button
           type="button"
           onClick={onSkip}
-          disabled={busy || skipsLeft === 0}
+          disabled={busy || lost || skipsLeft === 0}
           className="dv-btn inline-flex min-h-11 shrink-0 items-center px-4 text-sm whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
           style={
             {
@@ -842,6 +976,32 @@ function PlayCard({
         >
           {error}
         </p>
+      )}
+
+      {/* 응답을 못 받은 답을 다시 보낸다. 고른 답은 화면에 표시된 그대로라
+          (pickedId) 무엇이 다시 나가는지 보인다. 이 판을 이어가는 유일한
+          길이라 갈색이다. */}
+      {lost && (
+        <button
+          ref={retryRef}
+          type="button"
+          onClick={onRetry}
+          disabled={busy}
+          className="dv-btn inline-flex items-center self-start px-6 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
+          style={
+            {
+              minHeight: "var(--hit-min)",
+              background: "var(--brand)",
+              color: "var(--text-on-color)",
+              border: 0,
+              borderRadius: "var(--radius-pill)",
+              fontWeight: "var(--weight-black)",
+              "--lift": "var(--lift-button)",
+            } as React.CSSProperties
+          }
+        >
+          {busy ? "보내는 중..." : "다시 시도"}
+        </button>
       )}
     </div>
   );

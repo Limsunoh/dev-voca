@@ -26,6 +26,8 @@ DB 를 안 쓰는 이유:
                    보내고 맞은 것만 남기는 길이 열린다.
                    실패할 수 있는 일을 다 끝낸 뒤에 부른다. 먼저 태우면
                    거절 한 번에 토큰과 표시가 어긋나 판을 더 이어갈 수 없다.
+                   한 판의 답하기는 받은 답과 응답을 같이 남겨, 응답만
+                   끊겨 같은 답을 다시 보낸 사람에게 처음 응답을 돌려준다.
     _check_replay  보기만 한다. 끝내기 전용이다.
 
 표를 쓰는 이유는 `models.RoundStep` 참고. 캐시는 넘치면 스스로 지워서,
@@ -37,7 +39,7 @@ from __future__ import annotations
 import logging
 import random
 import secrets
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timedelta
 
 from django.core import signing
@@ -237,13 +239,34 @@ def answer(
         else _issue(state, now, shown_after)
     )
 
-    # 여기서부터는 실패할 것이 없다. 순번을 가져가고 반드시 새 토큰을 낸다.
-    _take_step(state)
-
+    # 새 토큰을 순번을 가져가기 전에 만든다. 이 응답을 순번 표시와 한 번에
+    # 저장해야, 응답만 끊긴 사람이 같은 답을 다시 보냈을 때 그대로 돌려줄 수
+    # 있다(models.RoundStep.reply). 토큰은 순번이 하나 오른 상태로 서명한다.
+    seq = int(state["n"])
+    next_state = {**state, "n": seq + 1}
     if question is None:
-        state.pop("q", None)
+        next_state.pop("q", None)
+    next_token = _sign(next_state)
 
-    return _sign(state), result, question
+    # 여기서부터는 실패할 것이 없다. 순번을 가져가고 반드시 새 토큰을 낸다.
+    # 같은 답이 다시 온 것이면 처음 응답을 돌려받는다.
+    #
+    # 받은 답은 칸 길이(32)에서 자른다. 보기 id 는 bigint 안이라 실제 보기는
+    # 잘리지 않는다. 터무니없이 큰 수(10**30)만 잘리는데, 잘려서 같아져도
+    # 처음 응답이 다시 올 뿐 새로 채점하지 않는다.
+    stored = _take_step(
+        state,
+        choice=("skip" if skip else f"choice:{picked_id}")[:32],
+        reply={"token": next_token, "result": asdict(result), "question": question},
+    )
+    if stored is not None:
+        # 지금 Result 에 있는 칸만 넘긴다. 저장한 뒤 배포로 칸이 빠지거나 이름이
+        # 바뀌면, 그 사이(최대 10분) 다시 보낸 답이 TypeError 로 500 이 난다.
+        known = {f.name for f in fields(Result)}
+        result_of = {k: v for k, v in stored["result"].items() if k in known}
+        return stored["token"], Result(**result_of), stored["question"]
+
+    return next_token, result, question
 
 
 def finish(token: str) -> dict:
@@ -347,25 +370,55 @@ def _check_replay(state: dict) -> None:
         raise SessionError("이미 지난 문제입니다. 최신 화면에서 다시 풀어주세요.")
 
 
-def _take_step(state: dict) -> None:
+def _take_step(
+    state: dict, *, choice: str = "", reply: dict | None = None
+) -> dict | None:
     """이 순번을 이 요청이 가져간다. 동시에 와도 하나만 성공한다.
 
     원자성은 RoundStep 의 유일 제약에서 나온다. 읽고 나서 쓰는 방식으로는
     못 막는다. 같은 토큰으로 보기 네 개를 동시에 보내면 넷 다 같은 값을
     읽고 넷 다 통과해서, 정답을 몰라도 맞은 응답의 토큰만 남기면 된다.
 
+    choice 와 reply 를 주면(한 판의 답하기) 받은 답과 돌려줄 응답을 표시와
+    같이 남긴다. 이미 가져간 순번에 같은 답이 다시 오면 거절하지 않고 그때
+    남긴 응답을 돌려준다. 응답만 끊긴 사람이 같은 답을 다시 보낸 것이다.
+    처음 요청이 이미 채점했으므로 새로 채점하지 않는다. 다른 답이면 지금처럼
+    거절한다. 보기 넷을 동시에 보내도 하나만 INSERT 에 성공하고, 나머지 셋은
+    답이 달라 거절된다. 처음 것과 같은 답을 또 보내면 이미 받은 응답이
+    다시 올 뿐이라 얻는 것이 없다.
+
+    choice 가 빈 문자열이면(복습) 같은 답이어도 거절한다. 예전과 같다.
+
     바깥 트랜잭션을 안 깨려고 savepoint 를 쓴다. IntegrityError 는 여기서
     잡아 400 으로 바꿀 것이고, 그대로 두면 바깥 트랜잭션 전체가 롤백된다.
+
+    돌려주는 것: 같은 답의 재전송이면 처음 응답, 아니면 None.
     """
     seq = int(state.get("n", 0))
     try:
         with transaction.atomic():
-            RoundStep.objects.create(round_id=state["id"], step=seq)
+            RoundStep.objects.create(
+                round_id=state["id"], step=seq, choice=choice, reply=reply
+            )
     except IntegrityError:
+        if choice:
+            first = (
+                RoundStep.objects.filter(round_id=state["id"], step=seq)
+                .values("choice", "reply")
+                .first()
+            )
+            if first and first["choice"] == choice and first["reply"] is not None:
+                logger.info(
+                    "같은 답을 다시 받아 처음 응답을 돌려줍니다. round=%s step=%s",
+                    state["id"],
+                    seq,
+                )
+                return first["reply"]
         logger.info("되돌리기를 거절했습니다. round=%s step=%s", state["id"], seq)
         raise SessionError("이미 처리한 답입니다. 최신 화면에서 다시 풀어주세요.")
 
     state["n"] = seq + 1
+    return None
 
 
 def _sweep_old_steps() -> None:
@@ -394,7 +447,10 @@ def expired_steps() -> QuerySet[RoundStep]:
 
 
 def _sign(state: dict) -> str:
-    return signing.dumps(state, salt=_SALT)
+    # 압축한다. 답 한 줄마다 토큰이 길어지는데, 그 토큰을 답마다 RoundStep.reply
+    # 에도 남긴다. 줄이 비슷해 잘 줄어든다. loads 는 압축 여부를 스스로 가려
+    # 압축 전에 낸 토큰도 그대로 풀린다. 일일공부 토큰(daily_study._sign)도 같다.
+    return signing.dumps(state, salt=_SALT, compress=True)
 
 
 def _load(token: str) -> dict:

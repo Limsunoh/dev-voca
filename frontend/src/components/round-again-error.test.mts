@@ -355,7 +355,7 @@ describe("결과 카드의 오류 갈래", () => {
 describe("판을 정상으로 닫으면 판 도중의 실패 문구를 지운다", () => {
   it("답 전송이 실패한 뒤 시간이 다 되어 타이머가 닫으면 문구가 없다", async () => {
     await openRound();
-    replies.push({ fail: 500, detail: GRADE_ERROR });
+    replies.push({ fail: 400, detail: GRADE_ERROR });
     await pick();
     assert.equal(playError(), GRADE_ERROR, "준비 실패: 판 도중 오류가 안 찼다");
 
@@ -370,7 +370,7 @@ describe("판을 정상으로 닫으면 판 도중의 실패 문구를 지운다
   it("마감이 지난 뒤 답 전송이 실패해 곧바로 닫혀도 문구가 없다", async () => {
     await openRound();
     passDeadline();
-    replies.push({ fail: 500, detail: GRADE_ERROR }, SUMMARY);
+    replies.push({ fail: 400, detail: GRADE_ERROR }, SUMMARY);
     await pick();
     await settle();
 
@@ -379,20 +379,40 @@ describe("판을 정상으로 닫으면 판 도중의 실패 문구를 지운다
     assert.equal(sent[2].token, "t0", "실패로 안 태워진 토큰으로 닫아야 한다");
   });
 
-  it("네트워크가 끊겨 답이 실패해도 곧바로 닫히면 문구가 없다", async () => {
+  it("마감 뒤 네트워크가 끊겨 답이 실패하면, 같은 답을 다시 보내 받은 새 토큰으로 닫고 문구가 없다", async () => {
+    // 서버가 그 답을 이미 처리했을 수 있어, 들고 있는 토큰으로 닫으면 지난
+    // 순번이라 거절된다. 같은 답을 다시 보내 새 토큰을 받은 뒤 닫는다.
     await openRound();
     passDeadline();
-    replies.push({ throws: "Failed to fetch" }, SUMMARY);
+    replies.push({ throws: "Failed to fetch" });
     await pick();
     await settle();
+    assert.deepEqual(actions(), ["start", "answer"], "끊긴 채로 바로 닫았다");
+
+    replies.push(
+      {
+        token: "t1",
+        result: { correct: false, skipped: false, in_time: true, score: -1, elapsed_ms: 100, answer_type: "word", answer_text: "a", answer_extra: "" },
+        question: null,
+        finished: true,
+      },
+      SUMMARY,
+    );
+    await tick();
+    await settle();
+
     assertClean(readCard(), connectionLostMessage());
+    assert.deepEqual(actions(), ["start", "answer", "answer", "finish"]);
+    assert.equal(sent[2].choice_id, sent[1].choice_id, "다른 답을 보냈다");
+    assert.equal(sent[2].token, "t0", "같은 토큰으로 다시 보내야 한다");
+    assert.equal(sent[3].token, "t1", "새로 받은 토큰으로 닫아야 한다");
   });
 
   it("닫는 응답을 기다리는 사이 온 채점 실패도 닫힌 뒤에는 안 보인다", async () => {
     await openRound();
     passDeadline();
     const closing = later();
-    replies.push(closing.promise, { fail: 500, detail: GRADE_ERROR });
+    replies.push(closing.promise, { fail: 400, detail: GRADE_ERROR });
     await tick();
     await pick();
     await settle();
@@ -416,7 +436,7 @@ describe("판을 정상으로 닫으면 판 도중의 실패 문구를 지운다
 
     closing.resolve(SUMMARY);
     await settle();
-    answering.resolve({ fail: 500, detail: GRADE_ERROR });
+    answering.resolve({ fail: 400, detail: GRADE_ERROR });
     await picking;
     await settle();
 
@@ -426,7 +446,7 @@ describe("판을 정상으로 닫으면 판 도중의 실패 문구를 지운다
 
   it("닫는 중에 타이머가 또 돌아도 요청은 하나고 문구가 없다", async () => {
     await openRound();
-    replies.push({ fail: 500, detail: GRADE_ERROR });
+    replies.push({ fail: 400, detail: GRADE_ERROR });
     await pick();
 
     passDeadline();
@@ -443,7 +463,7 @@ describe("판을 정상으로 닫으면 판 도중의 실패 문구를 지운다
 
   it("마감 전의 답 실패는 지우지 않고 판을 이어 간다", async () => {
     await openRound();
-    replies.push({ fail: 500, detail: GRADE_ERROR });
+    replies.push({ fail: 400, detail: GRADE_ERROR });
     await pick();
     assert.ok(isPlaying(), "마감 전인데 판이 끝났다");
     assert.equal(playError(), GRADE_ERROR);
@@ -468,7 +488,7 @@ describe("판을 닫지 못하면 오류 문구가 남는다", () => {
   it("답도 닫기도 실패하면 닫기의 문구만 남는다", async () => {
     await openRound();
     passDeadline();
-    replies.push({ fail: 500, detail: GRADE_ERROR }, { fail: 503, detail: FINISH_ERROR });
+    replies.push({ fail: 400, detail: GRADE_ERROR }, { fail: 503, detail: FINISH_ERROR });
     await pick();
     await settle();
 

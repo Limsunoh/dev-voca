@@ -8,7 +8,12 @@
  * 읽을 문구로 바꾼다.
  */
 
-/** 연결이 끊겨 요청이나 응답이 실패했다. message 는 connectionLostMessage() 다. */
+/**
+ * 연결이 끊겨 요청이나 응답이 실패했다. message 는 connectionLostMessage() 다.
+ *
+ * 한 판 화면(RoundBoard)은 5xx 도 이 클래스로 올리고, 그때 message 는 서버가 보낸
+ * 문구다. message 로 끊김인지 가르지 말고 클래스로 가른다.
+ */
 export class ConnectionLost extends Error {
   name = "ConnectionLost";
 }
@@ -19,7 +24,9 @@ export class ConnectionLost extends Error {
  * 대개는 요청이 서버에 닿기 전에 끊긴 것이라 판의 토큰이 아직 안 쓰였고,
  * 연결된 뒤 같은 보기를 다시 누르면 이어진다. 서버에 닿아 처리된 뒤 응답만
  * 끊긴 경우도 같은 TypeError 라 여기서는 가를 수 없다. 그때 다시 누르면 서버가
- * "이미 처리한 답입니다" 로 거절한다.
+ * "이미 처리한 답입니다" 로 거절한다. 한 판만 예외다. 같은 답을 다시 보내면
+ * 서버가 처음 응답을 돌려주고(backend session._take_step), 화면(RoundBoard)이
+ * 보기를 잠그고 그 답만 다시 보낸다.
  */
 export async function fetchOrExplain(
   input: string,
@@ -43,7 +50,8 @@ export async function fetchOrExplain(
  * 화면(HTML)이 200 으로 오는 것도 같은 길이다.
  *
  * fetchOrExplain 과 달리 이때는 서버가 이미 처리를 마쳤다(응답 머리가 왔다).
- * 답하기 요청이면 다시 눌러도 서버가 "이미 처리한 답입니다" 로 거절한다.
+ * 답하기 요청이면 다시 눌러도 서버가 "이미 처리한 답입니다" 로 거절한다. 한
+ * 판은 예외다(위 fetchOrExplain 주석).
  *
  * 중계를 잘못 고쳐 JSON 이 아닌 200 을 돌려주는 프로그램 오류도 같은 문구가
  * 되므로, 원래 오류를 콘솔에 남긴다.
