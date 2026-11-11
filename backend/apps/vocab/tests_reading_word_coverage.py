@@ -60,8 +60,13 @@ class WordReadingFileMatchesSeedsTest(SimpleTestCase):
                 self.assertEqual([row[0] for row in rows if row[0] not in names], [])
         self.assertEqual(len(file_rows()), len(set(seed_terms())))
 
-    def test_query_family_reads_kwiri(self):
-        """query 가 든 단어는 IPA 가 /kwɪri/, 한글 발음이 "퀴리" 계열로 같다."""
+    def test_query_family_reads_kwori(self):
+        """query 가 든 단어는 IPA 가 사전 표기 /kwɪri/, 한글 발음이 "쿼리" 로 같다.
+
+        한글은 한국 개발자가 실제로 부르는 "쿼리" 로 적는다(2026-11-12 운영자 결정,
+        ai_pipeline/prompts/korean-reading.md 의 예외 문단).
+        IPA 를 그대로 옮긴 "퀴리" 나 옛 표기 "퀘리" 로 돌아가지 않게 문장 발음까지 본다.
+        """
         ipa = {row[0]: row[1] for _, rows in SEEDS for row in rows}
         readings = {r["term"]: r["reading"] for r in file_rows()}
         family = [t for t in ipa if "query" in t.lower()]
@@ -73,8 +78,15 @@ class WordReadingFileMatchesSeedsTest(SimpleTestCase):
                 self.assertIn("kwɪri", ipa[term])
                 self.assertNotIn("kwɛ", ipa[term])
                 plain = readings[term].replace("**", "")
-                self.assertIn("퀴리", plain)
-                self.assertNotIn("퀘리", plain)
+                self.assertIn("쿼리", plain)
+        sentences = json.loads(
+            (WORD_FILE.parent / "readings_sentence.json").read_text(encoding="utf-8")
+        )
+        for row in [*file_rows(), *sentences]:
+            text = " ".join((row["reading"], row.get("note", ""))).replace("**", "")
+            with self.subTest(row.get("term") or row.get("slug")):
+                self.assertNotIn("퀴리", text)
+                self.assertNotIn("퀘리", text)
 
     def test_reading_fits_the_column(self):
         """한글 발음이 Word.reading 칸 길이를 넘지 않고 앞뒤 공백이 없다."""
