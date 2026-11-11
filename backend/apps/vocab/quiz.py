@@ -603,6 +603,13 @@ def _blank_out(text: str, term: str) -> str | None:
     return replaced
 
 
+# 에러 메시지 머리에 오는 등급 말. 서로 바꿔 넣어도 메시지가 말이 된다.
+# "____: cannot find symbol" 에 error 와 fatal 이 같이 보기로 나오면 둘 다
+# 맞는 답이라, 정답이 이 중 하나면 나머지는 빈칸 보기에서 뺀다. 모두 debug
+# 분류라 같은 분류에서 먼저 뽑는 _pick_distractors 가 자주 함께 고른다.
+_LEVEL_WORDS = re.compile(r"^(error|warning|fatal|panic|exception)$", re.IGNORECASE)
+
+
 def _terms_in(text: str, terms: list[tuple[int, str]]) -> list[tuple[int, str]]:
     """문장 안에 실제로 들어 있는 단어들.
 
@@ -650,9 +657,14 @@ def make_blank_question(
         if answer is None:
             continue
 
-        distractors = _pick_distractors(answer, words, CHOICE_COUNT - 1)
+        choice_pool = words
+        if _LEVEL_WORDS.match(term):
+            choice_pool = words.exclude(term__iregex=_LEVEL_WORDS.pattern)
+
+        # 등급 말이 정답이면 후보가 줄어 이 문장만 모자랄 수 있다. 다른 문장으로 넘어간다.
+        distractors = _pick_distractors(answer, choice_pool, CHOICE_COUNT - 1)
         if len(distractors) < CHOICE_COUNT - 1:
-            return None
+            continue
 
         options = [Choice(w.pk, w.term) for w in [answer, *distractors]]
         random.shuffle(options)
