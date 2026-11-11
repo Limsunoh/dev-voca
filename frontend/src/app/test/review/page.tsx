@@ -10,7 +10,7 @@ import { routes } from "@/lib/routes";
 import { getCurrentUser, getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "다시 보기 · dev-voca",
+  title: "다시 보기 · DeVoca",
   description: "틀린 것과 오래된 것을 다시 풉니다.",
 };
 

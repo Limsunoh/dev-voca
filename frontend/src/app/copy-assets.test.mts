@@ -25,12 +25,12 @@ const read = (path: string) => readFileSync(path, "utf8");
 
 /**
  * MicGate 의 고지 문단에서 화면에 나오는 글자만. 줄바꿈으로 끊긴 말을 잇는다.
- * 문단 안의 <BrandName /> 은 화면에 "dev-voca" 로 나오므로 그 글자로 바꿔 읽는다.
+ * 문단 안의 <BrandName /> 은 화면에 "DeVoca" 로 나오므로 그 글자로 바꿔 읽는다.
  */
 function micNotice(): string {
   const source = read(join(SRC, "components/MicGate.tsx"))
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
-    .replace(/<BrandName\s*\/>/g, "dev-voca");
+    .replace(/<BrandName\s*\/>/g, "DeVoca");
   const at = source.indexOf("copy.showPrivacy &&");
   assert.notEqual(at, -1, "고지 문단을 못 찾았다");
   const open = source.indexOf("<p", at);
@@ -65,8 +65,8 @@ describe("마이크 안내", () => {
     assert.doesNotMatch(micNotice().replace("크롬은 구글 등", ""), /구글/);
   });
 
-  it("dev-voca 서버에는 글자만 온다는 안내가 남아 있다", () => {
-    assert.match(micNotice(), /dev-voca 서버에는 바뀐 글자만 오고 목소리는 저장하지 않습니다/);
+  it("DeVoca 서버에는 글자만 온다는 안내가 남아 있다", () => {
+    assert.match(micNotice(), /DeVoca 서버에는 바뀐 글자만 오고 목소리는 저장하지 않습니다/);
   });
 });
 

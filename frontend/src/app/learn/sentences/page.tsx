@@ -22,7 +22,7 @@ import { isErrorSentence } from "@/lib/quiz-text";
 import { detailWithBack, listUrl, routes, searchText } from "@/lib/routes";
 
 export const metadata = {
-  title: "문장 · dev-voca",
+  title: "문장 · DeVoca",
   description: "리뷰 코멘트와 에러 메시지에서 실제로 만나는 영어 문장.",
   // 이유는 learn/words/page.tsx 참고.
   alternates: { canonical: routes.sentences },

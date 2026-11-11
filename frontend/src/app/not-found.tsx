@@ -4,12 +4,12 @@ import Link from "next/link";
 import { routes } from "@/lib/routes";
 
 /**
- * 탭·방문기록에 남는 제목. 없으면 루트 layout 의 `"dev-voca"` 가 그대로 떠서
+ * 탭·방문기록에 남는 제목. 없으면 루트 layout 의 `"DeVoca"` 가 그대로 떠서
  * 정상 화면과 구별이 안 된다.
  *
  * 다른 not-found 셋(`board`·`learn/words`·`learn/sentences`)도 제목이 없지만
  * 여기서는 루트만 정한다. 한 문구로 묶을 수 없어서다. 그쪽은 `notFound()` 로
- * 오는 자리라 위 세그먼트 이름을 쓰는 것이 맞고(`단어장 · dev-voca` 계열),
+ * 오는 자리라 위 세그먼트 이름을 쓰는 것이 맞고(`단어장 · DeVoca` 계열),
  * 속한 세그먼트가 없는 것은 루트뿐이다.
  *
  * 같이 고칠 것이 따로 있다. `learn/words/[id]/page.tsx` 와
@@ -21,7 +21,7 @@ import { routes } from "@/lib/routes";
  * 문구는 아래 h1 과 같게 둔다. `없는 주소` 로 줄이지 않은 것은 화면 이름이
  * 아니라 상태라서다. 줄이면 방문기록에서 그런 화면이 있는 것처럼 읽힌다.
  */
-export const metadata: Metadata = { title: "없는 주소입니다 · dev-voca" };
+export const metadata: Metadata = { title: "없는 주소입니다 · DeVoca" };
 
 /**
  * 어디에도 없는 주소로 들어왔을 때.

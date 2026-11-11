@@ -100,7 +100,11 @@ describe("Android 앱(TWA)과 웹을 잇는 확인 파일", () => {
   it("Android 앱이 이 웹의 이름·시작 주소를 쓴다", () => {
     assert.equal(twa.host, "dev-voca.vercel.app");
     assert.equal(twa.startUrl, data.start_url);
-    assert.equal(twa.name, data.name);
+    // 2026-11-11 이름을 DeVoca 로 바꾸며 웹이 먼저 바뀌었다. android/ 의 이름은
+    // Bubblewrap 으로 앱을 다시 만들 때 바꾼다. 바꾸면 "dev-voca" 를 지워 웹 이름만 받는다.
+    for (const name of [twa.name, twa.launcherName]) {
+      assert.ok([data.name, "dev-voca"].includes(name), `Android 앱 이름: ${name}`);
+    }
     assert.equal(twa.backgroundColor.toLowerCase(), data.background_color);
     assert.equal(twa.themeColor.toLowerCase(), data.theme_color);
     // 웹은 밝은 화면만 있다. 폰이 다크 모드여도 앱 테두리가 검게 바뀌지 않아야 한다.

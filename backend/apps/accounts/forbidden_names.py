@@ -20,9 +20,14 @@ import unicodedata
 _FILLERS = re.compile("[\u115f\u1160]")
 
 
+def _normalize(value: str) -> str:
+    """전각 글자를 반각으로, 한글 채움 문자를 공백으로. 대소문자는 둔다."""
+    return _FILLERS.sub(" ", unicodedata.normalize("NFKC", value))
+
+
 def _fold(value: str) -> str:
     """전각 글자와 대소문자 차이를 없앤다. ＡＤＭＩＮ 이 admin 과 같아진다."""
-    return _FILLERS.sub(" ", unicodedata.normalize("NFKC", value)).casefold()
+    return _normalize(value).casefold()
 
 
 # 이름 어디에 들어 있어도 막는 말.
@@ -41,8 +46,23 @@ _ANYWHERE = tuple(
 )
 
 # 띄어 써도 뜻이 같은 말. 이것만은 "dev voca", "공식 계정" 처럼 낱말 사이를
-# 띄워도 막는다.
-_EVEN_SPACED = ("devvoca", "데브보카", "공식계정", "고객센터")
+# 띄워도 막는다. 서비스 이름은 옛 이름 devvoca(dev-voca 도 여기 걸린다)와
+# 데브보카, 지금 이름의 한글 표기 데보카 다.
+_EVEN_SPACED = ("devvoca", "데브보카", "데보카", "공식계정", "고객센터")
+
+# 지금 이름 DeVoca. 위처럼 구분자를 다 지우고 찾으면 "code vocab" 이 "codevocab"
+# 이 되어 devoca 를 품는다. 단어장 앱이라 vocab 이 든 별명이 흔하다. 그래서
+# 낱말 하나로 떨어져 있을 때만 막는다. 대소문자를 살린 값에서 본다.
+# - 앞: 영문자가 없거나, 소문자 바로 뒤의 대문자 D. OfficialDeVoca 는 막고
+#   CodeVocab, codevocab 은 둔다.
+# - 뒤: 끝 글자 a 와 대소문자가 같은 영문자가 붙지 않아야 한다. DeVocaTeam,
+#   DEVOCAteam 은 막고 dev_ocaml, devocalize, DEV_OCAML, DEVOCALIZE 는 둔다.
+# 같은 대소문자로 붙여 쓴 사칭은 빠져나간다: officialdevoca, OFFICIALDEVOCA,
+# TEAMDEVOCA, DeVocateam. 막으려면 낱말 목록이 있어야 해서 두었다.
+_CURRENT_NAME = re.compile(
+    r"(?:(?<![A-Za-z])[Dd]|(?<=[a-z])D)(?i:[\W_]*e[\W_]*v[\W_]*o[\W_]*c[\W_]*a)"
+    r"(?:(?<=a)(?![a-z])|(?<=A)(?![A-Z]))"
+)
 
 # 위의 말을 품고 있지만 뜻이 다른 낱말. 찾기 전에 먼저 지운다.
 _HARMLESS = (
@@ -118,6 +138,8 @@ def name_is_forbidden(name: str) -> bool:
     if _ADDRESS.search(folded) or _PHONE.search(squeezed):
         return True
     if any(word in squeezed for word in _EVEN_SPACED):
+        return True
+    if _CURRENT_NAME.search(_normalize(name)):
         return True
 
     # 구분자를 없애기 전에 지운다. 없앤 뒤에 지우면 "관리자 금", "운영자.원빈" 이

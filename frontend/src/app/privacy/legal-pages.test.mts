@@ -70,7 +70,7 @@ describe("처리방침·약관·계정 삭제 안내 화면", () => {
     // Google Play 가 요구하는 웹 주소의 조건이다. 동의를 받는 문서가 아니라
     // 버전 줄은 없다.
     const html = pages["delete-account"];
-    assert.match(html, /dev-voca 계정 삭제 안내/);
+    assert.match(html, /DeVoca 계정 삭제 안내/);
     assert.match(html, /mailto:/);
     assert.doesNotMatch(html, /버전 v/);
     assert.match(pages.privacy, /href="\/delete-account"/);

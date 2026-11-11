@@ -14,8 +14,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "dev-voca",
-    short_name: "dev-voca",
+    name: "DeVoca",
+    short_name: "DeVoca",
     description: "개발할 때 마주치는 영어를 익히는 학습 앱",
     lang: "ko",
     start_url: "/",

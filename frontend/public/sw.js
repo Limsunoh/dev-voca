@@ -8,9 +8,10 @@
  * 그 밖의 요청(API, 그림, 스크립트)은 건드리지 않는다. 캐시에서 옛 화면을
  * 내주기 시작하면 배포한 내용이 앱에 바로 안 나간다.
  *
- * offline.html 을 고치면 아래 CACHE 의 숫자를 하나 올린다(v2 -> v3). 2026-11-11 에
- * 버튼 색을 갈색으로 바꾸며 v1 -> v2 로 올렸다. 브라우저는 이
- * 파일(sw.js)이 바뀔 때만 다시 설치하고, 안내 화면도 그때만 새로 받는다.
+ * offline.html 을 고치면 아래 CACHE 의 숫자를 하나 올린다(v3 -> v4). 브라우저는
+ * 이 파일(sw.js)이 바뀔 때만 다시 설치하고, 안내 화면도 그때만 새로 받는다.
+ * 2026-11-11 에 버튼 색을 갈색으로 바꾸며 v1 -> v2, 제목의 이름을 DeVoca 로
+ * 바꾸며 v2 -> v3 으로 올렸다.
  *
  * 웹 푸시를 붙이게 되면 이 파일에 push 처리를 더한다. 같은 주소(/)에는
  * service worker 를 하나만 둘 수 있다. 걷어낼 때는 이 파일을 지우지 말고
@@ -21,7 +22,7 @@
  * fetch 처리를 preloadResponse 를 안 쓰게 바꾸면 activate 에서
  * navigationPreload.disable() 도 부른다. 안 부르면 화면 요청이 두 번 나간다.
  */
-const CACHE = "offline-v2";
+const CACHE = "offline-v3";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {

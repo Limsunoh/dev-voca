@@ -5,8 +5,8 @@ import { BrandName } from "@/components/BrandName";
 import { ContactEmail, LegalDoc, type LegalSection } from "@/components/LegalDoc";
 
 export const metadata: Metadata = {
-  title: "계정 삭제 안내 · dev-voca",
-  description: "dev-voca 계정과 학습 기록을 지우는 방법과, 지워지는 것과 남는 것을 안내합니다.",
+  title: "계정 삭제 안내 · DeVoca",
+  description: "DeVoca 계정과 학습 기록을 지우는 방법과, 지워지는 것과 남는 것을 안내합니다.",
 };
 
 /*
@@ -109,7 +109,7 @@ const SECTIONS: LegalSection[] = [
 export default function DeleteAccountPage() {
   return (
     <LegalDoc
-      title="dev-voca 계정 삭제 안내"
+      title="DeVoca 계정 삭제 안내"
       intro={
         <p>
           <BrandName /> 계정과 학습 기록을 지우는 방법입니다. 로그인하지 않아도 이

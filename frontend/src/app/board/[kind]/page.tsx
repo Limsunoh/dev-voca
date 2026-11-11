@@ -12,10 +12,10 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { kind } = await params;
-  if (!isBoardKind(kind)) return { title: "순위표 · dev-voca" };
+  if (!isBoardKind(kind)) return { title: "순위표 · DeVoca" };
 
   return {
-    title: `${BOARD_LABELS[kind].title} · dev-voca`,
+    title: `${BOARD_LABELS[kind].title} · DeVoca`,
     description: BOARD_LABELS[kind].note,
   };
 }
