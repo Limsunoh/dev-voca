@@ -19,6 +19,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 
 import type { RoundSummary } from "@/lib/api/rounds";
+import { connectionLostMessage } from "@/lib/connection";
 
 const realReact = await import("react");
 
@@ -361,7 +362,7 @@ describe("다시 저장", () => {
 
     replies.push({ throws: "Failed to fetch" });
     await press("onRetrySave");
-    assert.equal(card().props.error, "Failed to fetch");
+    assert.equal(card().props.error, connectionLostMessage());
 
     replies.push(SUMMARY);
     await press("onRetrySave");

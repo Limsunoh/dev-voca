@@ -25,7 +25,8 @@ function warnBeforeUnload(event: BeforeUnloadEvent): void {
  * 새로고침·탭 닫기 때 브라우저 확인 창을 띄울지 정한다.
  *
  * 화면의 출구와 달리 새로고침은 브라우저가 처리해서 앱의 확인 창을 못 띄운다.
- * 뒤로가기는 여기로도 못 막는다(App Router 에는 이동을 멈추는 방법이 없다).
+ * 같은 문서 안의 뒤로 가기(Next 의 화면 이동)는 여기로 못 막는다. 그것은 ExitGuard
+ * 가 Navigation API 로 막는다.
  */
 export function setUnloadWarning(on: boolean): void {
   if (on) globalThis.addEventListener?.("beforeunload", warnBeforeUnload);

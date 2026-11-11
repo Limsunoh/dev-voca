@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 
 import type { RoundSummary } from "@/lib/api/rounds";
+import { connectionLostMessage } from "@/lib/connection";
 
 const realReact = await import("react");
 
@@ -384,7 +385,7 @@ describe("판을 정상으로 닫으면 판 도중의 실패 문구를 지운다
     replies.push({ throws: "Failed to fetch" }, SUMMARY);
     await pick();
     await settle();
-    assertClean(readCard(), "Failed to fetch");
+    assertClean(readCard(), connectionLostMessage());
   });
 
   it("닫는 응답을 기다리는 사이 온 채점 실패도 닫힌 뒤에는 안 보인다", async () => {
@@ -506,7 +507,8 @@ describe("한 판 더 실패", () => {
   const FAILURES: [string, Reply, string][] = [
     ["서버가 거절", { fail: 503, detail: START_ERROR }, START_ERROR],
     ["본문이 JSON 이 아님", { fail: 502, noBody: true }, "요청이 실패했습니다."],
-    ["네트워크 끊김", { throws: "Failed to fetch" }, "Failed to fetch"],
+    // 브라우저의 영어 문구(Failed to fetch)가 아니라 사람이 읽을 문구로 알린다.
+    ["네트워크 끊김", { throws: "Failed to fetch" }, connectionLostMessage()],
     [
       "문제가 빠진 응답",
       { token: "t1", question: null, round_seconds: 90, max_skips: 3 },
