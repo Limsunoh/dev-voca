@@ -7,7 +7,7 @@
  * 계약은 셋이다.
  *   1. 빈 순위표: 게스트에게는 "로그인하기"(돌아올 곳 = 지금 탭), 로그인한
  *      사람에게는 "문제 풀러 가기"(/test/round). 게스트가 푼 판은 순위표에
- *      안 오르므로 게스트에게 "한 판만 풀어도 올라간다" 를 보이면 안 된다.
+ *      안 오르므로 게스트에게 "지금 한 판을 끝내면 올라간다" 를 보이면 안 된다.
  *   2. 표가 있을 때 게스트 안내 줄의 "로그인" 도 지금 탭으로 돌아온다.
  *   3. 로그인 <-> 가입 전환 링크가 next 를 들고 간다. 안 들고 가면 가입을
  *      마친 사람이 홈에 떨어진다.
@@ -97,14 +97,14 @@ describe("빈 순위표", () => {
     it(`게스트(${kind})에게는 로그인을 권하고, 돌아올 곳은 지금 탭이다`, () => {
       const { html, hrefs } = board(kind, true, true);
       assert.deepEqual(actionHrefs(hrefs), [LOGIN_FROM[kind]]);
-      assert.match(html, /로그인하고 한 판을 풀면 이 자리에 이름이 올라갑니다\./);
+      assert.match(html, /로그인하고 .+ 1등으로 올라갑니다\./);
       assert.match(html, />로그인하기<\/a>/);
     });
 
-    it(`게스트(${kind})에게 "한 판만 풀어도" 와 문제 풀기 링크를 보이지 않는다`, () => {
+    it(`게스트(${kind})에게 "지금 풀면 올라간다" 와 문제 풀기 링크를 보이지 않는다`, () => {
       // 게스트가 푼 판은 순위표에 안 오른다. 믿고 풀면 다 풀고도 빈 표다.
       const { html, hrefs } = board(kind, true, true);
-      assert.doesNotMatch(html, /한 판만 풀어도/);
+      assert.doesNotMatch(html, /지금 한 판을 끝내면|오늘 하루 점수/);
       assert.doesNotMatch(html, /문제 풀러 가기/);
       assert.ok(!hrefs.includes("/test/round"), hrefs.join(" "));
     });
@@ -112,7 +112,7 @@ describe("빈 순위표", () => {
     it(`로그인했으면(${kind}) 전과 같이 문제 풀기로 보낸다`, () => {
       const { html, hrefs } = board(kind, true, false);
       assert.deepEqual(actionHrefs(hrefs), ["/test/round"]);
-      assert.match(html, /한 판만 풀어도 이 자리에 이름이 올라갑니다\./);
+      assert.match(html, /1등으로 올라갑니다\./);
       assert.match(html, />문제 풀러 가기<\/a>/);
       assert.doesNotMatch(html, /로그인/);
     });
