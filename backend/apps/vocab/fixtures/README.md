@@ -4,7 +4,8 @@
 `prompts/korean-reading.md` 의 표기 규칙대로 적은 한글 발음이다. 단어 앞쪽 566건은
 손으로 적은 `seed_words` 단어다. 뒤쪽 479건은 `seed_words_launch` 428개,
 `seed_words_more` 36개, `seed_exam_words` 15개 단어로, `generate_readings` 로 만든 뒤
-사람이 Admin 에서 검수해 승인한 값을 옮겼다.
+사람이 Admin 에서 검수해 승인한 값을 옮겼다. 그중 448건에는 화면의 "발음 설명" 으로
+나가는 `note` 칸이 있다. `load_readings` 가 이 칸을 `reading_note` 에 넣는다.
 
 ## 복원
 

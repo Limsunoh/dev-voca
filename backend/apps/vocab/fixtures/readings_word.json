@@ -2265,119 +2265,148 @@
  },
  {
   "term": "profiler",
-  "reading": "**프로**우f아일럴r"
+  "reading": "**프로**우f아일럴r",
+  "note": "첫음절에 힘을 주고, 가운데는 file(f아일) 소리 그대로다. \"프로파일러\"처럼 평평하게 읽으면 안 통한다."
  },
  {
   "term": "flame graph",
-  "reading": "**f레임** 그래f"
+  "reading": "**f레임** 그래f",
+  "note": "graph 끝은 \"프\"가 아니라 f 소리다. \"그래프\"로 음절을 늘리지 않는다."
  },
  {
   "term": "heap dump",
-  "reading": "**힢** 덤p"
+  "reading": "**힢** 덤p",
+  "note": "\"히프 덤프\"가 아니라 각각 한 박이다."
  },
  {
   "term": "watchpoint",
-  "reading": "**와**ch포인t"
+  "reading": "**와**ch포인t",
+  "note": "tch 는 받침으로 못 써서 ch 로 둔다."
  },
  {
   "term": "correlation id",
-  "reading": "코러**레이**sh언 아이 디"
+  "reading": "코러**레이**sh언 아이 디",
+  "note": "id 는 철자로 읽어 \"아이 디\"다. -tion 은 \"션\"이 아니라 sh 소리."
  },
  {
   "term": "structured logging",
-  "reading": "**s트럭**철rd l로깅"
+  "reading": "**s트럭**철rd l로깅",
+  "note": "앞 \"s트럭\" 에 힘이 있고 뒤는 흘린다. 어두 l 은 혀끝을 입천장에 붙이고 시작한다."
  },
  {
   "term": "log level",
-  "reading": "**l록** l레v을"
+  "reading": "**l록** l레v을",
+  "note": "둘 다 어두 l 이다. level 의 v 를 \"ㅂ\"으로 읽으면 다른 소리가 된다."
  },
  {
   "term": "sampling",
-  "reading": "**쌤**쁠링"
+  "reading": "**쌤**쁠링",
+  "note": "p 는 \"플\"보다 \"쁠\"에 가깝다."
  },
  {
   "term": "tail latency",
-  "reading": "**테일** l레이튼씨"
+  "reading": "**테일** l레이튼씨",
+  "note": "latency 는 3음절이다. \"레이턴시\"처럼 또박또박 늘리지 않는다."
  },
  {
   "term": "p99",
-  "reading": "피 나인티 **나**인"
+  "reading": "피 나인티 **나**인",
+  "note": "끝의 nine 에 힘이 간다."
  },
  {
   "term": "saturation",
-  "reading": "쌔처**레이**sh언"
+  "reading": "쌔처**레이**sh언",
+  "note": "강세는 \"레이\"에 있고 -tion 은 sh 소리다."
  },
  {
   "term": "backpressure",
-  "reading": "**백**프레sh얼r"
+  "reading": "**백**프레sh얼r",
+  "note": "-sure 는 sh 소리라 \"셔\"로 쓰지 않는다."
  },
  {
   "term": "cold start",
-  "reading": "**코울d** 스딸t"
+  "reading": "**코울d** 스딸t",
+  "note": "s 뒤의 t 는 \"트\"보다 \"ㄸ\"에 가깝다. 끝의 d, t 는 모음을 붙이지 않는다."
  },
  {
   "term": "blast radius",
-  "reading": "**블래s트** 레이디어s"
+  "reading": "**블래s트** 레이디어s",
+  "note": "radius 는 \"라디우스\"가 아니라 레이디어s 다."
  },
  {
   "term": "error budget",
-  "reading": "**에**럴r 버짇"
+  "reading": "**에**럴r 버짇",
+  "note": "budget 끝은 \"젯\"이 아니라 짇, \"버지트\"로 늘리지 않는다."
  },
  {
   "term": "toil",
-  "reading": "**토일**"
+  "reading": "**토일**",
+  "note": "한 박으로 짧게 붙여 읽는다."
  },
  {
   "term": "sparse checkout",
-  "reading": "**스빨s** ch엑아욷"
+  "reading": "**스빨s** ch엑아욷",
+  "note": "ch 는 한글로 적으면 소리가 어긋나 영문으로 둔다."
  },
  {
   "term": "autosquash",
-  "reading": "**오**토우스꽈sh"
+  "reading": "**오**토우스꽈sh",
+  "note": "끝의 sh 를 \"시\"로 읽지 않는다."
  },
  {
   "term": "octopus merge",
-  "reading": "**앜**터퍼s 멀j"
+  "reading": "**앜**터퍼s 멀j",
+  "note": "merge 끝의 dʒ 는 받침이 안 되어 j 로 둔다."
  },
  {
   "term": "orphan branch",
-  "reading": "**오r**f언 b뢘ch"
+  "reading": "**오r**f언 b뢘ch",
+  "note": "ph 는 f 소리다. \"오르판\"이 아니다."
  },
  {
   "term": "signed commit",
-  "reading": "**싸인d** 카믿"
+  "reading": "**싸인d** 카믿",
+  "note": "commit 은 \"커밋\"이 아니라 앞에 힘이 가는 카믿이다."
  },
  {
   "term": "rerere",
-  "reading": "리**뤠**러"
+  "reading": "리**뤠**러",
+  "note": "가운데에 힘이 간다."
  },
  {
   "term": "prefetch",
-  "reading": "**프리**f에ch"
+  "reading": "**프리**f에ch",
+  "note": "fetch 의 f 와 ch 는 둘 다 한글에 없는 소리다."
  },
  {
   "term": "preload",
-  "reading": "**프리**l로욷"
+  "reading": "**프리**l로욷",
+  "note": "load 끝은 \"로드\"가 아니라 로욷 한 박이다."
  },
  {
   "term": "web vitals",
-  "reading": "**웹** v아이틀z"
+  "reading": "**웹** v아이틀z",
+  "note": "vitals 는 \"비탈\"이 아니라 v아이틀z 다. 끝 z 도 살린다."
  },
  {
   "term": "above the fold",
-  "reading": "어버v th어 **f오울d**"
+  "reading": "어버v th어 **f오울d**",
+  "note": "강세는 fold 하나다. the 의 th 는 혀끝을 윗니에 대고 낸다."
  },
  {
   "term": "critical path",
-  "reading": "**크리**티클 패th"
+  "reading": "**크리**티클 패th",
+  "note": "path 끝을 \"스\"로 읽으면 다른 단어가 된다."
  },
  {
   "term": "shadow DOM",
-  "reading": "**sh애**도우 담"
+  "reading": "**sh애**도우 담",
+  "note": "DOM 은 철자가 아니라 한 단어로 읽는다."
  },
  {
   "term": "read replica",
-  "reading": "**릳** 뤠플리커"
+  "reading": "**릳** 뤠플리커",
+  "note": "read 는 한 음절로 끝을 받침으로 닫는다. replica 는 \"레플리카\" 가 아니라 끝이 약한 뤠플리커다."
  },
  {
   "term": "quorum",
@@ -2385,51 +2414,63 @@
  },
  {
   "term": "split brain",
-  "reading": "**s쁠맅** 브레인"
+  "reading": "**s쁠맅** 브레인",
+  "note": "s 뒤의 p 는 \"ㅃ\"에 가깝고, split 은 한 박이다."
  },
  {
   "term": "bulkhead",
-  "reading": "**벌k**헫"
+  "reading": "**벌k**헫",
+  "note": "\"벌크헤드\"처럼 모음을 넣지 않는다."
  },
  {
   "term": "vacuum",
-  "reading": "**v애**큐엄"
+  "reading": "**v애**큐엄",
+  "note": "\"바큠\"이 아니라 v 로 시작하고 3음절이다."
  },
  {
   "term": "sticky session",
-  "reading": "**스띠**끼 쎄sh언"
+  "reading": "**스띠**끼 쎄sh언",
+  "note": "-ssion 은 sh 소리라 \"션\"으로 쓰지 않는다."
  },
  {
   "term": "chaos engineering",
-  "reading": "케이아s 엔저**니어**링"
+  "reading": "케이아s 엔저**니어**링",
+  "note": "chaos 는 \"카오스\"가 아니라 케이아s 다."
  },
  {
   "term": "shift left",
-  "reading": "sh이f트 **l레f트**"
+  "reading": "sh이f트 **l레f트**",
+  "note": "강세는 left 에 있다. 어두 sh 와 l 을 한글로 쓰지 않는다."
  },
  {
   "term": "inheritance",
-  "reading": "인**헤**리턴s"
+  "reading": "인**헤**리턴s",
+  "note": "둘째 음절에 힘이 간다."
  },
  {
   "term": "use case",
-  "reading": "**유s** 케이s"
+  "reading": "**유s** 케이s",
+  "note": "여기 use 는 \"유즈\"가 아니라 s 소리로 끝난다."
  },
  {
   "term": "prototype",
-  "reading": "**프로**우터타잎"
+  "reading": "**프로**우터타잎",
+  "note": "가운데 터는 거의 안 들리게 흘린다."
  },
  {
   "term": "refactoring",
-  "reading": "리**f액**털링"
+  "reading": "리**f액**털링",
+  "note": "f 는 한글로 적지 않고 힘은 \"f액\" 에 있다. \"리팩토링\" 처럼 평평하게 읽지 않는다."
  },
  {
   "term": "design pattern",
-  "reading": "디**z아인** 패털n"
+  "reading": "디**z아인** 패털n",
+  "note": "design 의 s 는 z 소리다. 앞 음절은 거의 안 들리게."
  },
  {
   "term": "black box",
-  "reading": "**블랰** 박s"
+  "reading": "**블랰** 박s",
+  "note": "\"블랙 박스\"처럼 끝에 모음을 붙이지 않는다."
  },
  {
   "term": "white box",
@@ -2437,271 +2478,338 @@
  },
  {
   "term": "test case",
-  "reading": "**테s트** 케이s"
+  "reading": "**테s트** 케이s",
+  "note": "앞에 힘이 간다. case 끝은 s 소리다."
  },
  {
   "term": "code coverage",
-  "reading": "코욷 **커**v어리j"
+  "reading": "코욷 **커**v어리j",
+  "note": "강세는 coverage 앞에 있고, 끝 j 는 받침이 안 되어 영문으로 둔다."
  },
  {
   "term": "version control",
-  "reading": "**v얼**전 컨트로울"
+  "reading": "**v얼**전 컨트로울",
+  "note": "-sion 의 s 는 ㅈ 에 가깝게 울리는 소리다. \"버전\" 이 아니라 v 로 시작하고 r 을 머금는다."
  },
  {
   "term": "candidate key",
-  "reading": "**캔**디듣 키"
+  "reading": "**캔**디듣 키",
+  "note": "끝 -date 는 약해져 \"데이트\"가 아니라 듣에 가깝다."
  },
  {
   "term": "referential integrity",
-  "reading": "레f어**렌**sh얼 인테그러티"
+  "reading": "레f어**렌**sh얼 인테그러티",
+  "note": "-tial 은 sh 소리다. 강세는 \"렌\"에 있다."
  },
  {
   "term": "pointer",
-  "reading": "**포**인털r"
+  "reading": "**포**인털r",
+  "note": "끝 r 을 남겨 혀를 말아 끝낸다."
  },
  {
   "term": "call by value",
-  "reading": "**콜** 바이 v앨류"
+  "reading": "**콜** 바이 v앨류",
+  "note": "value 는 \"밸류\"가 아니라 v 로 시작한다."
  },
  {
   "term": "call by reference",
-  "reading": "콜 바이 **레**f어런s"
+  "reading": "콜 바이 **레**f어런s",
+  "note": "강세는 reference 앞에 있고 f 는 한글로 쓰지 않는다."
  },
  {
   "term": "abort",
-  "reading": "어**볼t**"
+  "reading": "어**볼t**",
+  "note": "앞 음절은 거의 들리지 않게 흘리고 뒤에 힘을 준다. \"어보트\" 처럼 끝에 모음을 붙이지 않는다."
  },
  {
   "term": "ahead",
-  "reading": "어**헫**"
+  "reading": "어**헫**",
+  "note": "끝의 d 는 받침으로 눌러 닫는다. \"어헤드\" 는 음절이 하나 늘어난다."
  },
  {
   "term": "assignee",
-  "reading": "어싸이**니**"
+  "reading": "어싸이**니**",
+  "note": "강세가 맨 뒤 \"니\" 에 온다. \"어싸인이\" 가 아니라 세 박자로 끊김 없이 읽는다."
  },
  {
   "term": "atomic commit",
-  "reading": "어**타**믹 카믿"
+  "reading": "어**타**믹 카믿",
+  "note": "\"아토믹 커밋\" 이 아니다. atomic 은 가운데 \"타\" 에 힘이 들어간다."
  },
  {
   "term": "auto-merge",
-  "reading": "**오**토우 멀j"
+  "reading": "**오**토우 멀j",
+  "note": "merge 의 끝소리 dʒ 는 받침으로 안 되므로 j 로 둔다. \"머지\" 로 읽으면 음절이 늘어난다."
  },
  {
   "term": "backport",
-  "reading": "**백**폴t"
+  "reading": "**백**폴t",
+  "note": "앞에 힘이 있는 합성어다. 뒤를 \"포트\" 로 늘이지 않는다."
  },
  {
   "term": "bare repository",
-  "reading": "**베어r** 리파z어토리"
+  "reading": "**베어r** 리파z어토리",
+  "note": "힘은 bare 에 있다. repository 의 z 는 한글 \"저\" 가 아니라 혀를 울리는 소리라 영문으로 둔다."
  },
  {
   "term": "base branch",
-  "reading": "**베이**s b뢘ch"
+  "reading": "**베이**s b뢘ch",
+  "note": "끝의 s 와 ch 는 모음 없이 붙인다. \"베이스 브랜치\" 는 두 음절이 더 생긴다."
  },
  {
   "term": "baseline",
-  "reading": "**베이**s라인"
+  "reading": "**베이**s라인",
+  "note": "앞에 힘을 주고 \"베이스라인\" 의 \"스\" 를 모음 없이 s 로 붙인다."
  },
  {
   "term": "behind",
-  "reading": "비**하인d**"
+  "reading": "비**하인d**",
+  "note": "뒤에 힘이 있다. 끝의 d 는 \"드\" 로 늘이지 않고 살짝 닫기만 한다."
  },
  {
   "term": "branching strategy",
-  "reading": "b**뢘**ch잉 스뜨래러지"
+  "reading": "b**뢘**ch잉 스뜨래러지",
+  "note": "힘은 branching 의 \"뢘\" 에 있다. strategy 는 s 뒤의 t 가 된소리에 가깝고, 미국식에서 뒤 t 는 ㄹ 처럼 굴린다."
  },
  {
   "term": "bump",
-  "reading": "**범p**"
+  "reading": "**범p**",
+  "note": "한 음절이다. \"범프\" 로 두 음절이 되지 않게 p 는 입만 다문다."
  },
  {
   "term": "change control",
-  "reading": "**ch에인j** 컨트로울"
+  "reading": "**ch에인j** 컨트로울",
+  "note": "힘은 change 에 있다. control 은 \"컨트롤\" 보다 \"컨트로울\" 에 가깝다."
  },
  {
   "term": "check-in",
-  "reading": "**ch에**킨"
+  "reading": "**ch에**킨",
+  "note": "두 낱말이지만 이어 읽어 \"ch에킨\" 이 된다. 앞에 힘을 준다."
  },
  {
   "term": "code owner",
-  "reading": "**코욷** 오우널r"
+  "reading": "**코욷** 오우널r",
+  "note": "code 는 한 음절로 닫고, owner 의 끝 r 은 한글로 쓰지 않는다."
  },
  {
   "term": "conflict marker",
-  "reading": "**칸**f릭t 말r컬r"
+  "reading": "**칸**f릭t 말r컬r",
+  "note": "f 는 윗니를 아랫입술에 댄다. \"콘플릭트 마커\" 처럼 모음을 넣지 않는다."
  },
  {
   "term": "contributor",
-  "reading": "컨**트리**뷰털r"
+  "reading": "컨**트리**뷰털r",
+  "note": "강세가 두 번째 \"트리\" 에 온다. \"컨트리뷰터\" 로 평평하게 읽으면 안 통한다."
  },
  {
   "term": "Conventional Commits",
-  "reading": "컨**v엔**sh어늘 카믿s"
+  "reading": "컨**v엔**sh어늘 카믿s",
+  "note": "v 와 sh 는 한글에 없는 소리라 영문으로 둔다. commits 는 \"커밋츠\" 가 아니라 카믿s 다."
  },
  {
   "term": "default branch",
-  "reading": "드**f올t** b뢘ch"
+  "reading": "드**f올t** b뢘ch",
+  "note": "default 는 앞이 거의 안 들리고 뒤에 힘이 간다. \"디폴트\" 아님."
  },
  {
   "term": "discard",
-  "reading": "디s**깔d**"
+  "reading": "디s**깔d**",
+  "note": "s 뒤의 k 는 된소리에 가깝다. 뒤쪽에 힘을 준다."
  },
  {
   "term": "diverge",
-  "reading": "다이**v얼j**"
+  "reading": "다이**v얼j**",
+  "note": "뒤에 힘이 있다. 끝의 dʒ 는 받침이 안 되므로 j 로 둔다."
  },
  {
   "term": "downstream",
-  "reading": "**다운**s트림"
+  "reading": "**다운**s트림",
+  "note": "앞에 힘을 준다. stream 은 \"스트림\" 처럼 s 뒤에 모음을 넣지 않는다."
  },
  {
   "term": "draft PR",
-  "reading": "드래f트 피 **아r**"
+  "reading": "드래f트 피 **아r**",
+  "note": "PR 은 발음기호에 공백이 있으니 철자로 끊어 읽는다. 힘은 맨 뒤 R 에 간다."
  },
  {
   "term": "feature branch",
-  "reading": "**f이**철r b뢘ch"
+  "reading": "**f이**철r b뢘ch",
+  "note": "f 는 ㅍ 가 아니다. \"피처\" 로 읽으면 다른 소리가 된다."
  },
  {
   "term": "feature request",
-  "reading": "**f이**철r 리퀘s트"
+  "reading": "**f이**철r 리퀘s트",
+  "note": "힘은 feature 에 있다. f 는 ㅍ 가 아니고, request 의 \"스\" 는 모음 없이 s 로 붙인다."
  },
  {
   "term": "force-with-lease",
-  "reading": "**f올s** 위th l리s"
+  "reading": "**f올s** 위th l리s",
+  "note": "with 의 th 와 lease 의 어두 l 은 영문 그대로 둔다. l 은 혀끝을 입천장에 붙이고 시작하라는 표시다."
  },
  {
   "term": "Git",
-  "reading": "**긷**"
+  "reading": "**긷**",
+  "note": "한 음절이다. 끝의 t 는 받침으로 닫는다."
  },
  {
   "term": "Git Flow",
-  "reading": "**긷** f로우"
+  "reading": "**긷** f로우",
+  "note": "flow 의 f 는 ㅍ 가 아니고, 뒤는 \"로\" 가 아니라 \"로우\" 로 살짝 미끄러진다."
  },
  {
   "term": "gitkeep",
-  "reading": "**긷**킾"
+  "reading": "**긷**킾",
+  "note": "두 음절이다. 앞에 힘을 주고 \"키프\" 로 늘이지 않는다."
  },
  {
   "term": "good first issue",
-  "reading": "귿 f얼rs트 **이**sh우"
+  "reading": "귿 f얼rs트 **이**sh우",
+  "note": "힘은 맨 뒤 issue 에 간다. \"이슈\" 의 sh 는 한글 \"시\" 소리가 아니다."
  },
  {
   "term": "hunk",
-  "reading": "**헝k**"
+  "reading": "**헝k**",
+  "note": "한 음절이다. \"헝크\" 로 모음을 붙이지 않는다."
  },
  {
   "term": "imperative mood",
-  "reading": "임**페**러티v 묻"
+  "reading": "임**페**러티v 묻",
+  "note": "강세는 두 번째 \"페\" 다. 끝의 v 는 윗니를 아랫입술에 대고 울린다."
  },
  {
   "term": "incoming change",
-  "reading": "**인**커밍 ch에인j"
+  "reading": "**인**커밍 ch에인j",
+  "note": "incoming 은 맨 앞에 힘이 간다. change 의 끝소리는 j 로 둔다."
  },
  {
   "term": "init",
-  "reading": "이**닡**"
+  "reading": "이**닡**",
+  "note": "뒤 음절에 힘이 간다. 두 음절로 짧게 끊는다."
  },
  {
   "term": "initial commit",
-  "reading": "이**니**sh얼 카믿"
+  "reading": "이**니**sh얼 카믿",
+  "note": "initial 의 sh 는 한글 \"셜\" 이 아니다. commit 은 \"커밋\" 이 아니라 \"카믿\"."
  },
  {
   "term": "issue",
-  "reading": "**이**sh우"
+  "reading": "**이**sh우",
+  "note": "앞에 힘을 준다. sh 를 \"슈\" 로 적으면 한글 ㅅ 소리로 굳는다."
  },
  {
   "term": "label",
-  "reading": "**l레이**블"
+  "reading": "**l레이**블",
+  "note": "어두의 l 은 혀끝을 입천장에 붙이고 시작한다. \"라벨\" 이 아니라 앞에 힘이 있는 \"l레이블\"."
  },
  {
   "term": "linear history",
-  "reading": "**l리**니얼r 히s터리"
+  "reading": "**l리**니얼r 히s터리",
+  "note": "힘은 linear 첫 음절에 있다. history 는 \"히스토리\" 가 아니라 세 음절이다."
  },
  {
   "term": "maintainer",
-  "reading": "메인**테이**널r"
+  "reading": "메인**테이**널r",
+  "note": "가운데 \"테이\" 에 힘이 간다. 끝의 r 은 한글로 쓰지 않는다."
  },
  {
   "term": "merge base",
-  "reading": "**멀j** 베이s"
+  "reading": "**멀j** 베이s",
+  "note": "merge 는 한 음절이다. 끝의 dʒ 는 받침이 안 되어 j 로 둔다."
  },
  {
   "term": "merge queue",
-  "reading": "**멀j** 큐"
+  "reading": "**멀j** 큐",
+  "note": "앞에 힘이 간다. queue 는 철자가 길어도 소리는 \"큐\" 하나다."
  },
  {
   "term": "open source",
-  "reading": "오우쁜 **쏘rs**"
+  "reading": "오우쁜 **쏘rs**",
+  "note": "힘은 source 에 간다. open 의 p 는 ㅍ 보다 ㅃ 에 가깝다."
  },
  {
   "term": "pathspec",
-  "reading": "**패th**s펙"
+  "reading": "**패th**s펙",
+  "note": "path 의 th 를 \"스\" 로 읽으면 다른 단어가 된다. 혀끝을 윗니에 대고 바람을 낸다."
  },
  {
   "term": "personal access token",
-  "reading": "펄r서늘 **액**세s 토우컨"
+  "reading": "펄r서늘 **액**세s 토우컨",
+  "note": "힘은 access 의 \"액\" 에 있다. token 은 \"토큰\" 이 아니라 \"토우컨\" 이다."
  },
  {
   "term": "protected branch",
-  "reading": "프러**텍**띧 b뢘ch"
+  "reading": "프러**텍**띧 b뢘ch",
+  "note": "가운데 \"텍\" 에 힘이 간다. 끝의 -ted 는 \"티드\" 가 아니라 한 음절로 닫는다."
  },
  {
   "term": "README",
-  "reading": "**릳**미"
+  "reading": "**릳**미",
+  "note": "두 음절이다. \"리드미\" 처럼 \"드\" 를 따로 내지 않는다."
  },
  {
   "term": "refspec",
-  "reading": "**뤠f**s펙"
+  "reading": "**뤠f**s펙",
+  "note": "f 는 윗니를 아랫입술에 댄다. 앞에 힘을 주고 \"레프\" 로 늘이지 않는다."
  },
  {
   "term": "repository",
-  "reading": "리**파**z어토리"
+  "reading": "리**파**z어토리",
+  "note": "강세는 두 번째 \"파\" 다. z 를 \"저\" 로 적으면 다른 소리가 되므로 영문으로 둔다."
  },
  {
   "term": "resolve",
-  "reading": "리**z알v**"
+  "reading": "리**z알v**",
+  "note": "s 자리가 z 소리다. 끝의 v 까지 한 음절로 닫고 \"리졸브\" 로 늘이지 않는다."
  },
  {
   "term": "SSH key",
-  "reading": "에s 에s **에이**ch 키"
+  "reading": "에s 에s **에이**ch 키",
+  "note": "발음기호에 공백이 있으니 철자로 끊어 읽는다. H 는 \"에이치\" 가 아니라 \"에이ch\"."
  },
  {
   "term": "stacked PR",
-  "reading": "s땍t 피 **아r**"
+  "reading": "s땍t 피 **아r**",
+  "note": "PR 은 철자로 읽어 띄어 쓴다. stacked 는 끝을 \"스택트\" 로 늘이지 않는다."
  },
  {
   "term": "stale branch",
-  "reading": "**스떼일** b뢘ch"
+  "reading": "**스떼일** b뢘ch",
+  "note": "ch 는 받침으로 못 적어 영문 그대로 둔다."
  },
  {
   "term": "status check",
-  "reading": "**s떼이**터s ch엑"
+  "reading": "**s떼이**터s ch엑",
+  "note": "\"스테이터스\" 가 아니라 끝 s 는 받침 없이 영문으로 둔다."
  },
  {
   "term": "SVN",
-  "reading": "에s v이 **엔**"
+  "reading": "에s v이 **엔**",
+  "note": "철자로 읽는다. v 는 한글로 적지 않는다."
  },
  {
   "term": "three-way merge",
-  "reading": "th리 웨이 **멀**j"
+  "reading": "th리 웨이 **멀**j",
+  "note": "th 를 \"쓰\" 로 읽으면 다른 소리가 되고, 끝 j 는 받침이 안 되어 영문으로 둔다."
  },
  {
   "term": "trunk-based development",
-  "reading": "**트렁k** 베이s트 드v엘럽먼t"
+  "reading": "**트렁k** 베이s트 드v엘럽먼t",
+  "note": "힘은 trunk 에 있다. tr 은 \"츠\" 가 아니라 \"트\" 이고, development 를 \"디벨롭먼트\" 처럼 늘이지 않는다."
  },
  {
   "term": "wontfix",
-  "reading": "워운t**f익s**"
+  "reading": "워운t**f익s**",
+  "note": "won't 처럼 \"워운\" 이고 f 는 한글로 적지 않는다."
  },
  {
   "term": "acceptance criteria",
-  "reading": "엌**쎕**턴s 크라이티리어"
+  "reading": "엌**쎕**턴s 크라이티리어",
+  "note": "criteria 는 \"크리테리아\" 가 아니라 \"크라이티리어\" 다."
  },
  {
   "term": "agile",
-  "reading": "**애**즐"
+  "reading": "**애**즐",
+  "note": "\"아자일\" 이 아니다. 미국식은 2음절로 짧게 \"애즐\"."
  },
  {
   "term": "anti-pattern",
@@ -2709,11 +2817,13 @@
  },
  {
   "term": "ASAP",
-  "reading": "에이 에s 에이 **피**"
+  "reading": "에이 에s 에이 **피**",
+  "note": "철자로 하나씩 읽는다."
  },
  {
   "term": "bandwidth",
-  "reading": "**밴**d위dth"
+  "reading": "**밴**d위dth",
+  "note": "끝이 th 라 \"위드스\" 처럼 s 소리로 내지 않는다."
  },
  {
   "term": "burndown chart",
@@ -2721,19 +2831,23 @@
  },
  {
   "term": "circle back",
-  "reading": "썰클 **백**"
+  "reading": "썰클 **백**",
+  "note": "힘은 back 에 있다. circle 의 c 는 s 소리다."
  },
  {
   "term": "code review",
-  "reading": "**코**욷 리v유"
+  "reading": "**코**욷 리v유",
+  "note": "code 는 \"코드\" 가 아니라 받침으로 끝낸다."
  },
  {
   "term": "cyclomatic complexity",
-  "reading": "싸이클러매틱 컴p**렉**써티"
+  "reading": "싸이클러매틱 컴p**렉**써티",
+  "note": "앞은 \"씨클로-\" 가 아니라 \"싸이클러-\" 다."
  },
  {
   "term": "dead code",
-  "reading": "덷 **코**욷"
+  "reading": "덷 **코**욷",
+  "note": "둘 다 \"드\" 를 붙이지 않고 받침으로 끝낸다."
  },
  {
   "term": "early return",
@@ -2741,23 +2855,28 @@
  },
  {
   "term": "EOD",
-  "reading": "이 오우 **디**"
+  "reading": "이 오우 **디**",
+  "note": "철자로 읽는다."
  },
  {
   "term": "epic",
-  "reading": "**에**픽"
+  "reading": "**에**픽",
+  "note": "\"이픽\" 이 아니라 앞이 \"에\" 다."
  },
  {
   "term": "escalate",
-  "reading": "**에**s껄레잍"
+  "reading": "**에**s껄레잍",
+  "note": "첫 음절에 힘이 있고 끝은 받침으로 닫는다."
  },
  {
   "term": "estimate",
-  "reading": "**에**s떠멑"
+  "reading": "**에**s떠멑",
+  "note": "명사라 끝이 \"메이트\" 가 아니라 약한 \"멑\" 이다."
  },
  {
   "term": "fan-in",
-  "reading": "**f앤** 인"
+  "reading": "**f앤** 인",
+  "note": "f 는 한글로 적지 않는다."
  },
  {
   "term": "fan-out",
@@ -2765,27 +2884,33 @@
  },
  {
   "term": "Gantt chart",
-  "reading": "**갠t** ch알t"
+  "reading": "**갠t** ch알t",
+  "note": "Gantt 는 \"간트\" 가 아니라 \"갠t\" 한 음절이다."
  },
  {
   "term": "hardcode",
-  "reading": "**할**d코욷"
+  "reading": "**할**d코욷",
+  "note": "\"하드코드\" 가 아니라 3음절 이하로 짧게."
  },
  {
   "term": "heads-up",
-  "reading": "**헫z** 엎"
+  "reading": "**헫z** 엎",
+  "note": "끝 s 가 z 소리라 영문으로 둔다."
  },
  {
   "term": "idiomatic",
-  "reading": "이디어**매**틱"
+  "reading": "이디어**매**틱",
+  "note": "힘이 \"매\" 에 있다."
  },
  {
   "term": "IMO",
-  "reading": "아이 엠 **오**우"
+  "reading": "아이 엠 **오**우",
+  "note": "철자로 읽는다."
  },
  {
   "term": "information hiding",
-  "reading": "인f얼**메이**sh언 하이딩"
+  "reading": "인f얼**메이**sh언 하이딩",
+  "note": "-tion 은 \"션\" 이 아니라 sh 를 살려 적는다."
  },
  {
   "term": "inspection",
@@ -2793,47 +2918,58 @@
  },
  {
   "term": "magic number",
-  "reading": "매직 **넘**벌r"
+  "reading": "매직 **넘**벌r",
+  "note": "magic 은 \"매직\" 두 음절 그대로 읽고, 힘은 number 에 간다."
  },
  {
   "term": "milestone",
-  "reading": "**마**일스또운"
+  "reading": "**마**일스또운",
+  "note": "\"마일스톤\" 이 아니라 뒤가 \"스또운\" 이다."
  },
  {
   "term": "naming convention",
-  "reading": "**네**이밍 컨v엔sh언"
+  "reading": "**네**이밍 컨v엔sh언",
+  "note": "힘은 naming 의 \"네\" 에 있다. convention 의 v 와 sh 는 영문 그대로 둔다."
  },
  {
   "term": "non-functional requirement",
-  "reading": "난**f엉**ksh어늘 리콰이얼먼t"
+  "reading": "난**f엉**ksh어늘 리콰이얼먼t",
+  "note": "requirement 는 \"리퀴어먼트\" 가 아니라 \"리콰이얼먼t\" 다."
  },
  {
   "term": "OOO",
-  "reading": "오우 오우 **오**우"
+  "reading": "오우 오우 **오**우",
+  "note": "철자로 셋을 따로 읽는다."
  },
  {
   "term": "over-engineering",
-  "reading": "오우v얼r 엔저**니**어링"
+  "reading": "오우v얼r 엔저**니**어링",
+  "note": "engineering 의 힘은 \"니\" 에 있다."
  },
  {
   "term": "P0",
-  "reading": "피 **z이**로우"
+  "reading": "피 **z이**로우",
+  "note": "zero 의 z 는 한글로 적지 않는다."
  },
  {
   "term": "product owner",
-  "reading": "**프라**덬t 오우널r"
+  "reading": "**프라**덬t 오우널r",
+  "note": "\"프로덕트\" 가 아니라 앞이 \"프라\" 다."
  },
  {
   "term": "rationale",
-  "reading": "래sh어**낼**"
+  "reading": "래sh어**낼**",
+  "note": "\"레이셔널\" 이 아니다. 끝 음절에 힘이 간다."
  },
  {
   "term": "requirement",
-  "reading": "리**콰**이얼먼t"
+  "reading": "리**콰**이얼먼t",
+  "note": "\"리콰이어\" 한 덩어리에 힘이 있다."
  },
  {
   "term": "roadmap",
-  "reading": "**로**욷맵"
+  "reading": "**로**욷맵",
+  "note": "\"로드맵\" 의 \"드\" 를 빼고 받침으로."
  },
  {
   "term": "rubber stamp",
@@ -2841,63 +2977,78 @@
  },
  {
   "term": "scrum",
-  "reading": "스끄**럼**"
+  "reading": "스끄**럼**",
+  "note": "s 뒤의 c 는 된소리에 가깝다."
  },
  {
   "term": "separation of concerns",
-  "reading": "쎄뻐레이sh언 어v 컨**썰nz**"
+  "reading": "쎄뻐레이sh언 어v 컨**썰nz**",
+  "note": "힘은 concerns 에 있다. of 는 거의 안 들리게 약하게."
  },
  {
   "term": "ship",
-  "reading": "**sh잎**"
+  "reading": "**sh잎**",
+  "note": "sh 를 \"시\" 로 적으면 다른 소리가 된다."
  },
  {
   "term": "side effect",
-  "reading": "**싸**읻 이f엨t"
+  "reading": "**싸**읻 이f엨t",
+  "note": "연음으로 \"싸이드 이펙트\" 처럼 늘어지지 않게."
  },
  {
   "term": "sign-off",
-  "reading": "**싸**인 어f"
+  "reading": "**싸**인 어f",
+  "note": "끝 f 는 한글로 적지 않는다."
  },
  {
   "term": "single source of truth",
-  "reading": "씽글 쏘rs 어v **트루th**"
+  "reading": "씽글 쏘rs 어v **트루th**",
+  "note": "끝이 th 라 \"트루스\" 가 아니다."
  },
  {
   "term": "spaghetti code",
-  "reading": "스뻐**게**티 코욷"
+  "reading": "스뻐**게**티 코욷",
+  "note": "\"스파게티\" 가 아니라 첫 모음이 약한 \"스뻐\" 다."
  },
  {
   "term": "spike",
-  "reading": "**스빠익**"
+  "reading": "**스빠익**",
+  "note": "s 뒤의 p 는 ㅍ 보다 ㅃ 에 가깝다. 한 음절이라 \"스파이크\" 처럼 끝에 모음을 붙이지 않는다."
  },
  {
   "term": "TBD",
-  "reading": "티 비 **디**"
+  "reading": "티 비 **디**",
+  "note": "철자로 읽는 약어라 글자 사이를 띄우고, 마지막 디에 힘을 준다."
  },
  {
   "term": "TODO",
-  "reading": "터**두**"
+  "reading": "터**두**",
+  "note": "\"투두\" 가 아니라 앞은 약하게 흘리고 뒤 두에 힘이 간다."
  },
  {
   "term": "typo",
-  "reading": "**타**이포우"
+  "reading": "**타**이포우",
+  "note": "뒤는 \"포\" 가 아니라 \"포우\" 다."
  },
  {
   "term": "user story",
-  "reading": "**유**z얼r s또리"
+  "reading": "**유**z얼r s또리",
+  "note": "z 는 한글로 쓰지 않고, s 뒤의 t 는 ㄸ 소리가 난다."
  },
  {
   "term": "walkthrough",
-  "reading": "**웍**th루"
+  "reading": "**웍**th루",
+  "note": "l 은 소리나지 않고, through 의 th 를 \"쓰\" 로 읽으면 다른 소리가 된다."
  },
  {
   "term": "waterfall",
-  "reading": "**워**덜rf올"
+  "reading": "**워**덜rf올",
+  "note": "미국식에서 모음 사이 t 는 ㄷ 에 가깝게 튄다. f 는 영문 그대로."
  },
  {
   "term": "WDYT",
-  "reading": "더블유 디 와이 **티**"
+  "reading": "더블유 디 와이 **티**",
+  "note": "철자로 읽는 약어다."
  },
  {
   "term": "XP",
@@ -2905,19 +3056,23 @@
  },
  {
   "term": "200",
-  "reading": "투 **헌**드렏"
+  "reading": "투 **헌**드렏",
+  "note": "끝의 d 는 받침으로 붙인다."
  },
  {
   "term": "201",
-  "reading": "투 오우 **원**"
+  "reading": "투 오우 **원**",
+  "note": "가운데 0 은 \"영\" 이 아니라 \"오우\" 로 읽는다."
  },
  {
   "term": "204",
-  "reading": "투 오우 **f올r**"
+  "reading": "투 오우 **f올r**",
+  "note": "four 의 f 와 끝 r 은 영문 그대로 둔다."
  },
  {
   "term": "304",
-  "reading": "th리 오우 **f올r**"
+  "reading": "th리 오우 **f올r**",
+  "note": "three 의 th 를 \"쓰\" 로 읽으면 다른 소리가 된다."
  },
  {
   "term": "400",
@@ -2933,11 +3088,13 @@
  },
  {
   "term": "422",
-  "reading": "f올r 투 **투**"
+  "reading": "f올r 투 **투**",
+  "note": "끝의 투에 힘이 간다."
  },
  {
   "term": "500",
-  "reading": "f아이v **헌**드렏"
+  "reading": "f아이v **헌**드렏",
+  "note": "five 의 끝 v 는 한글로 쓰지 않는다."
  },
  {
   "term": "503",
@@ -2945,11 +3102,13 @@
  },
  {
   "term": "access token",
-  "reading": "**액**세s 토우컨"
+  "reading": "**액**세s 토우컨",
+  "note": "힘은 맨 앞에 있고, token 은 \"토큰\" 이 아니라 \"토우컨\" 이다."
  },
  {
   "term": "base URL",
-  "reading": "**베이**s 유 아r 엘"
+  "reading": "**베이**s 유 아r 엘",
+  "note": "URL 은 철자로 읽으므로 글자를 띄운다."
  },
  {
   "term": "Base64",
@@ -2957,15 +3116,18 @@
  },
  {
   "term": "basic auth",
-  "reading": "**베이**씩 오th"
+  "reading": "**베이**씩 오th",
+  "note": "auth 의 끝은 s 가 아니라 혀끝을 윗니에 대는 th 다."
  },
  {
   "term": "BFF",
-  "reading": "비 에f **에f**"
+  "reading": "비 에f **에f**",
+  "note": "철자로 읽고 마지막 글자에 힘이 간다."
  },
  {
   "term": "Cache-Control",
-  "reading": "**캐**sh 컨트로울"
+  "reading": "**캐**sh 컨트로울",
+  "note": "cache 의 끝소리는 받침으로 쓸 수 없어 sh 로 둔다."
  },
  {
   "term": "callback URL",
@@ -2973,175 +3135,218 @@
  },
  {
   "term": "credential",
-  "reading": "크러**덴**sh얼"
+  "reading": "크러**덴**sh얼",
+  "note": "\"크리덴셜\" 이 아니라 앞은 약하게, 덴에 힘을 준다."
  },
  {
   "term": "curl",
-  "reading": "**컬**을"
+  "reading": "**컬**을",
+  "note": "끝의 l 은 혀끝을 입천장에 붙여 \"을\" 처럼 흘린다."
  },
  {
   "term": "DELETE",
-  "reading": "디**릳**"
+  "reading": "디**릳**",
+  "note": "앞은 거의 안 들리게, 뒤에 힘을 준다. 끝의 t 는 받침으로."
  },
  {
   "term": "deserialize",
-  "reading": "디**씨**리얼라이z"
+  "reading": "디**씨**리얼라이z",
+  "note": "힘은 씨에 있고, 끝 z 는 \"즈\" 로 늘이지 않는다."
  },
  {
   "term": "DTO",
-  "reading": "디 티 **오우**"
+  "reading": "디 티 **오우**",
+  "note": "철자로 읽는 약어다."
  },
  {
   "term": "GET",
-  "reading": "**겓**"
+  "reading": "**겓**",
+  "note": "끝의 t 는 받침으로 붙여 한 음절로 끝낸다."
  },
  {
   "term": "HATEOAS",
-  "reading": "헤이티**오**우애s"
+  "reading": "헤이티**오**우애s",
+  "note": "현장에서는 철자로 읽지 않고 \"헤이티오애스\" 처럼 이어 읽는다."
  },
  {
   "term": "HMAC",
-  "reading": "**에이**ch 맥"
+  "reading": "**에이**ch 맥",
+  "note": "앞 글자만 철자로 읽고 MAC 은 한 단어로 붙여 읽는다."
  },
  {
   "term": "HTTP method",
-  "reading": "에이ch 티 티 **피** 메th얻"
+  "reading": "에이ch 티 티 **피** 메th얻",
+  "note": "HTTP 는 철자로 읽고, method 의 th 는 \"쓰\" 나 \"드\" 가 아니다."
  },
  {
   "term": "HttpOnly",
-  "reading": "에이ch 티 티 피 **오**운리"
+  "reading": "에이ch 티 티 피 **오**운리",
+  "note": "only 는 \"온리\" 가 아니라 \"오운리\" 다."
  },
  {
   "term": "IDOR",
-  "reading": "**아**이돌r"
+  "reading": "**아**이돌r",
+  "note": "철자로 읽지 않고 \"아이도어\" 처럼 한 단어로 읽는다."
  },
  {
   "term": "input validation",
-  "reading": "**인**뿓 v앨러데이sh언"
+  "reading": "**인**뿓 v앨러데이sh언",
+  "note": "힘은 맨 앞에 있고, -tion 은 \"션\" 이 아니라 sh 소리다."
  },
  {
   "term": "login",
-  "reading": "**l로**긴"
+  "reading": "**l로**긴",
+  "note": "어두 l 은 혀끝을 입천장에 붙이고 시작하라는 표시다."
  },
  {
   "term": "long polling",
-  "reading": "**l롱** 포울링"
+  "reading": "**l롱** 포울링",
+  "note": "polling 은 \"폴링\" 이 아니라 \"포울링\" 이다."
  },
  {
   "term": "middleware",
-  "reading": "**미**들웨어r"
+  "reading": "**미**들웨어r",
+  "note": "끝의 r 은 한글로 쓰지 않는다."
  },
  {
   "term": "multipart",
-  "reading": "**멀**티팔t"
+  "reading": "**멀**티팔t",
+  "note": "끝의 rt 는 \"트\" 를 붙이지 않고 받침처럼 흘린다."
  },
  {
   "term": "nonce",
-  "reading": "**난**s"
+  "reading": "**난**s",
+  "note": "\"논스\" 가 아니라 모음은 \"아\" 에 가깝고 끝은 s 로 닫는다."
  },
  {
   "term": "over-fetching",
-  "reading": "오우v얼r**f에**ch잉"
+  "reading": "오우v얼r**f에**ch잉",
+  "note": "힘은 뒤쪽 f에 에 간다. v 와 f 는 한글로 쓰지 않는다."
  },
  {
   "term": "permission",
-  "reading": "펄r**미**sh언"
+  "reading": "펄r**미**sh언",
+  "note": "-ssion 을 \"션\" 으로 읽으면 sh 소리가 한글 ㅅ 로 굳는다."
  },
  {
   "term": "PKCE",
-  "reading": "**픽**씨"
+  "reading": "**픽**씨",
+  "note": "철자로 읽지 않고 \"픽시\" 한 단어로 읽는다."
  },
  {
   "term": "POST",
-  "reading": "**포우s트**"
+  "reading": "**포우s트**",
+  "note": "\"포스트\" 가 아니라 모음이 \"오우\" 이고, st 는 짧게 닫는다."
  },
  {
   "term": "pub/sub",
-  "reading": "**펍** 썹"
+  "reading": "**펍** 썹",
+  "note": "끝의 b 는 받침으로 붙인다."
  },
  {
   "term": "PUT",
-  "reading": "**푿**"
+  "reading": "**푿**",
+  "note": "\"풋\" 처럼 짧게, 끝의 t 는 받침으로."
  },
  {
   "term": "Referer",
-  "reading": "리**f얼**럴r"
+  "reading": "리**f얼**럴r",
+  "note": "철자가 r 하나 빠진 단어지만 발음은 referrer 와 같다. 힘은 가운데."
  },
  {
   "term": "replay attack",
-  "reading": "**리**플레이 어택"
+  "reading": "**리**플레이 어택",
+  "note": "replay 는 앞 \"리\" 에 힘이 간다. 뒤 attack 은 약하게 흘린다."
  },
  {
   "term": "request",
-  "reading": "리**퀘s트**"
+  "reading": "리**퀘s트**",
+  "note": "뒤에 힘. \"리퀘스트\" 처럼 또박또박 네 음절로 읽지 말고 끝 st 는 한 덩어리로 붙인다."
  },
  {
   "term": "resource",
-  "reading": "**리**쏘rs"
+  "reading": "**리**쏘rs",
+  "note": "앞에 힘. \"리소스\" 가 아니라 앞을 세게, 끝은 모음 없이 rs 로 닫는다."
  },
  {
   "term": "response",
-  "reading": "리s**빤s**"
+  "reading": "리s**빤s**",
+  "note": "s 뒤의 p 는 ㅍ 보다 ㅃ 에 가깝다. 끝 s 뒤에 \"스\" 를 붙이지 않는다."
  },
  {
   "term": "route",
-  "reading": "**롸웉**"
+  "reading": "**롸웉**",
+  "note": "끝 t 는 받침으로. \"라우트\" 처럼 세 음절이 되면 안 된다."
  },
  {
   "term": "sanitize",
-  "reading": "**쌔**너타이z"
+  "reading": "**쌔**너타이z",
+  "note": "앞에 힘. 끝 z 를 \"즈\" 로 쓰면 다른 소리가 된다."
  },
  {
   "term": "SDK",
-  "reading": "에s 디 **케이**"
+  "reading": "에s 디 **케이**",
+  "note": "철자로 읽는 약어라 글자 사이를 띄운다."
  },
  {
   "term": "session hijacking",
-  "reading": "**쎄**sh언 하이재킹"
+  "reading": "**쎄**sh언 하이재킹",
+  "note": "ʃ 는 한글 \"시\" 가 아니라 sh 다. \"세션\" 으로 굳히지 않는다."
  },
  {
   "term": "SSRF",
-  "reading": "에s 에s 아r **에f**"
+  "reading": "에s 에s 아r **에f**",
+  "note": "철자로 읽는 약어. 마지막 F 에 힘이 간다."
  },
  {
   "term": "streaming",
-  "reading": "**s트리**밍"
+  "reading": "**s트리**밍",
+  "note": "\"스트리밍\" 처럼 s 뒤에 모음을 넣지 않는다."
  },
  {
   "term": "trailing slash",
-  "reading": "**트레이**링 슬래sh"
+  "reading": "**트레이**링 슬래sh",
+  "note": "slash 끝은 받침으로 못 쓰므로 sh 로 둔다. \"슬래시\" 아님."
  },
  {
   "term": "URL encoding",
-  "reading": "유 아r **엘** 인코우딩"
+  "reading": "유 아r **엘** 인코우딩",
+  "note": "URL 은 철자로 읽는 약어라 띄어 쓴다."
  },
  {
   "term": "user agent",
-  "reading": "**유**z얼r 에이전t"
+  "reading": "**유**z얼r 에이전t",
+  "note": "user 의 s 는 z 소리다. 끝 t 는 받침처럼 붙인다."
  },
  {
   "term": "X-Forwarded-For",
-  "reading": "엑s **f올**월딛 f올r"
+  "reading": "엑s **f올**월딛 f올r",
+  "note": "f 를 \"포\" 로 쓰면 p 소리가 된다. forwarded 의 첫 음절에 힘."
  },
  {
   "term": "1NF",
-  "reading": "원 엔 **에f**"
+  "reading": "원 엔 **에f**",
+  "note": "숫자와 철자를 하나씩 읽는다."
  },
  {
   "term": "aggregate function",
-  "reading": "**애**그리겉 f엉ksh언"
+  "reading": "**애**그리겉 f엉ksh언",
+  "note": "명사 aggregate 는 앞에 힘이 가고 끝이 \"게이트\" 가 아니라 약한 \"겉\" 이다."
  },
  {
   "term": "anomaly",
-  "reading": "어**나**멀리"
+  "reading": "어**나**멀리",
+  "note": "\"아노말리\" 가 아니라 둘째 음절에 힘이 간다."
  },
  {
   "term": "attribute",
-  "reading": "**애**트리뷰t"
+  "reading": "**애**트리뷰t",
+  "note": "명사라 앞에 힘. 동사로 쓰면 어**트리**뷰t 로 힘이 옮겨간다."
  },
  {
   "term": "autocommit",
-  "reading": "오토우커**믿**"
+  "reading": "오토우커**믿**",
+  "note": "맨 뒤에 힘. \"커밋\" 이 아니라 받침으로 닫는 \"믿\" 이다."
  },
  {
   "term": "B-tree",
@@ -3149,151 +3354,188 @@
  },
  {
   "term": "BCNF",
-  "reading": "비 씨 엔 **에f**"
+  "reading": "비 씨 엔 **에f**",
+  "note": "철자로 하나씩 읽고 마지막 F 에 힘."
  },
  {
   "term": "bulk insert",
-  "reading": "**벌**k 인썰t"
+  "reading": "**벌**k 인썰t",
+  "note": "bulk 끝의 k 와 insert 끝의 t 뒤에 모음을 붙이지 않는다."
  },
  {
   "term": "checkpoint",
-  "reading": "**ch엑**포인t"
+  "reading": "**ch엑**포인t",
+  "note": "앞에 힘. 끝 t 를 \"트\" 로 늘리지 않는다."
  },
  {
   "term": "clustered index",
-  "reading": "k**러**s털rd 인덱s"
+  "reading": "k**러**s털rd 인덱s",
+  "note": "\"클러스터드\" 처럼 모음을 넣지 말고 s털rd 로 붙여 끝낸다."
  },
  {
   "term": "coalesce",
-  "reading": "코우얼**레s**"
+  "reading": "코우얼**레s**",
+  "note": "맨 뒤에 힘. 끝에 \"스\" 를 붙이지 않는다."
  },
  {
   "term": "column",
-  "reading": "**칼**럼"
+  "reading": "**칼**럼",
+  "note": "끝의 n 은 소리 나지 않는다."
  },
  {
   "term": "composite index",
-  "reading": "컴**파**z읻 인덱s"
+  "reading": "컴**파**z읻 인덱s",
+  "note": "가운데 s 는 z 소리고, 둘째 음절에 힘이 간다."
  },
  {
   "term": "concurrency control",
-  "reading": "컨**컬**런씨 컨트로울"
+  "reading": "컨**컬**런씨 컨트로울",
+  "note": "concurrency 의 둘째 음절에 힘. 뒤 control 은 약하게."
  },
  {
   "term": "connection string",
-  "reading": "커**넥**sh언 s트링"
+  "reading": "커**넥**sh언 s트링",
+  "note": "-tion 은 \"션\" 이 아니라 sh언 이다."
  },
  {
   "term": "covering index",
-  "reading": "**커**v어링 인덱s"
+  "reading": "**커**v어링 인덱s",
+  "note": "v 를 \"버\" 로 쓰면 b 소리가 된다."
  },
  {
   "term": "data warehouse",
-  "reading": "**데이**터 웨어하우s"
+  "reading": "**데이**터 웨어하우s",
+  "note": "끝 s 뒤에 \"스\" 의 ㅡ 를 길게 내지 않는다."
  },
  {
   "term": "distinct",
-  "reading": "디s**띵kt**"
+  "reading": "디s**띵kt**",
+  "note": "s 뒤 t 는 ㄸ 에 가깝고, 끝의 kt 는 모음 없이 붙여 닫는다."
  },
  {
   "term": "document database",
-  "reading": "**다**큐먼t 데이터베이s"
+  "reading": "**다**큐먼t 데이터베이s",
+  "note": "document 는 앞에 힘. \"도큐먼트\" 처럼 끝을 늘리지 않는다."
  },
  {
   "term": "entity",
-  "reading": "**엔**터티"
+  "reading": "**엔**터티",
+  "note": "앞에 힘. \"엔티티\" 가 아니라 가운데가 약한 \"터\" 다."
  },
  {
   "term": "entity integrity",
-  "reading": "**엔**터티 인테그러티"
+  "reading": "**엔**터티 인테그러티",
+  "note": "integrity 는 둘째 음절 \"테\" 가 상대적으로 세다."
  },
  {
   "term": "exclusive lock",
-  "reading": "익**s끌루**씨v l락"
+  "reading": "익**s끌루**씨v l락",
+  "note": "끝 v 를 \"브\" 로 쓰지 않는다. lock 의 l 은 혀끝을 입천장에 붙이고 시작한다."
  },
  {
   "term": "execution plan",
-  "reading": "엑씨**큐**sh언 플랜"
+  "reading": "엑씨**큐**sh언 플랜",
+  "note": "-tion 은 sh언. 힘은 \"큐\" 에 있다."
  },
  {
   "term": "functional dependency",
-  "reading": "**f엉**ksh어늘 디펜던씨"
+  "reading": "**f엉**ksh어늘 디펜던씨",
+  "note": "f 는 윗니로 아랫입술을 스친다. -tional 은 \"셔널\" 이 아니라 sh어늘 로 짧게 흘린다."
  },
  {
   "term": "grant",
-  "reading": "**그랜t**"
+  "reading": "**그랜t**",
+  "note": "끝 t 를 \"트\" 로 늘리지 않는다."
  },
  {
   "term": "graph database",
-  "reading": "**그래f** 데이터베이s"
+  "reading": "**그래f** 데이터베이s",
+  "note": "끝 f 를 \"프\" 로 쓰면 p 소리가 된다."
  },
  {
   "term": "in-memory database",
-  "reading": "인 **메**머리 데이터베이s"
+  "reading": "인 **메**머리 데이터베이s",
+  "note": "memory 의 첫 음절에 힘이 간다."
  },
  {
   "term": "inner join",
-  "reading": "**이**널r 조인"
+  "reading": "**이**널r 조인",
+  "note": "앞 단어에 힘. 끝의 r 은 혀를 말아 흘린다."
  },
  {
   "term": "key-value store",
-  "reading": "키 **v앨**류 스똘r"
+  "reading": "키 **v앨**류 스똘r",
+  "note": "value 의 v 와 첫 음절 힘이 핵심. \"밸류\" 로 쓰면 b 소리가 된다."
  },
  {
   "term": "lock granularity",
-  "reading": "**l락** 그래뉼레러티"
+  "reading": "**l락** 그래뉼레러티",
+  "note": "어두 l 은 혀끝을 입천장에 붙이고 시작하라는 표시다."
  },
  {
   "term": "lost update",
-  "reading": "**l로s트** 업데읻"
+  "reading": "**l로s트** 업데읻",
+  "note": "lost 의 l 은 혀끝을 붙여 내고, update 끝 t 는 받침처럼 닫는다."
  },
  {
   "term": "many-to-many",
-  "reading": "메니 터 **메**니"
+  "reading": "메니 터 **메**니",
+  "note": "가운데 to 는 약한 \"터\" 로 흘리고 뒤 many 에 힘."
  },
  {
   "term": "order by",
-  "reading": "**올**덜r 바이"
+  "reading": "**올**덜r 바이",
+  "note": "앞에 힘. \"오더 바이\" 처럼 평평하게 읽지 않는다."
  },
  {
   "term": "outer join",
-  "reading": "**아**우털r 조인"
+  "reading": "**아**우털r 조인",
+  "note": "앞 단어 첫 음절에 힘이 간다."
  },
  {
   "term": "partial dependency",
-  "reading": "**파r**sh얼 디펜던씨"
+  "reading": "**파r**sh얼 디펜던씨",
+  "note": "힘은 partial 첫 음절에 있다. ʃ 는 \"셜\" 이 아니라 sh 다."
  },
  {
   "term": "pessimistic locking",
-  "reading": "페써**미**s띡 l라킹"
+  "reading": "페써**미**s띡 l라킹",
+  "note": "세 번째 음절에 힘. s 뒤 t 는 ㄸ 에 가깝다."
  },
  {
   "term": "phantom read",
-  "reading": "**f앤**텀 릳"
+  "reading": "**f앤**텀 릳",
+  "note": "ph 는 f 소리다. '팬텀'처럼 ㅍ 으로 시작하면 안 되고, read 끝의 d 는 받침으로 붙여 한 음절로 끝낸다."
  },
  {
   "term": "point-in-time recovery",
-  "reading": "포인t 인 **타임** 리커v어리"
+  "reading": "포인t 인 **타임** 리커v어리",
+  "note": "힘은 time 에 있고 앞뒤는 약하게 흘린다. recovery 는 \"리커버리\" 의 ㅂ 가 아니라 v 소리다."
  },
  {
   "term": "prepared statement",
-  "reading": "프리**페얼d** s떼읻먼t"
+  "reading": "프리**페얼d** s떼읻먼t",
+  "note": "prepared 는 뒤 음절에 힘이 간다. statement 는 '스테이트먼트'처럼 모음을 넣지 말고 끝을 받침으로 막는다."
  },
  {
   "term": "relation",
-  "reading": "리**레이**sh언"
+  "reading": "리**레이**sh언",
+  "note": "-tion 은 sh 소리라 '션'으로 적지 않는다."
  },
  {
   "term": "relational algebra",
-  "reading": "리**레이**sh어늘 앨저브러"
+  "reading": "리**레이**sh어늘 앨저브러",
+  "note": "힘은 relational 의 '레이'에만 준다. algebra 는 '알지브라'가 아니라 '앨저브러'다."
  },
  {
   "term": "replication lag",
-  "reading": "레플리**케이**sh언 l랙"
+  "reading": "레플리**케이**sh언 l랙",
+  "note": "lag 의 l 은 혀끝을 입천장에 붙이고 시작하며, 끝 g 는 받침으로 한 음절이다."
  },
  {
   "term": "revoke",
-  "reading": "리**v오욱**"
+  "reading": "리**v오욱**",
+  "note": "v 를 ㅂ 로 읽으면 다른 소리가 된다. 뒤 음절에 힘이 간다."
  },
  {
   "term": "row",
@@ -3301,215 +3543,268 @@
  },
  {
   "term": "savepoint",
-  "reading": "**쎄이**v포인t"
+  "reading": "**쎄이**v포인t",
+  "note": "save 의 v 는 받침처럼 살짝 물고, 힘은 맨 앞에 준다."
  },
  {
   "term": "selectivity",
-  "reading": "썰렉**티**v어티"
+  "reading": "썰렉**티**v어티",
+  "note": "'셀렉티비티'가 아니라 세 번째 음절 '티'에 힘이 간다."
  },
  {
   "term": "slow query",
-  "reading": "s**l로**우 퀴리"
+  "reading": "s**l로**우 퀴리",
+  "note": "sl 은 s 뒤에 혀끝을 붙인 l 이 바로 이어진다. query 는 '쿼리'보다 '퀴리'에 가깝다."
  },
  {
   "term": "super key",
-  "reading": "**쑤**퍼r 키"
+  "reading": "**쑤**퍼r 키",
+  "note": "'슈퍼'가 아니라 '쑤퍼r' 이고, 끝의 r 은 혀만 말아준다."
  },
  {
   "term": "surrogate key",
-  "reading": "**써**러겉 키"
+  "reading": "**써**러겉 키",
+  "note": "맨 앞에 힘이 가고 뒤는 약하게 흘린다. '서로게이트'처럼 뒤를 늘이지 않는다."
  },
  {
   "term": "table",
-  "reading": "**테이**블"
+  "reading": "**테이**블",
+  "note": "\"테이블\" 의 끝 \"블\" 은 모음을 거의 내지 않고 짧게 닫는다."
  },
  {
   "term": "transitive dependency",
-  "reading": "**트랜**써티v 디펜던씨"
+  "reading": "**트랜**써티v 디펜던씨",
+  "note": "transitive 는 맨 앞에 힘이 간다. 끝의 v 를 'ㅂ'로 적지 않는다."
  },
  {
   "term": "truncate",
-  "reading": "**트렁**케잍"
+  "reading": "**트렁**케잍",
+  "note": "'트런케이트'처럼 끝에 모음을 붙이지 말고 받침으로 막는다."
  },
  {
   "term": "tuple",
-  "reading": "**투**쁠"
+  "reading": "**투**쁠",
+  "note": "\"튜플\" 이 아니라 \"투쁠\" 두 음절이다. 가운데 p 는 ㅍ 보다 ㅃ 에 가깝다."
  },
  {
   "term": "two-phase locking",
-  "reading": "투 **f에이z** l라킹"
+  "reading": "투 **f에이z** l라킹",
+  "note": "phase 의 ph 는 f, 끝 s 는 z 소리다. locking 은 '로킹'보다 '라킹'에 가깝다."
  },
  {
   "term": "union",
-  "reading": "**유**년"
+  "reading": "**유**년",
+  "note": "'유니온' 세 음절이 아니라 두 음절이다. '유' 에 힘을 주고 뒤를 빠르게 붙인다."
  },
  {
   "term": "vector database",
-  "reading": "**v엑**털r 데이터베이s"
+  "reading": "**v엑**털r 데이터베이s",
+  "note": "v 를 ㅂ 로 읽으면 안 되고, database 끝은 z 가 아니라 s 소리다."
  },
  {
   "term": "window function",
-  "reading": "**윈**도우 f엉ksh언"
+  "reading": "**윈**도우 f엉ksh언",
+  "note": "function 은 f 로 시작하고 -tion 은 sh 소리다. '펑션'으로 적지 않는다."
  },
  {
   "term": "alert fatigue",
-  "reading": "얼**럴t** f어틱"
+  "reading": "얼**럴t** f어틱",
+  "note": "alert 는 뒤에 힘이 간다. fatigue 의 gue 는 g 한 소리라 \"파티그\" 가 아니라 \"f어틱\" 이다."
  },
  {
   "term": "availability zone",
-  "reading": "어v에일러**빌**러티 z오운"
+  "reading": "어v에일러**빌**러티 z오운",
+  "note": "힘은 \"빌\" 에 있다. zone 의 z 는 ㅈ 가 아니라 윗니 뒤에서 목청을 울려 내는 소리다."
  },
  {
   "term": "backup",
-  "reading": "**백**업"
+  "reading": "**백**업",
+  "note": "앞에 힘을 주고 뒤는 가볍게 붙인다."
  },
  {
   "term": "base image",
-  "reading": "**베이s** 이미j"
+  "reading": "**베이s** 이미j",
+  "note": "image 끝은 받침으로 쓸 수 없는 j 소리라 영문 그대로 둔다."
  },
  {
   "term": "build",
-  "reading": "**빌d**"
+  "reading": "**빌d**",
+  "note": "'빌드' 두 음절이 아니라 한 음절이다. 끝의 d 는 받침처럼 막는다."
  },
  {
   "term": "cloud",
-  "reading": "k**l라**욷"
+  "reading": "k**l라**욷",
+  "note": "kl 은 모음 없이 붙여 한 음절로 낸다. '클라우드' 세 음절이 아니다."
  },
  {
   "term": "configuration drift",
-  "reading": "컨f이겨**레이**sh언 드리f트"
+  "reading": "컨f이겨**레이**sh언 드리f트",
+  "note": "힘은 '레이'에 있고 -tion 은 sh 소리다. drift 는 한 덩어리로 끝을 막는다."
  },
  {
   "term": "crash loop",
-  "reading": "k**래**sh l룹"
+  "reading": "k**래**sh l룹",
+  "note": "crash 끝은 받침이 안 되는 sh 소리라 영문으로 둔다. loop 끝 p 는 받침으로 막는다."
  },
  {
   "term": "CVE",
-  "reading": "씨 v이 **이**"
+  "reading": "씨 v이 **이**",
+  "note": "철자로 하나씩 읽는 약어다. V 는 ㅂ 가 아니라 v 소리다."
  },
  {
   "term": "daemon",
-  "reading": "**디**먼"
+  "reading": "**디**먼",
+  "note": "'데몬'이 아니라 '디먼'이다. ae 는 '이' 소리로 읽는다."
  },
  {
   "term": "dashboard",
-  "reading": "**대**sh볼d"
+  "reading": "**대**sh볼d",
+  "note": "sh 는 한글로 적지 않고, board 는 '보드'가 아니라 r 을 머금고 끝을 막는다."
  },
  {
   "term": "dead letter queue",
-  "reading": "**덷** l레털r 큐"
+  "reading": "**덷** l레털r 큐",
+  "note": "dead 는 한 음절로 끝을 받침으로 막는다."
  },
  {
   "term": "DevOps",
-  "reading": "**데**v압s"
+  "reading": "**데**v압s",
+  "note": "단어처럼 붙여 읽는 약어다. Ops 는 '옵스'보다 '압s'에 가깝다."
  },
  {
   "term": "DNS propagation",
-  "reading": "디 엔 에s 프라퍼**게이**sh언"
+  "reading": "디 엔 에s 프라퍼**게이**sh언",
+  "note": "DNS 는 철자로 하나씩 읽고, propagation 의 힘은 '게이'에 있다."
  },
  {
   "term": "Docker",
-  "reading": "**다**컬r"
+  "reading": "**다**컬r",
+  "note": "'도커'가 아니라 '다컬r' 이다. o 는 '아'에 가깝다."
  },
  {
   "term": "end of life",
-  "reading": "엔더v **l라이f**"
+  "reading": "엔더v **l라이f**",
+  "note": "end of 는 이어져 '엔더v'로 붙고, 힘은 life 에 간다. 끝의 f 는 ㅍ 가 아니다."
  },
  {
   "term": "ephemeral",
-  "reading": "이**f에**머를"
+  "reading": "이**f에**머를",
+  "note": "ph 는 f 소리이고 두 번째 음절에 힘이 간다. '에피메랄'이 아니다."
  },
  {
   "term": "failover",
-  "reading": "**f에일**오우v어r"
+  "reading": "**f에일**오우v어r",
+  "note": "맨 앞에 힘을 주고, f 와 v 를 한글로 적지 않는다."
  },
  {
   "term": "GitOps",
-  "reading": "**긷**압s"
+  "reading": "**긷**압s",
+  "note": "Git 끝 t 는 받침으로 막고 Ops 는 '옵스'가 아니라 '압s'다."
  },
  {
   "term": "graceful degradation",
-  "reading": "그레이sf을 데그러**데이**sh언"
+  "reading": "그레이sf을 데그러**데이**sh언",
+  "note": "힘은 degradation 의 '데이'에 있다. -tion 은 sh 소리다."
  },
  {
   "term": "heartbeat",
-  "reading": "**할t**빝"
+  "reading": "**할t**빝",
+  "note": "'하트비트'처럼 모음을 넣지 말고 두 음절로 끝을 막는다."
  },
  {
   "term": "hosting",
-  "reading": "**호우**s팅"
+  "reading": "**호우**s팅",
+  "note": "'호스팅'이 아니라 o 를 '오우'로 늘여 읽는다."
  },
  {
   "term": "hypervisor",
-  "reading": "**하이**펄rv아이z어r"
+  "reading": "**하이**펄rv아이z어r",
+  "note": "힘은 맨 앞에 있다. visor 의 v 와 z 를 한글로 적지 않는다."
  },
  {
   "term": "IAM",
-  "reading": "아이 에이 **엠**"
+  "reading": "아이 에이 **엠**",
+  "note": "철자로 하나씩 읽는 약어다. 현장에서 '아이앰'으로 붙여 부르기도 한다."
  },
  {
   "term": "IDS",
-  "reading": "아이 디 **에s**"
+  "reading": "아이 디 **에s**",
+  "note": "철자로 하나씩 읽고, 끝 S 는 '에스'가 아니라 받침 없는 에s 다."
  },
  {
   "term": "least privilege",
-  "reading": "l리s트 **프리**v얼리j"
+  "reading": "l리s트 **프리**v얼리j",
+  "note": "least 의 l 은 혀끝을 붙여 시작한다. privilege 는 맨 앞에 힘이 가고 끝은 j 소리다."
  },
  {
   "term": "liveness probe",
-  "reading": "**l라이**v너s 프로웁"
+  "reading": "**l라이**v너s 프로웁",
+  "note": "live 는 '리브'가 아니라 '라이v'다. probe 끝 b 는 받침으로 막는다."
  },
  {
   "term": "localhost",
-  "reading": "**l로**우클호우s트"
+  "reading": "**l로**우클호우s트",
+  "note": "어두 l 은 혀끝을 붙이고 시작한다. '로컬호스트'처럼 모음을 넣지 않는다."
  },
  {
   "term": "LTS",
-  "reading": "엘 티 **에s**"
+  "reading": "엘 티 **에s**",
+  "note": "철자로 하나씩 읽는 약어이고, 힘은 마지막 S 에 간다."
  },
  {
   "term": "maintenance window",
-  "reading": "**메인**터넌s 윈도우"
+  "reading": "**메인**터넌s 윈도우",
+  "note": "\"메인터넌스\"처럼 끝을 \"스\"로 늘리지 말고 s 받침처럼 짧게 닫는다."
  },
  {
   "term": "manifest",
-  "reading": "**매**너f에s트"
+  "reading": "**매**너f에s트",
+  "note": "가운데는 슈와라 거의 안 들리고 힘은 맨 앞에 있다. fe 는 f 소리라 \"페\"로 쓰지 않는다."
  },
  {
   "term": "message queue",
-  "reading": "**메**씨j 큐"
+  "reading": "**메**씨j 큐",
+  "note": "끝의 dʒ 는 받침으로 못 적어 j 로 둔다. \"메시지 큐\"처럼 음절을 늘리지 않는다."
  },
  {
   "term": "mitigation",
-  "reading": "미터**게이**sh언"
+  "reading": "미터**게이**sh언",
+  "note": "-tion 은 sh 소리라 \"션\"으로 쓰지 않는다. 힘은 \"게이\"에 있다."
  },
  {
   "term": "monitoring",
-  "reading": "**마**니터링"
+  "reading": "**마**니터링",
+  "note": "\"모니터링\"이 아니라 앞이 ɑ 소리라 \"마\"에 가깝고 거기에 힘이 간다."
  },
  {
   "term": "noisy neighbor",
-  "reading": "노이z이 **네이**벌r"
+  "reading": "노이z이 **네이**벌r",
+  "note": "noisy 의 s 는 z 소리다. 힘은 뒷말 첫 음절에 있다."
  },
  {
   "term": "object storage",
-  "reading": "**압**젝t s또리j"
+  "reading": "**압**젝t s또리j",
+  "note": "s 뒤 t 는 된소리에 가까워 \"s또\" 로 적는다. 끝의 dʒ 는 j 로 둔다."
  },
  {
   "term": "on-premises",
-  "reading": "안 **프레**미씨z"
+  "reading": "안 **프레**미씨z",
+  "note": "끝은 \"-미시스\"가 아니라 z 소리다. premises 첫 음절에 힘이 간다."
  },
  {
   "term": "outage",
-  "reading": "**아**우티j"
+  "reading": "**아**우티j",
+  "note": "\"아웃티지\"가 아니다. 끝 dʒ 는 j 로 두고 음절을 늘리지 않는다."
  },
  {
   "term": "pod",
-  "reading": "**팓**"
+  "reading": "**팓**",
+  "note": "\"파드\" 두 음절이 아니라 한 음절이다. 끝 d 는 받침으로 닫는다."
  },
  {
   "term": "readiness probe",
-  "reading": "**레**디너s 프로웁"
+  "reading": "**레**디너s 프로웁",
+  "note": "read 가 들어 있지만 \"리\"가 아니라 \"레\"다. probe 끝 b 는 받침으로 닫는다."
  },
  {
   "term": "region",
@@ -3517,139 +3812,173 @@
  },
  {
   "term": "runner",
-  "reading": "**뤄**널r"
+  "reading": "**뤄**널r",
+  "note": "끝의 r 은 한글로 적지 않고 r 로 남긴다. \"러너\"보다 앞을 세게."
  },
  {
   "term": "security group",
-  "reading": "씨**큐**러티 그룹"
+  "reading": "씨**큐**러티 그룹",
+  "note": "힘은 두 번째 음절에 있고 앞 \"씨\"는 약하게 흘린다."
  },
  {
   "term": "serverless",
-  "reading": "**썰**v얼r러s"
+  "reading": "**썰**v얼r러s",
+  "note": "v 와 끝 s 는 한글로 쓰지 않는다. \"서버리스\" 4음절이 아니라 3음절이다."
  },
  {
   "term": "sidecar",
-  "reading": "**싸**읻카r"
+  "reading": "**싸**읻카r",
+  "note": "\"사이드카\"처럼 d 를 음절로 만들지 말고 받침으로 닫는다."
  },
  {
   "term": "single point of failure",
-  "reading": "씽글 포인t 어v **f에일**려r"
+  "reading": "씽글 포인t 어v **f에일**려r",
+  "note": "힘은 맨 뒤 failure 에 몰린다. f 는 한글로 쓰지 않는다."
  },
  {
   "term": "SLI",
-  "reading": "에s 엘 **아이**"
+  "reading": "에s 엘 **아이**",
+  "note": "철자로 하나씩 읽는 약어라 띄어 쓴다. 마지막 글자에 힘이 간다."
  },
  {
   "term": "snapshot",
-  "reading": "**s냎**sh앝"
+  "reading": "**s냎**sh앝",
+  "note": "sh 는 한글 \"샷\" 으로 쓰면 \"사\" 소리로 굳는다. 끝 t 는 받침."
  },
  {
   "term": "status page",
-  "reading": "**s떼이**터s 페이j"
+  "reading": "**s떼이**터s 페이j",
+  "note": "s 뒤 t 는 된소리에 가깝다. page 끝 dʒ 는 j 로 둔다."
  },
  {
   "term": "VPC",
-  "reading": "v이 피 **씨**"
+  "reading": "v이 피 **씨**",
+  "note": "철자로 읽는 약어다. 첫 글자는 \"브이\"가 아니라 v 소리 하나다."
  },
  {
   "term": "vulnerability",
-  "reading": "v얼너러**빌**러티"
+  "reading": "v얼너러**빌**러티",
+  "note": "힘은 \"빌\"에 있고 앞 세 음절은 거의 흘린다."
  },
  {
   "term": "zero-day",
-  "reading": "**z이**로우 데이"
+  "reading": "**z이**로우 데이",
+  "note": "z 는 \"지\"가 아니다. 혀를 떨지 말고 윗니 뒤에서 울리는 소리."
  },
  {
   "term": "address already in use",
-  "reading": "애드레s 올레디 인 **유s**"
+  "reading": "애드레s 올레디 인 **유s**",
+  "note": "문장 전체의 힘은 맨 뒤 use 에 있다. 끝 s 는 \"스\"로 늘리지 않는다."
  },
  {
   "term": "benchmark",
-  "reading": "**벤**ch말k"
+  "reading": "**벤**ch말k",
+  "note": "ch 는 받침으로 못 적어 영문으로 둔다. 끝 k 에 \"크\" 를 붙이지 않는다."
  },
  {
   "term": "beta test",
-  "reading": "**베이**터 테s트"
+  "reading": "**베이**터 테s트",
+  "note": "\"베타\"가 아니라 \"베이터\"다. 힘은 앞말 첫 음절."
  },
  {
   "term": "branch coverage",
-  "reading": "b**뢘**ch 커v어리j"
+  "reading": "b**뢘**ch 커v어리j",
+  "note": "coverage 는 \"커버리지\"가 아니라 v 와 j 를 영문으로 남긴다."
  },
  {
   "term": "bug",
-  "reading": "**벅**"
+  "reading": "**벅**",
+  "note": "\"버그\" 두 음절이 아니다. 끝 g 는 받침으로 닫는다."
  },
  {
   "term": "call stack",
-  "reading": "**콜** s땍"
+  "reading": "**콜** s땍",
+  "note": "s 뒤 t 는 된소리에 가까워 \"s땍\" 이다."
  },
  {
   "term": "catch",
-  "reading": "**캐**ch"
+  "reading": "**캐**ch",
+  "note": "끝 ch 는 받침으로 못 적어 영문으로 둔다. \"캐치\" 두 음절이 아니다."
  },
  {
   "term": "circular import",
-  "reading": "**썰**큘럴r 임폴t"
+  "reading": "**썰**큘럴r 임폴t",
+  "note": "힘은 circular 첫 음절에 있다. 끝 r 은 영문으로 남긴다."
  },
  {
   "term": "command not found",
-  "reading": "커맨d 낱 **f아운d**"
+  "reading": "커맨d 낱 **f아운d**",
+  "note": "문장의 힘은 found 에 있다. f 는 \"파\"가 아니고 윗니로 아랫입술을 스친다."
  },
  {
   "term": "connection refused",
-  "reading": "커넥sh언 리**f유zd**"
+  "reading": "커넥sh언 리**f유zd**",
+  "note": "-tion 은 sh 소리라 \"션\" 으로 쓰지 않는다. 힘은 refused 뒤쪽에 있고 끝 d 에 \"드\" 를 붙이지 않는다."
  },
  {
   "term": "crash",
-  "reading": "k**래**sh"
+  "reading": "k**래**sh",
+  "note": "끝 sh 를 \"시\"로 적으면 다른 소리가 된다. 음절을 늘리지 않는다."
  },
  {
   "term": "debug",
-  "reading": "디**벅**"
+  "reading": "디**벅**",
+  "note": "뒤에 힘이 간다. \"디버그\" 3음절이 아니라 2음절."
  },
  {
   "term": "debugger",
-  "reading": "디**벅**걸r"
+  "reading": "디**벅**걸r",
+  "note": "가운데에 힘이 있고 끝 r 은 영문으로 남긴다."
  },
  {
   "term": "defect",
-  "reading": "**디**f엑t"
+  "reading": "**디**f엑t",
+  "note": "명사는 앞에 힘이 간다. fe 는 f 소리라 \"페\"가 아니다."
  },
  {
   "term": "duplicate",
-  "reading": "**두**쁠리컽"
+  "reading": "**두**쁠리컽",
+  "note": "\"듀플리케이트\"가 아니다. 형용사·명사는 끝이 약한 \"컽\"이고 힘은 맨 앞."
  },
  {
   "term": "equivalence partitioning",
-  "reading": "이**퀴**v얼런s 파r티sh어닝"
+  "reading": "이**퀴**v얼런s 파r티sh어닝",
+  "note": "전체 힘은 \"퀴\"에 있다. -tion- 은 sh 소리."
  },
  {
   "term": "error",
-  "reading": "**에**럴r"
+  "reading": "**에**럴r",
+  "note": "\"에러\"로 끝내지 말고 마지막 r 을 혀를 말아 남긴다."
  },
  {
   "term": "exit code",
-  "reading": "**엑**z잍 코욷"
+  "reading": "**엑**z잍 코욷",
+  "note": "x 는 여기서 gz 소리다. \"엑시트\"가 아니다."
  },
  {
   "term": "expected behavior",
-  "reading": "익s**뻭**틷 비헤이v열r"
+  "reading": "익s**뻭**틷 비헤이v열r",
+  "note": "s 뒤 p 는 된소리에 가깝다. 힘은 expected 가운데."
  },
  {
   "term": "fail fast",
-  "reading": "f에일 **f애s트**"
+  "reading": "f에일 **f애s트**",
+  "note": "둘 다 f 소리다. 힘은 뒷말에 간다."
  },
  {
   "term": "false negative",
-  "reading": "f올s **네**거티v"
+  "reading": "f올s **네**거티v",
+  "note": "끝 v 는 \"브\"로 늘리지 않는다. 힘은 negative 첫 음절."
  },
  {
   "term": "false positive",
-  "reading": "f올s **파**z어티v"
+  "reading": "f올s **파**z어티v",
+  "note": "positive 의 s 는 z 소리다. 힘은 \"파\"에 있다."
  },
  {
   "term": "fatal",
-  "reading": "**f에이**틀"
+  "reading": "**f에이**틀",
+  "note": "\"파탈\"이 아니라 \"f에이틀\"이다. 끝은 약하게 흘린다."
  },
  {
   "term": "hang",
@@ -3657,95 +3986,118 @@
  },
  {
   "term": "hot path",
-  "reading": "**핱** 패th"
+  "reading": "**핱** 패th",
+  "note": "path 끝은 s 가 아니라 th 다. 혀끝을 윗니에 대고 바람을 낸다."
  },
  {
   "term": "illegal",
-  "reading": "일**리**글"
+  "reading": "일**리**글",
+  "note": "힘은 가운데 \"리\"에 있다. 끝은 \"걸\"이 아니라 약한 \"글\"."
  },
  {
   "term": "index out of range",
-  "reading": "인덱s 아우러v **뤠인j**"
+  "reading": "인덱s 아우러v **뤠인j**",
+  "note": "out of 는 붙어서 \"아우러v\"로 흐른다. 힘은 맨 뒤 range 에 있다."
  },
  {
   "term": "infinite loop",
-  "reading": "**인**f어넡 l룹"
+  "reading": "**인**f어넡 l룹",
+  "note": "\"인피나이트\" 가 아니라 뒤가 약하게 \"f어넡\" 이다."
  },
  {
   "term": "instrumentation",
-  "reading": "인s트러멘**테이**sh언"
+  "reading": "인s트러멘**테이**sh언",
+  "note": "강세는 \"테이\" 에 있고 -tion 은 sh 소리다."
  },
  {
   "term": "intermittent",
-  "reading": "인털**미**튼t"
+  "reading": "인털**미**튼t",
+  "note": "가운데 \"미\" 에 힘, 끝은 약하게 흘린다."
  },
  {
   "term": "invalid",
-  "reading": "인**v앨**읻"
+  "reading": "인**v앨**읻",
+  "note": "v 를 \"ㅂ\" 로 쓰지 않는다. \"인발리드\" 처럼 끝에 모음을 붙이지 않는다."
  },
  {
   "term": "log",
-  "reading": "**l록**"
+  "reading": "**l록**",
+  "note": "어두 l 은 혀끝을 입천장에 붙여 시작한다. 받침 ㄱ 로 끝내 \"로그\" 의 \"그\" 를 길게 늘이지 않는다."
  },
  {
   "term": "log rotation",
-  "reading": "**l록** 로우테이sh언"
+  "reading": "**l록** 로우테이sh언",
+  "note": "힘은 log 에 있다. -tion 은 sh 소리다."
  },
  {
   "term": "malformed",
-  "reading": "맬**f올md**"
+  "reading": "맬**f올md**",
+  "note": "f 는 영문 그대로, \"말포름드\" 처럼 늘이지 않는다."
  },
  {
   "term": "mismatch",
-  "reading": "**미s**매ch"
+  "reading": "**미s**매ch",
+  "note": "끝의 ch 는 받침으로 안 되니 영문으로 둔다."
  },
  {
   "term": "monkey patch",
-  "reading": "**멍**끼 패ch"
+  "reading": "**멍**끼 패ch",
+  "note": "\"몽키\" 가 아니라 \"멍끼\" 에 가깝다."
  },
  {
   "term": "no such file or directory",
-  "reading": "노우 써ch f아일 오r 드**뤡**터리"
+  "reading": "노우 써ch f아일 오r 드**뤡**터리",
+  "note": "directory 는 \"뤡\" 에 힘, \"디렉토리\" 처럼 평평하게 읽지 않는다."
  },
  {
   "term": "overhead",
-  "reading": "**오**우v얼r헫"
+  "reading": "**오**우v얼r헫",
+  "note": "v 는 영문 그대로, 끝은 받침 ㄷ 로 닫는다."
  },
  {
   "term": "permission denied",
-  "reading": "펄r미sh언 드**나읻**"
+  "reading": "펄r미sh언 드**나읻**",
+  "note": "-ssion 도 sh 소리이고, denied 는 뒤에 힘이 간다."
  },
  {
   "term": "print debugging",
-  "reading": "**프린t** 디버깅"
+  "reading": "**프린t** 디버깅",
+  "note": "print 는 \"프린트\" 가 아니라 끝을 t 로 닫는다. 힘은 print 에 있다."
  },
  {
   "term": "propagate",
-  "reading": "**프롸**퍼게잍"
+  "reading": "**프롸**퍼게잍",
+  "note": "첫음절에 힘, \"프로파게이트\" 처럼 늘이지 않는다."
  },
  {
   "term": "redact",
-  "reading": "리**댁t**"
+  "reading": "리**댁t**",
+  "note": "뒤에 힘이 간다."
  },
  {
   "term": "severity",
-  "reading": "써**v에**러티"
+  "reading": "써**v에**러티",
+  "note": "v 는 영문 그대로, 둘째 음절에 힘이 간다."
  },
  {
   "term": "stack overflow",
-  "reading": "**s땍** 오우v얼rf로우"
+  "reading": "**s땍** 오우v얼rf로우",
+  "note": "s 뒤 t 는 된소리, f 와 v 는 영문 그대로. 힘은 stack 에 있다."
  },
  {
   "term": "stderr",
-  "reading": "스**땐**덜rd 에럴r"
+  "reading": "스**땐**덜rd 에럴r",
+  "note": "standard error 를 줄인 말이라 보통 풀어 읽는다. 철자로 \"에s 티 디 이 아r 아r\" 로 읽기도 한다."
  },
  {
   "term": "step into",
-  "reading": "**s뗍** 인투"
+  "reading": "**s뗍** 인투",
+  "note": "s 뒤 t 는 된소리에 가깝다."
  },
  {
   "term": "system test",
-  "reading": "**씨**s텀 테s트"
+  "reading": "**씨**s텀 테s트",
+  "note": "\"시스템\" 의 \"템\" 을 세게 읽지 않는다."
  },
  {
   "term": "tail",
@@ -3753,7 +4105,8 @@
  },
  {
   "term": "teardown",
-  "reading": "**테어r**다운"
+  "reading": "**테어r**다운",
+  "note": "앞에 힘이 간다. \"티어다운\" 이 아니다."
  },
  {
   "term": "test double",
@@ -3761,47 +4114,58 @@
  },
  {
   "term": "test harness",
-  "reading": "**테s트** 할니s"
+  "reading": "**테s트** 할니s",
+  "note": "끝 s 는 \"스\" 로 늘이지 말고 짧게."
  },
  {
   "term": "test oracle",
-  "reading": "**테s트** 오러클"
+  "reading": "**테s트** 오러클",
+  "note": "힘은 test 에 있다. oracle 은 \"오라클\" 이 아니라 \"오러클\" 이다."
  },
  {
   "term": "test pyramid",
-  "reading": "**테s트** 피러믿"
+  "reading": "**테s트** 피러믿",
+  "note": "pyramid 는 \"피라미드\" 가 아니라 끝을 받침 ㄷ 으로 닫는다."
  },
  {
   "term": "test suite",
-  "reading": "**테s트** s위t"
+  "reading": "**테s트** s위t",
+  "note": "suite 는 \"수이트\" 가 아니라 s위t 한 음절이다."
  },
  {
   "term": "throw",
-  "reading": "**th로**우"
+  "reading": "**th로**우",
+  "note": "th 는 혀끝을 윗니에 대고 바람을 낸다. \"쓰로우\" 로 읽으면 s 소리가 된다."
  },
  {
   "term": "timestamp",
-  "reading": "**타임**스땜p"
+  "reading": "**타임**스땜p",
+  "note": "끝 p 는 받침이 안 되니 영문으로 둔다."
  },
  {
   "term": "triage",
-  "reading": "트리**아**zh"
+  "reading": "트리**아**zh",
+  "note": "끝의 ʒ 는 한글에 없어 zh 로 쓴다. 뒤에 힘이 간다."
  },
  {
   "term": "troubleshoot",
-  "reading": "**트러**블sh웉"
+  "reading": "**트러**블sh웉",
+  "note": "sh 는 영문 그대로, 첫음절에 힘."
  },
  {
   "term": "unhandled",
-  "reading": "언**핸**들d"
+  "reading": "언**핸**들d",
+  "note": "가운데에 힘, 끝은 \"드\" 로 늘이지 않는다."
  },
  {
   "term": "unresolved",
-  "reading": "언리**z알vd**"
+  "reading": "언리**z알vd**",
+  "note": "z 와 v 는 영문 그대로, 셋째 음절에 힘."
  },
  {
   "term": "workaround",
-  "reading": "**월**커라운d"
+  "reading": "**월**커라운d",
+  "note": "앞에 힘이 간다. \"워크어라운드\" 처럼 쪼개 읽지 않는다."
  },
  {
   "term": "alt text",
@@ -3809,27 +4173,33 @@
  },
  {
   "term": "arrow function",
-  "reading": "**애**로우 f엉ksh언"
+  "reading": "**애**로우 f엉ksh언",
+  "note": "function 은 \"펑션\" 이 아니라 f 로 시작하고 -tion 은 sh 소리다."
  },
  {
   "term": "async/await",
-  "reading": "에이씽k 어**웨잍**"
+  "reading": "에이씽k 어**웨잍**",
+  "note": "힘은 await 의 뒤에 있다. async 는 \"어싱크\" 로도 들리지만 사전음은 \"에이씽k\" 다."
  },
  {
   "term": "cache busting",
-  "reading": "**캐**sh 버s띵"
+  "reading": "**캐**sh 버s띵",
+  "note": "cache 의 끝은 sh 소리라 \"캐시\" 로 쓰지 않는다."
  },
  {
   "term": "chunk",
-  "reading": "**ch엉k**"
+  "reading": "**ch엉k**",
+  "note": "끝 k 는 받침으로 붙이되 \"청크\" 처럼 모음을 넣지 않는다."
  },
  {
   "term": "contrast ratio",
-  "reading": "**칸**트래s트 레이sh오우"
+  "reading": "**칸**트래s트 레이sh오우",
+  "note": "ratio 의 ti 는 sh 소리다. \"라티오\" 가 아니다."
  },
  {
   "term": "CSS variable",
-  "reading": "씨 에s **에s** v에리어블"
+  "reading": "씨 에s **에s** v에리어블",
+  "note": "CSS 는 철자로 읽어 띄어 쓴다. v 는 영문 그대로."
  },
  {
   "term": "dark mode",
@@ -3837,51 +4207,63 @@
  },
  {
   "term": "dependency array",
-  "reading": "디**펜**던씨 어뤠이"
+  "reading": "디**펜**던씨 어뤠이",
+  "note": "힘은 dependency 의 \"펜\" 에 있다."
  },
  {
   "term": "derived state",
-  "reading": "드**롸이vd** s떼읻"
+  "reading": "드**롸이vd** s떼읻",
+  "note": "v 는 영문 그대로, 앞 음절은 거의 안 들리게."
  },
  {
   "term": "destructuring",
-  "reading": "디s**트럭**쳐링"
+  "reading": "디s**트럭**쳐링",
+  "note": "둘째 음절에 힘이 간다."
  },
  {
   "term": "dev server",
-  "reading": "**데v** 썰v얼r"
+  "reading": "**데v** 썰v얼r",
+  "note": "v 는 영문 그대로 두 번 다 적는다."
  },
  {
   "term": "DevTools",
-  "reading": "**데v**툴z"
+  "reading": "**데v**툴z",
+  "note": "끝의 z 는 \"스\" 가 아니라 울리는 소리다."
  },
  {
   "term": "element",
-  "reading": "**엘**러먼t"
+  "reading": "**엘**러먼t",
+  "note": "첫음절에 힘, 가운데는 약하게 흘린다."
  },
  {
   "term": "ES module",
-  "reading": "이 **에s** 마줄"
+  "reading": "이 **에s** 마줄",
+  "note": "ES 는 철자로 읽어 띄어 쓴다. module 은 \"모듈\" 보다 \"마줄\" 에 가깝다."
  },
  {
   "term": "event listener",
-  "reading": "이**v엔t** l리쓰널r"
+  "reading": "이**v엔t** l리쓰널r",
+  "note": "listener 의 t 는 소리 나지 않는다. \"리스테너\" 가 아니다."
  },
  {
   "term": "focus ring",
-  "reading": "**f오우**커s 링"
+  "reading": "**f오우**커s 링",
+  "note": "f는 윗니로 아랫입술을 스치고, 뒤 s는 받침처럼 짧게 붙인다."
  },
  {
   "term": "focus trap",
-  "reading": "**f오우**커s 트랲"
+  "reading": "**f오우**커s 트랲",
+  "note": "trap 끝 p는 \"프\"로 풀지 말고 받침으로 닫는다."
  },
  {
   "term": "global state",
-  "reading": "**글로**우블 s떼읻"
+  "reading": "**글로**우블 s떼읻",
+  "note": "\"글로벌 스테이트\"처럼 모음을 더 넣지 않는다."
  },
  {
   "term": "hard refresh",
-  "reading": "**할d** 리f뤠sh"
+  "reading": "**할d** 리f뤠sh",
+  "note": "hard 끝의 d는 \"드\"가 되면 음절이 늘어나니 영문으로 둔다."
  },
  {
   "term": "hoisting",
@@ -3889,19 +4271,23 @@
  },
  {
   "term": "iframe",
-  "reading": "**아이**f레임"
+  "reading": "**아이**f레임",
+  "note": "\"아이프레임\"의 \"프\"는 f 한 소리다."
  },
  {
   "term": "lifting state up",
-  "reading": "l리f팅 s떼읻 **엎**"
+  "reading": "l리f팅 s떼읻 **엎**",
+  "note": "힘은 맨 끝 up에 있고, 어두 l은 혀끝을 입천장에 붙이고 시작한다."
  },
  {
   "term": "main thread",
-  "reading": "**메인** th렏"
+  "reading": "**메인** th렏",
+  "note": "th를 \"쓰\"로 읽으면 다른 단어가 된다."
  },
  {
   "term": "margin",
-  "reading": "**말**진"
+  "reading": "**말**진",
+  "note": "\"마진\"이 아니라 앞에 ㄹ 받침이 들어간다."
  },
  {
   "term": "microtask",
@@ -3909,23 +4295,28 @@
  },
  {
   "term": "mockup",
-  "reading": "**마**껍"
+  "reading": "**마**껍",
+  "note": "k가 뒤 모음에 붙어 \"목업\"보다 \"마껍\"에 가깝다."
  },
  {
   "term": "modal",
-  "reading": "**모**우들"
+  "reading": "**모**우들",
+  "note": "\"모달\" 아님. o는 \"오우\"로 미끄러진다."
  },
  {
   "term": "nullish coalescing",
-  "reading": "**널**리sh 코우얼레씽"
+  "reading": "**널**리sh 코우얼레씽",
+  "note": "끝의 sh를 \"시\"로 적으면 소리가 굳어버린다."
  },
  {
   "term": "optimistic update",
-  "reading": "압티**미s**틱 업데읻"
+  "reading": "압티**미s**틱 업데읻",
+  "note": "힘은 mis에 있다."
  },
  {
   "term": "optional chaining",
-  "reading": "**앞**sh어늘 ch에이닝"
+  "reading": "**앞**sh어늘 ch에이닝",
+  "note": "-tion 류의 sh는 한글로 쓰지 않는다."
  },
  {
   "term": "padding",
@@ -3933,19 +4324,23 @@
  },
  {
   "term": "placeholder",
-  "reading": "**플레이**s호울덜r"
+  "reading": "**플레이**s호울덜r",
+  "note": "끝의 r은 혀를 말아 올리는 소리라 영문으로 둔다."
  },
  {
   "term": "preventDefault",
-  "reading": "프뤼v엔t 드**f올t**"
+  "reading": "프뤼v엔t 드**f올t**",
+  "note": "힘은 뒤 fault에 있고 앞은 거의 흘린다."
  },
  {
   "term": "pseudo-class",
-  "reading": "**쑤**도우 클래s"
+  "reading": "**쑤**도우 클래s",
+  "note": "p는 소리나지 않는다."
  },
  {
   "term": "re-render",
-  "reading": "리**뤤**덜r"
+  "reading": "리**뤤**덜r",
+  "note": "앞 re는 약하게, 뒤 ren에 힘."
  },
  {
   "term": "render-blocking",
@@ -3953,27 +4348,33 @@
  },
  {
   "term": "safe area",
-  "reading": "**쎄이f** 에리어"
+  "reading": "**쎄이f** 에리어",
+  "note": "safe 끝은 \"프\"가 아니라 f 한 소리다."
  },
  {
   "term": "same-origin policy",
-  "reading": "쎄임 **오**러진 팔러씨"
+  "reading": "쎄임 **오**러진 팔러씨",
+  "note": "힘은 origin 첫 음절에 있다."
  },
  {
   "term": "screen reader",
-  "reading": "**스끄린** 리덜r"
+  "reading": "**스끄린** 리덜r",
+  "note": "s 뒤 c는 된소리에 가깝다."
  },
  {
   "term": "selector",
-  "reading": "썰**렉**털r"
+  "reading": "썰**렉**털r",
+  "note": "\"셀렉터\"가 아니라 앞은 약하고 lec에 힘."
  },
  {
   "term": "server component",
-  "reading": "**썰**v얼r 컴포우넌t"
+  "reading": "**썰**v얼r 컴포우넌t",
+  "note": "v를 \"ㅂ\"로 읽지 않는다."
  },
  {
   "term": "sessionStorage",
-  "reading": "**쎄**sh언 s또리j"
+  "reading": "**쎄**sh언 s또리j",
+  "note": "\"세션\"의 션은 sh 소리라 한글로 적지 않는다."
  },
  {
   "term": "skeleton screen",
@@ -3981,7 +4382,8 @@
  },
  {
   "term": "spread operator",
-  "reading": "**스쁘렏** 아뻐레이털r"
+  "reading": "**스쁘렏** 아뻐레이털r",
+  "note": "spread는 한 음절이다. \"스프레드\"처럼 늘리지 않는다."
  },
  {
   "term": "stacking context",
@@ -3989,35 +4391,43 @@
  },
  {
   "term": "stale closure",
-  "reading": "**스떼일** 클로우절r"
+  "reading": "**스떼일** 클로우절r",
+  "note": "closure의 s는 \"ㅅ\"이 아니라 부드러운 ㅈ 소리다."
  },
  {
   "term": "template literal",
-  "reading": "**템**플렅 l리터를"
+  "reading": "**템**플렅 l리터를",
+  "note": "template 끝 t는 받침으로 닫고, 어두 l은 혀끝을 붙이고 시작한다."
  },
  {
   "term": "toast",
-  "reading": "**토우s트**"
+  "reading": "**토우s트**",
+  "note": "\"토스트\"가 아니라 \"토우\"로 미끄러진다."
  },
  {
   "term": "touch target",
-  "reading": "**터**ch 탈긷"
+  "reading": "**터**ch 탈긷",
+  "note": "ch는 받침이 안 되는 소리라 영문으로 둔다."
  },
  {
   "term": "truthy",
-  "reading": "**트루**th이"
+  "reading": "**트루**th이",
+  "note": "th를 \"씨\"로 읽으면 다른 소리가 된다."
  },
  {
   "term": "undefined",
-  "reading": "언디**f아인d**"
+  "reading": "언디**f아인d**",
+  "note": "힘은 맨 뒤 fined에 있다. 앞 두 음절은 흘린다."
  },
  {
   "term": "vanilla JS",
-  "reading": "v어닐러 제이 **에s**"
+  "reading": "v어닐러 제이 **에s**",
+  "note": "JS는 철자로 읽고 힘은 S에 있다."
  },
  {
   "term": "virtual scrolling",
-  "reading": "**v얼**추얼 스끄로울링"
+  "reading": "**v얼**추얼 스끄로울링",
+  "note": "\"버추얼\"의 ㅂ가 아니라 윗니로 아랫입술을 스치는 v다."
  },
  {
   "term": "web worker",
@@ -4025,19 +4435,23 @@
  },
  {
   "term": "wireframe",
-  "reading": "**와이**얼rf레임"
+  "reading": "**와이**얼rf레임",
+  "note": "wire는 \"와이얼r\" 한 덩어리로 흘린다."
  },
  {
   "term": "algorithm",
-  "reading": "**앨**거뤼th음"
+  "reading": "**앨**거뤼th음",
+  "note": "\"알고리즘\"의 z 소리가 아니라 혀끝을 윗니에 댄 th다."
  },
  {
   "term": "asynchronous",
-  "reading": "에이**씽**크러너s"
+  "reading": "에이**씽**크러너s",
+  "note": "힘은 syn에 있다. \"어씽크로너스\"처럼 평평하면 안 통한다."
  },
  {
   "term": "bubble sort",
-  "reading": "**버**블 쏠t"
+  "reading": "**버**블 쏠t",
+  "note": "sort 끝 t는 받침으로 못 쓰니 영문으로 둔다."
  },
  {
   "term": "callback",
@@ -4045,138 +4459,172 @@
  },
  {
   "term": "class",
-  "reading": "**클래s**"
+  "reading": "**클래s**",
+  "note": "\"클래스\"의 \"스\"는 받침처럼 짧게 붙는 s다."
  },
  {
   "term": "closure",
-  "reading": "**클로**우절r"
+  "reading": "**클로**우절r",
+  "note": "\"클로저\"보다 ㅈ를 부드럽게 끌고, 끝 r은 혀를 만다."
  },
  {
   "term": "critical section",
-  "reading": "크리띠클 **쎅**sh언"
+  "reading": "크리띠클 **쎅**sh언",
+  "note": "힘은 뒤 section에 있다."
  },
  {
   "term": "data structure",
-  "reading": "**데이**러 s트럭철r"
+  "reading": "**데이**러 s트럭철r",
+  "note": "미국 발음에서 data의 t는 ㄹ에 가깝게 튄다."
  },
  {
   "term": "DDoS",
-  "reading": "**디**다s"
+  "reading": "**디**다s",
+  "note": "철자로 읽지 않고 한 단어로 \"디다s\"라고 읽는다."
  },
  {
   "term": "digital signature",
-  "reading": "디지를 **씩**너ch얼r"
+  "reading": "디지를 **씩**너ch얼r",
+  "note": "힘은 signature 첫 음절, g는 \"그\"가 아니라 받침처럼 붙는다."
  },
  {
   "term": "divide and conquer",
-  "reading": "드v아읻 언 **캉**컬r"
+  "reading": "드v아읻 언 **캉**컬r",
+  "note": "힘은 conquer 앞에 있고, and 는 \"언\" 으로 거의 묻힌다. v 를 \"바\" 로 읽지 않는다."
  },
  {
   "term": "fragmentation",
-  "reading": "f랙먼**테이**sh언"
+  "reading": "f랙먼**테이**sh언",
+  "note": "-tion 은 \"션\" 이 아니라 sh 소리다. 힘은 \"테이\" 에."
  },
  {
   "term": "function",
-  "reading": "**f엉**ksh언"
+  "reading": "**f엉**ksh언",
+  "note": "f 는 윗니를 아랫입술에 대고 낸다. \"펑션\" 처럼 ㅍ, ㅅ 소리로 읽지 않는다."
  },
  {
   "term": "graph",
-  "reading": "**그래f**"
+  "reading": "**그래f**",
+  "note": "한 음절이다. 끝에 \"프\" 를 붙이지 않는다."
  },
  {
   "term": "hash collision",
-  "reading": "**해**sh 컬리전"
+  "reading": "**해**sh 컬리전",
+  "note": "sh 는 한글에 없는 소리라 영문으로 둔다. collision 의 si 는 \"지\" 가 아니라 부드러운 ㅈ 소리다."
  },
  {
   "term": "heap",
-  "reading": "**힢**"
+  "reading": "**힢**",
+  "note": "한 음절. \"히프\" 가 아니다."
  },
  {
   "term": "instance",
-  "reading": "**인**s턴s"
+  "reading": "**인**s턴s",
+  "note": "끝 s 는 받침으로 못 쓰니 영문으로 둔다. \"인스턴스\" 처럼 모음을 넣지 않는다."
  },
  {
   "term": "interface",
-  "reading": "**인**털rf에이s"
+  "reading": "**인**털rf에이s",
+  "note": "힘은 맨 앞에. 끝의 r 과 f 는 영문 그대로 둔다."
  },
  {
   "term": "interrupt",
-  "reading": "**인**터뤕t"
+  "reading": "**인**터뤕t",
+  "note": "힘은 맨 앞 \"인\" 이고, 끝은 \"럽트\" 가 아니라 받침 + t 로 짧게 끊는다."
  },
  {
   "term": "method",
-  "reading": "**메**th얻"
+  "reading": "**메**th얻",
+  "note": "th 는 혀끝을 윗니에 대고 바람을 낸다. \"메소드\" 처럼 3음절로 늘이지 않는다."
  },
  {
   "term": "overloading",
-  "reading": "오우v얼r**l로**우딩"
+  "reading": "오우v얼r**l로**우딩",
+  "note": "힘은 load 에. 어두의 l 은 혀끝을 입천장에 붙이고 시작하라는 표시다."
  },
  {
   "term": "overriding",
-  "reading": "오우v어**롸**이딩"
+  "reading": "오우v어**롸**이딩",
+  "note": "힘은 ride 에 있다. 앞의 over 는 평평하게 흘린다."
  },
  {
   "term": "packet",
-  "reading": "**패**킽"
+  "reading": "**패**킽",
+  "note": "끝은 받침으로 끊어 \"패킷\" 의 늘어짐을 없앤다."
  },
  {
   "term": "page fault",
-  "reading": "**페이**j f올t"
+  "reading": "**페이**j f올t",
+  "note": "끝의 dʒ 는 받침이 안 되어 j 로 둔다. fault 의 l 은 거의 들리지 않게 흘린다."
  },
  {
   "term": "parameter",
-  "reading": "퍼**래**미털r"
+  "reading": "퍼**래**미털r",
+  "note": "힘은 두 번째 음절에. \"파라미터\" 처럼 평평하게 읽으면 안 통한다."
  },
  {
   "term": "PCB",
-  "reading": "피 씨 **비**"
+  "reading": "피 씨 **비**",
+  "note": "철자로 하나씩 읽고, 마지막 글자에 힘을 준다."
  },
  {
   "term": "preemptive",
-  "reading": "프리**엠**티v"
+  "reading": "프리**엠**티v",
+  "note": "힘은 \"엠\" 에. mpt 의 p 는 거의 들리지 않고, 끝 v 는 영문 그대로 둔다."
  },
  {
   "term": "protocol",
-  "reading": "**프로**우터콜"
+  "reading": "**프로**우터콜",
+  "note": "힘은 맨 앞이다. 가운데 o 는 약하게 흘린다."
  },
  {
   "term": "quicksort",
-  "reading": "**퀵**쏠t"
+  "reading": "**퀵**쏠t",
+  "note": "힘은 앞에. 끝은 \"소트\" 가 아니라 받침 + t 로 끊는다."
  },
  {
   "term": "round robin",
-  "reading": "롸운d **롸**빈"
+  "reading": "롸운d **롸**빈",
+  "note": "힘은 robin 의 첫 음절에 있다."
  },
  {
   "term": "router",
-  "reading": "**롸**우털r"
+  "reading": "**롸**우털r",
+  "note": "미국식은 \"라우털\" 쪽이고 \"루터\" 가 아니다. 끝의 r 은 영문으로 남긴다."
  },
  {
   "term": "shell",
-  "reading": "**sh엘**"
+  "reading": "**sh엘**",
+  "note": "sh 는 한글에 없어 영문으로 둔다. \"쉘\" 로 쓰면 ㅅ 소리로 굳는다."
  },
  {
   "term": "spoofing",
-  "reading": "**스뿌**f잉"
+  "reading": "**스뿌**f잉",
+  "note": "s 뒤의 p 는 된소리에 가깝고, f 는 윗니를 입술에 대고 낸다."
  },
  {
   "term": "starvation",
-  "reading": "스딸r**v에이**sh언"
+  "reading": "스딸r**v에이**sh언",
+  "note": "힘은 \"v에이\" 에. s 뒤 t 는 된소리에 가깝다."
  },
  {
   "term": "symmetric key",
-  "reading": "씨메트맄 **키**"
+  "reading": "씨메트맄 **키**",
+  "note": "두 낱말 중 힘은 key 에 실린다."
  },
  {
   "term": "thrashing",
-  "reading": "**th뢔**sh잉"
+  "reading": "**th뢔**sh잉",
+  "note": "앞은 th, 뒤는 sh 로 서로 다른 소리다. \"쓰래싱\" 으로 읽으면 둘 다 ㅅ 이 된다."
  },
  {
   "term": "traversal",
-  "reading": "트러**v얼**슬"
+  "reading": "트러**v얼**슬",
+  "note": "힘은 가운데에. 첫 음절은 거의 안 들리게 흘린다."
  },
  {
   "term": "variable",
-  "reading": "**v에**리어블"
+  "reading": "**v에**리어블",
+  "note": "v 는 윗니를 아랫입술에 대고 낸다. \"배리어블\" 의 ㅂ 소리가 아니다."
  }
 ]
