@@ -139,10 +139,23 @@ export function TabBar() {
           가장 짧은 라벨의 칸이 가장 좁다. 기본 글자 크기, 5탭, 360px 에서
           "홈" 칸이 50px 이다. 폰 글자 크기를 130% 로 키우면 43px 로 44px
           아래가 되어(둘 다 2026-11-11 에 브라우저로 잼), 칸마다 min-w-[44px]
-          를 건다. --hit-floor(2.75rem)를 쓰지 않는 이유: rem 이라 글자를
-          키우면 같이 커진다. 계산상 200% 에서 다섯 칸 최소 폭 합이 440px
-          이라 360px 화면에서 탭 줄이 밖으로 밀린다.
-          탭이 6개가 되면 기본 글자 크기에서도 다시 잰다. */}
+          를 건다. --hit-floor(2.75rem)를 쓰지 않는 이유: rem 이라 브라우저의
+          기본 글자 크기를 키우면 같이 커진다.
+
+          다만 44px 은 탭 줄 폭의 1/5(20%)을 넘지 않는다. 폰 글자 크기를
+          200% 로 키우면 Chrome 이 페이지를 확대해 360폭 폰이 180px 폭처럼
+          그려지는데, 다섯 칸 x 44px = 220px 이라 "내정보" 가 화면 밖으로
+          잘렸다. 확대된 화면이라 36px 칸도 손가락에 닿는 실제 크기는 72px 와
+          같다. 보통 크기 360폭에서는 20% 가 72px 이라 그대로 44px 이다.
+          칸이 좁아 라벨이 꺾일 때는 반씩 나눈다("문제/풀기", "일상/영어").
+          앱 전체가 낱말 안에서 줄을 안 바꾸는데(globals.css 의 keep-all)
+          4글자 라벨은 한 낱말이라 꺾을 자리가 없고, 넘칠 때의 비상 꺾기
+          (overflow-wrap: anywhere)가 끝 글자에서 잘라 "문제풀/기" 가 됐다.
+          그래서 탭 라벨은 모두 음절 사이에서 꺾게 하고([word-break:normal])
+          줄 길이를 고르게 한다(text-balance). 비상 꺾기에는 text-balance 가
+          안 먹어서 둘이 같이 있어야 한다. Tailwind 의 break-normal 은
+          overflow-wrap 까지 normal 로 바꿔 안전망을 끄므로 쓰지 않는다.
+          탭이 6개가 되면 20% 를 1/6 로 바꾸고 기본 글자 크기에서도 다시 잰다. */}
         <ul className="mx-auto flex max-w-md">
           {tabs.map((tab) => {
             const active = tab.segment === current;
@@ -180,12 +193,15 @@ export function TabBar() {
             // min-h 를 14(56px)로 둔다. 12(48px)면 "준비 중 / 말하기" 처럼
             // 두 줄인 항목이 안 들어가 글자가 탭바 밖으로 잘린다. 준비 중인
             // 탭이 하나뿐이라 다른 항목만 보고는 못 알아챈다.
+            // 칸 폭 규칙(위 ul 주석). 링크 칸과 준비 중 칸이 같이 쓴다.
+            const cell = "min-w-[min(44px,20%)] flex-auto";
+
             const shape =
-              "flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-xs transition";
+              "flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-center text-xs [word-break:normal] text-balance transition";
 
             if (!tab.ready) {
               return (
-                <li key={tab.key} className="min-w-[44px] flex-auto">
+                <li key={tab.key} className={cell}>
                   {/* 링크가 아니라 span 이다. 갈 곳이 없는데 눌리면 아무 일도
                     안 일어나는 것을 매번 겪는다. 대신 자리를 남겨 이 서비스가
                     단어장 하나로 끝나지 않는다는 걸 알린다.
@@ -212,7 +228,7 @@ export function TabBar() {
             }
 
             return (
-              <li key={tab.key} className="min-w-[44px] flex-auto">
+              <li key={tab.key} className={cell}>
                 <Link
                   href={tabHref(tab, pathname)}
                   aria-current={active ? "page" : undefined}

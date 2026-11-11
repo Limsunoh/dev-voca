@@ -89,7 +89,13 @@ export function LeaveConfirm({
       //
       // backdrop 은 잉크(#191512) 72%. 크림 화면에 순검정이 한 번도 안
       // 나와서, 순검정을 깔면 다른 앱이 덮은 것처럼 보인다.
-      className="pop m-auto w-[min(22rem,calc(100vw-2rem))] p-6 backdrop:bg-[rgb(25_21_18/0.72)]"
+      //
+      // 안쪽 여백은 보통 24px(1.5rem)이고, 화면이 343px 보다 좁아지면 폭의 7%
+      // 로 줄되 16px 아래로는 안 간다. 폰 글자 크기 200% 면 화면이 180px 폭이
+      // 되고, 창은 148px 을 원하지만 dialog 의 기본 최대 폭(화면 - 2em - 6px)에
+      // 걸려 142px 이 된다. 24px 여백이면 버튼 칸이 94px 이라 "계속 풀기" 가 두
+      // 줄로 꺾였다.
+      className="pop m-auto w-[min(22rem,calc(100vw-2rem))] p-[clamp(1rem,7vw,1.5rem)] backdrop:bg-[rgb(25_21_18/0.72)]"
       style={{
         background: "var(--paper)",
         color: "var(--foreground)",
@@ -123,13 +129,22 @@ export function LeaveConfirm({
       </p>
       {note}
 
-      <div className="mt-6 flex gap-2">
+      {/* 버튼 둘이 한 줄에 안 들어가면 위아래로 쌓는다. 폰 글자 크기를 200% 로
+          키우면 창 안쪽이 110px 이라(위 dialog 주석), 나란히 두면 "계속 풀기"
+          가 한 글자씩 세로로 꺾였다. 칸마다 7rem 을 원하고(basis) 남는 폭은
+          똑같이 나눠 가져서, 들어갈 때는 지금처럼 같은 너비로 나란히 선다.
+          되돌아가는 쪽 라벨이 길면(내정보의 "계속 고치기") 200% 에서 띄어쓰기
+          자리에서 두 줄("계속 / 고치기")이 된다. 한 글자씩 꺾이는
+          것과 달리 읽는 데 지장이 없어 그대로 둔다. */}
+      <div className="mt-6 flex flex-wrap gap-2">
         {/* 되돌아가는 쪽을 먼저, 갈색으로 둔다. 실수로 연 사람이 대부분이라
-            손가락이 먼저 닿는 자리에 그쪽이 있어야 한다. */}
+            손가락이 먼저 닿는 자리에 그쪽이 있어야 한다. 쌓였을 때는 위에
+            온다. 눈이 먼저 닿는 자리이고, 아래 칸은 흰 알약이라 무게로도
+            되돌아가는 쪽이 앞선다. */}
         <button
           type="button"
           onClick={() => dialogRef.current?.close()}
-          className="dv-btn flex flex-1 items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="dv-btn flex flex-[1_1_7rem] items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
               minHeight: "var(--hit-min)",
@@ -153,7 +168,7 @@ export function LeaveConfirm({
             dialogRef.current?.close();
             onConfirm();
           }}
-          className="dv-btn flex flex-1 items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="dv-btn flex flex-[1_1_7rem] items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
               minHeight: "var(--hit-min)",

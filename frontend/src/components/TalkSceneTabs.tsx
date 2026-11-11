@@ -17,9 +17,9 @@ import { TalkTabRow } from "./TalkKindTabs";
  * "전체" 를 맨 앞에 둔다. Admin 에서 상황을 비운 채 검수를 통과한 표현은
  * 어느 상황 탭에서도 안 나오고 전체에서만 나온다(679a205).
  *
- * 여섯 개라 폰 폭(390)에서 한 줄에 안 들어가 줄을 바꾼다(TalkTabRow 의
- * wrap). 가로로 밀어 보게 두면 뒤쪽 셋이 화면 밖에 숨어, 그런 상황이 있는
- * 줄 모른다.
+ * 여섯 개라 폰 폭(390)에서 한 줄에 안 들어가 줄을 바꾼다(TalkTabRow 가
+ * 갈래·난이도·상황 탭 모두 그렇게 한다). 가로로 밀어 보게 두면 뒤쪽 셋이
+ * 화면 밖에 숨어, 그런 상황이 있는 줄 모른다.
  */
 export function TalkSceneTabs({
   level,
@@ -32,7 +32,6 @@ export function TalkSceneTabs({
   return (
     <TalkTabRow
       label="상황"
-      wrap
       items={SCENES.map((scene) => ({
         key: scene.value || "all",
         href: routes.talk("daily", level, scene.value),
