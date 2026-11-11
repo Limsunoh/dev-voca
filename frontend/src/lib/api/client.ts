@@ -91,6 +91,51 @@ export function buildQuery(params: Record<string, string | undefined>): string {
   return qs ? `?${qs}` : "";
 }
 
+/**
+ * 백엔드가 이 시간 안에 답하지 않으면 끊는다.
+ *
+ * 끊지 않으면 백엔드가 멈췄을 때 화면이 대기 화면(app/loading.tsx)에 계속
+ * 머문다. 끊으면 오류가 나서 각 화면의 실패 안내나 error.tsx 가 "다시 시도"
+ * 를 보여 준다.
+ *
+ * 읽기(GET)에만 건다. 쓰기는 우리가 끊어도 백엔드가 하던 일을 마칠 수 있어서,
+ * 저장은 됐는데 화면은 실패로 보이는 일이 생긴다. 판 답이 저장된 뒤 끊기면
+ * RoundBoard 가 옛 토큰으로 끝내기를 불러 판 기록이 통째로 빠지고, 비밀번호
+ * 변경이 저장된 뒤 끊기면 새 토큰을 못 받아 로그아웃된다. gunicorn 의 30초
+ * 로도 막지 못한다 - 그 시계는 작업자가 요청을 집어 든 뒤부터 재므로, 작업자
+ * 둘(Procfile --workers 2)이 바빠 줄을 선 시간이 빠진다. 쓰기는 누른 버튼이
+ * 이미 "처리 중" 을 보여 줘서 멈춘 것처럼 보이지 않는다.
+ */
+const READ_TIMEOUT_MS = 10_000;
+
+/**
+ * 읽기 요청에 넘길 대기 시간 신호. 백엔드를 직접 부르는 읽기(이 파일의
+ * request 의 GET, 사진 중계 라우트)가 같은 값을 쓰게 한다.
+ *
+ * fetch 에 signal 을 넘기면 Next 가 한 요청 안의 같은 GET 을 합치지 않는다
+ * (next/dist/server/lib/dedupe-fetch.js). 한 화면에서 같은 것을 두 번 부르는
+ * 곳(getWord, getSentence, getCurrentUser, 선택지 목록)은 React cache() 로
+ * 감싸 두었으니, 새로 그런 함수를 만들면 같이 감싼다.
+ */
+export function readTimeout(): AbortSignal {
+  return AbortSignal.timeout(READ_TIMEOUT_MS);
+}
+
+/**
+ * 위 대기 시간을 넘겨서 끊긴 것인가.
+ *
+ * 연결 실패(ApiError 의 status 0)와 가른다. 연결 실패는 화면이 "서버에 연결할
+ * 수 없습니다" 로 안내하는데, 느려서 끊긴 것에 그 문구를 쓰면 사실과 다르다.
+ */
+export function isBackendTimeout(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "TimeoutError";
+}
+
+/** 대기 시간을 넘겨 끊었을 때 던지는 오류. 중계 라우트는 504 로 내보낸다. */
+export function slowBackendError(): ApiError {
+  return new ApiError("서버 응답이 늦습니다. 잠시 뒤 다시 시도해주세요.", 504);
+}
+
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   /** JSON 으로 직렬화해 본문에 싣는다. */
@@ -151,7 +196,11 @@ async function errorDetail(
         return { message: value[0], field };
       }
     }
-  } catch {
+  } catch (error) {
+    // 본문을 읽다 대기 시간을 넘긴 것은 삼키지 않는다. request() 가 받아
+    // "서버 응답이 늦습니다" 로 바꾼다. 여기서 삼키면 "요청이 실패했습니다.
+    // (400)" 처럼 사실과 다른 문구가 나간다.
+    if (isBackendTimeout(error)) throw error;
     // 본문이 JSON 이 아닌 경우. 아래 기본 문구를 쓴다.
   }
 
@@ -179,19 +228,28 @@ export async function request<T>(
       // 목록은 searchParams 덕에 어차피 매 요청 렌더되지만, 상세는
       // request-time API 를 쓰지 않아 이 옵션이 없으면 빌드/첫요청 시점에 고정된다.
       cache: "no-store",
+      signal: method === "GET" ? readTimeout() : undefined,
     });
-  } catch {
+  } catch (error) {
+    if (isBackendTimeout(error)) throw slowBackendError();
     // 백엔드가 안 떠 있는 경우. 스택 대신 사람이 읽을 문구를 남긴다.
     throw new ApiError("서버에 연결할 수 없습니다.", 0);
   }
 
-  if (!res.ok) {
-    const { message, field } = await errorDetail(res);
-    throw new ApiError(message, res.status, field);
+  // GET 이면 아래 본문 읽기도 같은 대기 시간 안에 든다. 머리만 오고 본문이
+  // 늦게 오다 끊기면 여기서 TimeoutError 가 나므로 같은 오류로 바꾼다.
+  try {
+    if (!res.ok) {
+      const { message, field } = await errorDetail(res);
+      throw new ApiError(message, res.status, field);
+    }
+    // 204 는 본문이 없다. json() 을 부르면 파싱 에러가 난다.
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
+  } catch (error) {
+    if (isBackendTimeout(error)) throw slowBackendError();
+    throw error;
   }
-  // 204 는 본문이 없다. json() 을 부르면 파싱 에러가 난다.
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
 }
 
 /**
