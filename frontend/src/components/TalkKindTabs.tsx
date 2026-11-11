@@ -61,32 +61,32 @@ export function TalkKindTabs({
 export function TalkTabRow({
   label,
   items,
-  wrap = false,
 }: {
   label: string;
   items: { key: string | number; href: string; label: string; active: boolean }[];
-  /**
-   * 폭이 모자라면 줄을 바꾼다. 상황 탭(여섯 개)이 쓴다.
-   *
-   * 모서리를 알약(9999px)이 아니라 "한 줄 높이의 절반" 으로 둔다. 두 줄이
-   * 된 바탕에 알약 모서리를 주면 양 끝이 반원으로 부풀어 첫 칸과 끝 칸이
-   * 둥근 벽에 눌려 보인다. 한 줄 높이는 칸(--hit-floor) + 위아래 p-1 이라
-   * 그 절반이면 한 줄일 때 곧 알약이어서 다른 두 줄과 모양이 같다. 26px
-   * 같은 고정값으로 두면 글자 크기를 키운 브라우저에서 칸만 커지고
-   * 모서리는 그대로라 한 줄인데도 알약이 아니게 된다.
-   */
-  wrap?: boolean;
 }) {
   return (
     <nav
       aria-label={label}
-      className={`${wrap ? "flex flex-wrap" : "inline-flex"} gap-1 p-1`}
+      // 갈래·난이도·상황 탭 모두 폭이 모자라면 줄을 바꾼다. 예전에는 상황 탭만
+      // 그랬는데, 폰 글자 크기를 200% 로 키우면(360폭 폰이 180px 폭처럼
+      // 그려진다) 난이도 탭도 한 줄에 안 들어가 칸이 눌리며 "어려움" 이 한
+      // 글자씩 세로로 꺾이고 화면 밖으로 넘쳤다.
+      //
+      // 폭은 글자 길이만큼이다. 일상영어 화면은 부모(grid, justify-items-start)
+      // 가 이미 그렇게 잡지만, 다른 자리에 놓여도 같게 inline-flex 로 두고
+      // 화면 폭을 넘지 않게 max-w-full 을 단다.
+      className="inline-flex max-w-full flex-wrap gap-1 p-1"
       style={{
         // 바탕은 ContentTabs 와 같은 알약 색이다. 이유는 그쪽 주석에 있다.
         background: "var(--surface-pill)",
-        borderRadius: wrap
-          ? "calc(var(--hit-floor) / 2 + 0.25rem)"
-          : "var(--radius-pill)",
+        // 모서리를 알약(9999px)이 아니라 "한 줄 높이의 절반" 으로 둔다. 두
+        // 줄이 된 바탕에 알약 모서리를 주면 양 끝이 반원으로 부풀어 첫 칸과
+        // 끝 칸이 둥근 벽에 눌려 보인다. 한 줄 높이는 칸(--hit-floor) + 위아래
+        // p-1 이라 그 절반이면 한 줄일 때 곧 알약이다. 26px 같은 고정값으로
+        // 두면 글자 크기를 키운 브라우저에서 칸만 커지고 모서리는 그대로라 한
+        // 줄인데도 알약이 아니게 된다.
+        borderRadius: "calc(var(--hit-floor) / 2 + 0.25rem)",
       }}
     >
       {items.map((item) => (

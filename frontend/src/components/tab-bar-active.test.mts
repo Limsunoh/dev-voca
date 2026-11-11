@@ -111,7 +111,9 @@ describe("TabBar 칸 너비", () => {
       assert.ok(cls.includes("flex-auto"), cls.join(" "));
       assert.ok(!cls.includes("flex-1"), cls.join(" "));
       // 폰 글자 크기를 키우면 "홈" 칸이 터치 기준 44px 아래로 줄던 것을 막는다.
-      assert.ok(cls.includes("min-w-[44px]"), cls.join(" "));
+      // 다만 다섯 칸이 탭 줄을 넘지 않게 1/5 를 넘지 않는다(글자 200% 에서
+      // 360폭 폰이 180px 폭이 되면 44px x 5 = 220px 이라 "내정보" 가 잘렸다).
+      assert.ok(cls.includes("min-w-[min(44px,20%)]"), cls.join(" "));
     }
   });
 
