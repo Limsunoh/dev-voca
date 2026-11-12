@@ -199,8 +199,7 @@ class ThrottledAdminEmailHandler(AdminEmailHandler):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        # Handler.handle 이 emit 둘레에 잠금을 걸지만, should_send 를 따로 부르는
-        # 자리(테스트)도 있어 셈만은 자기 잠금으로 지킨다.
+        # 셈은 이 잠금으로만 지킨다. 처리기 잠금은 쓰지 않는다(handle 주석).
         self._lock = threading.Lock()
         # 서명 -> 그 서명으로 마지막에 보낸 시각
         self._last_sent: dict[str, float] = {}
@@ -229,6 +228,23 @@ class ThrottledAdminEmailHandler(AdminEmailHandler):
             self._last_sent[key] = now
             self._sent_times.append(now)
             return True
+
+    def handle(self, record: LogRecord) -> bool | LogRecord:
+        """logging.Handler.handle 에서 처리기 잠금만 뺀 것.
+
+        원래 handle 은 emit 전체를 처리기 잠금 안에서 돈다. 여기서는 그 안에 Gmail 발송
+        (최악 24초)이 들어간다. gunicorn 을 스레드 방식(--threads)으로 띄우면 같은
+        프로세스의 다른 스레드가 500 이나 잘못된 Host(400)를 기록하려다 그동안 기다려,
+        그 요청의 응답까지 늦어진다. 셈은 self._lock 이 지키고, 표준 오류에는 한 기록을
+        write 한 번으로 쓰므로 처리기 잠금을 잡지 않는다.
+        """
+        rv = self.filter(record)
+        # 파이썬 3.12 부터 거름망이 기록을 바꿔 돌려줄 수 있다(운영은 3.13).
+        if isinstance(rv, LogRecord):
+            record = rv
+        if rv:
+            self.emit(record)
+        return rv
 
     def emit(self, record: LogRecord) -> None:
         # 이 안에서 난 예외를 밖으로 내보내지 않는다(로깅 처리기의 관례). 내보내면

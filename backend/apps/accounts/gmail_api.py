@@ -34,8 +34,10 @@ SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
 # 두 번 맺고, 연결마다 TCP 연결·TLS 맺기·쓰기·읽기 네 단계에 이 제한이 걸린다.
 # 대략 최악이 2 x 4단계 x 3초 = 24초다(읽기는 조각마다 걸리고 DNS 조회는 이
 # 제한 밖이라 정확한 상한은 아니다).
-# 웹 요청은 gunicorn 기본 제한(30초) 안에서 끝나야 "메일을 보내지 못했습니다"
-# 안내가 나간다. settings.EMAIL_TIMEOUT(10초)을 그대로 쓰면 80초까지 갈 수 있다.
+# 처음에는 gunicorn 이 30초에 요청을 끊어서, 그 안에 끝나야 "메일을 보내지 못했습니다"
+# 안내가 나갔다. 스레드 방식(--threads)으로 바꾼 뒤로는 gunicorn 이 끊지 않으므로
+# (DEPLOY.md) 발송이 오래 멈추는 것을 막는 것은 이 값뿐이다. 멈춘 동안 스레드 하나를
+# 붙잡는다. settings.EMAIL_TIMEOUT(10초)을 그대로 쓰면 80초까지 갈 수 있다.
 TIMEOUT = httpx.Timeout(3.0)
 
 

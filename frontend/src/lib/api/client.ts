@@ -101,9 +101,9 @@ export function buildQuery(params: Record<string, string | undefined>): string {
  * 읽기(GET)에만 건다. 쓰기는 우리가 끊어도 백엔드가 하던 일을 마칠 수 있어서,
  * 저장은 됐는데 화면은 실패로 보이는 일이 생긴다. 판 답이 저장된 뒤 끊기면
  * RoundBoard 가 옛 토큰으로 끝내기를 불러 판 기록이 통째로 빠지고, 비밀번호
- * 변경이 저장된 뒤 끊기면 새 토큰을 못 받아 로그아웃된다. gunicorn 의 30초
- * 로도 막지 못한다 - 그 시계는 작업자가 요청을 집어 든 뒤부터 재므로, 작업자
- * 둘(Procfile --workers 2)이 바빠 줄을 선 시간이 빠진다. 쓰기는 누른 버튼이
+ * 변경이 저장된 뒤 끊기면 새 토큰을 못 받아 로그아웃된다. 백엔드의 gunicorn 도
+ * 막지 못한다 - 스레드 방식(Procfile --threads)이라 오래 걸리는 요청을 끊지
+ * 않는다(DEPLOY.md). 쓰기는 누른 버튼이
  * 이미 "처리 중" 을 보여 줘서 멈춘 것처럼 보이지 않는다.
  */
 const READ_TIMEOUT_MS = 10_000;
