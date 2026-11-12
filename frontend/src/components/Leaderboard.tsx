@@ -70,7 +70,11 @@ export function Leaderboard({ board, isGuest }: Props) {
         )}
       </header>
 
-      <nav aria-label="순위표 종류" className="mt-5 flex gap-2">
+      {/* 칩이 한 줄에 안 들어가면 다음 줄로 넘긴다. 폰 글자 크기 200% 면
+          360폭 폰이 180px 폭처럼 그려져 세 칩이 한 줄에 안 들어가고, 줄을
+          안 바꾸면 화면을 가로로 넘쳐 아래 탭바까지 밀었다. 칩 라벨은 짧아
+          칩 안에서는 꺾이지 않는다(whitespace-nowrap 그대로). */}
+      <nav aria-label="순위표 종류" className="mt-5 flex flex-wrap gap-2">
         {BOARD_KINDS.map((kind) => (
           <TabLink key={kind} kind={kind} current={board.kind} />
         ))}

@@ -22,6 +22,8 @@ type Props = {
  *
  * LeaveConfirm 을 쓰지 않는 이유: 그 창은 누르는 순간 닫힌다. 여기는 비밀번호를
  * 틀리면 창에 남아서 다시 쳐야 한다. 모양과 버튼 순서는 LeaveConfirm 과 같다.
+ * 폰 글자 크기 200% 에서 버티는 세 가지(창 여백, 버튼 줄 바꿈, 버튼 기본 폭)도
+ * 같다. 한쪽을 고치면 다른 쪽도 같이 고친다.
  */
 export function DeleteAccount(props: Props) {
   const [open, setOpen] = useState(false);
@@ -51,7 +53,8 @@ export function DeleteAccount(props: Props) {
   );
 }
 
-function DeleteDialog({
+/** 내보내는 것은 테스트가 버튼을 누르지 않고 창을 그려 보기 위해서다. */
+export function DeleteDialog({
   action,
   hasPassword,
   email,
@@ -94,7 +97,11 @@ function DeleteDialog({
         if (pending) dialogRef.current?.showModal();
         else onClose();
       }}
-      className="pop m-auto w-[min(22rem,calc(100vw-2rem))] p-6 backdrop:bg-[rgb(25_21_18/0.72)]"
+      // 안쪽 여백은 LeaveConfirm 과 같다. 보통 24px 이고 화면이 343px 보다
+      // 좁아지면 폭의 7% 로 줄되 16px 아래로는 안 간다. 폰 글자 크기 200% 면
+      // 360폭 폰이 180px 폭처럼 그려지는데, 24px 여백이면 버튼 칸이 좁아
+      // "삭제" 와 "취소" 가 한 글자씩 세로로 꺾였다.
+      className="pop m-auto w-[min(22rem,calc(100vw-2rem))] p-[clamp(1rem,7vw,1.5rem)] backdrop:bg-[rgb(25_21_18/0.72)]"
       style={{
         background: "var(--paper)",
         color: "var(--foreground)",
@@ -178,12 +185,15 @@ function DeleteDialog({
           )}
         </div>
 
-        <div className="mt-6 flex gap-2">
+        {/* 버튼 둘이 한 줄에 안 들어가면 위아래로 쌓는다(LeaveConfirm 과 같다).
+            칸마다 7rem 을 원하고 남는 폭은 똑같이 나눠 가져서, 들어갈 때는
+            예전처럼 같은 너비로 나란히 선다. 쌓이면 취소가 위에 온다. */}
+        <div className="mt-6 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={pending}
             onClick={() => dialogRef.current?.close()}
-            className="dv-btn flex flex-1 items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+            className="dv-btn flex flex-[1_1_7rem] items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
             style={
               {
                 minHeight: "var(--hit-min)",
@@ -201,7 +211,7 @@ function DeleteDialog({
           <button
             type="submit"
             disabled={pending}
-            className="dv-btn flex flex-1 items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
+            className="dv-btn flex flex-[1_1_7rem] items-center justify-center px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60"
             style={
               {
                 minHeight: "var(--hit-min)",

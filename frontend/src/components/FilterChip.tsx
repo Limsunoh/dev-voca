@@ -23,7 +23,7 @@ export function FilterChip({
 }) {
   // 보이는 크기는 그대로 두고 누를 수 있는 영역만 넓힌다. 알약을 키우면
   // 필터 줄이 세 개인 화면(문장)에서 첫 카드가 화면 밖으로 밀린다.
-  // 38px + 위아래 3px = 44px. 칩 사이 간격이 8px 이라 이웃과 겹치지 않는다.
+  // 36px + 위아래 4px = 44px. 칩 사이 간격이 8px 이라 이웃과 겹치지 않는다.
   const hitArea =
     // -inset-y-1(4px)이면 36px 알약이 44px 로 잡힌다. 3px 이면 42px 이라
     // 2px 모자라는데, 그 차이는 눈으로 봐서는 알 수 없다.
@@ -36,7 +36,20 @@ export function FilterChip({
   //
   // 켜진 칩에도 두께가 있어 높이가 어긋나지 않는다. 둘 다 padding 이 같고
   // 그림자는 자리를 안 먹어서, 다크 때처럼 투명 테두리로 맞출 필요가 없다.
-  const shape = `dv-card dv-card-press ${hitArea} inline-flex items-center rounded-full px-3.5 py-2 text-sm font-[weight:var(--weight-bold)] whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus`;
+  //
+  // 칩 하나가 줄 폭보다 길면 칩 안에서 줄을 바꾼다(whitespace-nowrap 을 뺐다).
+  // 폰 글자 크기 200% 면 360폭 폰이 180px 폭처럼 그려지는데, "코드
+  // 리뷰(Code Review)" 같은 분류 이름이 한 줄을 고집해 화면을 가로로 넘쳤고,
+  // 넓어진 화면을 따라 아래 탭바도 밀렸다. 칩 줄(CategoryFilter·ChoiceFilter·
+  // ExamScopeFilter)은 flex-wrap 이라 칩은 먼저 통째로 다음 줄로 가고, 혼자서도
+  // 줄보다 길 때만 안에서 꺾인다. 보통 크기에서는 모양이 그대로다. max-w-full 이
+  // 칩을 줄 폭 안에 묶고, 꺾인 두 줄은 text-center 로 가운데에 모은다.
+  //
+  // 모서리는 알약(9999px)이 아니라 한 줄 높이의 절반이다. 위아래 py-2 와
+  // text-sm 한 줄(1.25rem)이 2.25rem 이라 그 절반이 1.125rem 이고, 한 줄일
+  // 때는 곧 알약이다. 두 줄이 된 칩에 알약 모서리를 주면 양 끝이 반원으로
+  // 부풀어 글자 끝이 둥근 벽에 닿는다(TalkTabRow 와 같은 판단).
+  const shape = `dv-card dv-card-press ${hitArea} inline-flex max-w-full items-center rounded-[1.125rem] px-3.5 py-2 text-center text-sm font-[weight:var(--weight-bold)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus`;
 
   return (
     <Link

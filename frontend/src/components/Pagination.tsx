@@ -73,26 +73,38 @@ export function Pagination({
 
   return (
     // 양옆을 같은 폭으로 두어 가운데 쪽수가 쪽을 넘겨도 움직이지 않게 한다.
+    // 양옆이 flex-1(바탕 0 에서 같은 비율로 늘어남)이라 한 줄에 들어갈 때는
+    // 3칸 격자(1fr auto 1fr)와 같은 자리다.
+    //
+    // 한 줄에 안 들어가면 다음 줄로 넘긴다. 폰 글자 크기 200% 면 360폭 폰이
+    // 180px 폭처럼 그려지는데, 가운데 쪽(처음·이전·쪽수·다음·끝이 다 있을
+    // 때)은 한 줄이 약 280px 이다. 격자는 줄을 못 바꿔 화면이 그만큼 넓어졌고
+    // 아래 탭바도 밀렸다.
     <nav
       aria-label="페이지 이동"
-      className="mt-8 grid grid-cols-[1fr_auto_1fr] items-center gap-1.5"
+      className="mt-8 flex flex-wrap items-center justify-center gap-1.5"
     >
       {/* 2쪽에서 "처음" 은 "이전" 과 같은 곳이라 뺀다. "끝" 도 같다. */}
-      <div className="flex justify-start gap-1.5">
+      <div className="flex flex-1 justify-start gap-1.5">
         {currentPage > 2 && pageLink(1, "처음")}
         {hasPrevious && pageLink(currentPage - 1, "이전")}
       </div>
 
       {/* tabular-nums: 페이지를 넘길 때 숫자 폭이 달라지면 가운데 글자가
-          좌우로 흔들린다(1 과 4 의 폭이 다르다). */}
+          좌우로 흔들린다(1 과 4 의 폭이 다르다).
+
+          20rem(320px) 보다 좁으면 쪽수를 첫 줄에 혼자 가운데로 올린다. 줄이
+          꺾일 때 그냥 두면 1쪽은 오른쪽, 가운데 쪽은 왼쪽 하는 식으로 쪽마다
+          자리가 바뀐다. 글자를 키운 화면에서만 걸리고 보통 폰(360px 이상)은
+          그대로 한 줄이다. */}
       <span
-        className="text-sm whitespace-nowrap tabular-nums"
+        className="text-sm whitespace-nowrap tabular-nums max-[20rem]:order-first max-[20rem]:basis-full max-[20rem]:text-center"
         style={{ color: "var(--text-muted)", fontWeight: "var(--weight-bold)" }}
       >
         {totalPages ? `${currentPage} / ${totalPages}` : `${currentPage} 페이지`}
       </span>
 
-      <div className="flex justify-end gap-1.5">
+      <div className="flex flex-1 justify-end gap-1.5">
         {hasNext && pageLink(currentPage + 1, "다음")}
         {totalPages !== undefined &&
           totalPages - currentPage > 1 &&
