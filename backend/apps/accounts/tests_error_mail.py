@@ -8,6 +8,8 @@
   같은 줄에서 났어도 우리 코드 자리가 다르면 다른 오류다.
 - 메일에는 회원 정보, 요청 본문·머리, 오류 메시지, 주소의 숫자가 안 실린다.
 - 처리한 실패(502 처럼 뷰가 답한 것)와 django.security.*(400)는 알리지 않는다.
+- 운영 로그의 "[서버 오류]" 줄에는 처리방침 v3 시행일(MESSAGE_FROM)부터 오류 메시지가
+  한 줄로, 300자까지 붙는다. 그 전에는 안 붙는다.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ import io
 import json
 import logging
 import sys
+from datetime import date, timedelta
 from unittest import mock
 
 from django.core import mail
@@ -27,13 +30,27 @@ from .error_mail import (
     DAY_SECONDS,
     MAX_PER_DAY,
     MAX_PER_WINDOW,
+    MESSAGE_FROM,
+    MESSAGE_LIMIT,
     WINDOW_SECONDS,
     ThrottledAdminEmailHandler,
     code_place,
     masked_path,
     request_method,
+    short_message,
     signature,
 )
+
+
+# 시행일 문을 테스트마다 정해 둔다. 안 정하면 오늘 날짜를 따라가서, 시행일 전에 쓴
+# "메시지가 안 실린다" 테스트가 시행일 아침에 저절로 빨개진다.
+def messages_off():
+    return mock.patch("apps.accounts.error_mail.MESSAGE_FROM", date.max)
+
+
+def messages_on():
+    return mock.patch("apps.accounts.error_mail.MESSAGE_FROM", date.min)
+
 
 # 요청 머리에 싣는 값. 메일에 있으면 샌 것이다. 비밀값처럼 생긴 글자를 쓰면
 # GitGuardian 이 진짜 자격증명으로 잡는다.
@@ -239,9 +256,11 @@ class ServerErrorMailTest(TestCase):
         self.client.raise_request_exception = False
 
     def test_500_sends_one_short_mail_to_admins(self):
-        res = self.client.get(
-            "/boom/77/?email=a@example.com", HTTP_AUTHORIZATION=f"Token {HEADER_MARK}"
-        )
+        # 시행일 뒤로 둔다. 운영 로그에 메시지가 실리는 때에도 메일에는 안 실려야 한다.
+        with messages_on():
+            res = self.client.get(
+                "/boom/77/?email=a@example.com", HTTP_AUTHORIZATION=f"Token {HEADER_MARK}"
+            )
         self.assertEqual(res.status_code, 500)
         self.assertEqual(len(mail.outbox), 1)
         sent = mail.outbox[0]
@@ -252,20 +271,36 @@ class ServerErrorMailTest(TestCase):
         for leaked in ("a@example.com", "비밀 메시지", HEADER_MARK, "77", "email="):
             self.assertNotIn(leaked, sent.subject + sent.body)
 
-    def test_stack_goes_to_server_log_without_values(self):
-        # 메일이 걸러지는 두 번째 요청까지 운영 로그(표준 오류)에 남는다. 값은 없다.
+    def capture_two_errors(self) -> str:
+        # 메일이 걸러지는 두 번째 요청까지 운영 로그(표준 오류)에 남는다.
         with mock.patch("sys.stderr", new_callable=io.StringIO) as err:
-            self.client.get("/boom/5/")
-            self.client.get("/boom/6/")
-        log = err.getvalue()
-        self.assertEqual(log.count("[서버 오류] RuntimeError GET /boom/:id/"), 2)
+            self.client.get("/boom/5/?email=a@example.com")
+            self.client.get("/boom/6/?email=a@example.com")
+        self.assertEqual(len(mail.outbox), 1)
+        return err.getvalue()
+
+    def test_server_log_has_no_message_before_effective_date(self):
+        with messages_off():
+            log = self.capture_two_errors()
+        lines = [line for line in log.splitlines() if line.startswith("[서버 오류]")]
+        self.assertEqual(lines, ["[서버 오류] RuntimeError GET /boom/:id/"] * 2)
         self.assertIn("tests_error_mail.py", log)
         self.assertNotIn("비밀 메시지", log)
         self.assertNotIn("a@example.com", log)
         # 가리지 않은 주소도 없다(나중에 누가 request.path 를 그대로 쓰면 여기서 잡힌다).
         self.assertNotIn("/boom/5/", log)
         self.assertNotIn("/boom/6/", log)
-        self.assertEqual(len(mail.outbox), 1)
+
+    def test_server_log_has_message_from_effective_date(self):
+        with messages_on():
+            log = self.capture_two_errors()
+        lines = [line for line in log.splitlines() if line.startswith("[서버 오류]")]
+        self.assertEqual(
+            lines, ["[서버 오류] RuntimeError GET /boom/:id/ - 비밀 메시지 a@example.com"] * 2
+        )
+        # 메시지가 붙어도 주소는 여전히 가린다. 쿼리 문자열도 안 실린다.
+        self.assertNotIn("/boom/5/", log)
+        self.assertNotIn("email=", log)
 
     def test_same_error_again_sends_nothing(self):
         self.client.get("/boom/1/")
@@ -300,3 +335,58 @@ class ServerErrorMailTest(TestCase):
         self.assertEqual(self.client.get("/boom/1/").status_code, 500)
         self.assertEqual(len(mail.outbox), 0)
         self.assertEqual(mail_handler()._sent_times, [])
+
+
+class ShortMessageTest(SimpleTestCase):
+    """운영 로그 한 줄에 붙는 메시지. 시행일 문, 한 줄, 길이 상한."""
+
+    def at(self, day: date):
+        return mock.patch("apps.accounts.error_mail.timezone.localdate", return_value=day)
+
+    def test_off_the_day_before_and_on_from_the_day(self):
+        record = record_with_exc(RuntimeError("이미 있는 이메일"))
+        with self.at(MESSAGE_FROM - timedelta(days=1)):
+            self.assertEqual(short_message(record), "")
+        with self.at(MESSAGE_FROM):
+            self.assertEqual(short_message(record), "이미 있는 이메일")
+
+    def test_newlines_are_folded_so_a_line_cannot_be_forged(self):
+        record = record_with_exc(ValueError("첫 줄\n[서버 오류] 가짜\r\n\t끝"))
+        with messages_on():
+            self.assertEqual(short_message(record), "첫 줄 [서버 오류] 가짜 끝")
+
+    def test_control_characters_become_spaces(self):
+        # 터미널 색 바꾸기(ESC)와 글자 방향 뒤집기(U+202E)가 로그 화면에 그대로 닿지 않는다.
+        record = record_with_exc(ValueError("a\x1b[31mb\u202ec\x00d\u2028e"))
+        with messages_on():
+            self.assertEqual(short_message(record), "a [31mb c d e")
+
+    def test_long_message_is_cut_at_the_limit(self):
+        record = record_with_exc(ValueError("가" * (MESSAGE_LIMIT * 3)))
+        with messages_on():
+            text = short_message(record)
+        self.assertEqual(len(text), MESSAGE_LIMIT)
+        self.assertTrue(text.endswith("…"))
+
+    def test_cut_is_marked_even_if_folding_makes_it_short(self):
+        # 빈칸이 많은 긴 메시지는 펴고 나면 300자보다 짧다. 뒤가 버려졌으면 그래도 "…".
+        record = record_with_exc(RuntimeError("a" + " " * (MESSAGE_LIMIT * 5) + "tail"))
+        with messages_on():
+            self.assertEqual(short_message(record), "a…")
+
+    def test_message_at_the_limit_is_kept_whole(self):
+        record = record_with_exc(ValueError("가" * MESSAGE_LIMIT))
+        with messages_on():
+            self.assertEqual(short_message(record), "가" * MESSAGE_LIMIT)
+
+    def test_broken_str_does_not_break_the_line(self):
+        class BrokenStr(Exception):
+            def __str__(self) -> str:
+                raise RuntimeError("str 이 터진다")
+
+        with messages_on():
+            self.assertEqual(short_message(record_with_exc(BrokenStr())), "(메시지를 읽지 못함)")
+
+    def test_record_without_exception_has_no_message(self):
+        with messages_on():
+            self.assertEqual(short_message(record_plain("django.request", "x")), "")

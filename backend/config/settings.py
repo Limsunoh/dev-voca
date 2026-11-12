@@ -123,8 +123,9 @@ EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 
-# 없으면 SMTP 서버가 응답을 멈췄을 때 정기 정리가 끝나지 않는다. gunicorn 의
-# 기본 제한(30초)보다 짧아야 웹에서도 실패 안내가 나간다.
+# SMTP 로 보낼 때(로컬에서 앱 비밀번호를 쓸 때)만 읽힌다. 없으면 SMTP 서버가 응답을
+# 멈췄을 때 정기 정리가 끝나지 않는다. 운영은 Gmail API 라 이 값이 아니라
+# apps/accounts/gmail_api.py 의 TIMEOUT 이 발송 시간을 정한다.
 EMAIL_TIMEOUT = 10
 
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
@@ -210,6 +211,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # 맨 앞이어야 한다. 뒤의 SecurityMiddleware 가 Railway 의 배포 확인 요청을
+    # 400·301 로 돌려보낸다(config/healthz.py).
+    "config.healthz.healthz_middleware",
     "django.middleware.security.SecurityMiddleware",
     # whitenoise 는 SecurityMiddleware 바로 다음이어야 한다(공식 권장 위치).
     # 이게 없으면 DEBUG=False 인 배포 환경에서 Admin 의 CSS 가 전부 깨진다.
