@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { BrandName } from "@/components/BrandName";
+import { HomeLink } from "@/components/HomeLink";
 
 export type LegalSection = { id: string; title: string; body: ReactNode };
 
@@ -72,8 +73,7 @@ export function LegalDoc({
       className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 text-base leading-7 [overflow-wrap:anywhere] [&_a]:underline [&_a]:underline-offset-4 [&_a:focus-visible]:outline [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-focus [&_code]:font-mono [&_code]:text-sm [&_h3]:mt-5 [&_h3]:font-bold [&_h3]:text-balance [&_p]:mt-3 [&_section_ol]:mt-3 [&_section_ol]:list-decimal [&_section_ol]:space-y-2 [&_section_ol]:pl-5 [&_section_ul]:mt-3 [&_section_ul]:list-disc [&_section_ul]:space-y-2 [&_section_ul]:pl-5"
       style={{ color: "var(--text-body)" }}
     >
-      <Link
-        href="/"
+      <HomeLink
         className="inline-flex items-center text-sm"
         style={{ minHeight: "var(--hit-floor)", color: "var(--text-muted)" }}
       >
@@ -82,7 +82,7 @@ export function LegalDoc({
         <span>
           <BrandName /> 홈으로
         </span>
-      </Link>
+      </HomeLink>
 
       <h1
         className="mt-2 text-2xl"

@@ -25,16 +25,20 @@ import { after, beforeEach, describe, it, mock } from "node:test";
 import type { ReactElement, ReactNode } from "react";
 
 class Redirect extends Error {
-  constructor(readonly to: string) {
+  constructor(
+    readonly to: string,
+    readonly type?: string,
+  ) {
     super("NEXT_REDIRECT");
   }
 }
 
 mock.module("next/navigation", {
   namedExports: {
-    redirect: (to: string) => {
-      throw new Redirect(to);
+    redirect: (to: string, type?: string) => {
+      throw new Redirect(to, type);
     },
+    RedirectType: { push: "push", replace: "replace" },
     notFound: () => {
       throw new Error("notFound");
     },
@@ -139,14 +143,29 @@ function form(fields: Record<string, string>): FormData {
   return data;
 }
 
-async function redirectOf(run: () => Promise<unknown>): Promise<string | null> {
+async function caught(run: () => Promise<unknown>): Promise<Redirect | null> {
   try {
     await run();
     return null;
   } catch (error) {
-    if (error instanceof Redirect) return error.to;
+    if (error instanceof Redirect) return error;
     throw error;
   }
+}
+
+/** 화면(page.tsx)의 redirect. 화면의 redirect 는 원래 바꿔치기라 type 을 안 넘긴다. */
+async function redirectOf(run: () => Promise<unknown>): Promise<string | null> {
+  return (await caught(run))?.to ?? null;
+}
+
+/**
+ * 액션의 redirect. 모두 바꿔치기여야 한다. 묻는 화면이 기록에 남으면 홈에서
+ * 뒤로 가기가 거기로 가서 앱이 안 닫힌다(lib/history-nav.ts).
+ */
+async function actionRedirectOf(run: () => Promise<unknown>): Promise<string | null> {
+  const r = await caught(run);
+  if (r) assert.equal(r.type, "replace", `${r.to} 로 쌓으며 간다`);
+  return r?.to ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +199,7 @@ describe("saveDailyLengthAction - 입력", () => {
 describe("saveDailyLengthAction - 로그인한 사람", () => {
   it("처음 묻는 화면: 계정에 저장하고 홈으로", async () => {
     token = LIVE;
-    const to = await redirectOf(() =>
+    const to = await actionRedirectOf(() =>
       saveDailyLengthAction({}, form({ length: "30m", from: "start" })),
     );
 
@@ -200,7 +219,7 @@ describe("saveDailyLengthAction - 로그인한 사람", () => {
 
   it("from 을 모르는 값으로 바꾸면 처음 묻는 화면처럼 홈으로 간다", async () => {
     token = LIVE;
-    const to = await redirectOf(() =>
+    const to = await actionRedirectOf(() =>
       saveDailyLengthAction({}, form({ length: "5m", from: "https://evil.example" })),
     );
     assert.equal(to, "/");
@@ -211,7 +230,7 @@ describe("saveDailyLengthAction - 토큰이 거절(401)되면", () => {
   it("처음 묻는 화면: 토큰을 지우고 게스트로 저장한 뒤 홈으로", async () => {
     token = LIVE;
     patchReply = { status: 401 };
-    const to = await redirectOf(() =>
+    const to = await actionRedirectOf(() =>
       saveDailyLengthAction({}, form({ length: "10m", from: "start" })),
     );
 
@@ -223,7 +242,7 @@ describe("saveDailyLengthAction - 토큰이 거절(401)되면", () => {
   it("내정보: 토큰을 지우고 로그인으로, 게스트 쿠키에는 안 넣는다", async () => {
     token = LIVE;
     patchReply = { status: 401 };
-    const to = await redirectOf(() =>
+    const to = await actionRedirectOf(() =>
       saveDailyLengthAction({}, form({ length: "10m", from: "profile" })),
     );
 
@@ -255,7 +274,7 @@ for (const [label, r] of [
 describe("saveDailyLengthAction - 게스트", () => {
   it("처음 묻는 화면: 쿠키에 저장하고 홈으로, 백엔드에는 안 묻는다", async () => {
     guest = true;
-    const to = await redirectOf(() =>
+    const to = await actionRedirectOf(() =>
       saveDailyLengthAction({}, form({ length: "30m", from: "start" })),
     );
 
@@ -266,7 +285,7 @@ describe("saveDailyLengthAction - 게스트", () => {
 
   it("from=profile 로 조작해도 쿠키에 안 넣고 로그인으로 보낸다", async () => {
     guest = true;
-    const to = await redirectOf(() =>
+    const to = await actionRedirectOf(() =>
       saveDailyLengthAction({}, form({ length: "30m", from: "profile" })),
     );
 

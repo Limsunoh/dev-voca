@@ -33,16 +33,23 @@ const cookieJar = new Map<string, string>();
 
 /** redirect 는 실제로도 던진다. 성공 경로를 잡는 방식이 같아야 의미가 있다. */
 class RedirectError extends Error {
-  constructor(readonly to: string) {
+  constructor(
+    readonly to: string,
+    readonly type?: string,
+  ) {
     super("NEXT_REDIRECT");
   }
 }
 
 mock.module("next/navigation", {
   namedExports: {
-    redirect(to: string): never {
-      throw new RedirectError(to);
+    redirect(to: string, type?: string): never {
+      // 성공한 액션의 redirect 는 모두 바꿔치기다. push 면 로그인 화면이 기록에
+      // 남아, 앱에서 폰 뒤로 가기가 거기로 가고 앱이 안 닫힌다.
+      assert.equal(type, "replace", `${to} 로 가는 redirect 가 바꿔치기가 아니다`);
+      throw new RedirectError(to, type);
     },
+    RedirectType: { push: "push", replace: "replace" },
   },
 });
 

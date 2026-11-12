@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { goBackOrReplace } from "@/lib/history-nav";
 import { leaveDetail, solvedNow } from "@/lib/quiz-progress";
 
 import { LeaveConfirm } from "./LeaveConfirm";
@@ -136,11 +137,11 @@ export function ExitGuard({
     // 아무 설명 없는 빈 배경색 화면을 0.22초 본다. 애니메이션을 보는 것보다
     // 나쁘다 - 멈춘 화면은 고장으로 읽힌다.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      router.push(to);
+      goBackOrReplace(router, to);
       return;
     }
 
-    // 화면을 먼저 내리고 이동한다. 바로 push 하면 다음 화면이 그려지는
+    // 화면을 먼저 내리고 이동한다. 바로 옮기면 다음 화면이 그려지는
     // 것과 겹쳐서 나가는 동작이 안 보인다.
     setLeaving(true);
 
@@ -159,7 +160,12 @@ export function ExitGuard({
     // 220ms 는 exit-veil 의 200ms 보다 조금 길다. 덮이기 전에 이동하면
     // 다음 화면이 번쩍인다. globals.css 의 exit-veil 을 고치면 여기도
     // 같이 고친다.
-    timerRef.current = setTimeout(() => router.push(to), 220);
+    //
+    // push 가 아니라 goBackOrReplace 다. 나갈 곳(허브)은 대개 바로 뒤 기록이라
+    // 거기로 돌아가야, 허브에서 뒤로 가기가 끝난 판이 아니라 홈으로 간다
+    // (lib/history-nav.ts). 돌아가는 것도 뒤로 가기(traverse)지만 위에서
+    // leavingRef 를 켰으므로 아래 navigate 리스너가 막지 않는다.
+    timerRef.current = setTimeout(() => goBackOrReplace(router, to), 220);
   };
 
   // 그 사이 다른 곳으로 이미 갔으면 예약을 취소한다.

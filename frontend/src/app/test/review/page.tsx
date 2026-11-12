@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { HomeLink } from "@/components/HomeLink";
 import { ReviewBoard } from "@/components/ReviewBoard";
 import type { User } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
@@ -54,8 +54,7 @@ export default async function ReviewPage() {
         </p>
         <div className="mt-6">
           {/* 흰 알약. 실패해서 물러나는 자리라 갈색을 쓰지 않는다. */}
-          <Link
-            href={routes.home}
+          <HomeLink
             className="dv-btn inline-flex items-center rounded-[var(--radius-pill)] px-5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={
               {
@@ -68,7 +67,7 @@ export default async function ReviewPage() {
             }
           >
             홈으로
-          </Link>
+          </HomeLink>
         </div>
       </main>
     );

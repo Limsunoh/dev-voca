@@ -323,13 +323,19 @@ export function AuthForm({
             거르는 곳은 제출할 때의 safeNext 다((auth)/actions.ts). 여기서는
             쿼리 값으로만 싣고 가는 곳은 고정이라 괜찮지만, 걸러지지 않은 이
             값을 redirect(next) 처럼 가는 곳 자체로 쓰면 밖으로 나가는 길이
-            된다. */}
+            된다.
+
+            replace: 로그인과 가입을 오가도 기록이 늘지 않게 한다. 쌓이면 가입한
+            뒤 도착한 화면에서 뒤로 가기가 로그인 화면으로 가서 앱이 안 닫히고,
+            거기서 "로그인 없이 둘러보기" 를 누르면 방금 가입한 계정이 게스트로
+            바뀐다(continueAsGuestAction 이 토큰을 지운다). */}
         <Link
           href={
             next
               ? `${copy.switchHref}?next=${encodeURIComponent(next)}`
               : copy.switchHref
           }
+          replace
           className="underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={{
             color: "var(--brand)",

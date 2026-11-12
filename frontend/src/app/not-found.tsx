@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { routes } from "@/lib/routes";
+import { HomeLink } from "@/components/HomeLink";
 
 /**
  * 탭·방문기록에 남는 제목. 없으면 루트 layout 의 `"DeVoca"` 가 그대로 떠서
@@ -79,8 +78,7 @@ export default function NotFound() {
           받고, 안의 알약은 제 폭을 지키며 위 `text-center` 로 가운데 놓인다.
           `board/not-found.tsx` 와 `test/daily/page.tsx` 도 같은 모양이다. */}
       <div className="mt-6">
-        <Link
-          href={routes.home}
+        <HomeLink
           className="dv-btn inline-flex items-center rounded-full px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
@@ -95,7 +93,7 @@ export default function NotFound() {
           }
         >
           홈으로 가기
-        </Link>
+        </HomeLink>
       </div>
     </main>
   );

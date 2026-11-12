@@ -27,7 +27,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 let pathname = "/";
 
 mock.module("next/navigation", {
-  namedExports: { usePathname: () => pathname },
+  namedExports: {
+    usePathname: () => pathname,
+    // 탭바가 홈 탭을 누를 때 쓴다. 여기서는 누르지 않는다.
+    useRouter: () => ({ push() {}, replace() {}, refresh() {} }),
+  },
 });
 
 // 여기서 볼 것은 주소뿐이다. next/link 는 브라우저 라우터를 기대한다.

@@ -17,6 +17,7 @@ import { dailyLengthLabel } from "@/lib/daily-length";
 import { routes } from "@/lib/routes";
 
 import { Burst } from "./Burst";
+import { HomeLink } from "./HomeLink";
 import { QuestionCard } from "./QuestionCard";
 import { WrongAnswer } from "./WrongAnswer";
 import { Reaction, verdictMs } from "./Reaction";
@@ -846,8 +847,7 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
         >
           순위표에서 확인
         </Link>
-        <Link
-          href={routes.home}
+        <HomeLink
           className="dv-btn flex items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
@@ -861,7 +861,7 @@ function DoneCard({ study }: { study: StudyProgress | null }) {
           }
         >
           홈으로
-        </Link>
+        </HomeLink>
       </div>
     </div>
   );

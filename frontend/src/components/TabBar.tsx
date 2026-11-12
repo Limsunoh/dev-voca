@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
+import { onTraverseToOtherScreen, stepOffRepeat, traverseBackTo } from "@/lib/history-nav";
 import {
   activeTabSegment,
   immersiveRoutes,
@@ -22,8 +24,68 @@ import {
  * 그 표시는 이동할 때마다 즉시 바뀌어야 한다. 서버에서 그리면 이동할
  * 때마다 왕복이 생긴다.
  */
+/**
+ * 뒤로 가기로 돌아오면 새로 받는 화면. 일일공부·복습 카드(TodayCards)가 있어,
+ * 풀고 돌아왔을 때 받아 둔 옛 카드를 보이면 안 된다.
+ */
+const FRESH_ON_RETURN: string[] = [routes.home, routes.test];
+
 export function TabBar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const onHome = pathname === routes.home;
+
+  // 탭을 눌렀을 때. 뒤쪽 기록에 그 탭 화면이 있으면 새로 쌓지 않고 그리로
+  // 돌아간다. 홈 탭이면 홈이 기록의 맨 앞에 남아 뒤로 한 번이면 앱이 닫히고,
+  // 상세에서 같은 탭(익히기)을 누르면 목록이 두 번 쌓이지 않는다. 없으면
+  // Link 에 맡긴다(아래 replace 규칙: 홈에서 나갈 때만 쌓는다).
+  //
+  // onClick 이 아니라 onNavigate 다. Link 가 새 탭으로 열기(가운데 클릭, ctrl
+  // 클릭)와 다른 곳이 이미 막은 클릭(저장 안 한 내정보의 확인 창,
+  // useUnsavedGuard)을 거른 뒤에만 부른다. 막힌 클릭으로 돌아가면 확인 창이
+  // 뜨는 동시에 고친 내용이 사라진다.
+  const backTo = (e: { preventDefault(): void }, href: string) => {
+    const path = href.split("?")[0];
+    if (path !== pathname && traverseBackTo(path)) e.preventDefault();
+  };
+
+  // 같은 화면이 두 칸 쌓였으면 한 칸으로 줄인다. 홈에서 로그인하면 [홈, 홈] 이
+  // 된다(lib/history-nav.ts 의 stepOffRepeat).
+  useEffect(() => {
+    stepOffRepeat();
+  }, [pathname]);
+
+  // 뒤로·앞으로 가기로 홈이나 문제풀기에 돌아오면 일일공부·복습 카드를 새로
+  // 받는다. Next 는 이때 서버에 다시 묻지 않고 처음 받아 둔 응답으로 그린다
+  // (RefreshOnBack 주석). 탭과 "홈으로" 가 대부분 뒤로 가기가 되면서, 일일공부를
+  // 2문제 푼 뒤 홈에 오면 카드가 "시작 전" 이었다(11-12).
+  //
+  // 돌아간 뒤에 새로 받으면 Next 가 그 응답을 반영하지 않을 때가 있다(일일공부
+  // 뒤 홈 탭, 4번 중 1번 "시작 전"). 그래서 주소가 바뀐 직후, Next 가 popstate
+  // 에서 그 칸을 되살리기 전에 부른다. refresh 가 받아 둔 응답을 지우므로 Next 가
+  // 되살리면서 새로 받는다(4번 모두 새 값, 그사이 "불러오는 중" 이 잠깐 보인다).
+  // refresh 가 받으려던 떠나는 화면은 되살리기에 밀려 버려진다.
+  //
+  // 홈과 문제풀기만이다. 목록까지 지우면 돌아올 때 "불러오는 중" 이 먼저 그려져
+  // 보던 스크롤 위치를 잃는다(DetailBackLink 가 지키려는 것). 같은 화면 안의 #
+  // 이동(약관 목차)은 onTraverseToOtherScreen 이 거른다.
+  //
+  // 알고 둔 것:
+  // - 버려지는 refresh 의 요청도 끝까지 간다. 그래서 돌아올 때 요청이 둘이고,
+  //   일일공부에서 돌아오면 일일공부 조회(분당 30회 한도)를 두 번 쓴다. 그 요청만
+  //   실패하면(망 끊김, 504) Next 가 떠나온 화면으로 페이지를 통째로 다시 받는다.
+  //   돌아간 뒤에 부르는 방식은 이런 일이 없지만 6번 중 2~3번 옛 카드를 보였다.
+  // - 다른 이동이 진행 중일 때(답을 누르자마자 뒤로) 뒤로 가면 refresh 가 그 뒤에
+  //   줄을 서서 되살린 뒤에 돈다. 그때는 옛 카드가 남을 수 있다.
+  // - 홈·문제풀기에 같은 화면 안 # 링크를 두지 않는다. 그 칸에는 Next 의 기록이
+  //   없어 되살리기가 없고, refresh 가 떠나온 주소로 바꿔치기한다.
+  useEffect(
+    () =>
+      onTraverseToOtherScreen(() => {
+        if (FRESH_ON_RETURN.includes(window.location.pathname)) router.refresh();
+      }),
+    [router],
+  );
 
   // 로그인·가입은 한 가지 일만 하는 화면이다. 여기에 탭바를 두면 작업을
   // 끝내지 않고 빠져나가게 되고, 폼이 짧은 화면에서 자리만 차지한다.
@@ -230,10 +292,24 @@ export function TabBar() {
               );
             }
 
+            const href = tabHref(tab, pathname);
+            const toHome = href === routes.home;
+
             return (
               <li key={tab.key} className={cell}>
                 <Link
-                  href={tabHref(tab, pathname)}
+                  href={href}
+                  // 홈에서 다른 탭으로 나갈 때만 기록을 쌓는다. 나머지(탭끼리,
+                  // 지금 화면과 같은 탭, 홈에서 홈)는 바꿔치기한다. 그래서 탭을
+                  // 오가는 것만으로는 기록이 늘지 않고, 탭 화면에서 뒤로 한 번이면
+                  // 홈, 홈에서 한 번 더면 앱이 닫힌다(lib/history-nav.ts).
+                  //
+                  // 탭 안에서 들어간 화면(단어 상세, 순위표)은 기록을 쌓으므로,
+                  // 거기서 다른 탭으로 가면 뒤로 가기가 그 탭 목록을 한 번 거쳐
+                  // 홈으로 간다. 상세를 지우고 바로 홈 다음에 놓으려면 두 번
+                  // 움직여야 해서 그사이 다른 화면이 잠깐 보인다. 그래서 두었다.
+                  replace={!onHome || toHome}
+                  onNavigate={(e) => backTo(e, href)}
                   aria-current={active ? "page" : undefined}
                   className={`${shape} focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus`}
                   style={{
