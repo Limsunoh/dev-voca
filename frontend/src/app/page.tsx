@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Highlight } from "@/components/Highlight";
 import { LearningCard } from "@/components/LearningCard";
+import { PolicyNotice } from "@/components/PolicyNotice";
 import { Reading } from "@/components/Reading";
 import {
   loadToday,
@@ -99,6 +100,9 @@ export default async function Home() {
 
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-[var(--gutter)] pt-[22px] pb-7">
         <Greeting user={user} />
+
+        {/* 처리방침이 바뀌면 시행일 전까지 한 줄 뜬다(처리방침 14절의 약속). */}
+        <PolicyNotice />
 
         {word ? <DailyWord word={word} /> : <DailyWordUnavailable />}
 

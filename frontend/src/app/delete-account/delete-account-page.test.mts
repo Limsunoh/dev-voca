@@ -36,9 +36,8 @@ mock.module("next/link", {
     createElement("a", { href: props.href }, props.children),
 });
 
-const { DOC_VERSION, EFFECTIVE_DATE, LegalDoc } = await import(
-  "../../components/LegalDoc"
-);
+const { DOC_VERSION, EFFECTIVE_DATE, koreanDate, LegalDoc, PRIVACY_CHANGE } =
+  await import("../../components/LegalDoc");
 const { TabBar } = await import("../../components/TabBar");
 const { safeNext } = await import("../../lib/routes");
 const { default: TermsPage } = await import("../terms/page");
@@ -89,12 +88,17 @@ function section(markup: string, id: string): string {
 }
 
 const VERSION_LINE = `버전 ${DOC_VERSION} · 시행일 ${EFFECTIVE_DATE}`;
+// 처리방침은 v3 에서 약관과 따로 바뀌어 시행일이 다르다.
+const PRIVACY_VERSION_LINE = `버전 ${DOC_VERSION} · 시행일 ${koreanDate(PRIVACY_CHANGE.effective)}`;
 
 describe("버전 줄", () => {
   it("처리방침과 약관에는 버전과 시행일이 그대로 있다", () => {
     // showVersion 기본값이 false 로 뒤집히면 동의 문서에서 버전이 사라져
     // 누가 어느 판에 동의했는지 화면으로 확인할 길이 없다.
-    assert.ok(html.privacy.includes(VERSION_LINE), "처리방침에 버전 줄이 없다");
+    assert.ok(
+      html.privacy.includes(PRIVACY_VERSION_LINE),
+      "처리방침에 버전 줄이 없다",
+    );
     assert.ok(html.terms.includes(VERSION_LINE), "약관에 버전 줄이 없다");
   });
 
