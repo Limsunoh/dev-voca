@@ -124,13 +124,14 @@ mock.module("@/lib/api/vocab", {
 
 mock.module("@/lib/api/sentences", {
   namedExports: {
+    // id 9 는 에러 메시지 문장, 나머지는 실무 표현.
     getSentence: async (id: string) => ({
       id: Number(id),
       text: "Could you take a look at this PR?",
       reading: "",
       translation: "이 PR 좀 봐 줄래요?",
-      kind: "expression",
-      kind_label: "실무 표현",
+      kind: id === "9" ? "error" : "expression",
+      kind_label: id === "9" ? "에러 메시지" : "실무 표현",
       category: "collab",
       category_label: "협업",
       difficulty: 1,
@@ -746,5 +747,15 @@ describe("상세 히어로", () => {
     });
     const html = renderToStaticMarkup(el);
     assert.equal(html.split('aria-label="문장 듣기"').length - 1, 1);
+  });
+
+  it("에러 메시지 문장에는 듣기 버튼이 없다(기호를 기기 음성이 어색하게 읽는다)", async () => {
+    const el = await SentenceDetailPage({
+      params: Promise.resolve({ id: "9" }),
+      searchParams: Promise.resolve({}),
+    });
+    const html = renderToStaticMarkup(el);
+    assert.doesNotMatch(html, /aria-label="문장 듣기"/);
+    assert.doesNotMatch(html, /empty:hidden/, "버튼이 없으면 빈 줄도 그리지 않는다");
   });
 });
