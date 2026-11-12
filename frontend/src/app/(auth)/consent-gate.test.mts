@@ -10,6 +10,7 @@
  *   - /login 에는 체크가 없다. 구글 링크에도 consent 가 붙지 않는다.
  *   - 시작 화면은 버튼을 누르기 전에는 체크가 없고, 게스트는 두 항목만 묻는다.
  *   - 제출에 실패하면 포커스가 오류 문구로 간다.
+ *   - 전체 동의는 처음엔 꺼져 있고, 누르면 물어본 항목만 한꺼번에 켜고 끈다(게스트는 둘).
  *
  * 브라우저 없이 상태를 이어 가는 방법은 profile-cards-state.test.mts 와 같다.
  * react 의 useState·useActionState·useEffect 를 대역으로 바꾸고, jsx 런타임을
@@ -613,4 +614,94 @@ describe("입력칸 테두리", () => {
       assert.equal((input?.props.style as { border: string }).border, "1px solid var(--text-muted)");
     });
   }
+});
+
+// ---- 전체 동의 ----------------------------------------------------------------
+
+describe("전체 동의", () => {
+  const ALL = "consent-all";
+  const GUEST_ALL = "guest-consent-all";
+
+  it("가입 화면: 처음에는 꺼져 있다", () => {
+    mount(signup());
+    assert.equal(box(ALL).checked, false);
+  });
+
+  it("가입 화면: 누르면 세 항목이 다 켜지고 잠금이 풀린다", () => {
+    mount(signup());
+    tick(ALL);
+    assert.equal(box(TERMS).checked, true);
+    assert.equal(box(DISCLOSURE).checked, true);
+    assert.equal(box(AGE).checked, true);
+    assert.equal(box(ALL).checked, true);
+    assert.equal(submitButton()["aria-disabled"], undefined);
+    // 서버로 가는 값은 하나씩 켰을 때와 같다(전체 동의 칸 자체는 실리지 않는다)
+    assert.deepEqual(hiddenConsent(), [
+      ["terms_agreed", "on"],
+      ["disclosure_agreed", "on"],
+      ["age_confirmed", "on"],
+    ]);
+  });
+
+  it("가입 화면: 일부만 켠 상태에서 누르면 전부 켜진다", () => {
+    mount(signup());
+    tick(TERMS);
+    tick(ALL);
+    assert.deepEqual([box(TERMS).checked, box(DISCLOSURE).checked, box(AGE).checked], [true, true, true]);
+  });
+
+  it("가입 화면: 다시 누르면 세 항목이 다 꺼진다", () => {
+    mount(signup());
+    tick(ALL);
+    tick(ALL, false);
+    assert.equal(box(TERMS).checked, false);
+    assert.equal(box(DISCLOSURE).checked, false);
+    assert.equal(box(AGE).checked, false);
+    assert.equal(submitButton()["aria-disabled"], true);
+    assert.deepEqual(hiddenConsent(), []);
+  });
+
+  it("가입 화면: 하나씩 다 켜면 전체 동의도 켜지고, 하나를 끄면 꺼진다", () => {
+    mount(signup());
+    tick(TERMS);
+    tick(DISCLOSURE);
+    assert.equal(box(ALL).checked, false);
+    tick(AGE);
+    assert.equal(box(ALL).checked, true);
+    tick(DISCLOSURE, false);
+    assert.equal(box(ALL).checked, false);
+  });
+
+  it("게스트: 두 항목만 켜고 잠금이 풀린다, 다시 누르면 잠긴다", () => {
+    mount(createElement(GuestStep, { titleId: "t", onCancel: () => {} }));
+    tick(GUEST_ALL);
+    assert.equal(box(GUEST_TERMS).checked, true);
+    assert.equal(box(GUEST_AGE).checked, true);
+    assert.equal(box(GUEST_ALL).checked, true);
+    assert.match(html, /action="\/__guest__"/);
+    tick(GUEST_ALL, false);
+    assert.equal(box(GUEST_TERMS).checked, false);
+    assert.equal(box(GUEST_AGE).checked, false);
+    assert.doesNotMatch(html, /action="\/__guest__"/);
+  });
+
+  it("구글 시트: 세 항목을 켜고 구글 링크가 열린다", () => {
+    mount(createElement(GoogleStep, { titleId: "t", onCancel: () => {} }));
+    assert.deepEqual(googleLinks(html), []);
+    tick(ALL);
+    assert.deepEqual([box(TERMS).checked, box(DISCLOSURE).checked, box(AGE).checked], [true, true, true]);
+    assert.equal(googleLinks(html).length, 1);
+  });
+
+  it("화면 낭독기는 몇 항목을 켜는지 듣는다", () => {
+    mount(signup());
+    assert.match(html, /아래 필수 세 항목에 모두 동의/);
+    mount(createElement(GuestStep, { titleId: "t", onCancel: () => {} }));
+    assert.match(html, /아래 필수 두 항목에 모두 동의/);
+  });
+
+  it("로그인 화면에는 없다", () => {
+    mount(login());
+    assert.equal(hosts.filter((h) => h.type === "input" && h.props.id === ALL).length, 0);
+  });
 });
