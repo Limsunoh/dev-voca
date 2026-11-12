@@ -11,6 +11,8 @@
  *   - 처리방침 시행일은 공고일 7일 뒤이고, 서버가 오류 메시지를 남기기 시작하는
  *     날(error_mail.py 의 MESSAGE_FROM)과 같다.
  *   - 홈의 처리방침 알림은 시행일 전날까지만 뜨고 14절로 간다.
+ *   - IP 주소는 원문이 아니라 서버 비밀값을 섞은 해시값으로만 둔다고 적고,
+ *     "IP 주소를 저장하지 않는다" 는 옛 단정이 남지 않는다.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -135,7 +137,32 @@ describe("처리방침 변경 공고", () => {
     };
     assert.match(changes, new RegExp(`공고일: ${korean(announced)}`));
     assert.match(changes, new RegExp(`시행일: ${korean(effective)}`));
+  });
+
+  // v3 에서 바뀐 내용이다. 다음 개정에서 14절을 새로 쓰면 이 테스트는 건너뛴다.
+  it("v3: 14절이 오류 메시지와 IP 주소 세기를 바뀐 내용으로 적는다", {
+    skip: DOC_VERSION !== "v3",
+  }, () => {
+    const changes = pages.privacy.match(
+      /<section[^>]*id="changes"[^>]*>([\s\S]*?)<\/section>/,
+    )?.[1];
+    assert.ok(changes);
     assert.match(changes, /오류 메시지/);
+    assert.match(changes, /IP 주소/);
+  });
+
+  it("IP 주소는 원문이 아니라 해시값으로만 둔다고 적는다", () => {
+    // 가입·로그인 시도를 IP 주소로도 센다(백엔드 요청 제한). 원문을 저장한다고
+    // 읽히면 안 되고, "IP 를 저장하지 않는다" 는 옛 단정이 남아도 안 된다.
+    // 날짜는 IP 로 세기 시작한 날이라 글자로 박혀 있어야 한다(PRIVACY_CHANGE 와 무관).
+    const retention = pages.privacy.match(
+      /<section[^>]*id="retention"[^>]*>([\s\S]*?)<\/section>/,
+    )?.[1];
+    assert.ok(retention);
+    assert.match(retention, /2026년\s+11월 19일부터는 이메일 로그인·가입 시도를 접속한 IP 주소로도 셉니다/);
+    assert.match(retention, /원문을 저장하지 않고/);
+    assert.doesNotMatch(pages.privacy, /IP 주소나 브라우저 정보를 저장하지 않습니다/);
+    assert.doesNotMatch(pages.privacy + pages["delete-account"], /알아볼 수 없게 바꾼/);
   });
 
   it("홈 알림은 시행일 전날까지 뜨고 14절로 간다", () => {
