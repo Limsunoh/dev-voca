@@ -13,7 +13,7 @@ import {
   TodayCards,
 } from "@/components/TodayCards";
 import type { User } from "@/lib/api/accounts";
-import { getDailyWords, HOME_WORDS, type WordListItem } from "@/lib/api/vocab";
+import { pickTodayWords, type TodayWord } from "@/lib/api/daily";
 import { routes } from "@/lib/routes";
 import {
   getCurrentUser,
@@ -61,23 +61,9 @@ export default async function Home() {
     : !(await getToken()) && !(await getGuestDailyLength());
   if (askLength) redirect(routes.startDaily);
 
-  // 두 요청을 동시에 띄운다. 순서대로 기다리면 두 번의 왕복이 그대로
-  // 대기 시간이 되고, 그게 앱을 열자마자 보이는 시간이다.
+  // 요청을 동시에 띄운다. 순서대로 기다리면 왕복마다 그대로 대기 시간이
+  // 되고, 그게 앱을 열자마자 보이는 시간이다.
   const userPromise = getCurrentUser();
-
-  // 백엔드가 죽어도 홈은 떠야 한다. 앱을 열었는데 첫 화면이 에러면
-  // 다른 데로 갈 방법도 같이 사라진다(탭바가 이 화면 아래에 있다).
-  //
-  // 다만 로그는 남긴다. 로그가 없으면 백엔드가 죽은 것과 이 코드의
-  // 버그를 구분할 수 없고, 화면에는 둘 다 "불러오지 못했습니다" 로만 뜬다.
-  //
-  // 첫 장과 아래에 깔 것을 한 번에 받는다. 나눠 부르면 같은 목록을 두 번
-  // 받는 셈이고, 그사이 검수가 하나 통과되면 count 가 늘어 첫 장과 나머지가
-  // 어긋난다.
-  const wordsPromise = getDailyWords(HOME_WORDS).catch((error: unknown) => {
-    console.error("오늘의 단어를 불러오지 못했습니다.", error);
-    return [];
-  });
 
   // 토큰은 catch 밖에서 읽는다. 안에 넣으면 쿠키 접근이 일으키는
   // DynamicServerError 까지 잡혀서, 정상 동작인데 빌드 로그에 에러가
@@ -88,10 +74,27 @@ export default async function Home() {
   // 않으니 홈이 뜨는 데 필요한 왕복이 하나 적다.
 
   // 일일공부·복습 카드. 게스트에게 안 묻는 것과 실패 처리는 loadToday 가 한다.
-  const [user, words, today]: [User | null, WordListItem[], Today] =
-    await Promise.all([userPromise, wordsPromise, loadToday(token)]);
+  const todayPromise = loadToday(token);
+
+  // 오늘의 단어는 일일공부 상태와 같은 응답에 실려 온다. 로그인한 사람은
+  // 오늘 일일공부 첫 묶음(시작했으면 오늘 배운 단어)이라, 여기서 본 단어로
+  // 일일공부가 시작된다. 그것이 없으면(게스트, 백엔드 실패) 날짜로 고른
+  // 단어다. 백엔드가 죽어도 홈은 떠야 한다 - 앱을 열었는데 첫 화면이 에러면
+  // 다른 데로 갈 방법도 같이 사라진다(탭바가 이 화면 아래에 있다).
+  //
+  // 날짜 단어는 일일공부 상태를 받은 뒤에 부른다. 게스트는 상태를 안 물어서
+  // 바로 부르고, 로그인한 사람은 대개 내 단어가 있어 아예 안 부른다. 둘을 미리
+  // 같이 띄우면 로그인한 사람마다 쓰지 않을 요청이 셋까지 나간다. 내 단어를
+  // 못 받은 드문 경우(백엔드 실패, 옛 백엔드)에만 왕복이 하나 는다.
+  const wordsPromise = todayPromise.then((today) => pickTodayWords(today.words));
+
+  const [user, words, today]: [User | null, TodayWord[], Today] =
+    await Promise.all([userPromise, wordsPromise, todayPromise]);
 
   const [word, ...rest] = words;
+  // 상세로 갈 때 이 순서를 주소에 싣는다(routes.todayWord). 상세가 같은
+  // 순서로 이전·다음을 그린다.
+  const ids = words.map((one) => one.id);
 
   return (
     <>
@@ -104,7 +107,7 @@ export default async function Home() {
         {/* 처리방침이 바뀌면 시행일 전까지 한 줄 뜬다(처리방침 14절의 약속). */}
         <PolicyNotice />
 
-        {word ? <DailyWord word={word} /> : <DailyWordUnavailable />}
+        {word ? <DailyWord word={word} ids={ids} /> : <DailyWordUnavailable />}
 
         {/* 오늘 할 일을 단어 아래에 둔다. 맨 위에 두면 앱을 열 때마다
             "안 한 것" 이 먼저 보인다. 하루 한 번 오는 사람에게 그 자리는
@@ -121,7 +124,7 @@ export default async function Home() {
           </div>
         )}
 
-        {rest.length > 0 && <UpNext words={rest} />}
+        {rest.length > 0 && <UpNext words={rest} ids={ids} />}
       </main>
     </>
   );
@@ -201,7 +204,7 @@ function Greeting({ user }: { user: User | null }) {
 }
 
 /** 오늘의 단어. 포스터처럼 크게 두고 아래로 뜻과 진입을 붙인다. */
-function DailyWord({ word }: { word: WordListItem }) {
+function DailyWord({ word, ids }: { word: TodayWord; ids: number[] }) {
   return (
     // 흰 카드 하나로 감싼다. 크림 바탕 위에서 이 덩어리가 홈의 주인공이고,
     // 두께 3px 이 그것을 만든다. 아래 띠(--background-deep)에 버튼을 두어
@@ -319,7 +322,7 @@ function DailyWord({ word }: { word: WordListItem }) {
         style={{ background: "var(--background-deep)" }}
       >
         <Link
-          href={routes.todayWord(word.id)}
+          href={routes.todayWord(word.id, ids)}
           className="dv-btn flex flex-1 items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
@@ -364,18 +367,21 @@ function DailyWord({ word }: { word: WordListItem }) {
 }
 
 /**
- * 오늘의 단어와 같이 보여주는 여섯 개. 목록에서 오늘의 단어 다음 여섯 개라
- * 모든 계정이 같고 날마다 바뀐다.
+ * 오늘의 단어와 같이 보여주는 나머지(최대 여섯 개).
  *
- * 이름은 그 사실만 말한다. "이어서 볼 단어" 는 모든 계정이 같은 것을
- * 보는데도 "내가 보던 것을 이어서" 로 읽힌다.
+ * 로그인한 사람은 오늘 일일공부 첫 묶음의 나머지다(5분이면 하나, 10분·30분이면
+ * 넷). 시작한 뒤에는 오늘 배운 단어의 나머지다. 게스트는 날짜로 고른 목록에서
+ * 오늘의 단어 다음 여섯 개라 모든 게스트가 같다(pickTodayWords).
  *
- * "내일부터 나올 오늘의 단어" 는 쓰지 않는다. 단어 수가 그대로면 맞는 말이지만,
- * 검수로 한 개만 늘거나 줄어도 시작점(day % count)이 수십 칸 옮겨 가서 그날은
- * 여섯 개가 전부 틀린다(getDailyWords 머리말).
+ * 이름은 그 사실만 말한다. "이어서 볼 단어" 는 "내가 보던 것을 이어서" 로
+ * 읽힌다. "내일부터 나올 오늘의 단어" 도 쓰지 않는다. 게스트 목록은 검수로 한
+ * 개만 늘거나 줄어도 시작점(day % count)이 수십 칸 옮겨 가서 그날은 여섯 개가
+ * 전부 틀린다(getDailyWords 머리말).
  *
  * 첫 장 하나만 두면 화면 아래가 비어서 스크롤할 것이 있는지 보이지 않는다.
- * 앱에서는 그러면 첫 화면이 전부인 줄 안다.
+ * 앱에서는 그러면 첫 화면이 전부인 줄 안다. 5분 회원은 시작 전에 이 목록이
+ * 하나뿐이지만, 그 사이에 오늘 할 일 카드가 있어 화면이 비지는 않는다. 개수를
+ * 채우려고 일일공부에 없는 단어를 섞으면 이 기능을 만든 이유가 사라진다.
  *
  * 목록 화면과 같은 카드를 쓴다. 홈이라고 따로 그리면 누름 반응·포커스·
  * 색이 두 벌이 되고, 저쪽에 쌓인 판단(active:scale 을 0.96 으로 정한 것
@@ -384,7 +390,7 @@ function DailyWord({ word }: { word: WordListItem }) {
  * 발음기호와 한글 발음은 넘기지 않는다. 여기 넣으면 한 줄이 세 줄이 되고
  * 목록이 아니라 카드 더미가 된다. 눌러서 상세로 가면 다 있다.
  */
-function UpNext({ words }: { words: WordListItem[] }) {
+function UpNext({ words, ids }: { words: TodayWord[]; ids: number[] }) {
   return (
     // flex-1 로 남은 세로 공간을 먹는다. 이게 없으면 큰 폰에서 목록 아래가
     // 비고, 카드 수로 그것을 맞추려 들면 화면 크기마다 값이 달라진다
@@ -406,7 +412,7 @@ function UpNext({ words }: { words: WordListItem[] }) {
         {words.map((word) => (
           <li key={word.id}>
             <LearningCard
-              href={routes.todayWord(word.id)}
+              href={routes.todayWord(word.id, ids)}
               title={word.term}
               subtitle={word.meaning}
               compact

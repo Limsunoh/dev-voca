@@ -272,6 +272,18 @@ class DailyStudyStartView(APIView):
                 # 애초에 안 주는 편이 화면에서 막는 것보다 확실하다.
                 learning = []
 
+        # 홈의 오늘의 단어. 시작 전이면 첫 묶음을 미리 뽑아 두고, 시작했으면
+        # 오늘 배운 단어다(today_words). 홈과 일일공부가 같은 단어를 보게 한다.
+        #
+        # 실패해도 조회는 살린다. 이 응답은 일일공부 화면과 홈이 같이 쓰는데,
+        # 오늘의 단어 때문에 일일공부를 못 열면 안 된다. 비어 있으면 홈은 날짜로
+        # 고른 단어를 그린다.
+        try:
+            words = [_word_body(w) for w in daily_study.today_words(request.user, study)]
+        except Exception:
+            logger.exception("오늘의 단어를 뽑지 못했습니다. user=%s", request.user.pk)
+            words = []
+
         # 캐시하지 않는다. 응답에 매번 다른 서명 토큰이 실리므로,
         # 어디든 캐시가 붙으면 여러 사용자가 같은 토큰을 받는다. GET 은
         # 기본적으로 캐시 가능한 메서드라 프록시·중계 어디서든 붙을 수 있다.
@@ -299,6 +311,9 @@ class DailyStudyStartView(APIView):
                 "question": question,
                 # 이번 묶음의 학습 카드. 비어 있으면 문제를 풀 차례다.
                 "learning": learning,
+                # 홈의 오늘의 단어. 위 learning 과 다르다 - 저기는 "지금 넘길
+                # 카드" 이고 이건 "오늘의 단어 목록" 이라 시작 전에도 찬다.
+                "today_words": words,
             }
         )
         body["Cache-Control"] = "no-store"
