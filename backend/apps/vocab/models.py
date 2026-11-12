@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models.functions import Lower, Trim
 
 
 class LearningItemQuerySet(models.QuerySet):
@@ -106,6 +107,12 @@ class LearningItem(models.Model):
         abstract = True
 
 
+# 대소문자와 앞뒤 띄어쓰기를 무시한 term. Word 의 인덱스와 빈칸 문제의 쿼리
+# (quiz._terms_for)가 같이 쓴다. 식이 조금이라도 다르면 Postgres 가 인덱스를
+# 못 쓰므로, 두 곳에 따로 적지 않고 이것 하나를 가져다 쓴다.
+TERM_KEY = Lower(Trim("term"))
+
+
 class Word(LearningItem):
     """개발 영어 단어 하나."""
 
@@ -153,6 +160,9 @@ class Word(LearningItem):
         indexes = [
             # 목록/검색이 항상 검수된 것만 보므로 term 정렬과 묶어서 인덱스
             models.Index(fields=["is_reviewed", "term"]),
+            # 빈칸 문제가 "이 문장에 들어 있는 단어" 를 찾을 때 쓴다
+            # (quiz._terms_for). 없으면 문제 하나마다 단어 표 전체를 훑는다.
+            models.Index(TERM_KEY, name="vocab_word_term_lower_idx"),
         ]
         constraints = [
             # choices 는 폼과 full_clean() 에서만 검사한다. update_or_create 나

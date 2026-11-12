@@ -10,12 +10,14 @@
 
 from __future__ import annotations
 
+import bisect
 import functools
 import hashlib
 import hmac
 import random
 import re
 import secrets
+import string
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -23,7 +25,7 @@ from django.core import signing
 from django.db.models import Q, QuerySet
 from django.db.models.functions import Trim
 
-from .models import Sentence, Word
+from .models import TERM_KEY, Sentence, Word
 
 # 정답이 무엇을 가리키는지. 채점한 뒤 무엇을 보여줄지 정하는 데 쓴다.
 TARGET_WORD = "word"
@@ -558,9 +560,9 @@ _HAS_LETTER = re.compile(r"[A-Za-z]")
 # 문장에서 용어를 찾을 때 쓰는 경계. 앞뒤가 알파벳이면 다른 단어의 일부다.
 # "for" 가 "format" 안에서 잡히면 엉뚱한 자리에 빈칸이 뚫린다.
 #
-# 캐시가 필요한 이유: 한 문장을 검사할 때 단어 수만큼(566회) 부른다.
-# 파이썬 re 모듈의 자체 캐시는 512개라 단어가 그보다 많으면 매번 밀려나
-# 한 번도 안 맞는다. 캐시가 없으면 다시 컴파일하느라 문장 하나에 174ms 가 든다.
+# 이제는 DB 가 먼저 좁힌 몇 개(_terms_for)에만 쓴다. 예전에는 문장마다 단어
+# 전부에 불러서 캐시(2048개)를 넘는 순간 매번 다시 컴파일했고, 단어 2,100개에서
+# 빈칸 문제 하나가 0.3초, 1만 개에서 1.3초, 100만 개에서 2분이 걸렸다(11-12 측정).
 @functools.lru_cache(maxsize=2048)
 def _term_pattern(term: str) -> re.Pattern[str]:
     return re.compile(
@@ -611,12 +613,104 @@ _LEVEL_WORDS = re.compile(r"^(error|warning|fatal|panic|exception)$", re.IGNOREC
 
 
 def _terms_in(text: str, terms: list[tuple[int, str]]) -> list[tuple[int, str]]:
-    """문장 안에 실제로 들어 있는 단어들.
+    """문장 안에 실제로 들어 있는 단어들. 받은 단어를 정규식으로 하나씩 본다.
 
-    단어 566개를 전부 훑는다. 쿼리로는 "이 문장에 포함된 단어" 를 물을 수
-    없어서(방향이 반대다) 파이썬에서 본다. 정규식은 위에서 캐시한다.
+    단어 전부를 넘기면 단어 수만큼 느려진다. 빈칸 문제는 _terms_for 로 먼저
+    좁힌 것만 넘긴다.
     """
     return [(pk, term) for pk, term in terms if _term_pattern(term).search(text)]
+
+
+_ASCII_LETTERS = frozenset(string.ascii_letters)
+
+# 용어가 될 수 있는 조각의 최대 길이. Word.term 이 이보다 길 수 없다.
+_TERM_MAX_LENGTH = Word._meta.get_field("term").max_length
+
+# 한 번에 DB 에 묻는 후보 조각 수의 상한(뽑은 문장들 합). 더하면 넘치는 문장은
+# 이번 문제에서 빼고 다음 문장을 본다. 혼자 넘치는 문장은 빈칸 후보가 아니다.
+# SQLite 의 변수 수 상한(32,766)보다 아래로 둔다. Postgres 는 상한이 없지만
+# 숫자·기호가 많은 긴 로그(UUID 여럿, 16진수 스택 트레이스)는 수십만 개가 되어
+# 쿼리 하나에 수십 MB 가 실린다. 시드 문장 하나는 중앙값 67개, 최대 888개다.
+# ponytail: 넘치면 뺀다. 그런 문장도 빈칸으로 내야 하면 IN 을 나눠 묻는다.
+_MAX_CANDIDATES = 20000
+
+# 후보를 만들어 볼 문장의 최대 길이. 길면 빈칸 후보에서 뺀다. 같은 글자가 길게
+# 이어지면(구분선 "-----", "0000") 후보 수는 적은데 만드는 데 길이 x 100 번이
+# 들어, 20만 자에 2초가 걸렸다. 화면에도 3천 자 넘는 지문은 못 보인다.
+_MAX_TEXT_LENGTH = 3000
+
+
+def _is_term_edge(ch: str) -> bool:
+    """용어의 첫 글자나 끝 글자가 될 수 있나. 공백이 아닌 ASCII 글자.
+
+    Word.term 은 영어 용어라 ASCII 로 시작하고 끝난다. 이 조건이 없으면 한글이
+    든 문장에서는 한글 글자마다 경계가 되어(알파벳이 아니므로) 후보가 글자 수
+    x 100 개로 불어난다. 한글이 섞인 95자 문장이 2천 개를 넘었다.
+    """
+    return ch < "\x80" and not ch.isspace()
+
+
+def _term_candidates(text: str) -> set[str] | None:
+    """문장에서 용어가 될 수 있는 조각을 모두 소문자로 모은다. 너무 많으면 None.
+
+    _term_pattern 과 같은 경계를 쓴다. 조각 바로 앞과 바로 뒤가 영어 알파벳이
+    아니면 후보다. 그래서 "format" 에서 "for" 는 후보가 아니고, "CI/CD" 에서는
+    "CI", "CD", "CI/CD" 가 모두 후보다. 여러 낱말 용어("out of scope")도 같은
+    방식으로 잡힌다. 조각의 첫 글자와 끝 글자는 공백이 아닌 ASCII 다
+    (_is_term_edge). 그래서 한글·일본어로 시작하거나 끝나는 term 은 못 찾는다.
+
+    후보 수는 문장으로 정해지고 단어 수와는 상관이 없다. 시드 문장 하나에
+    중앙값 67개, 최대 888개다.
+    """
+    n = len(text)
+    if n > _MAX_TEXT_LENGTH:
+        return None
+    starts = [
+        i
+        for i in range(n)
+        if _is_term_edge(text[i]) and (i == 0 or text[i - 1] not in _ASCII_LETTERS)
+    ]
+    ends = [
+        j
+        for j in range(1, n + 1)
+        if _is_term_edge(text[j - 1]) and (j == n or text[j] not in _ASCII_LETTERS)
+    ]
+    found: set[str] = set()
+    for i in starts:
+        # ends 는 오름차순이라, 100자를 넘는 순간 그 시작점은 끝낸다.
+        k = bisect.bisect_right(ends, i)
+        while k < len(ends) and ends[k] - i <= _TERM_MAX_LENGTH:
+            found.add(text[i : ends[k]].lower())
+            k += 1
+        if len(found) > _MAX_CANDIDATES:
+            return None
+    return found
+
+
+def _terms_for(words: QuerySet[Word], candidates: set[str]) -> list[tuple[int, str, str]]:
+    """후보 조각과 같은 단어를 DB 에서 한 번에 찾는다. (id, term, 소문자 term).
+
+    방향을 뒤집은 것이다. 예전에는 단어 전부를 읽어 문장마다 대 봤다. 지금은
+    문장에서 나올 수 있는 조각을 만들어 "이 조각과 같은 단어" 를 묻는다. 단어가
+    100만 개여도 쿼리 한 번이다. 대소문자는 무시하고(정규식의 IGNORECASE),
+    앞뒤 띄어쓰기를 뗀다. SQL TRIM 은 띄어쓰기(U+0020)만 떼서 예전 t.strip()
+    과 달리 탭·줄바꿈은 남지만, 단어를 넣는 길(Admin 폼, AI 파이프라인, 시드)이
+    모두 strip 한다.
+
+    식은 Word 의 인덱스와 같은 TERM_KEY 를 쓴다. 식이 다르면 결과는 같은데
+    Postgres 가 인덱스를 못 써서 단어 표 전체를 훑는다.
+
+    순서는 words 의 정렬(term)을 따른다. 같은 길이 후보 중 무엇을 고를지가
+    예전과 같아진다.
+    """
+    if not candidates:
+        return []
+    return [
+        (pk, term.strip(), key)
+        for pk, term, key in words.annotate(_term_key=TERM_KEY)
+        .filter(_term_key__in=candidates)
+        .values_list("pk", "term", "_term_key")
+    ]
 
 
 def make_blank_question(
@@ -632,15 +726,34 @@ def make_blank_question(
     """
     pool = sentences.exclude(pk__in=exclude_sentence_ids or [])
 
-    # (id, term) 만 가져온다. 문장마다 다시 부르지 않으려고 한 번만 읽는다.
-    terms = [(pk, t.strip()) for pk, t in words.values_list("pk", "term") if t.strip()]
+    # 몇 개만 뽑아 그중 되는 것을 쓴다. 전부 훑으면 매 요청마다 380개를
+    # 스캔하게 되고, 안 되는 문장이 절반이라 몇 번만 시도해도 충분히 걸린다.
+    picked = list(pool.order_by("?")[:12])
+    if not picked:
+        return None
+
+    # 뽑은 문장 전부의 후보 조각으로 쿼리를 한 번만 한다. 문장마다 물으면
+    # 실패가 이어질 때 쿼리가 12번이 된다. 더해서 상한을 넘기는 문장은 빼고
+    # 다음 문장을 본다(_MAX_CANDIDATES).
+    usable: list[tuple[Sentence, set[str]]] = []
+    asking: set[str] = set()
+    for sentence in picked:
+        mine = _term_candidates(sentence.text)
+        if mine is None or len(asking | mine) > _MAX_CANDIDATES:
+            continue
+        usable.append((sentence, mine))
+        asking |= mine
+    terms = _terms_for(words, asking)
     if not terms:
         return None
 
-    # 몇 개만 뽑아 그중 되는 것을 쓴다. 전부 훑으면 매 요청마다 380개를
-    # 스캔하게 되고, 안 되는 문장이 절반이라 몇 번만 시도해도 충분히 걸린다.
-    for sentence in pool.order_by("?")[:12]:
-        found = _terms_in(sentence.text, terms)
+    for sentence, mine in usable:
+        # 영어 알파벳 안에서는 후보와 DB 가 이미 정규식과 같은 판정을 한다.
+        # 정규식으로 한 번 더 보는 것은 대소문자 접기가 파이썬 정규식과 다른
+        # 글자(비ASCII) 때문이다. 판정을 예전과 똑같이 두려는 것이다.
+        found = _terms_in(
+            sentence.text, [(pk, term) for pk, term, key in terms if key in mine]
+        )
         if not found:
             continue
 
