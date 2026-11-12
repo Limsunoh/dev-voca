@@ -50,7 +50,7 @@ export function FilterPanel({
         // 아직 후자만 본다. 안 지우면 알약 왼쪽에 기본 삼각형이 하나 더 붙는다.
         //
         // 높이는 min-h-11(44px)로 직접 잡는다. 상세 화면의 "발음 자세히"
-        // (learn/words/[id]/page.tsx)가 쓰는 것과 같은 방식이다. 칩들이
+        // (components/DetailHead.tsx)가 쓰는 것과 같은 방식이다. 칩들이
         // 쓰는 after 히트영역은 옆에 이웃이 있어 알약을 못 키울 때 쓰는
         // 우회책인데, 이 summary 는 한 줄을 혼자 쓰므로 그냥 키우면 된다.
         //
