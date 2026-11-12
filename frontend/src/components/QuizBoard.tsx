@@ -106,13 +106,13 @@ const RECENT_LIMIT = 100;
  *
  * 상수로 두지 않고 재는 이유: 탭바는 `pb-[env(safe-area-inset-bottom)]`
  * 로 기기마다 두꺼워진다(layout.tsx 가 viewportFit: "cover" 를 켜서 아이폰
- * 에서 이 값이 0 이 아니다). 5rem 만 박아두면 그 차이만큼 버튼이 물린다.
+ * 에서 이 값이 0 이 아니다). 높이를 숫자로 박아두면 그 차이만큼 버튼이 물린다.
  */
 function tabBarHeight(): number {
   // aria-label 이 아니라 data 속성으로 찾는다. 라벨 문구는 접근성을 다듬다
   // 바뀌기 쉬운데, 그때 에러 없이 못 찾게 되고 스크롤만 탭바 높이만큼 어긋난다.
   const bar = document.querySelector("[data-tabbar]");
-  // 못 찾으면 0. 5rem 같은 기본값으로 물러서면 없는 탭바만큼 더 스크롤해서
+  // 못 찾으면 0. 탭바 높이 같은 기본값으로 물러서면 없는 탭바만큼 더 스크롤해서
   // 문제를 화면 위로 밀어 올린다.
   return bar ? bar.getBoundingClientRect().height : 0;
 }

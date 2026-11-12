@@ -76,13 +76,13 @@ export function TabBar() {
 
           style 로 두는 이유: Tailwind 클래스로는 임의 이름의 커스텀
           프로퍼티를 문서 뿌리에 올릴 수 없다. */}
-      <style>{`:root{--tabbar-space:calc(5rem + env(safe-area-inset-bottom));--tabbar-height:calc(57px + env(safe-area-inset-bottom))}`}</style>
+      <style>{`:root{--tabbar-space:calc(5.5rem + env(safe-area-inset-bottom));--tabbar-height:calc(65px + env(safe-area-inset-bottom))}`}</style>
 
       {/* 자리막이. 아래 nav 가 fixed 라 흐름에서 빠져 있어서, 이게 없으면
           목록 마지막 항목과 페이지네이션이 탭바 뒤로 들어가 눌리지 않는다.
 
-          5rem 은 탭바 높이(테두리 1px + min-h-14 의 56px = 57px)에 여유를
-          더한 값이고,
+          5.5rem(88px)은 탭바 높이(테두리 1px + min-h-16 의 64px = 65px)에
+          여유를 더한 값이고,
           safe-area 를 더하는 이유는 탭바 자신도 그만큼 두꺼워지기 때문이다.
           이 둘이 어긋나면 아이폰에서만 마지막 항목이 가려진다.
 
@@ -91,14 +91,14 @@ export function TabBar() {
           해준다. */}
       {/* 높이를 변수가 아니라 값으로 직접 쓴다. var() 로 두면 위 style 이
           적용되기 전 한 프레임 동안 --tabbar-space 가 없어서 height 선언이
-          무효가 되고, 자리막이가 0 이었다가 80px 로 뛴다. 목록 하단이
+          무효가 되고, 자리막이가 0 이었다가 88px 로 뛴다. 목록 하단이
           올라갔다 내려온다.
 
           변수는 html 의 scroll-padding 이 읽으려고 있는 것이다. 같은
           컴포넌트 안의 자리막이가 그걸 거칠 이유가 없다. */}
       <div
         aria-hidden
-        className="h-[calc(5rem+env(safe-area-inset-bottom))] shrink-0"
+        className="h-[calc(5.5rem+env(safe-area-inset-bottom))] shrink-0"
       />
       <nav
         aria-label="주요 화면"
@@ -190,14 +190,17 @@ export function TabBar() {
             // 수십~수백 번 눌린다. 그 빈도에서는 반응이 붙을수록 느리게
             // 느껴진다 - 색과 표시줄이 즉시 바뀌는 지금이 가장 빠르다.
             // (globals.css 의 "누름 피드백" 주석 참고)
-            // min-h 를 14(56px)로 둔다. 12(48px)면 "준비 중 / 말하기" 처럼
+            // min-h 를 16(64px)으로 둔다. 12(48px)면 "준비 중 / 말하기" 처럼
             // 두 줄인 항목이 안 들어가 글자가 탭바 밖으로 잘린다. 준비 중인
-            // 탭이 하나뿐이라 다른 항목만 보고는 못 알아챈다.
+            // 탭이 하나뿐이라 다른 항목만 보고는 못 알아챈다. 14(56px)였다가
+            // 앱으로 써 본 사용자가 "탭바가 너무 짧다" 고 해서 올렸다(11-12).
+            // 이 값을 바꾸면 위 style 의 --tabbar-height(테두리 1px 더함)와
+            // --tabbar-space·자리막이 높이(여유를 더함)를 같이 바꾼다.
             // 칸 폭 규칙(위 ul 주석). 링크 칸과 준비 중 칸이 같이 쓴다.
             const cell = "min-w-[min(44px,20%)] flex-auto";
 
             const shape =
-              "flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-center text-xs [word-break:normal] text-balance transition";
+              "flex min-h-16 flex-col items-center justify-center gap-1 py-1.5 text-center text-xs [word-break:normal] text-balance transition";
 
             if (!tab.ready) {
               return (
