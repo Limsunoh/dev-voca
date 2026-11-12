@@ -132,8 +132,33 @@ Host 가 `healthcheck.railway.app` 이라 일반 뷰로 두면 400·301 이 된�
 |---|---|---|
 | `DJANGO_SECRET_KEY` | 랜덤 50자 | 기동 실패 (의도된 가드) |
 | `DJANGO_ALLOWED_HOSTS` | `xxx.up.railway.app` (스킴 없이) | 기동 실패 |
-| `DJANGO_DEBUG` | `0` | 에러 페이지에 소스 노출 |
+| `DJANGO_DEBUG` | `0` | 에러 페이지에 소스 노출. 가입·로그인 IP 제한도 사실상 꺼진다(DEBUG 면 1분 1000번) |
 | `DATABASE_URL` | PostgreSQL 추가 시 자동 | 로컬 기본값을 침 |
+| `RELAY_SECRET` | 무작위 긴 값. **Vercel 에도 같은 이름·같은 값** | 가입·로그인 IP 제한이 모든 사람을 한 통으로 센다 |
+
+`RELAY_SECRET` 은 Next 서버가 가입·로그인 요청에 싣는 값이다(frontend/src/lib/client-ip.ts,
+backend/apps/accounts/throttles.py). 백엔드는 이 값이 맞는 요청만 Next 에서 온 것으로 보고
+접속 IP 로 세고, 나머지는 백엔드를 바로 부른 요청으로 보고 한 통에 담는다. 2026-11-19
+(처리방침 v3 시행일) 전에는 Next 가 IP 를 싣지 않고 백엔드도 아무것도 세지 않는다.
+
+- 한쪽에만 넣거나 값이 다르면 실제 사용자도 모두 한 통에 들어, 가입이 사이트 전체로
+  한 시간 30건에 묶인다.
+  - 값이 다르면: 백엔드가 운영 로그에 `X-Next-Relay 비밀값이 맞지 않음(보낸 값 지문 ...)`
+    을 남긴다(값은 안 찍고 지문 8자만, 지문마다 한 번). 같은 지문이 계속 나오면 Next 쪽
+    값이 어긋난 것이니 두 곳 값을 맞춘다. 지문이 매번 다르면 머리를 지어 보내는 봇이다.
+    이 확인은 11-19 전에도 돈다. 지문은 프로세스마다 50개까지만 찍으므로, 봇이 먼저
+    50개를 채우면 그 뒤로는 재배포 전까지 진짜 어긋남도 안 찍힌다(그래도 429 는 보인다).
+  - Vercel 쪽에 값이 없으면: Next 가 머리를 아예 싣지 않아 로그가 안 남고 429 만 보인다.
+    `cd frontend && vercel env ls production` 에 `RELAY_SECRET` 이 있는지 이름으로 본다.
+- 바꿀 때는 두 곳을 같이 바꾸고, Vercel 은 환경변수를 바꾼 뒤 다시 배포해야 반영된다.
+  값은 화면에 찍지 않는다. 2026-11-12 에는 무작위 값을 파일로 만들어 `vercel env add
+  RELAY_SECRET production --sensitive < 파일`, `railway variable set RELAY_SECRET --stdin
+  --service web --skip-deploys < 파일` 로 넣고 파일을 지웠다.
+- 프론트를 이 기능 전 배포로 되돌리면(Vercel Instant Rollback) Next 가 비밀값을 싣지
+  않아 같은 일이 생긴다. 그때는 봇이 바로 부른 요청 30번으로 사이트 전체 가입을 한 시간
+  막을 수 있다.
+- 로컬(DEBUG)은 RELAY_SECRET 이 없어 전부 한 통에 들므로 settings 가 테스트처럼 넉넉한
+  비율을 쓴다.
 
 SECRET_KEY 생성:
 
@@ -175,9 +200,10 @@ curl -so /dev/null -w "login  %{http_code}\n" -X POST $H/api/accounts/login/ \
 하나 - throttle 이 캐시 테이블에 접근하는 데 성공했다(500 이 아니다).
 그런데 throttle 은 캐시 키를 못 만들면 캐시를 안 건드리고 그냥 통과한다.
 
-- `login/` 은 이메일로 키를 만든다. **`email` 이 없으면 키가 `None` 이라
-  캐시를 아예 안 친다** - 400 이 나와도 아무것도 검증하지 않은 것이다.
-  없는 계정으로 보내면 400 이면서 캐시는 확실히 친다.
+- `login/` 은 이메일로 키를 만든다. **`email` 이 없으면 이메일 키가 `None` 이라
+  그 제한은 캐시를 안 친다** - 400 이 나와도 이메일 제한은 검증하지 않은 것이다.
+  없는 계정으로 보내면 400 이면서 캐시는 확실히 친다. 2026-11-19 부터는 접속 IP
+  제한(LoginIpThrottle)이 이메일과 상관없이 캐시를 친다.
 - `google/` 은 본문과 무관한 고정 키를 쓰므로 `{}` 로 충분하다. 그리고
   `{}` 면 코드 검사에서 먼저 400 이라 **구글로 실제 요청이 나가지 않는다.**
   `{"code":"x"}` 처럼 보내면 매번 구글에 실패 요청을 보내게 되고, 그때는
@@ -483,8 +509,9 @@ railway ssh --service web "python backend/manage.py shell -c 'from apps.accounts
 
 - HSTS (`SECURE_HSTS_SECONDS`) - 도메인 확정 후 짧은 값부터 켠다.
   브라우저가 기억해버려 되돌리기 어렵다.
-- 레이트리밋 - 로그인·가입은 이메일 단위로 걸어뒀다. 나머지 조회 경로는
-  모든 요청이 Next 서버 하나로 보여 IP 로 셀 수 없으니, 필요해지면
-  Next 중계 쪽에 둔다.
+- 레이트리밋 - 로그인·가입은 이메일 단위와 접속 IP 단위(2026-11-19 부터, Next 가
+  비밀값과 함께 넘긴 IP)로 걸어뒀다. 나머지 조회 경로는 모든 요청이 Next 서버 하나로
+  보여 그냥은 IP 로 셀 수 없다. 필요해지면 그 경로에도 lib/client-ip.ts 의 머리를
+  실어 같은 방식으로 센다.
 - 프론트엔드 - Vercel 배포 시 `CORS_ALLOWED_ORIGINS` 에 도메인 추가.
 - `ANTHROPIC_API_KEY` - AI 생성을 서버에서 돌릴 때만 필요. 로컬에서 돌려도 된다.

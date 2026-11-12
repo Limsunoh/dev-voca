@@ -60,8 +60,10 @@ from .throttles import (
     EmailChangeThrottle,
     EmailRateThrottle,
     GoogleRateThrottle,
+    LoginIpThrottle,
     PasswordChangeThrottle,
     ProfileUpdateThrottle,
+    SignUpIpThrottle,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,14 +90,12 @@ def _auth_response(user: AbstractBaseUser, created: bool = False) -> Response:
 class SignUpView(APIView):
     """이메일 가입. 가입과 동시에 로그인된다.
 
-    시도 제한은 같은 이메일을 반복해서 두드리는 것만 막는다. 이메일마다
-    한 번씩 던져 가입 여부를 훑는 것은 이 제한으로 못 막는다. 그러려면 요청
-    주체를 알아야 하는데, 백엔드에는 전부 Next 서버로 보인다. 막으려면 실제
-    클라이언트를 아는 Next 중계 쪽에 IP 제한을 둬야 한다.
+    같은 이메일을 반복해서 두드리는 것은 이메일로, 이메일을 바꿔 가며 계정을
+    찍어 내는 것은 접속 IP 로 막는다(apps.accounts.throttles 머리말).
     """
 
     permission_classes = [AllowAny]
-    throttle_classes = [EmailRateThrottle]
+    throttle_classes = [EmailRateThrottle, SignUpIpThrottle]
 
     def post(self, request: Request) -> Response:
         serializer = SignUpSerializer(data=request.data)
@@ -107,12 +107,13 @@ class SignUpView(APIView):
 class LoginView(APIView):
     """이메일 로그인.
 
-    시도 제한이 없으면 한 계정의 비밀번호를 무한히 추측할 수 있다.
+    시도 제한이 없으면 한 계정의 비밀번호를 무한히 추측할 수 있다(이메일로
+    센다). 여러 계정에 같은 비밀번호를 대보는 것은 접속 IP 로 센다.
     백엔드가 공개 도메인이라 Next 중계를 건너뛰고 직접 두드릴 수 있다.
     """
 
     permission_classes = [AllowAny]
-    throttle_classes = [EmailRateThrottle]
+    throttle_classes = [EmailRateThrottle, LoginIpThrottle]
 
     def post(self, request: Request) -> Response:
         serializer = LoginSerializer(data=request.data, context={"request": request})

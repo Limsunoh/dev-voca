@@ -310,6 +310,11 @@ AUTH_USER_MODEL = "accounts.User"
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
+# Next 서버가 백엔드에 실제 접속 IP 를 넘길 때 같이 싣는 비밀값(apps.accounts.throttles 의
+# came_through_next). Vercel 의 같은 이름 환경변수와 같아야 한다. 비면 넘겨받은 IP 를 믿지
+# 않고 모든 가입·로그인을 "Next 를 거치지 않은 요청" 한 통으로 센다.
+RELAY_SECRET = os.getenv("RELAY_SECRET", "")
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -367,11 +372,14 @@ CACHES = {
         "LOCATION": "throttle_cache",
         # 기본값 300 을 넘으면 일부를 지워 자리를 만든다. 그때 노리던
         # 계정의 카운터가 함께 밀려나면 제한이 풀린다. 값을 올려도 그 길은
-        # 닫히지 않고 비용만 오른다. 제대로 막으려면 아래 REST_FRAMEWORK
-        # 주석대로 Next 중계에 제한을 둬야 한다.
+        # 닫히지 않고 비용만 오른다. 가입·로그인의 접속 IP 카운터(1시간)는
+        # IPv6 를 /64 로 묶어 행 수를 줄였지만, IP 를 많이 가진 쪽이 행을 채우면
+        # 같은 식으로 밀려날 수 있다. 넘치면 키 이름 순으로 앞에서부터 지우므로
+        # (throttle_auth_email_* 가 먼저) 이메일별 비밀번호 추측 카운터부터 사라진다.
         #
-        # 여기 들어오는 것은 요청 제한 카운터뿐이고 1분이면 만료된다. 만료된
-        # 행은 스스로 안 지워져서 daily_cleanup 이 치운다. 넉넉히 잡아도 된다.
+        # 여기 들어오는 것은 요청 제한 카운터뿐이다. 대부분 1분, 가입·로그인의
+        # 접속 IP 카운터는 1시간이면 만료된다. 만료된 행은 스스로 안 지워져서
+        # daily_cleanup 이 치운다. 넉넉히 잡아도 된다.
         #
         # 되돌리기 방어는 캐시에 두지 않는다. 캐시는 넘치면 스스로 지우므로
         # (cull) 공격자가 항목을 채우면 방어가 열린다. 그래서
@@ -407,16 +415,12 @@ REST_FRAMEWORK = {
     # 접속자 전원이 한 통에 담겨, 한 사람이 빠르게 눌러도 나머지가
     # 429 를 받는다. 막고 싶은 반복 호출도 같은 통을 쓰니 구분되지 않는다.
     #
-    # 제한이 필요해지면 실제 클라이언트를 아는 쪽, 즉 Next 중계에 둔다.
-    #
-    # 다만 로그인·가입은 예외다. 그쪽은 IP 가 아니라 제출된 이메일로 세므로
-    # 위 문제를 피해간다(apps.accounts.throttles). 백엔드가 공개 도메인이라
-    # Next 를 건너뛰고 직접 두드릴 수 있어, 제한이 없으면 한 계정의
-    # 비밀번호를 무한히 추측할 수 있다.
-    #
-    # 이 제한이 막는 것은 거기까지다. 이메일마다 한 번씩 던져 가입 여부를
-    # 훑는 것은 못 막는다(카운터가 이메일별이라 한 번씩은 다 통과한다).
-    # 그건 실제 클라이언트를 아는 Next 중계에서 IP 로 막아야 한다.
+    # 다만 로그인·가입은 예외다. 먼저 제출된 이메일로 센다(한 계정의
+    # 비밀번호를 무한히 추측하는 것). 이메일마다 한 번씩 던지는 것은 이메일
+    # 카운터로 못 막아서 접속 IP 로도 센다. IP 는 Next 서버가 비밀값과 함께
+    # 실어 보낸 것만 믿는다(apps.accounts.throttles 의 came_through_next).
+    # 백엔드가 공개 도메인이라 Next 를 건너뛰고 직접 두드릴 수 있어, 그런
+    # 요청은 IP 를 보지 않고 한 통으로 센다.
     #
     # 테스트에서는 넉넉하게 둔다. 테스트는 사람보다 훨씬 빠르게 요청해서
     # 운영 값이면 관계없는 테스트까지 429 로 막힌다.
@@ -432,6 +436,13 @@ REST_FRAMEWORK = {
         # 그래서 실제 사용량보다 훨씬 넉넉하게 잡는다 - 여기서 재는 것은
         # 개인의 시도 횟수가 아니라 우리 서버가 구글을 두드리는 총량이다.
         "auth_google": "2000/min" if sys.argv[1:2] == ["test"] else "120/min",
+        # 가입·로그인을 접속 IP 로도 센다(apps.accounts.throttles 의 SignUpIpThrottle,
+        # LoginIpThrottle). 휴대폰 통신사나 강의실·회사는 여러 사람이 같은 IP 를 쓰므로
+        # 사람 기준으로 넉넉하게 잡는다(강의실 30명이 한 시간에 같이 가입해도 된다).
+        # Next 를 거치지 않은 요청은 모두 한 통에서 이 값을 나눠 쓴다. 로컬(DEBUG)은
+        # RELAY_SECRET 이 없어 전부 그 한 통에 들므로 테스트처럼 넉넉하게 둔다.
+        "signup_ip": "1000/min" if sys.argv[1:2] == ["test"] or DEBUG else "30/hour",
+        "login_ip": "1000/min" if sys.argv[1:2] == ["test"] or DEBUG else "60/hour",
         # 이메일 변경 신청. 확인 메일이 나가는 자리라 낮게 잡는다 - 반복해서
         # 신청하면 우리 이름으로 남의 메일함을 채우는 통로가 된다. 계정별로
         # 세고, 주소를 바꾸는 일은 계정당 아주 가끔이라 좁아서 불편할 일이 없다.
