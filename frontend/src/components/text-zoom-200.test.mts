@@ -17,7 +17,10 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 mock.module("next/navigation", {
-  namedExports: { usePathname: () => "/talk" },
+  namedExports: {
+    usePathname: () => "/talk",
+    useRouter: () => ({ push() {}, replace() {}, refresh() {} }),
+  },
 });
 
 mock.module("next/link", {

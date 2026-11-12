@@ -21,7 +21,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 let pathname = "/";
 
 mock.module("next/navigation", {
-  namedExports: { usePathname: () => pathname },
+  namedExports: {
+    usePathname: () => pathname,
+    useRouter: () => ({ push() {}, replace() {}, refresh() {} }),
+  },
 });
 
 type LinkProps = {

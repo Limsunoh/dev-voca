@@ -44,10 +44,15 @@ mock.module("react", {
 
 /** router.push 로 간 곳. */
 const pushed: string[] = [];
+/** router.replace 로 간 곳. */
+const replaced: string[] = [];
 
 mock.module("next/navigation", {
   namedExports: {
-    useRouter: () => ({ push: (to: string) => pushed.push(to) }),
+    useRouter: () => ({
+      push: (to: string) => pushed.push(to),
+      replace: (to: string) => replaced.push(to),
+    }),
   },
 });
 
@@ -76,8 +81,14 @@ const listenerApi = (bag: Registered[]) => ({
 const PAGE = "http://localhost:3001/profile";
 
 class FakeElement {
+  /** 아래 탭(nav[data-tabbar])인가. */
+  tabbar = false;
   constructor(readonly parent: FakeElement | null = null) {}
   closest(selector: string): FakeElement | null {
+    if (selector === "[data-tabbar]") {
+      if (this.tabbar) return this;
+      return this.parent ? this.parent.closest(selector) : null;
+    }
     assert.equal(selector, "a[href]");
     if (this instanceof FakeAnchor && this.rawHref !== null) return this;
     return this.parent ? this.parent.closest(selector) : null;
@@ -89,9 +100,9 @@ class FakeAnchor extends FakeElement {
   attrs: Record<string, string> = {};
   constructor(
     readonly rawHref: string | null,
-    options: { target?: string; download?: boolean } = {},
+    options: { target?: string; download?: boolean; parent?: FakeElement } = {},
   ) {
-    super(null);
+    super(options.parent ?? null);
     if (options.target !== undefined) this.target = options.target;
     if (options.download) this.attrs.download = "";
   }
@@ -191,6 +202,7 @@ function click(target: unknown, over: Partial<FakeClick> = {}): FakeClick {
 
 beforeEach(() => {
   pushed.length = 0;
+  replaced.length = 0;
 });
 
 // ---------------------------------------------------------------------------
@@ -249,6 +261,62 @@ describe("dirty 일 때", () => {
     click(new FakeAnchor("/learn/words?page=2#top"));
     dialog.props.onConfirm();
     assert.deepEqual(pushed, ["/learn/words?page=2#top"]);
+  });
+
+  it("아래 탭이었으면 쌓지 않고 바꿔치기한다(지나온 기록에 없을 때)", () => {
+    // 쌓으면 [홈, 내정보, 홈] 이 되어 앱에서 홈의 뒤로 가기가 내정보로 간다.
+    // 지나온 기록에 있으면 그리로 돌아가는 것은 lib/history-nav 테스트가 본다.
+    mount(true);
+    const nav = new FakeElement();
+    nav.tabbar = true;
+    click(new FakeAnchor("/talk", { parent: nav }));
+    dialog.props.onConfirm();
+    assert.deepEqual(pushed, []);
+    assert.deepEqual(replaced, ["/talk"]);
+  });
+
+  it("아래 탭이 지나온 기록에 있으면 그 칸으로 돌아간다(쌓지도 바꿔치기하지도 않는다)", () => {
+    // 가장 흔한 길: 홈 -> 내정보(고치는 중) -> 홈 탭 -> 나가기. 홈이 첫 칸으로
+    // 남아야 앱에서 홈의 뒤로 가기가 앱을 닫는다.
+    const traversals: string[] = [];
+    const list = ["/", "/profile"].map((path, index) => ({
+      key: `k${index}`,
+      url: new URL(path, PAGE).href,
+      index,
+      sameDocument: true,
+    }));
+    const win = (globalThis as unknown as { window: Record<string, unknown> }).window;
+    win.navigation = {
+      entries: () => list,
+      currentEntry: list[1],
+      traverseTo: (key: string) => {
+        traversals.push(key);
+        return { committed: Promise.resolve(), finished: Promise.resolve() };
+      },
+    };
+    try {
+      mount(true);
+      const nav = new FakeElement();
+      nav.tabbar = true;
+      click(new FakeAnchor("/", { parent: nav }));
+      dialog.props.onConfirm();
+      assert.deepEqual(traversals, ["k0"]);
+      assert.deepEqual(pushed, []);
+      assert.deepEqual(replaced, []);
+    } finally {
+      delete win.navigation;
+    }
+  });
+
+  it("탭 다음에 누른 화면 안 링크는 다시 쌓는다(앞 클릭이 남지 않는다)", () => {
+    mount(true);
+    const nav = new FakeElement();
+    nav.tabbar = true;
+    click(new FakeAnchor("/talk", { parent: nav }));
+    click(new FakeAnchor("/board"));
+    dialog.props.onConfirm();
+    assert.deepEqual(pushed, ["/board"]);
+    assert.deepEqual(replaced, []);
   });
 
   it("두 번째로 누른 링크로 간다(앞 클릭이 남지 않는다)", () => {

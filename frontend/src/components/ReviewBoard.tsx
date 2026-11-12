@@ -15,6 +15,7 @@ import { fetchOrExplain, jsonOrExplain } from "@/lib/connection";
 import { routes } from "@/lib/routes";
 
 import { Burst } from "./Burst";
+import { HomeLink } from "./HomeLink";
 import { QuestionCard } from "./QuestionCard";
 import { WrongAnswer } from "./WrongAnswer";
 import { Reaction, verdictMs } from "./Reaction";
@@ -929,8 +930,7 @@ function DoneCard({
         >
           {busy ? "여는 중" : "이어서 더"}
         </button>
-        <Link
-          href={routes.home}
+        <HomeLink
           className="dv-btn inline-flex items-center justify-center rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:px-10"
           style={
             {
@@ -943,7 +943,7 @@ function DoneCard({
           }
         >
           홈으로
-        </Link>
+        </HomeLink>
       </div>
 
       {/* "이어서 더" 가 실패하는 흔한 경로가 있다 - 이번 판에서 남은

@@ -115,8 +115,13 @@ export default async function StartPage({
           style={{ color: "var(--text-muted)" }}
         >
           이미 계정이 있다면{" "}
+          {/* replace: 시작 화면을 기록에 남기지 않는다. 남으면 로그인한 뒤
+              뒤로 가기가 옛 시작 화면으로 돌아가고, 거기서 "게스트로 둘러보기"
+              를 누르면 방금 한 로그인이 풀린다(continueAsGuestAction). 로그인
+              화면에도 게스트로 둘러보는 길이 있어 막다른 곳은 아니다. */}
           <Link
             href="/login"
+            replace
             className="underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={{
               color: "var(--brand)",

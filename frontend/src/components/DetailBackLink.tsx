@@ -62,6 +62,10 @@ export function DetailBackLink({
   return (
     <Link
       href={href}
+      // 앞 기록이 목록이 아니면(공유받은 상세 주소로 앱을 열었다) 목록으로
+      // 바꿔치기한다. 쌓으면 목록에서 뒤로 가기가 상세로, 거기서 홈 탭을 누른
+      // 뒤에는 홈에서 뒤로 가기가 상세로 간다(lib/history-nav.ts).
+      replace
       className={className}
       style={style}
       onClick={(event) => {

@@ -33,7 +33,11 @@ const pushed: string[] = [];
 
 mock.module("next/navigation", {
   namedExports: {
-    useRouter: () => ({ push: (to: string) => pushed.push(to) }),
+    useRouter: () => ({
+      push: (to: string) => pushed.push(to),
+      replace: (to: string) => pushed.push(to),
+      refresh() {},
+    }),
     usePathname: () => "/test/words",
   },
 });

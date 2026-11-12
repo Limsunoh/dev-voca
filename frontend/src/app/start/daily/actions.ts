@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 
 import { updateMe } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
@@ -46,11 +46,13 @@ export async function saveDailyLengthAction(
   if (!stored) {
     // 내정보는 로그인해야 열리는 화면이다. 거기서 토큰이 거절됐으면 게스트로
     // 저장할 일이 아니라 다시 로그인할 일이다.
-    if (fromProfile) redirect("/login?next=/profile");
+    if (fromProfile) redirect("/login?next=/profile", RedirectType.replace);
     await setGuestDailyLength(length);
   }
 
   revalidatePath("/", "layout");
   if (fromProfile) return { saved: true };
-  redirect("/");
+  // 바꿔치기다. 공부량을 묻는 화면이 기록에 남으면 홈에서 뒤로 가기가 거기로
+  // 간다(lib/history-nav.ts).
+  redirect("/", RedirectType.replace);
 }

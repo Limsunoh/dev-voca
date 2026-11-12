@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import { traverseBackTo } from "@/lib/history-nav";
+
 import { LeaveConfirm } from "./LeaveConfirm";
 
 /**
@@ -46,6 +48,8 @@ export function useUnsavedGuard({
   const openRef = useRef<(() => void) | null>(null);
   /** 확인을 받으면 갈 곳. */
   const pendingRef = useRef("");
+  /** 그 링크가 아래 탭이었나. 탭은 기록을 쌓지 않는다(TabBar). */
+  const fromTabRef = useRef(false);
   /**
    * 창에서 "나가기" 를 눌렀나. 이동이 페이지를 내리는 쪽으로 떨어지면
    * (Next 밖 경로, 새 배포 뒤 등) beforeunload 창이 한 번 더 뜨는 것을 막는다.
@@ -93,6 +97,7 @@ export function useUnsavedGuard({
 
       event.preventDefault();
       pendingRef.current = url.pathname + url.search + url.hash;
+      fromTabRef.current = link.closest("[data-tabbar]") !== null;
       openRef.current?.();
     };
 
@@ -113,7 +118,15 @@ export function useUnsavedGuard({
       cancelLabel={cancelLabel}
       onConfirm={() => {
         leavingRef.current = true;
-        router.push(pendingRef.current);
+        // 아래 탭이었으면 탭처럼 간다. 지나온 기록에 그 화면이 있으면 돌아가고,
+        // 없으면 바꿔치기한다. 쌓으면 [홈, 내정보, 홈] 이 되어 앱(TWA)에서 홈의
+        // 뒤로 가기가 내정보로 간다(lib/history-nav.ts). 이 확인은 내정보에만
+        // 걸려서, 홈에서 나갈 때만 쌓는 탭의 규칙은 따로 볼 일이 없다.
+        if (!fromTabRef.current) {
+          router.push(pendingRef.current);
+        } else if (!traverseBackTo(new URL(pendingRef.current, window.location.href).pathname)) {
+          router.replace(pendingRef.current);
+        }
       }}
     />
   );

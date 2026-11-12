@@ -1,9 +1,8 @@
 "use client"; // 에러 경계는 클라이언트 컴포넌트여야 한다.
 
-import Link from "next/link";
 import { useEffect } from "react";
 
-import { routes } from "@/lib/routes";
+import { HomeLink } from "@/components/HomeLink";
 
 /**
  * 자기 error.tsx 가 없는 화면 전부의 마지막 방어선.
@@ -72,8 +71,7 @@ export default function RootError({
         >
           다시 시도
         </button>
-        <Link
-          href={routes.home}
+        <HomeLink
           className="dv-btn flex items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
@@ -88,7 +86,7 @@ export default function RootError({
           }
         >
           홈으로
-        </Link>
+        </HomeLink>
       </div>
     </main>
   );

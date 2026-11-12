@@ -20,6 +20,7 @@ mock.module("next/navigation", {
     redirect(to: string): never {
       throw new Error(`NEXT_REDIRECT ${to}`);
     },
+    RedirectType: { push: "push", replace: "replace" },
   },
 });
 
