@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass
+from datetime import date
 
 from django.core import signing
 from django.db import IntegrityError, transaction
@@ -51,7 +52,7 @@ from apps.vocab import quiz
 from apps.vocab.models import Sentence, Word
 
 from . import calendar_kst
-from .models import STUDY_PLANS, DailyStudy, ReviewState, StudyPlan
+from .models import STUDY_PLANS, DailyPreview, DailyStudy, ReviewState, StudyPlan
 from .record import add_daily_study, bump_review_states
 from .session import RECENT_KEEP, SessionError, _describe, make_question
 
@@ -116,6 +117,18 @@ def _fit_chunks(plan: StudyPlan, total: int, words: int) -> tuple[int, int]:
         # 묶음 크기보다 작은 판은 학습을 넣을 자리가 없다.
         return 0, 0
     return plan.chunk_size, count
+
+
+def _fit_plan(plan: StudyPlan) -> tuple[int, int, int]:
+    """지금 콘텐츠로 이 길이를 열면 (문제 수, 묶음 크기, 묶음 수).
+
+    시작(start)과 홈의 미리 뽑기(today_words)가 같이 쓴다. 따로 계산하면
+    콘텐츠가 적은 DB 에서 홈은 두 개를 보여주고 판은 학습 없이 열리는 식으로
+    갈린다.
+    """
+    total = min(plan.total, _answerable(plan))
+    chunk_size, chunk_count = _fit_chunks(plan, total, Word.objects.visible().count())
+    return total, chunk_size, chunk_count
 
 
 def today_of(user) -> DailyStudy | None:
@@ -202,10 +215,7 @@ def start(user, length: str) -> tuple[DailyStudy, str, dict]:
     if make_question([], []) is None:
         raise SessionError("낼 수 있는 문제가 없습니다.")
 
-    total = min(plan.total, _answerable(plan))
-    chunk_size, chunk_count = _fit_chunks(
-        plan, total, Word.objects.visible().count()
-    )
+    total, chunk_size, chunk_count = _fit_plan(plan)
 
     try:
         with transaction.atomic():
@@ -558,16 +568,122 @@ def issue_chunk(study: DailyStudy) -> list[Word]:
 def _pick_for_study(study: DailyStudy) -> list[Word]:
     """이번 묶음에 학습할 단어를 고른다.
 
+    첫 묶음은 홈이 "오늘의 단어" 로 미리 보여준 것이다(preview_words). 홈에서
+    본 단어와 일일공부에서 배우는 단어가 다르면 공부량이 두 배가 된다.
+
+    그 뒤 묶음은 이번 판에서 이미 학습한 것을 빼고 새로 고른다. 안 빼면 앞
+    묶음에서 본 단어가 다음 묶음에 또 나오는데, 그건 복습이 아니라 버그로
+    보인다.
+    """
+    if study.issued_chunks == 0:
+        return preview_words(study.user_id, study.day, study.chunk_size)
+    return _pick_words(study.user_id, study.chunk_size, set(study.learned_ids))
+
+
+def today_words(user, study: DailyStudy | None) -> list[Word]:
+    """홈의 오늘의 단어. study 는 today_of(user) 결과를 그대로 넘긴다.
+
+    시작했으면 오늘 배운 단어(learned_ids)다. 시작 전이면 그 사람의 하루
+    공부량으로 첫 묶음을 미리 뽑아 둔다 - 시작하면 정확히 이것으로 첫 묶음을
+    낸다(_pick_for_study).
+
+    빈 목록이면 홈은 날짜로 고른 단어를 그린다. 하루 공부량을 아직 안
+    골랐거나, 콘텐츠가 적어 학습 없이 여는 판이거나, 시작했는데 학습분이 없는
+    판(학습 단계가 생기기 전 판)일 때다.
+
+    홈을 연 것만으로 "시작한 것" 이 되지 않는다. DailyStudy 행을 만들지 않고
+    점수판(DailyScore)도 건드리지 않는다.
+    """
+    if study is not None:
+        return _words_in_order(study.learned_ids)
+
+    plan = STUDY_PLANS.get(user.daily_length)
+    if plan is None:
+        return []
+    _total, chunk_size, _count = _fit_plan(plan)
+    return preview_words(user.pk, calendar_kst.today(), chunk_size)
+
+
+def preview_words(user_id: int, day: date, size: int) -> list[Word]:
+    """그날 첫 묶음 size 개. 미리 뽑아 둔 것을 앞에서부터 쓰고, 모자라면 채운다.
+
+    홈(today_words)과 시작(_pick_for_study)이 같이 부른다. 두 자리가 같은
+    함수를 지나야 홈에서 본 단어로 첫 묶음이 시작된다.
+
+    저장한 목록이 바뀌는 경우 둘:
+    - 뽑은 뒤 검수가 취소됐다. 그 단어는 목록에서 빼고(visible()), 모자라면
+      새로 채운다. 다시 검수돼도 원래 자리로 돌아오지 않는다 - 돌아오면 홈의
+      순서가 밀린다. 나중에 모자란 자리를 채울 때 새 후보로 다시 뽑힐 수는
+      있는데, 그때는 맨 뒤에 붙어 앞 순서가 그대로다.
+    - 뽑은 뒤 하루 공부량을 바꿔 묶음이 커졌다(5분 2개 → 10분 5개). 앞의
+      두 개는 그대로 두고 세 개를 더한다. 반대로 작아지면 앞에서부터 자르되
+      저장한 것은 그대로 둔다(다시 커지면 같은 단어가 돌아온다).
+    바뀐 목록은 저장한다. 안 하면 홈과 시작이 각자 다른 것으로 채운다.
+
+    쓰기는 조건부다. 동시에 홈을 두 번 열면 줄 만들기는 (user, day) 유일
+    제약이, 고쳐 쓰기는 "읽은 목록 그대로일 때만 바꾸기" 가 하나로 지킨다.
+    진 쪽은 처음부터 다시 읽는다. 이긴 쪽이 더 작은 묶음으로 채웠으면 진 쪽이
+    모자란 만큼 다시 채워야 한다 - 그냥 자르기만 하면 시작한 판이 첫 묶음을
+    못 채워 그날 학습이 통째로 꺼진다(issue_chunk 의 부분 묶음 처리).
+
+    자정 직전에 홈을 보고 자정 뒤에 시작하면 다른 날 줄이라 다른 단어가
+    나온다. 날짜가 바뀌었으니 맞는 동작이다.
+    """
+    if size < 1:
+        return []
+
+    # 다시 읽기는 경합에서 졌을 때만 일어난다. 세 번이면 충분하다 - 매번 지려면
+    # 다른 요청이 그 사이마다 같은 줄을 고쳐 써야 한다.
+    kept: list[Word] = []
+    for _attempt in range(3):
+        row = DailyPreview.objects.filter(user_id=user_id, day=day).first()
+        if row is None:
+            picked = _pick_words(user_id, size, set())
+            row, created = DailyPreview.objects.get_or_create(
+                user_id=user_id,
+                day=day,
+                defaults={"word_ids": [w.pk for w in picked]},
+            )
+            if created:
+                # 지난날 줄은 더 읽을 일이 없다. 하루 한 번 여기서 지워 사람마다
+                # 한 줄만 남긴다.
+                DailyPreview.objects.filter(user_id=user_id, day__lt=day).delete()
+                return picked
+
+        words = _words_in_order(row.word_ids)
+        # 지금 목록에 든 것(방금 검수가 취소돼 뺄 것 포함)은 다시 고르지 않는다.
+        extra = (
+            _pick_words(user_id, size - len(words), set(row.word_ids))
+            if len(words) < size
+            else []
+        )
+        kept = words + extra
+        ids = [w.pk for w in kept]
+        if ids == row.word_ids:
+            return kept[:size]  # 바뀐 것이 없다. 쓰지 않는다
+
+        if DailyPreview.objects.filter(pk=row.pk, word_ids=row.word_ids).update(
+            word_ids=ids
+        ):
+            return kept[:size]
+        # 그 사이 다른 요청이 고쳐 썼거나(채우기, 자정의 지난 줄 지우기) 줄이
+        # 사라졌다. 처음부터 다시 읽는다.
+
+    # 마지막에 계산한 묶음을 저장하지 않고 돌려준다. 저장된 줄을 읽어 주면
+    # 그것이 묶음보다 짧을 때 시작한 판의 학습이 꺼진다. 홈과 한 번 어긋나는
+    # 쪽이 판을 잃는 쪽보다 작다.
+    logger.warning("오늘의 단어 줄 고쳐 쓰기에서 계속 졌습니다. user=%s day=%s", user_id, day)
+    return kept[:size]
+
+
+def _pick_words(user_id: int, size: int, seen: set[int]) -> list[Word]:
+    """학습할 단어 size 개를 고른다. seen 에 든 것은 고르지 않는다.
+
     틀린 것 > 안 본 것 > 오래된 것 순이다. 복습 화면이 쓰는 정렬과
     같다(review.py). 거기서 이미 "지금 모르는 것" 을 그 순서로 정의했고,
     학습이 다른 순서를 쓰면 두 화면이 서로 다른 것을 "모르는 것" 이라
     부르게 된다.
-
-    이번 판에서 이미 학습한 것은 뺀다. 안 빼면 앞 묶음에서 본 단어가
-    다음 묶음에 또 나오는데, 그건 복습이 아니라 버그로 보인다.
     """
-    seen = set(study.learned_ids)
-
     # 이 사람의 복습 상태. 없는 단어는 "안 본 것" 이라 뒤에서 채운다.
     #
     # 모델 객체 대신 필요한 세 값만 읽는다. 한 판에 여섯 번까지 부르는
@@ -576,7 +692,7 @@ def _pick_for_study(study: DailyStudy) -> list[Word]:
     states = {
         target_id: (is_wrong, last_correct_at)
         for target_id, is_wrong, last_correct_at in ReviewState.objects.filter(
-            user_id=study.user_id, target_type=quiz.TARGET_WORD
+            user_id=user_id, target_type=quiz.TARGET_WORD
         ).values_list("target_id", "is_wrong", "last_correct_at")
     }
 
@@ -594,10 +710,10 @@ def _pick_for_study(study: DailyStudy) -> list[Word]:
         picked.extend(
             Word.objects.visible()
             .filter(pk__in=wrong_ids)
-            .order_by("?")[: study.chunk_size]
+            .order_by("?")[:size]
         )
 
-    need = study.chunk_size - len(picked)
+    need = size - len(picked)
     if need < 1:
         return picked
 
@@ -611,7 +727,7 @@ def _pick_for_study(study: DailyStudy) -> list[Word]:
         Word.objects.visible().exclude(pk__in=known).order_by("?")[:need]
     )
 
-    need = study.chunk_size - len(picked)
+    need = size - len(picked)
     if need < 1:
         return picked
 
@@ -639,7 +755,7 @@ def _pick_for_study(study: DailyStudy) -> list[Word]:
         }
         picked.extend(found[pk] for pk in old_ids if pk in found)
 
-    return picked[: study.chunk_size]
+    return picked[:size]
 
 
 def _study_scope(study: DailyStudy) -> list[int] | None:

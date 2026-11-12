@@ -1,5 +1,6 @@
 import { request } from "./client";
 import type { RoundChoice, RoundQuestion, RoundResult } from "./rounds";
+import { getDailyWords, HOME_WORDS, type WordListItem } from "./vocab";
 
 /**
  * 일일공부. 공통 규칙은 client.ts 에 있다.
@@ -96,6 +97,15 @@ export type DailyStatus = {
    * 되돌리기를 막을 이유가 없고, 막지 않으면 왕복만 늘어난다.
    */
   learning: StudyCard[];
+  /**
+   * 홈의 오늘의 단어. 시작 전이면 오늘 일일공부 첫 묶음을 서버가 미리 뽑아
+   * 둔 것이고(시작하면 정확히 이것으로 첫 묶음이 나온다), 시작했으면 오늘
+   * 배운 단어다. 위 learning 과 다르다 - 저기는 지금 넘길 카드다.
+   *
+   * 비어 있으면 홈은 날짜로 고른 단어를 그린다(pickTodayWords). 이 칸이
+   * 생기기 전 백엔드(배포가 엇갈린 사이)는 안 보내므로 없을 수 있다.
+   */
+  today_words?: StudyCard[];
 };
 
 export type DailyStarted = {
@@ -130,6 +140,34 @@ export function startDaily(
     method: "POST",
     body: { length },
     token,
+  });
+}
+
+/** 홈과 단어 상세가 오늘의 단어로 그리는 칸. 학습 카드와 단어 목록 둘 다 갖는다. */
+export type TodayWord = Pick<
+  WordListItem,
+  "id" | "term" | "pronunciation" | "reading" | "meaning"
+>;
+
+/**
+ * 오늘의 단어 묶음. 홈과, 홈에서 연 단어 상세(이전 / n / 다음)가 같이 쓴다.
+ * 두 화면이 각자 고르면 상세에서 넘기는 순서가 홈과 달라진다.
+ *
+ * 로그인한 사람은 일일공부 상태가 실어 준 today_words 다. 홈에서 본 단어로
+ * 일일공부가 시작된다(사용자 결정 11-12: "둘이 다르면 오늘의 단어를 왜 보나").
+ * 없거나 비었으면 날짜로 고른 단어다 - 게스트, 하루 공부량을 아직 안 고른
+ * 사람, 미리 뽑기가 실패한 경우다. 홈은 어떤 경우에도 단어를 그려야 한다.
+ *
+ * 홈이 깔 수 있는 만큼(HOME_WORDS)만 쓴다. 30분 공부를 마치면 오늘 배운 단어가
+ * 서른 개라 홈이 카드 더미가 된다.
+ */
+export async function pickTodayWords(
+  own: StudyCard[] | null | undefined,
+): Promise<TodayWord[]> {
+  if (own && own.length > 0) return own.slice(0, HOME_WORDS);
+  return getDailyWords(HOME_WORDS).catch((error: unknown) => {
+    console.error("오늘의 단어를 불러오지 못했습니다.", error);
+    return [];
   });
 }
 

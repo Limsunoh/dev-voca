@@ -75,13 +75,40 @@ export function toTalkScene(value: unknown): TalkScene {
   return talkScenes.find((scene) => scene === value) ?? "";
 }
 
+/**
+ * 상세 주소의 today 값(`57-939-576`)을 단어 번호 목록으로 읽는다. 아니면 빈 목록.
+ *
+ * 주소창으로 아무 값이나 넣을 수 있는 자리라 양의 정수만 받고 max 개에서 자른다.
+ * 넘기는 줄은 이 번호로 링크만 만들고, 단어는 상세가 따로 받는다(검수 안 된
+ * 번호는 상세가 404).
+ *
+ * 예전 주소(`today=1`)는 [1] 이 된다. 되돌아가기는 홈이지만 넘길 곳이 없어
+ * 줄은 안 그린다.
+ */
+export function parseTodayIds(
+  raw: string | string[] | undefined,
+  max: number,
+): number[] {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value || !/^[1-9]\d{0,9}(-[1-9]\d{0,9})*$/.test(value)) return [];
+  // 같은 번호가 두 번 오면(손으로 고친 주소) 넘기다가 같은 자리로 돌아온다.
+  return [...new Set(value.split("-").map(Number))].slice(0, max);
+}
+
 export const routes = {
   home: "/",
   words: "/learn/words",
   wordDetail: (id: number | string) => `/learn/words/${id}`,
-  // 홈의 오늘의 개발영어에서 연 상세. 상세가 이 표시를 보고 묶음 안에서
-  // 이전·다음으로 넘기는 줄을 그리고, 되돌아가기를 홈으로 보낸다.
-  todayWord: (id: number | string) => `/learn/words/${id}?today=1`,
+  // 홈의 오늘의 단어에서 연 상세. 홈이 보여준 묶음의 순서(ids)를 주소에 싣는다.
+  // 상세는 그 순서로 이전·다음 줄을 그리고, 되돌아가기를 홈으로 보낸다.
+  //
+  // 상세가 서버에 묶음을 다시 묻지 않게 하려는 것이다. 로그인한 사람의 묶음은
+  // 일일공부 상태(GET /api/learning/daily/)에서 오는데, 넘길 때마다 그것을 부르면
+  // 일일공부 시작과 같은 요청 한도(분당 30회)를 나눠 쓰고, 한도에 걸리면 홈이
+  // 날짜 단어로 바뀌어 홈과 일일공부가 다시 어긋난다. 주소에 실으면 홈에서 본
+  // 순서와 어긋날 일도 없다.
+  todayWord: (id: number | string, ids: readonly number[]) =>
+    `/learn/words/${id}?today=${ids.join("-")}`,
   sentences: "/learn/sentences",
   sentenceDetail: (id: number | string) => `/learn/sentences/${id}`,
   login: "/login",

@@ -94,6 +94,15 @@ Host 가 `healthcheck.railway.app` 이라 일반 뷰로 두면 400·301 이 된�
 - 제약(UniqueConstraint, CheckConstraint)을 새로 거는 것, 그리고 열을 고치는 `AlterField` 중
   비워 둘 수 없게 하거나(`null=True` 를 뺌) 길이를 줄이거나 형을 바꾸는 것도 같다. 옛 코드는 그 제약을
   모르고 어기는 값을 넣는다.
+- 회원(User)을 가리키는 새 표도 조심한다. Django 의 `on_delete=CASCADE` 는 DB 가 아니라
+  Django 가 지우는 것이라, 그 표를 모르는 옛 코드는 회원을 지울 때 그 줄을 남기고 외래 키에
+  걸려 계정 삭제가 500 이 된다. 새 코드가 그 표에 줄을 쓴 뒤 옛 코드가 회원을 지우는 경우다
+  (배포가 겹친 몇 초, 또는 이전 배포로 되돌렸을 때). 되돌릴 때는 새 코드 배포가 완전히
+  내려간 뒤(옛 배포가 요청을 받기 시작하고 Draining 30초가 지난 뒤) 그 표를 한 번 비운다.
+  그 전에 비우면 내려가는 새 코드가 받아 둔 요청으로 줄을 다시 쓴다. 옛 코드는 그 표에
+  쓰지 않으므로 한 번이면 된다. 비워도 되는 표인지는 모델 docstring 에
+  적는다. 지금은 `learning_dailypreview`(홈의 오늘의 단어, 비우면 다음에 다시 뽑는다)가
+  그렇다: `DELETE FROM learning_dailypreview;`
 
 ### release: 는 쓰지 않는다
 

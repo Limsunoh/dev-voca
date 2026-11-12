@@ -463,6 +463,54 @@ class DailyStudy(models.Model):
 
 
 
+class DailyPreview(models.Model):
+    """일일공부를 시작하기 전에 미리 뽑아 둔 첫 묶음. 홈이 "오늘의 단어" 로 보인다.
+
+    홈의 오늘의 단어와 일일공부 첫 묶음은 같은 단어여야 한다(11-12 사용자
+    결정). 달랐을 때 "오늘의 단어를 왜 보나, 공부량이 두 배" 라는 말을 들었다.
+    그래서 홈을 열 때 첫 묶음을 미리 뽑아 여기 두고, 시작하면 이것으로 첫
+    묶음을 낸다(daily_study.preview_words).
+
+    DailyStudy 에 두지 않는 이유: 저기는 행이 있으면 "오늘 시작했다" 다
+    (today_of, 하루 한 번 제약). 홈을 연 것만으로 그 행을 만들면 시작이
+    "이미 시작했습니다" 로 막히고 화면이 진행 중으로 그린다.
+
+    하루 한 줄이다. 동시에 홈을 두 번 열어도 (user, day) 유일 제약이 묶음을
+    하나로 지킨다. 새날 줄을 만들 때 그 사람의 지난 줄은 지운다 - 시작한
+    뒤로는 DailyStudy.learned_ids 를 보므로 지난 줄은 다시 읽을 일이 없다.
+
+    통째로 비워도 된다. 다음에 홈을 열면 다시 뽑는다. 배포를 되돌리면 새 코드
+    배포가 완전히 내려간 뒤 한 번 비운다 - 이 표를 모르는 옛 코드는 회원을
+    지울 때 이 줄을 안 지워 외래 키에 걸린다(DEPLOY.md "배포 확인").
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="daily_previews",
+        verbose_name="사용자",
+    )
+    day = models.DateField("날짜(KST)")
+
+    # 뽑은 순서 그대로다. 홈은 첫 단어를 큰 카드로, 나머지를 아래 목록으로
+    # 그리고, 시작하면 앞에서부터 묶음 크기만큼 쓴다.
+    word_ids = models.JSONField("뽑은 단어 id", default=list, blank=True)
+
+    created_at = models.DateTimeField("뽑은 때", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "오늘의 단어(일일공부 첫 묶음)"
+        verbose_name_plural = "오늘의 단어(일일공부 첫 묶음)"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "day"], name="learning_dailypreview_user_day_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.day} ({len(self.word_ids)}개)"
+
+
 class ReviewState(models.Model):
     """한 사람이 한 항목(단어/문장)을 얼마나 익혔는지.
 

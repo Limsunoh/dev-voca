@@ -19,7 +19,6 @@ import threading
 import unittest
 from contextlib import contextmanager
 from datetime import timedelta
-from types import SimpleNamespace
 from unittest import mock
 
 from django.core import signing
@@ -744,15 +743,20 @@ class DownstreamListsTest(PracticeCase):
         with self.assertRaises(SessionError):
             review.start(self.user)
 
-    def _study(self):
-        return SimpleNamespace(user_id=self.user.pk, learned_ids=[], chunk_size=1)
+    def _pick(self):
+        # 일일공부가 단어를 고르는 규칙(틀린 것 > 안 본 것 > 오래된 것)을 직접 본다.
+        # _pick_for_study 는 첫 묶음이면 홈이 미리 뽑아 둔 것을 쓰므로(preview_words)
+        # 여기서 보려는 순서를 지나지 않는다. 그래서 홈을 연 뒤 연습에서 틀린
+        # 단어는 그날 첫 묶음에는 안 들어오고, 다음 묶음과 다음 날 미리 뽑기부터
+        # 앞에 온다. 홈에서 본 단어로 시작하자는 결정(11-12) 그대로다.
+        return daily_study._pick_words(self.user.pk, 1, set())
 
     def test_wrong_practice_is_picked_first_for_daily_study(self):
         self.grade(self.wrong_pick)
 
         for _ in range(5):
             self.assertEqual(
-                [w.pk for w in daily_study._pick_for_study(self._study())],
+                [w.pk for w in self._pick()],
                 [self.word.pk],
             )
 
@@ -763,7 +767,7 @@ class DownstreamListsTest(PracticeCase):
         for _ in range(5):
             self.assertNotIn(
                 self.word.pk,
-                [w.pk for w in daily_study._pick_for_study(self._study())],
+                [w.pk for w in self._pick()],
             )
 
     def test_wrong_sentence_does_not_pull_the_same_numbered_word_into_daily(self):
@@ -778,7 +782,7 @@ class DownstreamListsTest(PracticeCase):
         self.grade(others[0].pk, token=token, url=SENTENCE_GRADE)
 
         picks = {
-            tuple(w.pk for w in daily_study._pick_for_study(self._study()))
+            tuple(w.pk for w in self._pick())
             for _ in range(25)
         }
 

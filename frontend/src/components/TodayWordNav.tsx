@@ -3,13 +3,15 @@ import Link from "next/link";
 import { routes } from "@/lib/routes";
 
 /**
- * 오늘의 개발영어 묶음 안에서 앞뒤로 넘기는 줄. 단어 상세 맨 아래에 둔다.
+ * 오늘의 단어 묶음 안에서 앞뒤로 넘기는 줄. 단어 상세 맨 아래에 둔다.
  *
- * 홈은 오늘의 단어 하나와 아래 여섯 개를 한 묶음으로 보여준다. 이 줄이 없으면
- * 한 단어를 읽은 뒤 다음 것을 보려고 홈으로 돌아가 다시 골라야 한다.
+ * 홈은 오늘의 단어 하나와 그 아래 몇 개를 한 묶음으로 보여준다(로그인했으면
+ * 일일공부 단어 2~7개, 게스트는 7개). 이 줄이 없으면 한 단어를 읽은 뒤 다음
+ * 것을 보려고 홈으로 돌아가 다시 골라야 한다. 묶음의 순서는 홈이 주소에
+ * 실어 준다(routes.todayWord).
  *
- * 넘길 때 방문 기록을 쌓지 않는다(replace). 일곱 개를 다 넘긴 뒤 뒤로 가기를
- * 일곱 번 눌러야 홈에 닿으면 안 된다. 한 번이면 묶음에 들어오기 전 화면이다.
+ * 넘길 때 방문 기록을 쌓지 않는다(replace). 다 넘긴 뒤 뒤로 가기를 묶음
+ * 개수만큼 눌러야 홈에 닿으면 안 된다. 한 번이면 묶음에 들어오기 전 화면이다.
  */
 export function TodayWordNav({
   words,
@@ -20,20 +22,21 @@ export function TodayWordNav({
 }) {
   const previous = words[index - 1];
   const next = words[index + 1];
+  const ids = words.map((one) => one.id);
 
   return (
     <nav
       aria-label="오늘의 개발영어"
       className="rise mt-5 flex items-center gap-2.5 [animation-delay:400ms]"
     >
-      <Step word={previous} side="previous" />
+      <Step word={previous} side="previous" ids={ids} />
       <p
         className="min-w-16 shrink-0 text-center text-sm tabular-nums"
         style={{ color: "var(--text-muted)", fontWeight: "var(--weight-bold)" }}
       >
         {index + 1} / {words.length}
       </p>
-      <Step word={next} side="next" />
+      <Step word={next} side="next" ids={ids} />
     </nav>
   );
 }
@@ -42,9 +45,12 @@ export function TodayWordNav({
 function Step({
   word,
   side,
+  ids,
 }: {
   word: { id: number } | undefined;
   side: "previous" | "next";
+  /** 묶음 순서. 넘긴 상세도 같은 순서를 주소에 싣는다. */
+  ids: number[];
 }) {
   const content =
     side === "previous" ? (
@@ -81,7 +87,7 @@ function Step({
 
   return (
     <Link
-      href={routes.todayWord(word.id)}
+      href={routes.todayWord(word.id, ids)}
       replace
       className={`dv-btn ${shape} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus`}
       style={

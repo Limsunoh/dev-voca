@@ -2,15 +2,25 @@ import Link from "next/link";
 
 import { ProgressDots, StatCard } from "@/components/StatCard";
 import { ApiError } from "@/lib/api/client";
-import { fetchDailyStatus, type StudyProgress } from "@/lib/api/daily";
+import {
+  fetchDailyStatus,
+  type StudyCard,
+  type StudyProgress,
+} from "@/lib/api/daily";
 import { fetchDue, type ReviewDue } from "@/lib/api/review";
 import { dailyLengthLabel } from "@/lib/daily-length";
 import { routes } from "@/lib/routes";
 
-/** 카드 두 장이 그릴 값. loadToday 가 채운다. */
+/** 카드 두 장이 그릴 값과 홈의 오늘의 단어. loadToday 가 채운다. */
 export type Today = {
   daily: StudyProgress | null;
   due: ReviewDue | null;
+  /**
+   * 홈의 오늘의 단어로 쓸 내 단어(일일공부 첫 묶음이나 오늘 배운 단어). 일일공부
+   * 상태와 같은 응답에 실려 와서 여기서 같이 받는다 - 따로 부르면 홈의 왕복이
+   * 하나 는다. 비어 있으면 홈은 날짜로 고른 단어를 쓴다(pickTodayWords).
+   */
+  words: StudyCard[];
 };
 
 /**
@@ -27,14 +37,18 @@ export type Today = {
  * 홈·허브를 열 때마다 두 줄씩 쌓여 진짜 오류가 묻힌다.
  */
 export async function loadToday(token: string | null): Promise<Today> {
-  if (!token) return { daily: null, due: null };
-  const [daily, due] = await Promise.all([
-    fetchDailyStatus(token)
-      .then((s) => s.today)
-      .catch(logUnlessRejected("일일공부 상태를 불러오지 못했습니다.")),
+  if (!token) return { daily: null, due: null, words: [] };
+  const [status, due] = await Promise.all([
+    fetchDailyStatus(token).catch(
+      logUnlessRejected("일일공부 상태를 불러오지 못했습니다."),
+    ),
     fetchDue(token).catch(logUnlessRejected("복습 개수를 불러오지 못했습니다.")),
   ]);
-  return { daily, due };
+  return {
+    daily: status?.today ?? null,
+    due,
+    words: status?.today_words ?? [],
+  };
 }
 
 /** 실패를 null 로 바꾸되, 토큰 거절(401)이 아니면 로그에 남긴다. */
@@ -53,9 +67,9 @@ function logUnlessRejected(message: string) {
  * 홈과 문제풀기 허브가 같은 카드를 쓴다. 두 벌로 그리면 "시작 전은
  * 글로 적는다", "볼 것이 없으면 비운다" 같은 판단이 한쪽에서만 바뀐다.
  *
- * 불러오기(loadToday)와 그리기를 나눈 이유: 홈은 이 둘을 오늘의 단어와
- * 동시에 받는다. 카드가 스스로 불러오면 홈이 단어를 다 받은 뒤에야
- * 요청이 떠서 왕복이 하나 늘어난다.
+ * 불러오기(loadToday)와 그리기를 나눈 이유: 홈은 이 응답에서 오늘의 단어까지
+ * 꺼내 쓰고, 그것을 인사 줄을 받는 요청과 동시에 띄운다. 카드가 스스로
+ * 불러오면 같은 일일공부 상태를 홈이 한 번 더 묻게 된다.
  */
 export function TodayCards({ daily, due }: Today) {
   return (

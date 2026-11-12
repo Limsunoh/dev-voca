@@ -22,8 +22,8 @@
  *      그리는 중이라 못 지운다).
  *   3. 일일공부·복습: 쿠키 토큰(getToken)으로 바로 묻는다. 토큰이 없거나
  *      백엔드가 401 이면 /login?next=... 로 보낸다. 다른 오류는 실패 화면.
- *   4. 오늘 카드(loadToday): 토큰이 없으면 묻지 않고 둘 다 null. 실패하면
- *      null 로 바꾸되 401 은 로그를 안 남기고 그 밖의 실패만 남긴다. 홈과
+ *   4. 오늘 카드(loadToday): 토큰이 없으면 묻지 않고 둘 다 null(오늘의 단어는
+ *      빈 배열). 실패하면 null 로 바꾸되 401 은 로그를 안 남기고 그 밖의 실패만 남긴다. 홈과
  *      문제풀기 허브(/test)는 getToken 을 그대로 넘긴다.
  */
 import assert from "node:assert/strict";
@@ -286,12 +286,12 @@ const isToday = (path: string) =>
 
 describe("오늘 카드(loadToday)", () => {
   it("토큰이 없으면 묻지 않고 둘 다 null", async () => {
-    assert.deepEqual(await loadToday(null), { daily: null, due: null });
+    assert.deepEqual(await loadToday(null), { daily: null, due: null, words: [] });
     assert.equal(calls.length, 0);
   });
 
   it("서버가 토큰을 거절하면(401) 둘 다 null 이고 로그를 안 남긴다", async () => {
-    assert.deepEqual(await loadToday(DEAD), { daily: null, due: null });
+    assert.deepEqual(await loadToday(DEAD), { daily: null, due: null, words: [] });
     assert.equal(calls.filter((c) => isToday(c.path)).length, 2);
     assert.deepEqual(logged, [], "죽은 토큰은 오류가 아니다 - 홈을 열 때마다 두 줄씩 쌓인다");
   });
@@ -299,7 +299,7 @@ describe("오늘 카드(loadToday)", () => {
   for (const mode of [500, "down"] as const) {
     it(`백엔드가 ${mode} 면 둘 다 null 이고 두 실패를 로그에 남긴다`, async () => {
       backend = mode;
-      assert.deepEqual(await loadToday(LIVE), { daily: null, due: null });
+      assert.deepEqual(await loadToday(LIVE), { daily: null, due: null, words: [] });
       assert.equal(logged.length, 2, JSON.stringify(logged));
     });
   }
