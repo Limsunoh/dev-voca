@@ -281,6 +281,10 @@ export function TalkBoard({
 
   function listen() {
     if (!prompt) return;
+    // 소리 듣기(카드의 SpeakButton)로 읽던 중이면 바로 멈춘다. 계속 읽으면
+    // 마이크가 폰 음성을 받아, 사람이 말한 것이 아니라 폰이 읽은 것을
+    // 채점한다. 듣는 동안은 카드가 버튼을 감춰(listening) 다시 누를 수 없다.
+    window.speechSynthesis?.cancel();
     // 건너뛰기·다음이 실패해 떠 있던 오류를 지운다. 안 지우면 새 결과
     // 옆에 지난 오류가 같이 남는다.
     setError(null);
@@ -354,6 +358,7 @@ export function TalkBoard({
         <TalkPromptCard
           prompt={prompt}
           wrongAt={result && !result.ok ? result.wrong_at : null}
+          listening={phase === "listening"}
         />
       )}
 

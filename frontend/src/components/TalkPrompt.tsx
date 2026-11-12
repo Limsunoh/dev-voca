@@ -2,19 +2,20 @@
 
 import { CategoryChip, DifficultyBadge } from "@/components/MetaBadge";
 import { Reading } from "@/components/Reading";
+import { SpeakButton } from "@/components/SpeakButton";
 import { alignParts } from "@/lib/talk-parts";
 import type { TalkPrompt as Prompt } from "@/lib/api/talk";
 
 /**
  * 읽을 것을 보여주는 카드.
  *
- * 본보기를 발음기호와 한글 발음으로 그린다. 소리로 들려주는 쪽
- * (speechSynthesis)은 주된 장치로 못 쓴다. 영어 음성이 하나도 설치돼 있지
- * 않은 기계가 있고, 그런 기계에서는 "들어보기" 가 눌러도 아무 일도 안 하는
- * 버튼이 된다.
+ * 본보기는 발음기호와 한글 발음이다. 이 두 칸은 검수까지 끝난 채로 DB 에
+ * 있다.
  *
- * 대신 이 두 칸은 검수까지 끝난 채로 DB 에 있다. 없는 것을 만들어내지 않고
- * 이미 있는 것을 쓴다.
+ * 소리 듣기 버튼(SpeakButton, 폰 음성)도 둔다(2026-11-12 운영자 요청). 이
+ * 화면은 사람이 소리내어 말하는 곳이라 글만 보고는 어떻게 소리내는지 모를 수
+ * 있다. 다만 주된 본보기는 여전히 위의 두 칸이다 - 영어 음성이 하나도 없는
+ * 기계가 있고, 그런 기계에서는 버튼이 숨는다(SpeakButton 머리말).
  */
 
 export function TalkPromptCard({
@@ -26,9 +27,23 @@ export function TalkPromptCard({
    * 빈 배열은 어긋난 자리가 없다는 뜻이다.
    */
   wrongAt,
+  /**
+   * 마이크로 듣는 중인가. 그동안은 소리 듣기 버튼을 감춘다.
+   *
+   * 듣는 중에 눌리면 폰이 읽은 소리를 마이크가 받아, 사람이 말한 것이 아니라
+   * 폰 음성을 채점한다(거의 늘 통과로 나온다).
+   *
+   * 지우지 않고 감추는(invisible) 이유: 자리는 그대로 두고 누를 수도, 초점을
+   * 받을 수도, 화면 낭독기가 읽을 수도 없게 한다. 지우면 글자 200%(버튼이
+   * 줄을 차지하는 폭)에서 읽을 때마다 카드가 56px 줄었다 늘어 아래 버튼이
+   * 출렁이고, 영어 음성이 없는 기기에서는 다시 만들어진 버튼이 1.5초 보였다
+   * 숨는다. 읽던 소리는 TalkBoard 의 listen() 이 먼저 멈춘다.
+   */
+  listening = false,
 }: {
   prompt: Prompt;
   wrongAt?: number[] | null;
+  listening?: boolean;
 }) {
   // 셋(글자·발음기호·한글발음)을 낱말 단위로 짝짓는다. 하나라도 개수가
   // 어긋나면 null 이고, 그때는 쪼개지 않고 그린다. 엉뚱한 자리를 강조하면
@@ -43,7 +58,7 @@ export function TalkPromptCard({
 
   return (
     <section
-      className="grid gap-3 p-6 text-center"
+      className="relative grid gap-3 p-6 text-center"
       style={{
         background: "var(--paper)",
         borderRadius: "var(--radius-2xl)",
@@ -65,7 +80,10 @@ export function TalkPromptCard({
 
           목록 카드가 분류를 그리는 그 칩이다. 이 카드에서는 누를 곳이
           없어서 링크 없이 쓴다. */}
-      <p className="flex flex-wrap items-center justify-center gap-2">
+      {/* px-10: 오른쪽 위 소리 버튼(아래)과 겹치지 않게 양옆을 비운다. 한쪽만
+          비우면 배지가 가운데에서 비켜 보인다. 화면이 좁아 버튼이 줄로 내려가면
+          (max-[20rem], 아래 주석) 비울 필요가 없다. */}
+      <p className="flex flex-wrap items-center justify-center gap-2 px-10 max-[20rem]:px-0">
         <DifficultyBadge
           level={prompt.difficulty}
           label={prompt.difficulty_label}
@@ -110,6 +128,32 @@ export function TalkPromptCard({
             ))
           : prompt.term}
       </p>
+
+      {/* 소리 듣기. 카드 오른쪽 위 구석, 배지와 같은 줄에 띄워 둔다.
+
+          줄을 따로 두지 않는 이유: 카드가 44px 버튼 한 줄만큼 길어지면 세로가
+          짧은 폰(375x667, 폴드 8 접은 416x657)에서 주 버튼 "읽기" 가 아래
+          탭바 밑으로 밀려 스크롤해야 보인다. 띄워 두면 카드 높이가 그대로다.
+
+          화면 폭이 20rem(320px) 아래면 띄우지 않고 읽을 글자 아래 가운데에
+          한 줄로 둔다. 폰 글자 크기 200% 는 페이지 확대라 360폭 폰이 180px
+          폭으로 그려진다(CODE_INSIGHTS 11-12). 그 폭에서 띄워 두면 배지에 남는
+          자리가 20px 뿐이라 난이도 배지가 버튼 밑으로 들어간다. 그 크기에서는
+          어차피 화면이 스크롤되니 줄을 하나 쓰는 편이 낫다. 우리가 보는 폰은
+          가장 좁은 것이 360px 이라 평소에는 띄운 채다.
+
+          화면 낭독기 순서는 읽을 글자 바로 뒤라 "이것을 듣기" 로 이어진다.
+
+          key 로 문제마다 새로 만든다. 같은 버튼을 다음 문제에 그대로 쓰면
+          읽던 앞 문제 소리가 다음 문제 위에서 계속 나온다. 새로 만들면
+          앞 버튼이 사라지며 읽던 것을 멈춘다(SpeakButton 의 정리 단계). */}
+      <div
+        className={`absolute top-4 right-4 max-[20rem]:static max-[20rem]:flex max-[20rem]:justify-center${
+          listening ? " invisible" : ""
+        }`}
+      >
+        <SpeakButton key={prompt.id} text={prompt.term} label="발음 듣기" />
+      </div>
 
       {/* 발음기호는 받은 값을 그대로 그린다. 이 저장소의 다섯 화면이 이미
           그렇게 그리고 있어서(슬래시째) 여기서만 벗기면 어긋난다.
