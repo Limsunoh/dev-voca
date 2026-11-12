@@ -66,7 +66,7 @@ export default function RootLayout({
       className={`${notoSansKr.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
       {/* 탭바가 가리는 만큼의 여백은 여기가 아니라 TabBar 자신이 만든다.
-          여기에 두면 탭바가 없는 화면(문제풀이·로그인)에도 5rem 이 남아,
+          여기에 두면 탭바가 없는 화면(문제풀이·로그인)에도 5.5rem 이 남아,
           게임 화면 아래에 아무것도 없는 띠가 생긴다. 탭바가 자기 자리를
           스스로 비우면 숨는 조건이 늘어도 여기를 같이 고칠 일이 없다. */}
       <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
