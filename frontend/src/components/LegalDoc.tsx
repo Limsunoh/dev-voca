@@ -7,10 +7,34 @@ export type LegalSection = { id: string; title: string; body: ReactNode };
 
 // 가입할 때 저장하는 backend/apps/accounts/models.py 의 TERMS_VERSION 과 같아야
 // 누가 어느 문서에 동의했는지 가릴 수 있다. 어긋나면 테스트가 실패한다.
-export const DOC_VERSION = "v2";
+// 약관과 처리방침이 버전 하나를 같이 쓴다. v3 은 처리방침만 바뀌었다.
+export const DOC_VERSION = "v3";
 
-// 시행일은 화면을 올리는 날이다.
+// 약관 시행일. 시행일은 화면을 올리는 날이다.
 export const EFFECTIVE_DATE = "2026년 11월 9일";
+
+/**
+ * 처리방침을 마지막으로 바꾼 공고일과 시행일(한국 시간, YYYY-MM-DD).
+ *
+ * 처리방침 14절이 "바꾸면 시행 7일 전부터 서비스 화면에 알린다" 고 약속한다.
+ * 그래서 머지하는 날을 공고일로, 그 7일 뒤를 시행일로 두고, 시행일 전까지 홈에
+ * 알림을 띄운다(PolicyNotice). 다음에 처리방침을 바꿀 때도 이 두 날짜만 고치면
+ * 알림이 다시 뜬다.
+ *
+ * v3 의 시행일은 서버가 운영 로그에 오류 메시지를 싣기 시작하는 날
+ * (backend/apps/accounts/error_mail.py 의 MESSAGE_FROM)과 같아야 한다. 어긋나면
+ * 테스트가 실패한다.
+ */
+export const PRIVACY_CHANGE = {
+  announced: "2026-11-12",
+  effective: "2026-11-19",
+};
+
+/** "2026-11-19" 를 "2026년 11월 19일" 로. 문서의 다른 날짜와 같은 꼴이다. */
+export function koreanDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return `${year}년 ${month}월 ${day}일`;
+}
 
 const CONTACT = "vhtmxjooo@gmail.com";
 
@@ -32,6 +56,7 @@ export function LegalDoc({
   sections,
   other,
   showVersion = true,
+  effectiveDate = EFFECTIVE_DATE,
 }: {
   title: string;
   intro?: ReactNode;
@@ -39,6 +64,8 @@ export function LegalDoc({
   other: { href: string; label: string };
   /** 동의를 받는 문서(처리방침·약관)만 버전을 보인다. 안내 글에는 없다. */
   showVersion?: boolean;
+  /** 버전 줄의 시행일. 처리방침은 약관과 따로 바뀌어 자기 날짜를 넘긴다. */
+  effectiveDate?: string;
 }) {
   return (
     <main
@@ -68,7 +95,7 @@ export function LegalDoc({
       </h1>
       {showVersion && (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          버전 {DOC_VERSION} · 시행일 {EFFECTIVE_DATE}
+          버전 {DOC_VERSION} · 시행일 {effectiveDate}
         </p>
       )}
       {intro}
