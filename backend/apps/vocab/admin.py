@@ -24,6 +24,9 @@ class WordAdmin(admin.ModelAdmin):
         # 허용되지만(아직 안 정한 것) 과목 필터로는 찾을 수 없다.
         "is_exam",
         "exam_subject",
+        # 대량 생성분("AI 생성(일괄)")만 골라 검수하는 데 쓴다. 수천 개가 기존
+        # 검수 대기와 섞이면 찾을 수가 없다.
+        "source",
     )
     search_fields = ("term", "meaning", "aliases", "description")
     list_editable = ("is_reviewed", "reading_reviewed")
@@ -118,6 +121,8 @@ class SentenceAdmin(admin.ModelAdmin):
         # 단어 쪽과 같은 이유. 위 WordAdmin 주석 참고.
         "is_exam",
         "exam_subject",
+        # 단어 쪽과 같은 이유.
+        "source",
     )
     search_fields = ("text", "translation", "context", "description")
     list_editable = ("is_reviewed", "reading_reviewed")
@@ -197,8 +202,17 @@ class DailyPhraseAdmin(admin.ModelAdmin):
         "difficulty",
         "is_reviewed",
     )
-    list_filter = ("is_reviewed", "scene", "difficulty")
+    # source: 대량 생성분만 골라 검수할 때(단어 쪽과 같은 이유).
+    list_filter = ("is_reviewed", "scene", "difficulty", "source")
     search_fields = ("text", "meaning")
+    actions = ["mark_reviewed"]
+
+    # 단어·문장 쪽과 같은 이유로 change 권한을 요구한다(WordAdmin 주석).
+    # 일상 표현은 칸 단위 발음 게이트가 없어 이 한 칸이 노출을 정한다.
+    @admin.action(description="선택한 일상 표현을 검수 완료로 표시", permissions=["change"])
+    def mark_reviewed(self, request, queryset):
+        updated = queryset.update(is_reviewed=True)
+        self.message_user(request, f"{updated}개 일상 표현을 검수 완료로 표시했습니다.")
     list_editable = ("is_reviewed",)
     readonly_fields = ("created_at", "updated_at")
 
