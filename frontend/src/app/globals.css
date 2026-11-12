@@ -197,7 +197,7 @@
   --radius-xl: 22px; /* 보기 버튼 */
   --radius-2xl: 26px; /* 카드 */
   --radius-sheet: 30px; /* 하단 시트 */
-  --radius-pill: 9999px; /* 칩, 주요 버튼 */
+  --radius-pill: 9999px; /* 주요 버튼, 한 줄로 고정한 칩. 줄을 바꾸는 칩은 한 줄 높이의 절반(FilterChip·CategoryChip) */
 
   /* ---- 치수 ---- */
   --gutter: 1.125rem; /* 화면 좌우 18px */
