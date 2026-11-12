@@ -5,8 +5,45 @@ Railway 기준. 다른 플랫폼도 대부분 같은 값이 필요하다.
 ## 시작 명령
 
 ```
-python backend/manage.py migrate --noinput && python backend/manage.py collectstatic --noinput && gunicorn --chdir backend config.wsgi --bind 0.0.0.0:$PORT --workers 2
+python backend/manage.py migrate --noinput && python backend/manage.py collectstatic --noinput && exec gunicorn --chdir backend config.wsgi --bind 0.0.0.0:$PORT --workers 2 --threads 4 --keep-alive 0
 ```
+
+`exec` 는 셸을 gunicorn 으로 바꿔 끼운다. 없으면 셸이 남아 Railway 의 종료 신호(SIGTERM)를
+받는데, 셸은 그것을 gunicorn 에 넘기지 않는다. 그러면 gunicorn 이 처리 중인 요청을 마치고
+스스로 내려가지 못하고, 아래 Draining Seconds 가 다 지나 강제로 꺼질 때까지 기다린다.
+
+`--keep-alive 0` 은 응답마다 연결을 닫는다. 스레드 방식은 기본으로 응답 뒤 연결을 2초
+열어 두는데, 앞의 Railway 프록시가 그 연결을 다시 쓰다가 닫히는 순간에 걸리면 502 가 날 수
+있다. 작업자 하나가 한 요청씩 받던 때는 늘 응답마다 닫았고 그 상태로 문제가 없었으므로 그대로
+둔다(gunicorn workers/gthread.py 의 handle_request 가 keepalive 가 0 이면 닫는다). 같은 값을
+새 연결이 첫 요청을 보내기까지 더 기다려 주는 시간으로도 쓰므로, 연결하고 5초 안에 요청을
+보내지 않으면 끊긴다(gthread.py 의 DEFAULT_WORKER_DATA_TIMEOUT). Railway 프록시가 연결하자마자
+보내는지는 확인하지 않았다. 다만 기본값 2초였어도 7초(기다리는 5초 + keep-alive 2초)에 끊겼으므로 0 때문에 새로 생긴 위험은
+작다. 배포 뒤 502 나 응답 지연이 보이면 이 값부터 본다.
+
+`--threads 4` 는 작업자(프로세스) 둘이 각각 스레드 넷으로 받게 한다. 없으면 한 번에
+두 요청만 처리해서, Gmail 발송(최악 24초)처럼 오래 기다리는 요청 둘이 겹치면 그동안
+다른 사람 요청이 다 멈춘다. 스레드로 바꿔도 되는지는 2026-11-12 에 봤다
+(backend/config/tests_threads.py 가 같은 꼴로 동시에 부른다).
+
+- 모듈 전역에 바뀌는 값이 없다. 정규식 `lru_cache` 는 스레드에 안전하다.
+- Gmail 은 보낼 때마다 새로 연결한다.
+- DB 연결은 Django 가 스레드마다 따로 잡는다. 평소 최대 2 x 4 = 8개이고, 배포 중에는
+  옛 배포 8개와 새 배포 8개가 겹쳐 최대 16개다(새 배포의 migrate 는 gunicorn 이 뜨기 전에 끝난다). Railway Postgres 기본 상한(100) 안이다.
+- 오류 알림 메일은 횟수 세기를 자기 잠금으로 지키고, 로깅의 처리기 잠금은 일부러 쓰지
+  않는다(error_mail.py 의 handle). 쓰면 메일 한 통을 보내는 동안(최악 24초) 같은
+  프로세스의 다른 500 응답이 함께 멈춘다.
+- 요청 제한(DRF 스로틀)은 카운터를 읽고 다시 쓰는 사이가 원자적이지 않다. 동시에 들어온
+  요청은 같은 값을 읽어 하나로 세어질 수 있고, 동시에 받는 수가 2에서 8로 늘어 그
+  틈도 커졌다. 한꺼번에 몰아 보내면 "1분에 10번" 이 그보다 느슨해진다.
+
+스레드로 바꾸면 gunicorn 이 30초 넘은 요청을 끊지 않는다. 작업자 하나가 한 요청만 받을 때는
+그 요청이 30초를 넘기면 작업자가 "멈췄다" 고 보고 다시 띄웠지만, 스레드 방식에서는 다른
+스레드가 계속 살아 있다고 알린다. 오래 멈춘 요청은 스레드 여덟 개 중 하나를 붙잡고 있게
+된다. 그래서 요청의 길이를 정하는 것은 호출마다 건 제한 시간이다. Gmail 은 단계마다 3초
+(apps/accounts/gmail_api.py 의 TIMEOUT, 최악 24초), 구글 로그인은 단계마다 10초
+(apps/accounts/google.py 의 TIMEOUT)다. DB 쿼리와 행 잠금 대기에는 아직 상한이 없다
+(statement_timeout, lock_timeout 을 두지 않았다).
 
 **지금 이 값은 저장소가 아니라 서비스 설정에 있다** - Settings > Deploy >
 Custom Start Command. 거기에 값이 있으면 `Procfile` 은 무시된다. 저장소의
@@ -20,6 +57,43 @@ railway status --json    # serviceInstances ... startCommand
 
 **`migrate` 가 그 한 줄 안에 들어 있어야 한다.** 빠지면 마이그레이션이
 도는 곳이 하나도 없어진다. 대시보드를 고칠 때 같이 지우기 쉬운 자리다.
+
+### 배포 확인(Healthcheck)과 옛 배포 내리기
+
+서비스 설정(Settings > Deploy)에 아래 값을 둔다. 모두 저장소 밖이라, 바꿨는지는
+`railway status --json` 으로 확인한다.
+
+`railway.toml` 로 저장소에 넣지 않았다. 같은 저장소에서 매일 정리(cron) 서비스도 빌드되어, 설정 파일 경로를
+서비스마다 따로 지정하지 않으면 시작 명령과 확인 경로가 그 서비스에도 걸린다. 옮기려면
+그것부터 맞춘다.
+
+| 설정 | 값 | 하는 일 |
+|---|---|---|
+| Custom Start Command | 위 시작 명령 그대로(`exec gunicorn ... --threads 4 --keep-alive 0`) | 실제로 도는 값이다. Procfile 을 고쳐도 이걸 안 바꾸면 운영은 그대로다 |
+| Healthcheck Path | `/healthz` | 새 배포가 이 주소에서 200 을 줄 때까지 옛 배포가 계속 받는다 |
+| Draining Seconds | `30` | 옛 배포를 내릴 때 처리 중인 요청을 마칠 시간. 기본값은 0초라 그 자리에서 끊긴다 |
+
+없을 때는 새 컨테이너가 켜지자마자 옛 것을 내려, 새 것이 migrate·collectstatic·
+gunicorn 을 띄우는 동안(11-11 배포에서 3.5초) 들어온 요청이 실패했다. `/healthz` 는
+`backend/config/healthz.py` 가 미들웨어 맨 앞에서 답한다. Railway 의 확인 요청은 http 에
+Host 가 `healthcheck.railway.app` 이라 일반 뷰로 두면 400·301 이 된다.
+
+**이제 migrate 가 옛 코드가 도는 중에 돈다.** 새 배포의 migrate 부터 확인이 끝날
+때까지 옛 배포가 바뀐 DB 로 요청을 받는다. migrate 는 성공했는데 새 코드가 뜨다 죽거나
+확인 제한 시간(기본 300초)을 넘기면 배포가 실패하고, 옛 코드가 바뀐 DB 위에서 다음
+배포까지 계속 돈다. 그래서 마이그레이션은 옛 코드가 그대로 돌아도 깨지지 않게 짠다.
+
+- 비어 있으면 안 되는(NOT NULL) 열을 더할 때는 `db_default` 를 준다. 옛 코드는 새 행을
+  저장할 때 그 열을 빼고 보낸다(#173 의 RoundStep.choice). `makemigrations` 는 `default=`
+  만 넣으므로 모델에 직접 적어야 한다. `null=True` 로 더하는 열은 그대로 괜찮다.
+- 열·표를 지우거나 이름을 바꾸는 마이그레이션은 옛 코드와 같이 돌 수 없다. 모델에서
+  필드를 빼면 `makemigrations` 가 같은 배포에 열을 지우는 단계(`RemoveField`)를 만들고,
+  옛 코드는 아직 그 열을 읽고 쓴다. 나눠 하려면 `SeparateDatabaseAndState` 로 손으로 쓴
+  마이그레이션이 필요한데 이 저장소는 마이그레이션 손편집을 금지한다. 그런 배포는 짧은
+  오류를 감수할지 사용자에게 먼저 묻는다.
+- 제약(UniqueConstraint, CheckConstraint)을 새로 거는 것, 그리고 열을 고치는 `AlterField` 중
+  비워 둘 수 없게 하거나(`null=True` 를 뺌) 길이를 줄이거나 형을 바꾸는 것도 같다. 옛 코드는 그 제약을
+  모르고 어기는 값을 넣는다.
 
 ### release: 는 쓰지 않는다
 
