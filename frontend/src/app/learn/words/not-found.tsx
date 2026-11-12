@@ -23,6 +23,9 @@ export default function VocabNotFound() {
       {/* 이 화면의 유일한 동작이라 갈색을 준다. */}
       <Link
         href={routes.words}
+        // 쌓지 않는다. 공유받은 주소가 404 면 [404, 목록] 이 되어, 홈 탭을 누른 뒤
+        // 홈에서 뒤로 가기가 404 로 간다(lib/history-nav.ts).
+        replace
         className="dv-btn mt-6 inline-flex items-center rounded-full px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         style={
           {

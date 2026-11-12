@@ -16,9 +16,12 @@ let token: string | null = "tok";
 
 mock.module("next/navigation", {
   namedExports: {
-    redirect(to: string): never {
-      throw new Error(`NEXT_REDIRECT ${to}`);
+    // 종류까지 싣는다. 액션의 redirect 는 모두 바꿔치기(replace)다. 쌓으면
+    // 앱(TWA)에서 뒤로 가기가 떠난 내정보로 돌아간다(lib/history-nav.ts).
+    redirect(to: string, type?: string): never {
+      throw new Error(`NEXT_REDIRECT ${to} ${type}`);
     },
+    RedirectType: { push: "push", replace: "replace" },
   },
 });
 
@@ -84,7 +87,7 @@ describe("deleteAccountAction", () => {
 
     await assert.rejects(
       deleteAccountAction({}, form({ current_password: "pw" })),
-      /NEXT_REDIRECT \/start\?deleted=1/,
+      /NEXT_REDIRECT \/start\?deleted=1 replace/,
     );
 
     assert.equal(sent.method, "DELETE");
@@ -118,7 +121,7 @@ describe("deleteAccountAction", () => {
 
     await assert.rejects(
       deleteAccountAction({}, form({ current_password: "x" })),
-      /NEXT_REDIRECT \/login\?next=\/profile/,
+      /NEXT_REDIRECT \/login\?next=\/profile replace/,
     );
 
     assert.equal(forgotToken, true);
@@ -131,7 +134,7 @@ describe("deleteAccountAction", () => {
 
     await assert.rejects(
       deleteAccountAction({}, form({ current_password: "x" })),
-      /NEXT_REDIRECT \/login\?next=\/profile/,
+      /NEXT_REDIRECT \/login\?next=\/profile replace/,
     );
 
     assert.equal(sent.method, undefined);

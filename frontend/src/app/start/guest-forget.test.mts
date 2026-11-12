@@ -23,16 +23,20 @@ import assert from "node:assert/strict";
 import { after, beforeEach, describe, it, mock } from "node:test";
 
 class Redirect extends Error {
-  constructor(readonly to: string) {
+  constructor(
+    readonly to: string,
+    readonly type?: string,
+  ) {
     super("NEXT_REDIRECT");
   }
 }
 
 mock.module("next/navigation", {
   namedExports: {
-    redirect: (to: string) => {
-      throw new Redirect(to);
+    redirect: (to: string, type?: string) => {
+      throw new Redirect(to, type);
     },
+    RedirectType: { push: "push", replace: "replace" },
   },
 });
 
@@ -98,6 +102,9 @@ async function run() {
   await assert.rejects(continueAsGuestAction(), (error) => {
     assert.ok(error instanceof Redirect, String(error));
     assert.equal(error.to, "/");
+    // 바꿔치기다. 시작 화면이 기록에 남으면 홈에서 뒤로 가기가 거기로 가서
+    // 앱이 안 닫힌다(lib/history-nav.ts).
+    assert.equal(error.type, "replace");
     return true;
   });
 }

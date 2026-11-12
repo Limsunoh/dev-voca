@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DailyStudyBoard } from "@/components/DailyStudyBoard";
+import { HomeLink } from "@/components/HomeLink";
 import { RefreshOnBack } from "@/components/RefreshOnBack";
 import { ApiError } from "@/lib/api/client";
 import { fetchDailyStatus } from "@/lib/api/daily";
@@ -67,8 +67,7 @@ export default async function DailyPage({
         <div className="mt-6">
           {/* 여기서 갈 곳은 홈뿐이라 이 화면의 갈색 하나다. 되돌아가는
               동작이지만 다른 선택지가 없으면 그것이 주된 동작이다. */}
-          <Link
-            href={routes.home}
+          <HomeLink
             className="dv-btn inline-flex items-center px-6 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             style={
               {
@@ -82,7 +81,7 @@ export default async function DailyPage({
             }
           >
             홈으로
-          </Link>
+          </HomeLink>
         </div>
       </main>
     );

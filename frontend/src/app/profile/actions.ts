@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+// 여기 redirect 는 모두 바꿔치기(replace)다. 쌓으면 앱(TWA)에서 뒤로 가기가
+// 떠나온 내정보로 돌아가고, 내정보는 로그인을 요구해 로그인 화면이 다시 뜬다
+// (lib/history-nav.ts).
+import { redirect, RedirectType } from "next/navigation";
 
 import {
   changePassword,
@@ -50,7 +53,7 @@ export async function updateProfileAction(
   if (!token) {
     // 폼을 열어둔 채 로그인이 풀린 경우. 저장에 실패했다고만 하면
     // 몇 번을 더 누르게 된다.
-    redirect("/login?next=/profile");
+    redirect("/login?next=/profile", RedirectType.replace);
   }
 
   const sentName = String(formData.get("display_name") ?? "");
@@ -100,7 +103,7 @@ export async function requestEmailChangeAction(
 ): Promise<EmailChangeState> {
   const token = await getToken();
   if (!token) {
-    redirect("/login?next=/profile");
+    redirect("/login?next=/profile", RedirectType.replace);
   }
 
   // 필요한 키만 꺼내 쓴다. 폼에는 비밀번호 관리자용 username 칸도 실려
@@ -164,7 +167,7 @@ export async function changePasswordAction(
 ): Promise<PasswordState> {
   const token = await getToken();
   if (!token) {
-    redirect("/login?next=/profile");
+    redirect("/login?next=/profile", RedirectType.replace);
   }
 
   // trim 하지 않는다. 비밀번호는 앞뒤 공백도 값이다 - 다듬어서 보내면
@@ -236,7 +239,7 @@ export async function deleteAccountAction(
   formData: FormData,
 ): Promise<DeleteAccountState> {
   const token = await getToken();
-  if (!token) redirect("/login?next=/profile");
+  if (!token) redirect("/login?next=/profile", RedirectType.replace);
 
   // 화면에는 둘 중 한 칸만 그려진다. trim 하지 않는다 - 비밀번호는 앞뒤
   // 공백도 값이고, 이메일은 서버가 다듬어서 비교한다.
@@ -253,7 +256,7 @@ export async function deleteAccountAction(
     // 못 받은 경우도 있다. 창에 남겨 두면 몇 번을 눌러도 같은 오류만 나온다.
     if (error instanceof ApiError && error.status === 401) {
       await forgetToken();
-      redirect("/login?next=/profile");
+      redirect("/login?next=/profile", RedirectType.replace);
     }
     if (error instanceof ApiError) return { error: error.message };
     return { error: "잠시 후 다시 시도해주세요." };
@@ -262,7 +265,7 @@ export async function deleteAccountAction(
   await clearToken();
 
   // redirect 는 내부적으로 예외를 던져서 위 try 안에 두면 안 된다.
-  redirect("/start?deleted=1");
+  redirect("/start?deleted=1", RedirectType.replace);
 }
 
 /**
@@ -306,7 +309,7 @@ export async function uploadPhotoAction(
   formData: FormData,
 ): Promise<PhotoState> {
   const token = await getToken();
-  if (!token) redirect("/login?next=/profile");
+  if (!token) redirect("/login?next=/profile", RedirectType.replace);
 
   const file = formData.get("photo");
 
@@ -350,7 +353,7 @@ export async function uploadPhotoAction(
  */
 export async function deletePhotoAction(): Promise<PhotoState> {
   const token = await getToken();
-  if (!token) redirect("/login?next=/profile");
+  if (!token) redirect("/login?next=/profile", RedirectType.replace);
 
   let saved;
   try {

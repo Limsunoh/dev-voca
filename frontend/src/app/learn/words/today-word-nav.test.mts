@@ -190,10 +190,13 @@ describe("넘기기는 방문 기록을 쌓지 않는다", () => {
     for (const link of links) assert.match(link, /data-replace="true"/);
   });
 
-  it("되돌아가기(홈) 링크는 replace 가 아니다", async () => {
+  it("되돌아가기(홈) 링크도 쌓지 않는다", async () => {
+    // 앞 기록이 홈이면 뒤로 가기로 돌아가고(DetailBackLink), 아니면(공유받은
+    // 주소로 앱을 열었다) 홈으로 바꿔치기한다. 쌓으면 [상세, 홈] 이 되어 홈에서
+    // 뒤로 가기가 상세로 가고 앱(TWA)이 안 닫힌다(lib/history-nav.ts).
     const html = await render(576, { today: TODAY });
     const main = html.slice(html.indexOf("<main"));
-    assert.doesNotMatch(main.match(/<a [^>]*>/)![0], /data-replace/);
+    assert.match(main.match(/<a [^>]*>/)![0], /data-replace="true"/);
   });
 });
 

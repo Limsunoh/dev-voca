@@ -29,6 +29,9 @@ export default function BoardNotFound() {
             자리(빈 순위표의 문제 풀러 가기·로그인하기)에 남긴다. */}
         <Link
           href={routes.board()}
+          // 쌓지 않는다. 공유받은 주소가 404 면 [404, 목록] 이 되어, 홈 탭을 누른 뒤
+          // 홈에서 뒤로 가기가 404 로 간다(lib/history-nav.ts).
+          replace
           className="dv-btn inline-flex items-center rounded-[var(--radius-pill)] px-5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {

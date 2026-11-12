@@ -65,10 +65,15 @@ mock.module("react", {
   },
 });
 
+/** 버튼으로 간 곳. 나가기는 기록을 쌓지 않고 바꿔치기(replace)로 간다(lib/history-nav.ts). */
 const pushed: string[] = [];
 mock.module("next/navigation", {
   namedExports: {
-    useRouter: () => ({ push: (to: string) => pushed.push(to) }),
+    useRouter: () => ({
+      push: (to: string) => pushed.push(`push ${to}`),
+      replace: (to: string) => pushed.push(to),
+      refresh() {},
+    }),
     usePathname: () => "/test/round",
   },
 });

@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 
 import { logOut } from "@/lib/api/accounts";
 import { forgetToken, getToken, setGuest } from "@/lib/session";
@@ -36,5 +36,7 @@ export async function continueAsGuestAction(): Promise<void> {
     await forgetToken();
   }
   await setGuest();
-  redirect("/");
+  // 바꿔치기다. 시작 화면이 기록에 남으면 홈에서 뒤로 가기가 거기로 가고,
+  // 앱이 안 닫힌다(lib/history-nav.ts). 서버 액션의 redirect 는 기본이 push 다.
+  redirect("/", RedirectType.replace);
 }

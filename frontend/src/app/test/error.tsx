@@ -1,9 +1,8 @@
 "use client"; // 에러 경계는 클라이언트 컴포넌트여야 한다.
 
-import Link from "next/link";
 import { useEffect } from "react";
 
-import { routes } from "@/lib/routes";
+import { HomeLink } from "@/components/HomeLink";
 
 /**
  * 문제풀이 영역 전체의 마지막 방어선.
@@ -74,8 +73,7 @@ export default function TestError({
         </button>
         {/* 크림 바탕 위 흰 종이 + 두께. 테두리가 아니라 아래 그림자가
             "여기가 버튼" 을 말한다(가이드 shape-lift). */}
-        <Link
-          href={routes.home}
+        <HomeLink
           className="dv-btn flex flex-1 items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
@@ -90,7 +88,7 @@ export default function TestError({
           }
         >
           홈으로
-        </Link>
+        </HomeLink>
       </div>
     </main>
   );

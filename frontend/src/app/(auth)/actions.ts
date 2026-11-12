@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 
 import { logIn, logOut, signUp } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
@@ -73,7 +73,15 @@ export async function loginAction(
 
   // redirect 는 내부적으로 예외를 던진다. try 안에서 부르면 위 catch 가
   // 그것을 삼켜 "잠시 후 다시 시도해주세요" 로 바뀐다.
-  redirect(next);
+  //
+  // 바꿔치기다. 서버 액션의 redirect 는 기본이 push 라, 로그인 화면이 기록에
+  // 남아 도착한 화면에서 뒤로 가기가 로그인 화면으로 간다. 앱에서는 폰의 뒤로
+  // 가기가 이것이라 앱이 안 닫힌다(lib/history-nav.ts).
+  //
+  // 액션 안에서 redirect 해야 한다. 값을 돌려주고 화면에서 옮기면, 쿠키를 바꾼
+  // 액션이라 Next 가 지금 화면(/login)을 새 쿠키로 다시 그리고, 그 화면의
+  // "이미 로그인했으면 홈으로" 가 먼저 돌아 next 를 잃는다(11-12 에 해 봤다).
+  redirect(next, RedirectType.replace);
 }
 
 export async function signUpAction(
@@ -114,7 +122,8 @@ export async function signUpAction(
     return { error: messageOf(error), values: kept };
   }
 
-  redirect(next);
+  // 바꿔치기인 이유는 loginAction 과 같다.
+  redirect(next, RedirectType.replace);
 }
 
 export async function logoutAction(): Promise<void> {
@@ -132,5 +141,7 @@ export async function logoutAction(): Promise<void> {
   }
 
   await clearToken();
-  redirect("/");
+  // 바꿔치기다(loginAction 의 주석). 내정보가 기록에 남으면 홈에서 뒤로 가기가
+  // 내정보로 가고, 그 화면은 로그인을 요구한다.
+  redirect("/", RedirectType.replace);
 }
