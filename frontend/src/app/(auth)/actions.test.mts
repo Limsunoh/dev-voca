@@ -73,6 +73,20 @@ mock.module("@/lib/session", {
   },
 });
 
+/**
+ * 실제 접속 IP 머리 대역(lib/client-ip.ts). 그 파일도 맨 위가 `import "server-only"` 라
+ * Next 밖에서 해석되지 않는다. 여기서 보는 것은 "가입·로그인 요청에 그 머리가
+ * 실리는가" 다. 머리를 만드는 규칙(날짜 포함)은 lib/client-ip.test.mts 가 본다.
+ */
+const RELAY = { "X-Next-Relay": ["leakmark", "relay"].join("-"), "X-Next-Client-IP": "203.0.113.7" };
+mock.module("@/lib/client-ip", {
+  namedExports: {
+    async clientIpHeaders() {
+      return RELAY;
+    },
+  },
+});
+
 // ---------------------------------------------------------------------------
 // 가짜 백엔드
 // ---------------------------------------------------------------------------
@@ -83,7 +97,7 @@ after(() => {
 });
 
 /** 백엔드가 실제로 받은 본문. 비밀번호가 제대로·그대로 나가는지 확인에 쓴다. */
-let sent: Array<{ path: string; body: Record<string, unknown> }> = [];
+let sent: Array<{ path: string; body: Record<string, unknown>; headers: Headers }> = [];
 
 beforeEach(() => {
   sent = [];
@@ -106,7 +120,7 @@ function installBackend(
   ) => {
     const href = typeof url === "string" ? url : url.toString();
     const body = JSON.parse(String(init?.body ?? "{}"));
-    sent.push({ path: new URL(href).pathname, body });
+    sent.push({ path: new URL(href).pathname, body, headers: new Headers(init?.headers) });
 
     const { status, json } = reply(body);
     return new Response(JSON.stringify(json), {
@@ -498,4 +512,33 @@ describe("입력 다듬기와 서버 오류", () => {
     assert.ok(state?.error?.includes("너무 잦"));
     assert.equal(state?.values?.email, "nobody-10@example.com");
   });
+});
+
+describe("가입·로그인 요청에 실제 접속 IP 를 싣는다", () => {
+  // 백엔드는 이 머리로 접속 IP 를 센다(backend/apps/accounts/throttles.py). 빠지면
+  // 모든 사람이 "Next 를 거치지 않은 요청" 한 통에 담겨 한 시간 가입 수가 사이트
+  // 전체로 묶인다.
+  for (const [name, action, fields] of [
+    ["로그인", loginAction, { email: "ip@example.com", password: "QaProbe2026!x" }],
+    [
+      "가입",
+      signUpAction,
+      {
+        email: "ip@example.com",
+        password: "QaProbe2026!x",
+        terms_agreed: "on",
+        disclosure_agreed: "on",
+        age_confirmed: "on",
+      },
+    ],
+  ] as const) {
+    it(name, async () => {
+      installAcceptingBackend();
+      await run(action, {}, fields);
+      assert.equal(sent.length, 1);
+      for (const [key, value] of Object.entries(RELAY)) {
+        assert.equal(sent[0].headers.get(key), value, `${key} 가 안 실렸다`);
+      }
+    });
+  }
 });

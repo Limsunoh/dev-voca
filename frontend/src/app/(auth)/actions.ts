@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { logIn, logOut, signUp } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
+import { clientIpHeaders } from "@/lib/client-ip";
 import { safeNext } from "@/lib/routes";
 import { carryGuestDailyLength, clearToken, getToken, setToken } from "@/lib/session";
 
@@ -61,7 +62,9 @@ export async function loginAction(
   }
 
   try {
-    const { token, user } = await logIn({ email, password });
+    // 가입·로그인 제한이 접속 IP 로도 센다. 백엔드에는 이 서버만 보이므로 실어 보낸다.
+    const relay = await clientIpHeaders();
+    const { token, user } = await logIn({ email, password }, relay);
     await setToken(token);
     await carryGuestDailyLength(token, user);
   } catch (error) {
@@ -96,6 +99,7 @@ export async function signUpAction(
   }
 
   try {
+    const relay = await clientIpHeaders();
     const { token, user } = await signUp({
       email,
       password,
@@ -103,7 +107,7 @@ export async function signUpAction(
       terms_agreed: formData.get("terms_agreed") === "on",
       disclosure_agreed: formData.get("disclosure_agreed") === "on",
       age_confirmed: formData.get("age_confirmed") === "on",
-    });
+    }, relay);
     await setToken(token);
     await carryGuestDailyLength(token, user);
   } catch (error) {

@@ -8,7 +8,7 @@ import io
 import os
 import unicodedata
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from importlib import import_module
 from unittest import mock
 
@@ -23,6 +23,7 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
+from . import throttles
 from .google import GoogleAuthError, fetch_google_user
 from .mail import MailNotConfigured
 from .models import (
@@ -461,8 +462,9 @@ class ThrottleTest(TestCase):
     def test_counts_per_email_not_per_client(self):
         """한 사람이 막혔다고 다른 사람까지 막히면 안 된다.
 
-        IP 로 세면 모든 요청이 Next 서버 하나로 보여 전원이 한 통에 담긴다.
-        그래서 제출된 이메일로 센다.
+        백엔드에는 모든 요청이 Next 서버 하나로 보여, 그냥 IP 로 세면 전원이 한
+        통에 담긴다. 그래서 제출된 이메일로 센다(접속 IP 는 Next 가 비밀값과 함께
+        넘긴 것만 따로 센다, tests_ip_throttle.py).
         """
         for _ in range(3):
             self.login(email="victim@example.com")
@@ -1064,8 +1066,14 @@ class ThrottleCacheTableTest(TransactionTestCase):
 
         이 테스트만으로는 "이메일이 없어서" 와 "요청 제한이 없어서" 를
         구분하지 못한다. 제한이 붙어 있다는 것은 ThrottleTest 가 본다.
+
+        접속 IP 제한(LoginIpThrottle)은 날짜를 지나면 이메일과 상관없이 캐시를
+        친다. 여기서 보는 것은 이메일 제한이라 그것은 꺼 둔다.
         """
         self._drop_table()
+        patcher = mock.patch.object(throttles, "IP_COUNT_FROM", date.max)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
         response = self.client.post(
             LOGIN_URL, {"password": "x"}, content_type="application/json"

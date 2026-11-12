@@ -147,6 +147,8 @@ type RequestOptions = {
    * 그것을 읽어 헤더에 붙이는 일은 Next 서버에서만 일어난다.
    */
   token?: string;
+  /** 더 실을 머리. 가입·로그인은 실제 접속 IP 를 싣는다(lib/client-ip.ts). */
+  headers?: Record<string, string>;
 };
 
 /**
@@ -211,13 +213,15 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = "GET", body, token } = options;
+  const { method = "GET", body, token, headers: extra } = options;
 
   let res: Response;
   try {
     res = await fetch(`${apiBase()}${path}`, {
       method,
       headers: {
+        // 더 실을 머리를 먼저 둔다. 같은 이름이면 아래 기본 머리(인증 등)가 이긴다.
+        ...extra,
         Accept: "application/json",
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Token ${token}` } : {}),

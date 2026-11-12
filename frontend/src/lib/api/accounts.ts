@@ -72,15 +72,16 @@ export function signUp(body: {
   terms_agreed: boolean;
   disclosure_agreed: boolean;
   age_confirmed: boolean;
-}): Promise<AuthResult> {
-  return request("/api/accounts/signup/", { method: "POST", body });
+}, headers?: Record<string, string>): Promise<AuthResult> {
+  return request("/api/accounts/signup/", { method: "POST", body, headers });
 }
 
+/** headers 에는 실제 접속 IP 를 싣는다(lib/client-ip.ts). 가입과 같다. */
 export function logIn(body: {
   email: string;
   password: string;
-}): Promise<AuthResult> {
-  return request("/api/accounts/login/", { method: "POST", body });
+}, headers?: Record<string, string>): Promise<AuthResult> {
+  return request("/api/accounts/login/", { method: "POST", body, headers });
 }
 
 /**
