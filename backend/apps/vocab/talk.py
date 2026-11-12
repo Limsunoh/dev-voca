@@ -226,6 +226,17 @@ _MANUAL_EXCLUDE: frozenset[str] = frozenset()
 # 이 예외가 있어도 big O 는 여전히 제외된다(O 는 목록에 없다).
 _READ_AS_WORD = frozenset({"I"})
 
+# 풀어 쓴 형태(where is, I am). 일상 표현은 전부 축약형으로 적는다 - 사람이
+# 줄여 읽으면(where's) 낱말 수가 어긋나 맞게 읽어도 오답이 되고 틀린 자리
+# 표시도 안 나온다(seed_phrases 머리말). 낱말 수·강세 검사는 이 형태로도 다
+# 통과하므로 따로 막는다. 시드 테스트(tests_talk)와 대량 생성(ai_pipeline.bulk)이
+# 같이 쓴다. 소문자로 바꾼 글에 댄다.
+UNCONTRACTED = re.compile(
+    r"\b(where is|what is|how is|there is|that is|it is|i am|i would|i will"
+    r"|you are|we are|they are|let us|do not|does not|did not|is not|are not"
+    r"|can not|cannot|could not|would not|that would)\b(?=\s+\w)"
+)
+
 _HAS_DIGIT = re.compile(r"\d")
 # 낱말 구분자로 쓰는 것 외의 기호. 하이픈과 슬래시는 낱말을 나누는 데
 # 쓰므로 여기서 빼고, 아래 낱말 검사가 각 조각을 본다.

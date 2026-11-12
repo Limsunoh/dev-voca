@@ -34,6 +34,14 @@ export function useConsent(needsDisclosure = true, idPrefix = "consent") {
     document.getElementById(`${idPrefix}-${first}`)?.focus();
   }
 
+  // "전체 동의" 칸. 물어본 항목만 한꺼번에 켜고 끈다. 게스트에게 묻지 않는
+  // 공개·해외 항목(needsDisclosure=false)은 건드리지 않는다.
+  function setAll(value: boolean) {
+    setTerms(value);
+    setAge(value);
+    if (needsDisclosure) setDisclosure(value);
+  }
+
   return {
     terms,
     disclosure,
@@ -41,6 +49,7 @@ export function useConsent(needsDisclosure = true, idPrefix = "consent") {
     setTerms,
     setDisclosure,
     setAge,
+    setAll,
     idPrefix,
     needsDisclosure,
     ready: terms && age && (disclosure || !needsDisclosure),
@@ -65,6 +74,7 @@ export function ConsentChecks({
   setTerms,
   setDisclosure,
   setAge,
+  setAll,
   idPrefix,
   needsDisclosure,
   ready,
@@ -72,6 +82,25 @@ export function ConsentChecks({
 }: Props) {
   return (
     <div className="grid gap-1">
+      {/* 한 번에 켜는 칸. 따로 상태를 두지 않고 "물어본 항목이 다 켜졌나" 를
+          그대로 보여 준다. 그래야 하나씩 다 켜면 이 칸도 켜지고, 하나라도
+          끄면 같이 꺼져 두 표시가 어긋나지 않는다. 아래 항목은 그대로 보여
+          무엇에 동의하는지 하나씩 읽고 켤 수도 있다. */}
+      <Check id={`${idPrefix}-all`} checked={ready} onChange={setAll}>
+        <span style={{ fontWeight: "var(--weight-bold)" }}>전체 동의</span>
+        {/* 화면 낭독기는 이 칸에서 "전체 동의" 만 읽어, 무엇을 한꺼번에
+            켜는지 칸을 지나간 뒤에야 안다. 보는 사람은 아래 목록이 같이
+            보인다. */}
+        <span className="sr-only">
+          {` (아래 필수 ${needsDisclosure ? "세" : "두"} 항목에 모두 동의)`}
+        </span>
+      </Check>
+      {/* 색은 같은 화면의 "또는" 구분선(AuthForm)과 맞춘다. */}
+      <hr
+        aria-hidden="true"
+        className="my-1"
+        style={{ border: 0, height: 1, background: "var(--sand-deep)" }}
+      />
       <Check id={`${idPrefix}-terms`} checked={terms} onChange={setTerms}>
         <span style={{ fontWeight: "var(--weight-bold)" }}>[필수]</span>{" "}
         <DocLink href="/terms">이용약관</DocLink>과{" "}

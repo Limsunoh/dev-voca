@@ -80,6 +80,7 @@ export default async function WordDetailPage({
       >
         <DetailHero
           title={word.term}
+          speak={{ text: word.term, label: "발음 듣기" }}
           aside={word.pronunciation || undefined}
           reading={word.reading || undefined}
           meaning={word.meaning}

@@ -11,7 +11,6 @@
 인식 결과가 제각각이라 채점이 안 되는" 부류다.
 """
 
-import re
 from io import StringIO
 
 from django.core.cache import cache
@@ -23,6 +22,7 @@ from .models import DailyPhrase, PhraseScene, Word
 from .talk import (
     MAX_ALTERNATIVES,
     MAX_HEARD_LENGTH,
+    UNCONTRACTED,
     clean_heard,
     grade_one,
     is_speakable,
@@ -798,11 +798,7 @@ class SeedContractionGradingTest(TestCase):
 
 # 사람이 말할 때 거의 늘 줄이는 짝. 뒤에 낱말이 이어질 때만 본다 -
 # "do you know where it is" 처럼 끝에 온 it is 는 줄일 수 없다.
-_UNCONTRACTED = re.compile(
-    r"\b(where is|what is|how is|there is|that is|it is|i am|i would|i will"
-    r"|you are|we are|they are|let us|do not|does not|did not|is not|are not"
-    r"|can not|cannot|could not|would not|that would)\b(?=\s+\w)"
-)
+_UNCONTRACTED = UNCONTRACTED  # 정의는 talk.py(대량 생성도 같이 쓴다)
 
 
 class SeedStaysContractedTest(TestCase):

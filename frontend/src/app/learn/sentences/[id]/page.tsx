@@ -67,6 +67,9 @@ export default async function SentenceDetailPage({
 
       <DetailHero
         title={sentence.text}
+        // 에러 메시지는 듣기 버튼을 두지 않는다(2026-11-12 운영자 결정). 콜론,
+        // 괄호, 밑줄 같은 기호를 기기 음성이 어색하게 읽는다.
+        speak={isError ? undefined : { text: sentence.text, label: "문장 듣기" }}
         reading={sentence.reading || undefined}
         meaning={sentence.translation}
         mono={isError}
