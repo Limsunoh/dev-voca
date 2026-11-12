@@ -319,7 +319,11 @@ describe("카드: 상황 배지", () => {
   it("상황이 비면(개발 용어·상황 없는 표현) 빈 알약을 그리지 않는다", () => {
     const html = card({ scene: "", scene_label: "" });
     assert.match(html, />쉬움<\/span>/);
-    // 난이도 배지 하나만 남는다.
-    assert.equal(html.match(/rounded-full/g)?.length, 1, html);
+    // 난이도 배지 하나만 남는다. 모서리 클래스로 세지 않는다 - 상황 칩은
+    // 난이도 배지와 모서리 클래스가 달라 빈 칩이 그려져도 셈에 안 잡힌다.
+    // py-1.5 는 알약 둘의 공통 치수(MetaBadge 의 CHIP_BASE)다.
+    const chips = (h: string) => h.match(/py-1\.5/g)?.length ?? 0;
+    assert.equal(chips(card({})), 2, "상황이 있으면 알약이 둘이어야 셈이 맞다");
+    assert.equal(chips(html), 1, html);
   });
 });

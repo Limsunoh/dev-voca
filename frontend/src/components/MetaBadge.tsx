@@ -32,9 +32,20 @@ const CHIP_TONES = {
 
 type ChipTone = keyof typeof CHIP_TONES;
 
-/** 알약의 공통 치수. 링크판(CategoryChip)도 이걸 쓴다. */
-const CHIP_SHAPE =
-  "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-[weight:var(--weight-bold)] whitespace-nowrap";
+/**
+ * 알약의 공통 치수. 줄바꿈 규칙은 담지 않는다. 배지마다 다르다.
+ *
+ * whitespace-nowrap 을 여기 넣고 CategoryChip 에서 whitespace-normal 을 덧붙여
+ * "떼던" 때가 있었다(850e995). 두 클래스가 같이 붙으면 어느 쪽이 이길지는
+ * 클래스 순서가 아니라 생성된 CSS 순서로 정해지고, 거기서는 nowrap 이 뒤에
+ * 있어 늘 이겼다. 그래서 분류가 한 번도 줄을 안 바꿨다. 이제 nowrap 이 필요한
+ * 쪽(CHIP_SHAPE)만 따로 붙인다.
+ */
+const CHIP_BASE =
+  "inline-flex items-center gap-1 px-3 py-1.5 text-xs font-[weight:var(--weight-bold)]";
+
+/** 한 줄로 고정하는 배지(난이도, 정처기). 라벨이 짧게 닫혀 있다. */
+const CHIP_SHAPE = `${CHIP_BASE} rounded-full whitespace-nowrap`;
 
 /**
  * 난이도 배지.
@@ -91,14 +102,19 @@ export function CategoryChip({
   // 여기서 한 번 막는다.
   if (!label) return null;
 
-  // shrink-0 을 쓰지 않는다. 분류 라벨은 "CS 기초(Computer Science)" 처럼
-  // 길 수 있는데, 줄어들지 못하게 막으면 칸보다 넓어졌을 때 그대로 화면
-  // 밖으로 나간다. 부모가 flex-wrap 이라 줄바꿈으로 해결되는 자리다.
-  // 기본 글꼴에서는 안 드러나고 글자를 200% 로 키운 사용자에게만 보인다.
+  // shrink-0 도 whitespace-nowrap 도 쓰지 않는다. 분류 라벨은 "CS
+  // 기초(Computer Science)" 처럼 길 수 있어서, 줄어들지도 꺾이지도 못하면
+  // 칸보다 넓어졌을 때 그대로 화면 밖으로 나간다. 기본 글꼴에서는 안 드러나고
+  // 폰 글자 크기를 200% 로 키운 사용자에게만 보인다(360폭 폰이 180px 폭처럼
+  // 그려진다). 막혀 있을 때는 단어·문장 목록 카드가 "코드 리뷰(Code Review)"
+  // 폭을 고집해 화면이 233px 로 넓어지고 아래 탭바가 밀렸다. 이제 칸이
+  // 모자라면 칩 안에서 줄을 바꾸고, 꺾인 줄은 text-center 로 가운데에 모은다.
   //
-  // 그래서 whitespace-nowrap 도 여기서만 뗀다. CHIP_SHAPE 이 갖고 있는데,
-  // 긴 분류가 안 줄어드는 것과 같은 결과가 된다.
-  const shape = `min-w-0 whitespace-normal ${CHIP_SHAPE}`;
+  // 모서리는 알약(9999px)이 아니라 한 줄 높이의 절반이다. 위아래 py-1.5 와
+  // text-xs 한 줄(1rem)이 1.75rem 이라 그 절반이 0.875rem 이고, 한 줄일 때는
+  // 곧 알약이다. 두 줄이 된 알약은 양 끝이 반원으로 부풀어 글자 끝이 둥근
+  // 벽에 닿는다(FilterChip 과 같은 판단).
+  const shape = `min-w-0 rounded-[0.875rem] text-center ${CHIP_BASE}`;
 
   // 누를 수 있는 것과 없는 것을 모양으로 가른다. hover 로만 다르게 두면
   // 터치에서는 구분할 단서가 하나도 없다. 같은 줄에 두 종류가 나란히
