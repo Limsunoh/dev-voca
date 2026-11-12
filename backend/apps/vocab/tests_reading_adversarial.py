@@ -20,7 +20,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
-from .models import Sentence, SentenceKind, Word
+from .models import DailyPhrase, Sentence, SentenceKind, Word
 
 WORDS_URL = "/api/vocab/words/"
 SENTENCES_URL = "/api/vocab/sentences/"
@@ -817,9 +817,11 @@ class LoadReadingsTest(TestCase):
 
 ADMIN_WORDS = "/admin/vocab/word/"
 ADMIN_SENTENCES = "/admin/vocab/sentence/"
+ADMIN_PHRASES = "/admin/vocab/dailyphrase/"
 
 # (Admin 목록 주소, 모델, 동작 이름, 건드리는 칸, 동작 전 값)
-# 동작 여섯 개. 동작 전 값의 반대가 되면 실행된 것이다.
+# 동작 일곱 개. 동작 전 값의 반대가 되면 실행된 것이다. 일상 표현은 발음
+# 칸 게이트가 없어 is_reviewed 하나가 노출을 정하므로 그 동작이 가장 무겁다.
 REVIEW_ACTIONS = [
     (ADMIN_WORDS, Word, "mark_reviewed", "is_reviewed", False),
     (ADMIN_WORDS, Word, "mark_reading_reviewed", "reading_reviewed", False),
@@ -827,11 +829,12 @@ REVIEW_ACTIONS = [
     (ADMIN_SENTENCES, Sentence, "mark_reviewed", "is_reviewed", False),
     (ADMIN_SENTENCES, Sentence, "mark_reading_reviewed", "reading_reviewed", False),
     (ADMIN_SENTENCES, Sentence, "unmark_reading_reviewed", "reading_reviewed", True),
+    (ADMIN_PHRASES, DailyPhrase, "mark_reviewed", "is_reviewed", False),
 ]
 
 
 class ReviewActionPermissionTest(TestCase):
-    """Admin 검수 동작 여섯 개를 누가 돌릴 수 있는지.
+    """Admin 검수 동작 일곱 개를 누가 돌릴 수 있는지.
 
     검수 게이트는 결국 이 동작들에 걸려 있다. 권한이 모자란 계정이 POST 를
     직접 보내도 값이 안 바뀌어야 하고, 수정 권한이 있으면 바뀌어야 한다 -
@@ -850,20 +853,27 @@ class ReviewActionPermissionTest(TestCase):
                 user.user_permissions.add(*Permission.objects.filter(codename__in=codenames))
             return user
 
-        cls.non_staff = staff("plain@example.com", "change_word", "change_sentence", is_staff=False)
+        cls.non_staff = staff(
+            "plain@example.com", "change_word", "change_sentence", "change_dailyphrase", is_staff=False
+        )
         cls.no_perm = staff("noperm@example.com")
-        cls.view_only = staff("view@example.com", "view_word", "view_sentence")
+        cls.view_only = staff("view@example.com", "view_word", "view_sentence", "view_dailyphrase")
         cls.add_delete = staff(
             "adddel@example.com",
             "add_word", "delete_word", "add_sentence", "delete_sentence",
+            "add_dailyphrase", "delete_dailyphrase",
         )
-        cls.changer = staff("change@example.com", "change_word", "change_sentence")
+        cls.changer = staff("change@example.com", "change_word", "change_sentence", "change_dailyphrase")
         cls.superuser = User.objects.create_superuser(email="root@example.com", password="x")
 
     def post_action(self, url: str, model, action: str, field: str, before: bool):
         """대상 하나를 동작 전 값으로 만들고 동작을 POST 한다. (응답, 동작 뒤 값)"""
         if model is Word:
             obj = Word.objects.create(term=f"t-{action}", meaning="뜻")
+        elif model is DailyPhrase:
+            obj = DailyPhrase.objects.create(
+                text=f"p {action}", pronunciation="/p/", reading="**피**", meaning="뜻"
+            )
         else:
             obj = Sentence.objects.create(text=f"s-{action}", translation="뜻")
         setattr(obj, field, before)
