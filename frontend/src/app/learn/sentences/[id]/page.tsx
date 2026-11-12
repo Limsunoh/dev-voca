@@ -67,6 +67,7 @@ export default async function SentenceDetailPage({
 
       <DetailHero
         title={sentence.text}
+        speak={{ text: sentence.text, label: "문장 듣기" }}
         reading={sentence.reading || undefined}
         meaning={sentence.translation}
         mono={isError}

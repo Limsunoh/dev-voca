@@ -5,6 +5,7 @@ import { withWrapPoints } from "@/lib/wrap-points";
 import { DetailBackLink } from "./DetailBackLink";
 import { Highlight } from "./Highlight";
 import { Reading } from "./Reading";
+import { SpeakButton } from "./SpeakButton";
 
 /**
  * 단어·문장 상세의 공통 뼈대.
@@ -92,6 +93,7 @@ export function DetailHero({
   meta,
   meaning,
   mono = true,
+  speak,
 }: {
   title: string;
   /** 제목 옆 보조 문구. 발음기호 같은 것. */
@@ -116,6 +118,11 @@ export function DetailHero({
   meaning?: string;
   /** 제목을 고정폭으로 둘지. 단어는 true, 사람이 쓴 문장은 false. */
   mono?: boolean;
+  /**
+   * 소리 듣기 버튼. 읽을 영어(text)와 화면 낭독기용 이름(label). 발음기호 줄
+   * 오른쪽에 온다. 발음기호가 없으면(문장) 그 자리에 버튼만 선다.
+   */
+  speak?: { text: string; label: string };
 }) {
   return (
     // 조각마다 따로 올라온다. 카드 하나에 걸면 한 덩어리로 밀려 올라와서
@@ -174,16 +181,27 @@ export function DetailHero({
         {withWrapPoints(title)}
       </h1>
 
-      {aside && (
-        // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
-        // 깨지거나 폭이 어긋난다(디자인 가이드 type-ipa).
-        <p
-          lang="en-US"
-          className="rise mt-2.5 [animation-delay:60ms]"
-          style={{ fontSize: "var(--text-base)", color: "var(--text-muted)" }}
-        >
-          {aside}
-        </p>
+      {(aside || speak) && (
+        // 발음기호와 소리 듣기를 한 줄에 둔다. 눈으로 읽는 발음과 귀로 듣는
+        // 발음이 같은 자리에 있어야 둘을 맞춰 본다. 글자를 키워 발음기호가
+        // 길어지면 버튼이 다음 줄로 간다(flex-wrap). 영어 음성이 없는 기기에서
+        // 문장은 버튼이 숨어 빈 줄만 남으므로 그때는 줄째 접는다(empty:hidden).
+        // 44px 버튼 때문에 이 줄이 발음기호만 있을 때보다 20px 높다. 음수
+        // 여백으로 줄이면 버튼이 다음 줄로 갔을 때 아래 한글 발음을 덮는다.
+        <div className="rise mt-2.5 flex flex-wrap empty:hidden items-center gap-x-2.5 gap-y-1 [animation-delay:60ms]">
+          {aside && (
+            // 발음기호는 고정폭으로 두지 않는다. IPA 기호가 고정폭 글꼴에서
+            // 깨지거나 폭이 어긋난다(디자인 가이드 type-ipa).
+            <p
+              lang="en-US"
+              className="min-w-0"
+              style={{ fontSize: "var(--text-base)", color: "var(--text-muted)" }}
+            >
+              {aside}
+            </p>
+          )}
+          {speak && <SpeakButton text={speak.text} label={speak.label} />}
+        </div>
       )}
 
       {reading && (
@@ -199,7 +217,8 @@ export function DetailHero({
         // 칠하는 자리라, 각자 그라디언트를 적으면 한쪽만 고쳐진다.
         //
         // 색은 기본(초록)이다. 갈색은 "지금 여기" 와 주요 동작이 쓰는
-        // 색이고 이 화면에서는 맨 아래 "문제 풀기" 버튼이 그것을 갖는다.
+        // 색이고 이 화면에서는 맨 아래 "문제 풀기" 버튼이 그것을 갖는다
+        // (소리 버튼이 읽는 동안 잠깐 칠하는 것 말고는).
         <p
           className="rise mt-5 text-pretty [animation-delay:120ms]"
           style={{
@@ -296,6 +315,8 @@ export function DetailCard({
  *
  * 이 화면의 갈색 하나를 여기가 갖는다 - 읽고 나서 할 일이 그것뿐이고,
  * 없으면 상세가 막다른 화면이 된다(목록으로 되돌아가는 길만 있다).
+ * 소리 버튼(SpeakButton)이 읽는 동안만 갈색이 되는 것은 "지금 소리가
+ * 난다" 는 잠깐의 표시라 예외로 둔다.
  */
 export function DetailAction({
   href,
