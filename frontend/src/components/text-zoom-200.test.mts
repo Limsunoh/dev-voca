@@ -78,7 +78,7 @@ describe("탭바: 다섯 칸 최소 폭 합이 탭 줄을 넘지 않는다", () 
   it("라벨은 음절 사이에서 꺾고([word-break:normal]) 줄 길이를 고른다(text-balance) - 링크와 준비 중 칸 모두", () => {
     // 둘 중 하나만 있으면 비상 꺾기가 끝 글자에서 잘라 "문제풀/기" 가 된다.
     // break-normal 은 overflow-wrap 안전망까지 꺼서 쓰지 않는다.
-    const cells = [...classesOf(html, "a"), ...classesOf(html, "span").filter((c) => c.includes("min-h-14"))];
+    const cells = [...classesOf(html, "a"), ...classesOf(html, "span").filter((c) => c.includes("text-balance"))];
     assert.ok(cells.length >= 5, `칸 ${cells.length}개`);
     for (const cls of cells) {
       for (const need of ["[word-break:normal]", "text-balance", "text-center"]) {
