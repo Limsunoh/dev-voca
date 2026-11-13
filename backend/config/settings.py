@@ -196,13 +196,9 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # 서드파티
     "rest_framework",
-    # 옛 계정당 토큰 표(authtoken_token) 때문에 남겨 둔다. 로그인 토큰은 이제
-    # accounts.LoginToken 이고 이 표는 아무도 안 읽는다. 앱을 빼면 Django 가 회원을
-    # 지울 때 이 표의 행을 같이 지우지 않아, 남은 행의 외래 키에 걸려 탈퇴가 실패한다.
-    # ponytail: 옛 표의 행을 지운 뒤(배포 한 번 지나서) 이 줄과 accounts/admin.py 의
-    # unregister(TokenProxy) 를 같이 뺀다. 그 unregister 가 돌려면 이 줄이 apps.accounts
-    # 보다 앞에 있어야 한다.
-    "rest_framework.authtoken",
+    # rest_framework.authtoken 은 11-13 에 뺐다. 로그인 토큰은 accounts.LoginToken 이다.
+    # 운영 DB 에는 그 앱의 표(authtoken_token)가 빈 채로 남아 있다. 앱이 없으니 Django 는
+    # 회원을 지울 때 그 표를 보지 않는다. 그 표에 행을 넣으면 탈퇴가 외래 키에 걸린다.
     "django_filters",
     "corsheaders",
     # 로컬 앱
