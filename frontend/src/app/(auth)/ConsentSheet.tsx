@@ -135,8 +135,8 @@ export function GoogleStep({ titleId, onCancel }: StepProps) {
       <GoogleNameNote />
       {consent.ready ? (
         // 구글 공식 버튼. 폰 Chrome 에서는 화면 아래 계정 창이 이 시트 위로
-        // 뜨고 페이지를 떠나지 않는다. 스크립트가 뜨기 전이나 못 뜨면 구글
-        // 화면으로 가는 예전 링크를 보인다.
+        // 뜨고 페이지를 떠나지 않는다. 구글 버튼이 뜨기 전에는 구글 화면으로
+        // 가는 예전 링크를 흐리게, 누를 수 없게 두고, 못 뜨면 누를 수 있게 한다.
         <GoogleButton
           consent
           context="signup"

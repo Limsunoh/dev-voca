@@ -1,5 +1,6 @@
 "use client";
 
+import { unstable_rethrow } from "next/navigation";
 import Script from "next/script";
 import { type ReactNode, useEffect, useRef, useState, useTransition } from "react";
 
@@ -19,8 +20,15 @@ declare global {
 /** 구글 버튼의 가장 넓은 폭(px). 구글 스크립트가 받는 상한이다. */
 const MAX_WIDTH = 400;
 
-/** 구글 버튼이 나타나길 기다리는 시간(ms). 넘기면 예전 링크를 그대로 둔다. */
-const BUTTON_WAIT_MS = 10_000;
+/**
+ * 구글 버튼을 기다리는 동안 예전 링크를 누를 수 없게 두는 시간(ms). 넘기면 예전
+ * 링크를 누를 수 있게 한다. 기다리는 동안 누를 수 있으면, 폰에서 동의를 켜자마자
+ * 누른 사람은 예전 링크로 구글 화면에 갔다(11-13 사용자 폰, 시작 화면 동의 창).
+ */
+const FALLBACK_AFTER_MS = 6_000;
+
+/** 구글 버튼이 크기를 갖는지 살피는 시간(ms). 예전 링크를 연 뒤에도 그 위로 바꾼다. */
+const BUTTON_WAIT_MS = 30_000;
 
 /**
  * 구글이 그린 버튼이 보이는가. 구글 스크립트는 el 안에 iframe 을 넣고, 버튼이
@@ -94,10 +102,16 @@ export function renderGoogleButton(id: GoogleId, el: HTMLElement): void {
  * 화면 아래 창 방식을 구글이 공식으로 지원하는 것은 구글이 직접 그리는 이
  * 버튼뿐이라 모양을 우리 것으로 바꾸지 않는다(11-13 사용자 결정).
  *
- * 구글 스크립트가 뜨기 전, 못 뜨면(차단·끊김), 서버에 클라이언트 ID 가 없으면,
- * 구글이 버튼을 그리지 못하면(구글 콘솔의 "승인된 자바스크립트 원본" 에 이
- * 주소가 없으면) fallback(구글 화면으로 가는 예전 링크)을 그 자리에 보인다.
- * 누를 수 없는 빈 칸이 남지 않는다.
+ * 구글 버튼이 뜨기 전에는 fallback(구글 화면으로 가는 예전 링크)을 그 자리에
+ * 흐리게, 누를 수 없게 둔다. 구글 버튼이 못 뜨면(스크립트 차단·끊김, 서버에
+ * 클라이언트 ID 가 없음, 구글 콘솔의 "승인된 자바스크립트 원본" 에 이 주소가
+ * 없어 버튼이 0x0) 예전 링크를 누를 수 있게 한다. 화면 코드가 돌면 끝내 누를
+ * 것이 없는 빈 칸은 남지 않는다.
+ *
+ * 서버가 그린 처음 화면부터 예전 링크를 막는다. 화면 코드가 붙기 전에 열어 두면,
+ * 느린 폰에서 로그인 화면을 열자마자 누른 사람이 다시 예전 방식으로 간다. 대신
+ * 자바스크립트가 아예 안 도는 브라우저에서는 구글 로그인 링크를 못 누른다(이메일
+ * 로그인은 된다). 앱은 늘 자바스크립트가 돈다.
  *
  * consent 는 가입 동의 세 항목을 켠 뒤 그린 버튼에서만 true 다. 새 계정은 그
  * 값이 있어야 만들어진다.
@@ -117,6 +131,8 @@ export function GoogleButton({
   const box = useRef<HTMLDivElement>(null);
   const [scriptReady, setScriptReady] = useState(false);
   const [shown, setShown] = useState(false);
+  /** 구글 버튼을 더 기다리지 않고 예전 링크를 누를 수 있게 했나. */
+  const [gaveUp, setGaveUp] = useState(false);
   const [pending, startTransition] = useTransition();
   /** 신분 토큰을 이미 보냈나. 두 번째부터는 버린다. */
   const sentRef = useRef(false);
@@ -132,9 +148,14 @@ export function GoogleButton({
     // 눌러 토큰이 또 오면, 첫 번째가 이미 쓴 쿠키 값이 없어 실패하고 로그인
     // 화면으로 가 돌아갈 곳을 잃는다.
     //
-    // 액션은 끝나면 redirect 로 화면을 옮긴다. 호출 자체가 실패하면(망이
-    // 끊겼거나, 배포 직후라 열려 있던 화면의 액션이 서버에 없거나) 오류가 화면
-    // 전체의 오류 화면으로 올라가므로, 여기서 받아 로그인 화면의 안내로 보낸다.
+    // 액션은 성공하면 redirect 로 화면을 옮긴다. 그때 Next 는 화면을 옮기고, 이
+    // 호출은 화면 이동 신호(NEXT_REDIRECT)를 오류로 던진다. 그 신호는
+    // unstable_rethrow 로 Next 에 돌려준다. 실패로 받으면 옮겨 간 화면을 로그인
+    // 화면으로 다시 덮어, 돌아갈 곳(next)과 새 계정의 가입 안내를 잃었다.
+    //
+    // 호출 자체가 실패하면(망이 끊겼거나, 배포 직후라 열려 있던 화면의 액션이
+    // 서버에 없거나) 오류가 화면 전체의 오류 화면으로 올라가므로, 여기서 받아
+    // 로그인 화면의 안내로 보낸다.
     const send = (credential: string) => {
       if (sentRef.current) return;
       sentRef.current = true;
@@ -143,6 +164,7 @@ export function GoogleButton({
         try {
           failed = !!(await googleCredentialAction({ credential, next, consent }))?.failed;
         } catch (error) {
+          unstable_rethrow(error);
           console.error("구글 로그인을 보내지 못했습니다", error);
           failed = true;
         }
@@ -157,7 +179,12 @@ export function GoogleButton({
       .then((prep) => {
         const id = window.google?.accounts?.id;
         const el = box.current;
-        if (cancelled || !prep || !id || !el) return;
+        if (cancelled) return;
+        // 서버에 클라이언트 ID 가 없거나 구글 스크립트가 비었으면 기다릴 것 없다.
+        if (!prep || !id || !el) {
+          setGaveUp(true);
+          return;
+        }
         showGoogleButton(id, el, prep, { context, onCredential: send });
         // 구글 버튼이 실제로 크기를 갖고 나타난 뒤에만 예전 링크를 걷는다.
         // 구글 콘솔에 이 주소가 등록되지 않았으면 구글이 버튼을 0x0 으로
@@ -181,8 +208,9 @@ export function GoogleButton({
         resize.observe(el);
       })
       .catch((error) => {
-        // 준비가 실패하면 예전 링크가 그대로 남는다. 원인은 기록만 한다.
+        // 준비가 실패하면 예전 링크를 바로 누를 수 있게 한다. 원인은 기록만 한다.
         console.warn("구글 버튼을 준비하지 못했습니다", error);
+        if (!cancelled) setGaveUp(true);
       });
     return () => {
       cancelled = true;
@@ -192,6 +220,14 @@ export function GoogleButton({
     };
   }, [scriptReady, next, consent, context]);
 
+  // 구글 스크립트가 막혔거나 끝내 안 뜨면 onReady 도 안 오므로, 화면 코드가 붙어
+  // 이 버튼이 살아난 때부터 잰다.
+  useEffect(() => {
+    if (shown) return;
+    const timer = setTimeout(() => setGaveUp(true), FALLBACK_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [shown]);
+
   return (
     // min-w-0: 시작 화면 동의 창처럼 그리드 안에 놓이면 안의 iframe 폭 아래로
     // 줄지 않아, 폴드를 접어도 다시 그리지 못하고 창이 화면 밖으로 넘쳤다.
@@ -200,6 +236,12 @@ export function GoogleButton({
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
         onReady={() => setScriptReady(true)}
+        // 스크립트를 받는 도중에 이 버튼이 다시 붙으면(동의를 껐다 켬, 로그인에서
+        // 가입으로 옮김) Next 는 onReady 를 다시 부르지 않고 onLoad 만 부른다.
+        // 받기가 이미 실패한 뒤 다시 붙어도 onLoad 가 오고, 그러면 구글 객체가
+        // 없어 준비 액션이 돌아오는 대로 예전 링크를 연다.
+        onLoad={() => setScriptReady(true)}
+        onError={() => setGaveUp(true)}
       />
       {/* 구글 스크립트가 버튼을 그려 넣는 자리. 폭을 재야 해서 처음부터
           보이게 두고, 그려지기 전에는 예전 링크를 그 위에 덮는다. */}
@@ -222,7 +264,23 @@ export function GoogleButton({
         }}
         inert={!shown}
       />
-      {!shown && <div className="absolute inset-0">{fallback}</div>}
+      {/* 구글 버튼을 기다리는 동안 예전 링크는 흐리게 두고 누를 수 없게 한다.
+          구글 버튼이 못 뜨는 것이 확실하거나(스크립트 차단, 준비 실패) 기다릴
+          만큼 기다렸으면 누를 수 있게 한다. */}
+      {!shown && (
+        <div
+          className="absolute inset-0"
+          inert={!gaveUp}
+          style={gaveUp ? undefined : { opacity: 0.5 }}
+        >
+          {fallback}
+        </div>
+      )}
+      {!shown && !gaveUp && (
+        <span role="status" className="sr-only">
+          구글 로그인 버튼을 불러오는 중입니다.
+        </span>
+      )}
       {/* 확인하는 동안 구글 버튼을 덮어 다시 누르지 못하게 한다. */}
       {pending && <div className="absolute inset-0" aria-hidden />}
       {pending && (
