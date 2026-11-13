@@ -26,6 +26,7 @@ from rest_framework.response import Response
 from apps.learning.record import note_practice_answer
 
 from .models import DailyPhrase, LearningItem, PhraseScene, Sentence, Word
+from .pagination import ContentPagination
 from .quiz import (
     TARGET_SENTENCE,
     TARGET_WORD,
@@ -143,6 +144,8 @@ class LearningItemViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
     alias_field: str | None = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, ReadableOrdering]
+    # 뒤쪽 절반의 쪽을 거꾸로 읽어 빠르게 하는 쪽 나누기(pagination.py).
+    pagination_class = ContentPagination
     # is_exam·exam_subject 로 정처기 범위를 좁힌다.
     #
     # 두 파라미터의 오류 처리가 다르다. exam_subject 는 choices 라 없는
@@ -175,13 +178,21 @@ class LearningItemViewSet(viewsets.ModelViewSet):
 
         그래서 필터가 다 끝난 뒤에 정렬 키를 앞에 덧붙인다. 사용자가 고른
         정렬은 뒤에 남아 그대로 작동한다.
+
+        맨 끝에는 pk 를 붙여 같은 값이 없는 순서로 만든다. ?ordering=difficulty
+        처럼 칸 하나만 고르면 같은 난이도끼리 순서가 정해지지 않는다. 그러면
+        쪽 나누기(ContentPagination)가 뒤쪽 쪽을 거꾸로 읽을 때 쪽 경계에서
+        항목이 겹치거나 빠진다.
         """
         queryset = super().filter_queryset(queryset)
         queryset = self._shuffle(queryset)
         queryset = self._rank_by_search(queryset)
+        keys = list(queryset.query.order_by) or list(queryset.model._meta.ordering)
         if can_review(self.request.user):
-            return queryset.order_by("is_reviewed", *queryset.query.order_by)
-        return queryset
+            keys.insert(0, "is_reviewed")
+        if not keys or keys[-1] not in ("pk", "-pk", "id", "-id"):
+            keys.append("pk")
+        return queryset.order_by(*keys)
 
     def _rank_by_search(self, queryset: QuerySet) -> QuerySet:
         """검색 결과를 제목이 맞는 것부터 놓는다.
