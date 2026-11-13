@@ -80,8 +80,8 @@ class EmailRateThrottle(SimpleRateThrottle):
 class GoogleRateThrottle(SimpleRateThrottle):
     """구글 로그인 시도 제한.
 
-    이메일로 셀 수 없다. 구글 요청에는 코드만 들어 있고 이메일은 구글에
-    물어봐야 나온다.
+    이메일로 셀 수 없다. 구글 요청에는 코드나 신분 토큰만 들어 있고 이메일은
+    구글에 물어봐야 나온다.
 
     요청자별로도 못 센다. 이 프로젝트는 모든 요청이 Next 서버 하나로
     보인다. 가입·로그인은 Next 가 비밀값과 함께 접속 IP 를 실어 보내

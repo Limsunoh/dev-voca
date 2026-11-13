@@ -87,18 +87,27 @@ export function logIn(body: {
 /**
  * 구글 로그인.
  *
- * 구글이 준 코드를 넘기면 백엔드가 구글에 되물어 확인하고, 계정을 찾거나
- * 만든다. 사용자 정보를 직접 넘기지 않는 이유: 그러면 누구든 남의
- * 이메일을 적어 보내 그 계정으로 들어올 수 있다.
+ * 구글이 준 신분 토큰이나 코드를 넘기면 백엔드가 구글에 되물어 확인하고,
+ * 계정을 찾거나 만든다. 사용자 정보를 직접 넘기지 않는 이유: 그러면 누구든
+ * 남의 이메일을 적어 보내 그 계정으로 들어올 수 있다.
  */
-export function logInWithGoogle(body: {
-  code: string;
-  redirect_uri: string;
-  /** 가입 화면에서 동의하고 온 경우에만 싣는다. 새 계정을 만들 때 쓰인다. */
-  terms_agreed?: boolean;
-  disclosure_agreed?: boolean;
-  age_confirmed?: boolean;
-}): Promise<AuthResult> {
+export function logInWithGoogle(
+  body: (
+    | /** 구글 화면을 다녀와 받은 코드. 구글 스크립트를 못 쓰는 브라우저. */
+    { code: string; redirect_uri: string }
+    /**
+     * 구글 버튼이 브라우저에 준 신분 토큰. 화면 아래 계정 창(FedCM)으로
+     * 페이지를 떠나지 않고 로그인했다. nonce 는 버튼을 그릴 때 정해 쿠키에 둔
+     * 비밀값이고, 토큰 안에는 그 해시가 들어 있다.
+     */
+    | { credential: string; nonce: string }
+  ) & {
+    /** 가입 화면에서 동의하고 온 경우에만 싣는다. 새 계정을 만들 때 쓰인다. */
+    terms_agreed?: boolean;
+    disclosure_agreed?: boolean;
+    age_confirmed?: boolean;
+  },
+): Promise<AuthResult> {
   return request("/api/accounts/google/", { method: "POST", body });
 }
 
