@@ -209,11 +209,16 @@ export function GoogleButton({
         // 나타나기 전에는 숨기고 누를 수도 읽을 수도 없게 한다. 구글은 주소가
         // 허용되지 않아도 버튼 글자를 여기 넣어 두는데, 그러면 예전 링크 밑에
         // 동작하지 않는 버튼이 하나 더 그려지고 읽힌다(11-13 impeccable 이 잡았다).
-        // visibility 는 자리를 그대로 두어 폭과 iframe 크기를 재는 데 지장이 없다.
+        //
+        // 숨기는 것은 투명도로만 한다. visibility: hidden(이나 display: none)이면
+        // 구글 iframe 이 크기를 알리지 않는다. 브라우저가 숨긴 다른 사이트 iframe
+        // 의 그리기를 멈추는 것으로 보인다. 우리는 크기가 생겨야 보이게 하니 서로
+        // 기다리다 영영 0x0 으로 남았다(11-13 운영에서 콘솔 원본을 등록한 뒤
+        // 드러났다). 투명도 0 이면 크기를 알린다(실제 Chrome 에서 확인).
         style={{
           minHeight: "var(--hit-min)",
           alignItems: "center",
-          visibility: shown ? undefined : "hidden",
+          opacity: shown ? undefined : 0,
         }}
         inert={!shown}
       />
