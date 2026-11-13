@@ -341,8 +341,8 @@ class ChunkWriteTest(TestCase):
         DailyStudy.objects.filter(pk=study.pk).update(answered=study.chunk_size)
         study.answered = study.chunk_size
 
-        # _pick_for_study 가 도는 동안(ReviewState 조회 + order_by("?")
-        # 세 번, 수십 ms) DB 쪽 learned_ids 가 늘어나는 순간을 만든다.
+        # _pick_for_study 가 도는 동안(ReviewState 조회 + 무작위 고르기
+        # 여러 번) DB 쪽 learned_ids 가 늘어나는 순간을 만든다.
         # 다른 요청이 묶음을 넣었거나, 관리 화면이 손댄 경우다. 이때
         # 인메모리 값으로 이어붙이면 그 사이에 늘어난 것이 사라진다.
         real = daily_study._pick_for_study

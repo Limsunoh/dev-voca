@@ -45,11 +45,12 @@ from datetime import date
 
 from django.core import signing
 from django.db import IntegrityError, transaction
-from django.db.models import Case, F, When
+from django.db.models import Case, Exists, F, OuterRef, QuerySet, When
 from django.utils import timezone
 
 from apps.vocab import quiz
 from apps.vocab.models import Sentence, Word
+from apps.vocab.sampling import pick_random
 
 from . import calendar_kst
 from .models import STUDY_PLANS, DailyPreview, DailyStudy, ReviewState, StudyPlan
@@ -119,6 +120,20 @@ def _fit_chunks(plan: StudyPlan, total: int, words: int) -> tuple[int, int]:
     return plan.chunk_size, count
 
 
+def _count_up_to(queryset: QuerySet, limit: int) -> int:
+    """행 수를 세되 limit 에서 멈춘다.
+
+    아래 계산들은 콘텐츠 수를 계획한 문제 수(plan.total)와의 min 으로만
+    쓴다. 콘텐츠가 그보다 많으면 몇 개든 결과가 같다. 그래서 다 세지 않는다.
+    단어·문장이 33만 개씩일 때 전부 세는 COUNT 셋이 일일공부 시작에서
+    130ms 였다(2026-11-13 측정). 슬라이스한 count 는 LIMIT 을 건 하위
+    질의를 세어 limit 개만 읽는다. 자른 쿼리에는 기본 정렬이 남으므로
+    order_by() 로 지운다. 안 그러면 정렬 칸에 맞는 인덱스가 없을 때 표 전체를
+    정렬한다.
+    """
+    return queryset.order_by()[:limit].count()
+
+
 def _fit_plan(plan: StudyPlan) -> tuple[int, int, int]:
     """지금 콘텐츠로 이 길이를 열면 (문제 수, 묶음 크기, 묶음 수).
 
@@ -127,7 +142,10 @@ def _fit_plan(plan: StudyPlan) -> tuple[int, int, int]:
     갈린다.
     """
     total = min(plan.total, _answerable(plan))
-    chunk_size, chunk_count = _fit_chunks(plan, total, Word.objects.visible().count())
+    # total 은 plan.total 이하라 plan.total 까지만 세도 _fit_chunks 의
+    # min(total, words) 가 같다.
+    words = _count_up_to(Word.objects.visible(), plan.total)
+    chunk_size, chunk_count = _fit_chunks(plan, total, words)
     return total, chunk_size, chunk_count
 
 
@@ -707,6 +725,9 @@ def _pick_words(user_id: int, size: int, seen: set[int]) -> list[Word]:
         if is_wrong and target_id not in seen
     ]
     if wrong_ids:
+        # 여기는 ORDER BY RANDOM() 을 그대로 둔다. 이 사람이 틀린 단어(id 목록)
+        # 안에서만 섞어 행이 몇 개뿐이다. 표 전체를 섞는 곳만 pick_random 으로
+        # 바꿨다.
         picked.extend(
             Word.objects.visible()
             .filter(pk__in=wrong_ids)
@@ -722,10 +743,20 @@ def _pick_words(user_id: int, size: int, seen: set[int]) -> list[Word]:
     # 후보를 무작위로 자르는 것은 여기서만 한다. 안 본 것은 대개
     # 수백 개라 순서를 정할 근거가 없고, 매번 같은 것이 나오면
     # 알파벳 앞쪽만 배우게 된다.
-    known = set(states) | seen | {w.pk for w in picked}
-    picked.extend(
-        Word.objects.visible().exclude(pk__in=known).order_by("?")[:need]
+    #
+    # 복습 상태가 있는 단어는 id 목록이 아니라 EXISTS 로 뺀다. 많이 푼
+    # 사람은 상태가 수천 개라, 목록으로 넘기면 pick_random 이 쿼리를 여러
+    # 조각으로 나눌 때마다 그 수천 개를 다시 실어 보낸다(조각당 같은 목록).
+    # 오늘 본 것과 방금 고른 것은 몇 개뿐이라 목록으로 둔다.
+    has_state = ReviewState.objects.filter(
+        user_id=user_id, target_type=quiz.TARGET_WORD, target_id=OuterRef("pk")
     )
+    unseen = (
+        Word.objects.visible()
+        .filter(~Exists(has_state))
+        .exclude(pk__in=seen | {w.pk for w in picked})
+    )
+    picked.extend(pick_random(unseen, need))
 
     need = size - len(picked)
     if need < 1:
@@ -846,8 +877,11 @@ def _answerable(plan: StudyPlan) -> int:
     내주는 것은 사용자가 손해를 안 본다. 반대로 틀리면 "25문제" 를
     약속받고 8문제에서 끝나는 화면을 보게 된다.
     """
-    words = Word.objects.visible().count()
-    sentences = Sentence.objects.visible().count()
+    # plan.total 까지만 센다(_count_up_to). 아래 식은 단어 수를 from_study 와,
+    # 남은 단어와 문장 수를 rest_room 과의 min 으로만 쓰고, from_study +
+    # rest_room 이 plan.total 이다. 그래서 plan.total 보다 많으면 결과가 같다.
+    words = _count_up_to(Word.objects.visible(), plan.total)
+    sentences = _count_up_to(Sentence.objects.visible(), plan.total)
 
     # 학습분은 단어만 쓴다. 계획한 만큼 단어가 있으면 그대로 선다.
     learning = min(words, plan.from_study)

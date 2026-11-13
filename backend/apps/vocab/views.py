@@ -37,6 +37,7 @@ from .quiz import (
     make_situation_question,
     sign_question,
 )
+from .sampling import pick_random
 from .serializers import (
     QuizSentenceSerializer,
     QuizWordSerializer,
@@ -541,6 +542,10 @@ _LEVELS = frozenset(LearningItem.Difficulty.values)
 # 고를 수 있는 상황. 일상 표현에만 있다(개발 용어에는 상황이 없다).
 _SCENES = frozenset(PhraseScene.values)
 
+# 일상영어 문제를 낼 때 무작위로 먼저 읽어 보는 수. 일상 표현은 전부, 개발
+# 용어는 열에 아홉이 읽을 수 있는 것이라(2026-11-13) 열 개면 거의 늘 걸린다.
+TALK_SAMPLE = 10
+
 
 def _item_of(
     request: Request, pool: QuerySet, name: str
@@ -882,9 +887,14 @@ class TalkViewSet(viewsets.ViewSet):
 
         그 필터를 SQL 로 옮기지 않고 파이썬에서 도는 이유: 판정이 "낱말로
         쪼개 각 낱말이 전부 대문자인지" 라 SQL 로 옮기면 정규식 세 개가
-        되고, 그것이 DB 엔진마다 다르게 동작한다. 일상 표현이 6천 개를
-        넘어 판정이 문제마다 22ms 였는데, is_speakable 이 결과를 기억해
-        두 번째부터는 거의 들지 않는다.
+        되고, 그것이 DB 엔진마다 다르게 동작한다.
+
+        그래서 전부를 읽어 거르지 않고 무작위로 몇 개만 읽어 그중 읽을 수
+        있는 것을 낸다. 표현이 33만 개일 때 전부 읽어 거르면 문제마다 1초가
+        걸렸다(2026-11-13 측정). 뽑은 것이 전부 못 읽는 것일 때만 전부를
+        훑어, 정말 다 봤는지(404)를 그때 가린다. 전부 훑을 때는 is_speakable
+        이 결과를 기억해 두어 두 번째부터 판정이 거의 들지 않는다(일상 표현
+        6천 개에서 22ms 이던 것).
         """
         if request.query_params.get("kind") == KIND_DEV:
             kind, model, field = KIND_WORD, Word, "term"
@@ -913,14 +923,21 @@ class TalkViewSet(viewsets.ViewSet):
         if scene is not None:
             pool = pool.filter(scene=scene)
 
-        # 소리로 채점할 수 있는 것만 남긴다. values_list 로 두 칸만 읽어
-        # 필터한 뒤 pk 로 다시 꺼낸다 - 전 항목을 객체로 만들 이유가 없다.
-        speakable = [
-            pk
-            for pk, text in pool.values_list("pk", field)
-            if is_speakable(text)
-        ]
-        if not speakable:
+        # 소리로 채점할 수 있는 것을 고른다. 무작위로 몇 개 읽어 먼저 본다.
+        sample = pick_random(pool, TALK_SAMPLE)
+        item = next((one for one in sample if is_speakable(getattr(one, field))), None)
+        if item is None and sample:
+            # 뽑은 것이 전부 약어·숫자 든 것이었다. 드물지만 그런 것만 남은
+            # 풀이면 정말 없는지 전부 훑어 가린다. values_list 로 두 칸만 읽는다.
+            speakable = [
+                pk
+                for pk, text in pool.values_list("pk", field)
+                if is_speakable(text)
+            ]
+            if speakable:
+                # 그 사이 검수가 취소됐으면 None 이 되어 아래 404 로 간다.
+                item = pool.filter(pk=random.choice(speakable)).first()
+        if item is None:
             # 다 봤거나 exclude 가 풀을 비웠다. 화면이 "다 봤습니다" 를
             # 그리고 다른 갈래로 가는 길을 둔다.
             #
@@ -940,7 +957,6 @@ class TalkViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        item = model.objects.get(pk=random.choice(speakable))
         text = getattr(item, field)
 
         return Response(
