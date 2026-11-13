@@ -467,7 +467,8 @@ REST_FRAMEWORK = {
         "round_finish": "2000/min" if sys.argv[1:2] == ["test"] else "60/min",
         # 답하기는 한 판에 수십 번 오간다. 90초에 40문제를 풀고 곧바로
         # 다음 판을 해도 걸리지 않을 값이어야 한다. 그래도 통을 두는 이유는
-        # 요청마다 RoundStep 표에 쓰고 order_by("?") 로 표를 훑기 때문이다.
+        # 요청마다 RoundStep 표에 쓰고 다음 문제를 만드느라 단어·문장 표를
+        # 읽기 때문이다(무작위 고르기, vocab/sampling.py).
         "round_answer": "5000/min" if sys.argv[1:2] == ["test"] else "600/min",
         # 순위표는 읽기만 한다. 막는 것은 데이터가 아니라 집계 비용이다.
         # 이 값은 순위표 하나당이다. 통을 셋으로 나눠 쓴다

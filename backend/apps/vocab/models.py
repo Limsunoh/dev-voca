@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models.functions import Lower, Trim
+from django.db.models.functions import Lower, Random, Trim
 
 
 class LearningItemQuerySet(models.QuerySet):
@@ -99,6 +99,22 @@ class LearningItem(models.Model):
     is_reviewed = models.BooleanField("검수 완료", default=False)
     created_at = models.DateTimeField("생성일", auto_now_add=True)
     updated_at = models.DateTimeField("수정일", auto_now=True)
+    # 무작위로 몇 개 고를 때 쓰는 키(0 이상 1 미만). 행마다 DB 가 random() 으로
+    # 채운다. 문제 보기·후보를 고를 때 "키 >= 무작위 값" 을 키 순서로 몇 개
+    # 읽는다(sampling.pick_random). 표 전체를 섞는 ORDER BY RANDOM() 은 표가
+    # 커지면 표 크기만큼 든다. 화면과 API 에는 내보내지 않는다.
+    #
+    # 인덱스는 이 칸 하나에만 건다. 다른 인덱스처럼 검수 칸과 묶으면
+    # (is_reviewed, random_key) 검수 안 된 행을 건너뛰지 않아도 되지만, 그러려면
+    # 모델마다 Meta.indexes 에 따로 적어야 한다. 새 콘텐츠 타입이 물려받는
+    # 것만으로는 그 인덱스가 생기지 않는다. 검수 대기가 아주 많은 동안만 몇 행
+    # 더 읽는다.
+    #
+    # SQLite 모드(USE_SQLITE)의 기본값 RAND() 는 Django 가 연결마다 등록하는
+    # 함수라, 장고 밖(sqlite3 명령 등)에서 행을 넣으면 그 함수가 없다고 실패한다.
+    random_key = models.FloatField(
+        "무작위 키", db_default=Random(), db_index=True, editable=False
+    )
 
     # 상속한 모델이 Word.objects.visible() 을 쓸 수 있게 한다.
     objects = LearningItemQuerySet.as_manager()

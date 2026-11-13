@@ -26,6 +26,7 @@ from django.db.models import Q, QuerySet
 from django.db.models.functions import Trim
 
 from .models import TERM_KEY, Sentence, Word
+from .sampling import pick_random
 
 # 정답이 무엇을 가리키는지. 채점한 뒤 무엇을 보여줄지 정하는 데 쓴다.
 TARGET_WORD = "word"
@@ -293,17 +294,18 @@ def _pick_distractors(answer: Word, pool: QuerySet[Word], count: int) -> list[Wo
 
     같은 분류에서 먼저 뽑는다. 아무 데서나 뽑으면 git 단어 문제에 DB 용어가
     섞여 답이 뻔해진다. 같은 분류가 모자라면 나머지로 채운다.
+
+    무작위 고르기는 pick_random 이다. 표가 커도 표 전체를 섞지 않는다
+    (sampling 머리말).
     """
-    picked = list(
-        pool.filter(category=answer.category)
-        .exclude(pk=answer.pk)
-        .order_by("?")[:count]
+    picked = pick_random(
+        pool.filter(category=answer.category).exclude(pk=answer.pk), count
     )
 
     if len(picked) < count:
         # 분류가 작아서 모자란 경우. 이미 고른 것과 정답을 빼고 채운다.
         used = {answer.pk, *(w.pk for w in picked)}
-        rest = list(pool.exclude(pk__in=used).order_by("?")[: count - len(picked)])
+        rest = pick_random(pool.exclude(pk__in=used), count - len(picked))
         picked.extend(rest)
 
     return picked
@@ -513,9 +515,10 @@ def make_question(
     if kind == QuizKind.DESCRIPTION:
         candidates = candidates.exclude(description="")
 
-    answer = candidates.order_by("?").first()
-    if answer is None:
+    chosen = pick_random(candidates, 1)
+    if not chosen:
         return None
+    answer = chosen[0]
 
     return _with_answer(kind, answer, choices_from if choices_from is not None else pool)
 
@@ -728,7 +731,7 @@ def make_blank_question(
 
     # 몇 개만 뽑아 그중 되는 것을 쓴다. 전부 훑으면 매 요청마다 380개를
     # 스캔하게 되고, 안 되는 문장이 절반이라 몇 번만 시도해도 충분히 걸린다.
-    picked = list(pool.order_by("?")[:12])
+    picked = pick_random(pool, 12)
     if not picked:
         return None
 
@@ -902,9 +905,10 @@ def make_situation_question(
             return None
     else:
         candidates = pool.exclude(pk__in=exclude_ids or [])
-        answer = candidates.order_by("?").first()
-        if answer is None:
+        chosen = pick_random(candidates, 1)
+        if not chosen:
             return None
+        answer = chosen[0]
 
     # 정답과 같은 종류(장면이면 장면, 자리면 자리)만 보기로 쓴다.
     want_place = _is_place(answer.context)
@@ -927,9 +931,9 @@ def make_situation_question(
     def pick(candidates) -> list[Sentence]:
         chosen: list[Sentence] = []
         seen = {answer.context}
-        for one in candidates.exclude(pk=answer.pk).order_by("?")[
-            : (CHOICE_COUNT - 1) * 5
-        ]:
+        for one in pick_random(
+            candidates.exclude(pk=answer.pk), (CHOICE_COUNT - 1) * 5
+        ):
             if one.context in seen:
                 continue
             seen.add(one.context)
