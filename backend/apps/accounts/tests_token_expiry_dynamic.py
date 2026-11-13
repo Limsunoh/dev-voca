@@ -2,7 +2,7 @@
 
   - 가입(이메일·구글)하면 동의 기록의 버전이 화면 문서(LegalDoc.tsx 의 DOC_VERSION)와 같다.
   - authtoken 앱이 없어도 rest_framework.authtoken 을 부르는 곳이 없고, 그 관리자 화면은 404 다.
-  - 운영 DB 처럼 빈 authtoken_token 표가 남아 있어도 탈퇴·관리자 삭제·1년 파기가 된다.
+  - 옛 배포로 되돌렸다 와서 빈 authtoken_token 표가 다시 생겨 있어도 탈퇴·관리자 삭제·1년 파기가 된다.
 """
 
 from __future__ import annotations
@@ -96,7 +96,7 @@ class AuthtokenGoneTest(TestCase):
 
 
 class LeftoverAuthtokenTableTest(TestCase):
-    """운영 DB 처럼 빈 authtoken_token 표가 회원을 가리키는 외래 키와 함께 남아 있을 때."""
+    """빈 authtoken_token 표가 회원을 가리키는 외래 키와 함께 있을 때(옛 배포로 되돌렸다 온 경우)."""
 
     def setUp(self):
         cache.clear()

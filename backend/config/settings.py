@@ -197,8 +197,7 @@ INSTALLED_APPS = [
     # 서드파티
     "rest_framework",
     # rest_framework.authtoken 은 11-13 에 뺐다. 로그인 토큰은 accounts.LoginToken 이다.
-    # 운영 DB 에는 그 앱의 표(authtoken_token)가 빈 채로 남아 있다. 앱이 없으니 Django 는
-    # 회원을 지울 때 그 표를 보지 않는다. 그 표에 행을 넣으면 탈퇴가 외래 키에 걸린다.
+    # 운영 DB 의 그 앱 표(authtoken_token)와 마이그레이션 기록도 같은 날 지웠다.
     "django_filters",
     "corsheaders",
     # 로컬 앱
