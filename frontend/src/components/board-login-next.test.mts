@@ -39,6 +39,14 @@ mock.module("next/link", {
 // AuthForm 의 "로그인 없이 둘러보기" 가 부르는 server action. 원본은
 // "use server" 파일이라 session(server-only)을 끌고 와 Next 밖에서는
 // import 자체가 안 된다. 여기서는 전환 링크만 보므로 빈 함수로 둔다.
+// 구글 버튼(GoogleButton)이 부르는 서버 액션. 실제 파일은 서버 전용 모듈을 불러
+// 테스트에서 읽히지 않는다. 준비가 null 이면 버튼은 예전 링크를 그대로 보인다.
+mock.module("@/app/(auth)/google-actions", {
+  namedExports: {
+    prepareGoogleButton: async () => null,
+    googleCredentialAction: async () => {},
+  },
+});
 mock.module("@/app/start/actions", {
   namedExports: { continueAsGuestAction: async () => {} },
 });

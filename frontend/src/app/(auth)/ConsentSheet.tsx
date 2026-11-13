@@ -9,6 +9,7 @@ import {
   useConsent,
 } from "@/app/(auth)/ConsentChecks";
 import { continueAsGuestAction } from "@/app/start/actions";
+import { GoogleButton } from "@/components/GoogleButton";
 
 export const BUTTON =
   "dv-btn flex w-full items-center justify-center rounded-[var(--radius-pill)] px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-disabled:opacity-60";
@@ -133,9 +134,18 @@ export function GoogleStep({ titleId, onCancel }: StepProps) {
       <ConsentChecks {...consent} />
       <GoogleNameNote />
       {consent.ready ? (
-        <a href={googleConsentHref()} className={BUTTON} style={BRAND}>
-          구글로 계속하기
-        </a>
+        // 구글 공식 버튼. 폰 Chrome 에서는 화면 아래 계정 창이 이 시트 위로
+        // 뜨고 페이지를 떠나지 않는다. 스크립트가 뜨기 전이나 못 뜨면 구글
+        // 화면으로 가는 예전 링크를 보인다.
+        <GoogleButton
+          consent
+          context="signup"
+          fallback={
+            <a href={googleConsentHref()} className={BUTTON} style={BRAND}>
+              구글로 계속하기
+            </a>
+          }
+        />
       ) : (
         <LockedButton onClick={consent.guide}>구글로 계속하기</LockedButton>
       )}

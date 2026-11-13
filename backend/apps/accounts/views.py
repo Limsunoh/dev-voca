@@ -42,7 +42,7 @@ from .email_change import (
 from .email_change import (
     read_token as read_email_change_token,
 )
-from .google import GoogleAuthError, fetch_google_user
+from .google import GoogleAuthError, fetch_google_user, verify_google_credential
 from .mail import MailNotConfigured, send_account_mail
 from .models import AVATAR_PHOTO, TERMS_VERSION, LoginToken, free_display_name
 from .serializers import (
@@ -149,9 +149,10 @@ class LoginView(APIView):
 class GoogleLoginView(APIView):
     """구글 로그인. 계정이 있으면 그대로 들어오고, 없으면 동의를 확인해 만든다.
 
-    Next 서버가 구글에서 받은 코드를 넘긴다. 사용자 정보를 그대로 받지
-    않는 이유: 그러면 누구든 남의 이메일을 적어 보내 그 계정으로 들어올
-    수 있다. 코드를 받아 구글에 되물어 확인한다.
+    화면이 구글 버튼에서 받은 신분 토큰(credential)을, 또는 구글 화면을 다녀온
+    코드(code)를 넘긴다(_google_user). 사용자 정보를 그대로 받지 않는 이유:
+    그러면 누구든 남의 이메일을 적어 보내 그 계정으로 들어올 수 있다. 어느
+    쪽이든 구글에 되물어 확인한다.
 
     이미 그 이메일로 계정이 있으면 새로 만들지 않고 붙는다. 안 묶으면
     같은 사람의 학습 기록이 두 계정으로 갈린다.
@@ -175,6 +176,45 @@ class GoogleLoginView(APIView):
     # 요청자를 구분할 방법이 없어서 나누는 척하면 오히려 뚫린다.
     throttle_classes = [GoogleRateThrottle]
 
+    @staticmethod
+    def _google_user(data: dict) -> dict | Response:
+        """구글에 확인받은 사용자 정보. 확인하지 못하면 400 응답.
+
+        두 길이 있다.
+        - credential: 구글 버튼이 브라우저에 준 신분 토큰. 화면 아래 계정 창
+          (FedCM)으로 페이지를 떠나지 않고 로그인한 경우다. nonce 는 버튼을 그릴
+          때 화면이 정해 쿠키에 둔 비밀값이고, 토큰 안에는 그 해시가 들어 있다
+          (verify_google_credential).
+        - code: 구글 화면으로 갔다 돌아온 경우(구글 스크립트를 못 쓰는 브라우저).
+          Next 서버가 구글이 준 코드를 넘긴다.
+        """
+        bad = Response(
+            {"detail": "구글 로그인 정보가 없습니다."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+        try:
+            if "credential" in data:
+                credential = data.get("credential")
+                nonce = data.get("nonce")
+                if not isinstance(credential, str) or not credential.strip():
+                    return bad
+                if not isinstance(nonce, str) or not nonce.strip():
+                    return bad
+                return verify_google_credential(credential.strip(), nonce.strip())
+
+            code = data.get("code")
+            redirect_uri = data.get("redirect_uri")
+            if not isinstance(code, str) or not code.strip():
+                return bad
+            if not isinstance(redirect_uri, str) or not redirect_uri.strip():
+                return Response(
+                    {"detail": "구글 로그인 정보가 올바르지 않습니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return fetch_google_user(code.strip(), redirect_uri.strip())
+        except GoogleAuthError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
     def post(self, request: Request) -> Response:
         if not isinstance(request.data, dict):
             return Response(
@@ -182,26 +222,9 @@ class GoogleLoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        code = request.data.get("code")
-        redirect_uri = request.data.get("redirect_uri")
-
-        if not isinstance(code, str) or not code.strip():
-            return Response(
-                {"detail": "구글 로그인 정보가 없습니다."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not isinstance(redirect_uri, str) or not redirect_uri.strip():
-            return Response(
-                {"detail": "구글 로그인 정보가 올바르지 않습니다."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            info = fetch_google_user(code.strip(), redirect_uri.strip())
-        except GoogleAuthError as exc:
-            return Response(
-                {"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST
-            )
+        info = self._google_user(request.data)
+        if isinstance(info, Response):
+            return info
 
         User = get_user_model()
 

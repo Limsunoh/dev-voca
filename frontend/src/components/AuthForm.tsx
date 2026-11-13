@@ -12,6 +12,7 @@ import {
 } from "@/app/(auth)/ConsentChecks";
 import type { FormState } from "@/app/(auth)/actions";
 import { ConsentSheet } from "@/app/(auth)/ConsentSheet";
+import { GoogleButton } from "@/components/GoogleButton";
 import { useFocusOnError } from "@/components/useFocusOnError";
 
 /**
@@ -178,9 +179,11 @@ export function AuthForm({
         </div>
       )}
 
-      {/* 링크지만 버튼처럼 보인다. 누르면 구글 동의 화면으로 간다.
-          갈색이 아니라 흰 버튼인 이유: 한 화면에 갈색은 하나뿐이고,
-          그 자리는 아래 제출 버튼이 가진다.
+      {/* 구글 공식 버튼(GoogleButton). 폰 Chrome 에서는 화면 아래 계정 창이
+          뜨고 페이지를 떠나지 않는다. 구글 스크립트가 뜨기 전이나 못 뜨면
+          구글 화면으로 가는 예전 링크를 보인다. 그 링크가 갈색이 아니라 흰
+          버튼인 이유: 한 화면에 갈색은 하나뿐이고, 그 자리는 아래 제출 버튼이
+          가진다.
 
           가입 화면에서 세 항목을 안 켰으면 링크 대신 잠긴 버튼을 그린다.
           disabled 가 아니라 aria-disabled 다. 눌렀을 때 이유를 알려 줘야 해서
@@ -201,10 +204,17 @@ export function AuthForm({
             구글로 계속하기
           </button>
         ) : (
-          <a href={googleHref} className={googleClass} style={googleStyle}>
-            <GoogleMark />
-            구글로 계속하기
-          </a>
+          <GoogleButton
+            next={next}
+            consent={isSignup}
+            context={isSignup ? "signup" : "signin"}
+            fallback={
+              <a href={googleHref} className={googleClass} style={googleStyle}>
+                <GoogleMark />
+                구글로 계속하기
+              </a>
+            }
+          />
         )}
       </div>
 

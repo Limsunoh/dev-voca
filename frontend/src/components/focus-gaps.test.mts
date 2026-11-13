@@ -24,6 +24,14 @@ import { describe, it, mock } from "node:test";
 
 // AuthForm 이 import 하는 "use server" 파일은 Next 밖에서 못 읽어 대역으로
 // 바꾼다. SearchInput 은 라우터 훅을 쓴다. 둘 다 import 전에 등록한다.
+// 구글 버튼(GoogleButton)이 부르는 서버 액션. 실제 파일은 서버 전용 모듈을 불러
+// 테스트에서 읽히지 않는다. 준비가 null 이면 버튼은 예전 링크를 그대로 보인다.
+mock.module("@/app/(auth)/google-actions", {
+  namedExports: {
+    prepareGoogleButton: async () => null,
+    googleCredentialAction: async () => {},
+  },
+});
 mock.module("@/app/start/actions", {
   namedExports: { continueAsGuestAction: async () => {} },
 });
