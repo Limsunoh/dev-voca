@@ -10,7 +10,8 @@ import secrets
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from rest_framework.authtoken.models import Token
+
+from apps.accounts.models import LoginToken
 
 User = get_user_model()
 
@@ -22,7 +23,7 @@ class DailyStatusCarriesLengthTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(email="d@example.com", password=PASSWORD)
-        cls.token = Token.objects.create(user=cls.user)
+        cls.token = LoginToken.objects.create(user=cls.user)
 
     def status(self):
         res = self.client.get(DAILY_URL, HTTP_AUTHORIZATION=f"Token {self.token.key}")

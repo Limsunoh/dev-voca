@@ -22,7 +22,8 @@ from django.db import IntegrityError, connection, transaction
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
+
+from apps.accounts.models import LoginToken
 
 from .admin import UserAdmin
 from .forbidden_names import name_is_forbidden
@@ -261,7 +262,7 @@ class MeNameTest(TestCase):
         self.user = User.objects.create_user(
             email="me@example.com", password=PASSWORD, display_name="평범한이름"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def patch(self, body, token=None):
         headers = {"HTTP_AUTHORIZATION": f"Token {token}"} if token else {}
@@ -556,7 +557,7 @@ class DeleteUploadedPhotoTest(TestCase):
         )
 
     def api_delete(self, user):
-        token = Token.objects.create(user=user)
+        token = LoginToken.objects.create(user=user)
         return Client().delete(PHOTO_URL, HTTP_AUTHORIZATION=f"Token {token.key}")
 
     def assert_same_as_my_page(self, *, photo, avatar):
@@ -596,7 +597,7 @@ class DeleteUploadedPhotoTest(TestCase):
     def test_실제로_올린_사진의_주소가_404_가_된다(self):
         """다른 사람에게 더 보이지 않아야 지운 것이다."""
         user = User.objects.create_user(email="m@example.com", password=PASSWORD)
-        token = Token.objects.create(user=user)
+        token = LoginToken.objects.create(user=user)
         api = Client()
         res = api.post(
             PHOTO_URL,
@@ -829,7 +830,7 @@ class BlankLookingNameRouteTest(TestCase):
         self.member = User.objects.create_user(
             email="me@example.com", password=PASSWORD, display_name="평범한이름"
         )
-        self.token = Token.objects.create(user=self.member)
+        self.token = LoginToken.objects.create(user=self.member)
         self.owner = User.objects.create_user(
             email="owner@example.com", password=PASSWORD, display_name="주인"
         )

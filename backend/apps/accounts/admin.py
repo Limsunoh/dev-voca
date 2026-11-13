@@ -9,9 +9,10 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.db import transaction
-from django.db.models import Case, F, Value, When
+from django.db.models import Case, F, QuerySet, Value, When
+from rest_framework.authtoken.models import TokenProxy
 
-from .models import AVATAR_PHOTO, User, name_taken, shorten_display_name
+from .models import AVATAR_PHOTO, LoginToken, User, name_taken, shorten_display_name
 
 
 class LowercaseEmailMixin:
@@ -154,3 +155,40 @@ class UserAdmin(BaseUserAdmin):
             for member in members:
                 self.log_change(request, member, "올린 사진을 지웠습니다.")
         self.message_user(request, f"사진 {len(members)}장을 지웠습니다.")
+
+
+# DRF 가 붙여 둔 "토큰" 화면을 뗀다. 그 표는 이제 아무도 안 읽어서, 거기서 토큰을
+# 지워도 아무도 로그아웃되지 않는다. 지웠으니 끊겼다고 믿게 되는 화면이다.
+admin.site.unregister(TokenProxy)
+
+
+@admin.register(LoginToken)
+class LoginTokenAdmin(admin.ModelAdmin):
+    """기기별 로그인 토큰. 지우면 그 기기만 로그아웃된다.
+
+    계정 전체를 막으려면 사용자의 "활성" 을 끈다. 토큰을 다 지워도 비밀번호를
+    아는 사람은 다시 로그인한다.
+
+    토큰 값은 보이지 않는다. 화면에 띄우면 관리자 화면을 본 사람이 그 기기로
+    로그인한 것처럼 쓸 수 있다. 새로 만들 이유도 없어서 추가는 막는다.
+    """
+
+    list_display = ("user", "created")
+    search_fields = ("user__email",)
+    fields = ("user", "created")
+    readonly_fields = ("user", "created")
+
+    def get_queryset(self, request) -> QuerySet[LoginToken]:
+        # 회원 행에서 사진 바이트는 빼고 붙인다(SlimTokenAuthentication 과 같은 이유).
+        return super().get_queryset(request).select_related("user").defer("user__avatar_photo")
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def lookup_allowed(self, lookup, value, request=None) -> bool:
+        # 목록 주소의 검색어(?key__startswith=...)로 토큰 값을 거르지 못하게 한다.
+        # Django 는 자기 표의 칸이면 list_filter 에 없어도 받아 주는데, 결과가 1건인지
+        # 0건인지로 40자를 한 글자씩 맞힐 수 있다. 막으면 400 이 난다.
+        if lookup.split("__", 1)[0] == "key":
+            return False
+        return super().lookup_allowed(lookup, value, request)

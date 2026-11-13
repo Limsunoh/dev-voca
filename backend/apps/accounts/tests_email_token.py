@@ -19,7 +19,8 @@ from django.core import signing
 from django.core.cache import cache
 from django.db import connection, connections
 from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase, override_settings
-from rest_framework.authtoken.models import Token
+
+from apps.accounts.models import LoginToken
 
 from .email_change import _SALT, email_mark, make_token, read_token
 from .tests import (
@@ -56,7 +57,7 @@ class EmailChangeFlowMixin:
         self.user = User.objects.create_user(
             email=OLD, password=PASSWORD, display_name="주인"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def request_change(self, new_email=NEW, **body):
         payload = {"new_email": new_email, "current_password": PASSWORD, **body}
@@ -165,7 +166,7 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
     """링크를 눌렀을 때의 판정."""
 
     def token_keys(self):
-        return set(Token.objects.filter(user=self.user).values_list("key", flat=True))
+        return set(LoginToken.objects.filter(user=self.user).values_list("key", flat=True))
 
     def test_정상_변경(self):
         res = self.confirm(self.issued_token())
@@ -337,7 +338,7 @@ class TokenConfirmRaceTest(TransactionTestCase):
     def setUp(self):
         cache.clear()
         self.user = User.objects.create_user(email=OLD, password=PASSWORD)
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def token_for(self, new_email):
         return make_token(
@@ -386,17 +387,17 @@ class TokenConfirmRaceTest(TransactionTestCase):
         )
         self.user.refresh_from_db()
         self.assertIn(self.user.email, (NEW, THIRD))
-        self.assertEqual(Token.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(LoginToken.objects.filter(user=self.user).count(), 1)
 
 
 class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
-    """변경이 끝나거나 로그인이 바뀌면 그 전에 보낸 링크는 죽는다."""
+    """변경이 끝나거나 신청한 기기의 로그인이 끝나면 그 전에 보낸 링크는 죽는다."""
 
     def complete(self, link):
         """링크로 변경을 끝낸다. 변경 뒤에는 로그인 토큰이 새것이 된다."""
         res = self.confirm(link)
         self.assertEqual(res.status_code, 200)
-        self.token = Token.objects.get(user=self.user)
+        self.token = LoginToken.objects.get(user=self.user)
         self.assertEqual(res.json()["token"], self.token.key)
 
     def round_trip(self):
@@ -449,7 +450,7 @@ class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
 
         self.assert_rejected(self.confirm(first))
 
-        self.assertEqual(Token.objects.get(user=self.user).key, self.token.key)
+        self.assertEqual(LoginToken.objects.get(user=self.user).key, self.token.key)
         self.assertEqual(self.me_status(self.token.key), 200)
 
     def test_a_b_와_a_c_를_함께_받아_b_를_쓰면_c_링크는_거절된다(self):
@@ -482,7 +483,7 @@ class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
         self.assertEqual(self.logout().status_code, 204)
 
         self.assert_rejected(self.confirm(link))
-        self.assertFalse(Token.objects.filter(user=self.user).exists())
+        self.assertFalse(LoginToken.objects.filter(user=self.user).exists())
 
     def test_로그아웃_뒤_다시_로그인해도_링크는_거절된다(self):
         """다시 로그인하면 토큰이 새것이다. 메일의 안내와 같은 동작이다."""
@@ -518,12 +519,15 @@ class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
         self.assertEqual(self.confirm(link).status_code, 200)
 
     def test_다른_기기에서_로그인해도_링크는_살아_있다(self):
-        """로그인은 같은 토큰을 돌려준다. 이것으로 링크가 죽으면 이유를 알 수 없다."""
+        """새 기기는 새 토큰을 받지만 링크는 신청한 기기의 토큰에 묶여 있다.
+
+        새 로그인으로 링크가 죽으면 사용자는 이유를 알 수 없다.
+        """
         link = self.issued_token()
 
         res = self.login()
 
-        self.assertEqual(res.json()["token"], self.token.key)
+        self.assertNotEqual(res.json()["token"], self.token.key)
         self.assertEqual(self.confirm(link).status_code, 200)
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, NEW)
@@ -540,8 +544,35 @@ class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
             )
 
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["token"], self.token.key)
+        self.assertNotEqual(res.json()["token"], self.token.key)
         self.assertEqual(self.confirm(link).status_code, 200)
+
+    def test_나중에_로그인한_기기가_로그아웃해도_링크는_살아_있다(self):
+        link = self.issued_token()
+        later = self.login().json()["token"]
+
+        res = self.client.post(LOGOUT_URL, HTTP_AUTHORIZATION=f"Token {later}")
+
+        self.assertEqual(res.status_code, 204)
+        self.assertEqual(self.confirm(link).status_code, 200)
+
+    def test_나중에_로그인한_기기에서_신청해도_링크가_통한다(self):
+        self.login()
+        self.token = LoginToken.objects.filter(user=self.user).latest("pk")
+
+        self.assertEqual(self.confirm(self.issued_token()).status_code, 200)
+
+    def test_신청한_기기가_로그아웃하면_다른_기기가_남아_있어도_링크는_거절된다(self):
+        """처리방침이 "로그아웃하면 대기 중인 링크는 무효" 라고 적고 있다."""
+        first = self.token
+        self.login()
+        self.token = LoginToken.objects.filter(user=self.user).latest("pk")
+        link = self.issued_token()
+
+        self.assertEqual(self.logout().status_code, 204)
+
+        self.assert_rejected(self.confirm(link))
+        self.assertTrue(LoginToken.objects.filter(pk=first.pk).exists())
 
     def test_로그인_없이_다른_기기에서_링크를_열_수_있다(self):
         """메일은 로그인하지 않은 폰에서 열 수 있다. 토큰 자체가 증거다."""
@@ -596,8 +627,13 @@ class SessionUserEmailChangeTest(TestCase):
     def complete(self, link):
         self.assertEqual(self.confirm(link).status_code, 200)
 
-    def logout(self):
-        self.assertEqual(self.session.post(LOGOUT_URL).status_code, 204)
+    def drop_tokens(self):
+        """관리자 화면에서 이 계정의 토큰을 지운 경우.
+
+        세션으로 로그아웃하면 지울 토큰이 없어 아무것도 안 지운다(LogoutView).
+        토큰이 다 없어지는 길은 이것뿐이다.
+        """
+        LoginToken.objects.filter(user=self.user).delete()
 
     def assert_rejected(self, res, email=OLD):
         self.assertEqual(res.status_code, 400)
@@ -606,11 +642,11 @@ class SessionUserEmailChangeTest(TestCase):
         self.assertEqual(self.user.email, email)
 
     def test_신청하면_로그인_토큰이_만들어지고_링크가_통한다(self):
-        self.assertFalse(Token.objects.filter(user=self.user).exists())
+        self.assertFalse(LoginToken.objects.filter(user=self.user).exists())
 
         link = self.issued_token()
 
-        self.assertTrue(Token.objects.filter(user=self.user).exists())
+        self.assertTrue(LoginToken.objects.filter(user=self.user).exists())
         self.complete(link)
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, NEW)
@@ -621,23 +657,28 @@ class SessionUserEmailChangeTest(TestCase):
 
         self.assertEqual(res.status_code, 400)
         sent.assert_not_called()
-        self.assertFalse(Token.objects.filter(user=self.user).exists())
+        self.assertFalse(LoginToken.objects.filter(user=self.user).exists())
 
-    def test_로그아웃으로_토큰이_없어지면_링크는_거절된다(self):
+    def test_세션으로_로그아웃해도_토큰은_그대로다(self):
+        self.issued_token()
+
+        self.assertEqual(self.session.post(LOGOUT_URL).status_code, 204)
+
+        self.assertTrue(LoginToken.objects.filter(user=self.user).exists())
+
+    def test_토큰이_없어지면_링크는_거절된다(self):
         """신청 때 빈 값을 섞었다면 토큰이 없어진 지금 다시 맞아떨어진다."""
         link = self.issued_token()
-        self.logout()
-        self.assertFalse(Token.objects.filter(user=self.user).exists())
+        self.drop_tokens()
 
         self.assert_rejected(self.confirm(link))
 
-    def test_a_b_a_뒤에_로그아웃해도_옛_링크는_거절된다(self):
+    def test_a_b_a_뒤에_토큰이_없어져도_옛_링크는_거절된다(self):
         first = self.issued_token(NEW)
         self.complete(first)
         back = self.issued_token(OLD)
         self.complete(back)
-        self.logout()
-        self.assertFalse(Token.objects.filter(user=self.user).exists())
+        self.drop_tokens()
 
         self.assert_rejected(self.confirm(first))
         self.assert_rejected(self.confirm(back))
@@ -679,7 +720,7 @@ class SessionRequestRaceTest(TransactionTestCase):
                 thread.join(timeout=30)
 
         self.assertEqual(statuses, [202, 202])
-        self.assertEqual(Token.objects.filter(user=user).count(), 1)
+        self.assertEqual(LoginToken.objects.filter(user=user).count(), 1)
 
         links = [
             call.kwargs["body"].split("/profile/email/")[1].split()[0]

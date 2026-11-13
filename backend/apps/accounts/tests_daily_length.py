@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from rest_framework.authtoken.models import Token
+
+from apps.accounts.models import LoginToken
 
 from .tests import ME_URL, PASSWORD
 
@@ -19,7 +20,7 @@ class DailyLengthTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(email="a@example.com", password=PASSWORD)
-        cls.token = Token.objects.create(user=cls.user)
+        cls.token = LoginToken.objects.create(user=cls.user)
 
     def auth(self):
         return {"HTTP_AUTHORIZATION": f"Token {self.token.key}"}

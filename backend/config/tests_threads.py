@@ -30,6 +30,7 @@ from contextlib import redirect_stderr
 from threading import Barrier
 
 from apps.accounts.error_mail import ThrottledAdminEmailHandler
+from apps.accounts.models import LoginToken
 from apps.learning.tests import make_words
 from apps.learning.tests_daily_study_edge import _KeepsCacheTable
 from django.contrib.auth import get_user_model
@@ -38,7 +39,6 @@ from django.db import connection
 from django.http import HttpRequest, HttpResponse
 from django.test import LiveServerTestCase, SimpleTestCase, override_settings
 from django.urls import path
-from rest_framework.authtoken.models import Token
 
 from config.urls import urlpatterns as real_urlpatterns
 
@@ -155,7 +155,7 @@ class SharedProcessThreadsTest(_KeepsCacheTable, LiveServerTestCase):
             user = get_user_model().objects.create_user(
                 email=f"thread{i}@example.com", password=LOGIN_MARK, display_name=f"스레드{i}"
             )
-            users.append((user.email, Token.objects.create(user=user).key))
+            users.append((user.email, LoginToken.objects.create(user=user).key))
 
         plan = users * 6
         results = self.together(
@@ -165,7 +165,8 @@ class SharedProcessThreadsTest(_KeepsCacheTable, LiveServerTestCase):
             self.assertEqual(code, 200)
             self.assertEqual(json.loads(body)["email"], email)
 
-    def test_same_account_logging_in_at_once_gets_one_token(self):
+    def test_same_account_logging_in_at_once_gets_a_token_each(self):
+        """로그인마다 토큰이 따로라 동시에 들어와도 서로 다른 토큰을 받는다(LoginToken)."""
         user = get_user_model().objects.create_user(
             email="login-race@example.com", password=LOGIN_MARK, display_name="동시로그인"
         )
@@ -174,8 +175,8 @@ class SharedProcessThreadsTest(_KeepsCacheTable, LiveServerTestCase):
             [lambda: self.call("POST", "/api/accounts/login/", body) for _ in range(8)]
         )
         self.assertEqual([code for code, _ in results], [200] * 8)
-        self.assertEqual(len({json.loads(b)["token"] for _, b in results}), 1)
-        self.assertEqual(Token.objects.filter(user=user).count(), 1)
+        self.assertEqual(len({json.loads(b)["token"] for _, b in results}), 8)
+        self.assertEqual(LoginToken.objects.filter(user=user).count(), 8)
 
     def test_four_choices_on_one_round_token_only_one_wins(self):
         make_words()

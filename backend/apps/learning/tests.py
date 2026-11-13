@@ -22,8 +22,8 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 
+from apps.accounts.models import LoginToken
 from apps.vocab import quiz
 from apps.vocab.models import Sentence, Word
 
@@ -823,7 +823,7 @@ class RoundApiTest(TestCase):
     def setUpTestData(cls):
         make_words()
         cls.user = User.objects.create_user(email="a@example.com", password=PASSWORD)
-        cls.token = Token.objects.create(user=cls.user)
+        cls.token = LoginToken.objects.create(user=cls.user)
 
     def auth(self):
         return {"HTTP_AUTHORIZATION": f"Token {self.token.key}"}

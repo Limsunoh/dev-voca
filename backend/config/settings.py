@@ -196,8 +196,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # 서드파티
     "rest_framework",
-    # 토큰 인증. 토큰은 Next 서버가 받아 httpOnly 쿠키에 넣으므로
-    # 브라우저 자바스크립트가 읽지 못한다.
+    # 옛 계정당 토큰 표(authtoken_token) 때문에 남겨 둔다. 로그인 토큰은 이제
+    # accounts.LoginToken 이고 이 표는 아무도 안 읽는다. 앱을 빼면 Django 가 회원을
+    # 지울 때 이 표의 행을 같이 지우지 않아, 남은 행의 외래 키에 걸려 탈퇴가 실패한다.
+    # ponytail: 옛 표의 행을 지운 뒤(배포 한 번 지나서) 이 줄과 accounts/admin.py 의
+    # unregister(TokenProxy) 를 같이 뺀다. 그 unregister 가 돌려면 이 줄이 apps.accounts
+    # 보다 앞에 있어야 한다.
     "rest_framework.authtoken",
     "django_filters",
     "corsheaders",

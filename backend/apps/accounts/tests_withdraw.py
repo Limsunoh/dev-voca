@@ -12,8 +12,8 @@ from django.db import connection, connections, models
 from django.db.models.deletion import Collector
 from django.test import Client, TestCase, TransactionTestCase
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 
+from apps.accounts.models import LoginToken
 from apps.learning import record
 from apps.learning.models import DailyScore, QuizAnswer, QuizSession, ReviewState
 
@@ -34,7 +34,7 @@ class WithdrawTestCase(TestCase):
         cache.clear()
 
     def delete(self, user, body):
-        token, _ = Token.objects.get_or_create(user=user)
+        token = LoginToken.objects.create(user=user)
         return self.client.delete(
             ME_URL,
             body,
@@ -110,13 +110,13 @@ class PasswordAccountTest(WithdrawTestCase):
         self.assertKept(self.user)
 
     def test_old_token_stops_working(self):
-        token = Token.objects.create(user=self.user)
+        token = LoginToken.objects.create(user=self.user)
         self.delete(self.user, {"current_password": PASSWORD})
 
         res = self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {token.key}")
 
         self.assertEqual(res.status_code, 401)
-        self.assertFalse(Token.objects.filter(key=token.key).exists())
+        self.assertFalse(LoginToken.objects.filter(key=token.key).exists())
 
     def test_same_email_can_sign_up_again_as_a_new_account(self):
         old_pk = self.user.pk
@@ -197,7 +197,7 @@ class ThrottleTest(WithdrawTestCase):
         self.assertKept(self.user)
 
     def test_reading_my_info_is_not_limited(self):
-        token = Token.objects.create(user=self.user)
+        token = LoginToken.objects.create(user=self.user)
         with mock.patch.object(PasswordChangeThrottle, "rate", "1/min", create=True):
             codes = [
                 self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {token.key}").status_code
@@ -235,7 +235,7 @@ class BodyEdgeTest(WithdrawTestCase):
     def setUp(self):
         super().setUp()
         self.user = User.objects.create_user(email="a@example.com", password=PASSWORD)
-        self.token = Token.objects.create(user=self.user).key
+        self.token = LoginToken.objects.create(user=self.user).key
 
     def raw(self, body, content_type="application/json", method="delete"):
         return getattr(self.client, method)(
@@ -379,7 +379,7 @@ class ThrottleEdgeTest(WithdrawTestCase):
         self.user = User.objects.create_user(email="a@example.com", password=PASSWORD)
 
     def test_bucket_is_shared_with_password_change_and_blocks_right_password(self):
-        token = Token.objects.create(user=self.user).key
+        token = LoginToken.objects.create(user=self.user).key
         with mock.patch.object(PasswordChangeThrottle, "rate", "2/min", create=True):
             self.client.post(
                 "/api/accounts/password/",
@@ -433,7 +433,7 @@ class LeftBehindTest(WithdrawTestCase):
             QuizAnswer.objects.filter(session__user_id=user.pk),
             DailyScore.objects.filter(user_id=user.pk),
             ReviewState.objects.filter(user_id=user.pk),
-            Token.objects.filter(user_id=user.pk),
+            LoginToken.objects.filter(user_id=user.pk),
         ):
             self.assertEqual(query.count(), 0, query.model.__name__)
 
@@ -512,7 +512,7 @@ class WithdrawRaceTest(_KeepsCacheTable, TransactionTestCase):
     def setUp(self):
         cache.clear()
         self.user = User.objects.create_user(email="race@example.com", password=PASSWORD)
-        self.token = Token.objects.create(user=self.user).key
+        self.token = LoginToken.objects.create(user=self.user).key
 
     def delete_now(self):
         client = Client(raise_request_exception=False)
