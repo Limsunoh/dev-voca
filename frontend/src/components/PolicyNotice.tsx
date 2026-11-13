@@ -21,7 +21,8 @@ export function seoulToday(): string {
 export function PolicyNotice({ today = seoulToday() }: { today?: string }) {
   if (today >= PRIVACY_CHANGE.effective) return null;
   // 해는 뺀다. 7일 뒤 날짜라 헷갈릴 일이 없고, 넣으면 360폭 폰에서 두 줄이 된다.
-  const [, month, day] = PRIVACY_CHANGE.effective.split("-").map(Number);
+  // 날짜는 가장 먼저 바뀌는 날이다(LegalDoc.tsx 의 PRIVACY_CHANGE 주석).
+  const [, month, day] = PRIVACY_CHANGE.firstChange.split("-").map(Number);
   return (
     <Link
       href="/privacy#changes"

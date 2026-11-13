@@ -23,10 +23,10 @@ const GUEST_COOKIE = "devvoca_guest";
 // 게스트가 고른 하루 공부량. 로그인하면 계정으로 옮기고 지운다.
 const GUEST_LENGTH_COOKIE = "devvoca_daily_length";
 
-// 30일. 학습 앱이라 자주 로그인시킬 이유가 없다. 백엔드 토큰은 로그인마다
-// 새로 나오고 만료가 없어서, 이 값이 사실상 그 기기의 로그인 수명이다.
-// 쿠키가 끝나면 그 토큰은 서버에 남은 채 버려지고, 비밀번호·이메일 변경이나
-// 탈퇴 때 지워진다(accounts.LoginToken).
+// 30일. 학습 앱이라 자주 로그인시킬 이유가 없다. 백엔드 토큰은 이 쿠키를 붙일
+// 때마다 새로 나오고, 발급 30일이 지나면 매일 정리가 지운다(accounts.LoginToken
+// 의 LIFETIME). 이 값을 늘리면 쿠키가 살아 있는데 토큰이 먼저 지워져 로그인이
+// 풀린다. 그쪽과 처리방침 3절의 30일을 같이 고친다.
 const MAX_AGE = 60 * 60 * 24 * 30;
 
 export async function setToken(token: string): Promise<void> {

@@ -22,6 +22,7 @@ from django.core.management.base import BaseCommand, CommandError, CommandParser
 from apps.accounts import purge
 from apps.accounts.gmail_api import GmailSendError, check_token
 from apps.accounts.mail import GMAIL_BACKEND, MailNotConfigured
+from apps.accounts.models import LoginToken
 from apps.accounts.throttles import sweep_expired_counters
 from apps.learning.session import expired_steps
 
@@ -43,7 +44,8 @@ class Command(BaseCommand):
                 f"삭제 {purge.due_for_delete().count()}명, "
                 f"안내 메일 {purge.due_for_notice().count()}명, "
                 f"진행 표시 {expired_steps().count()}행, "
-                f"시도 횟수 {sweep_expired_counters(apply=False)}행"
+                f"시도 횟수 {sweep_expired_counters(apply=False)}행, "
+                f"로그인 토큰 {LoginToken.expired().count()}개"
             )
             return
 
@@ -52,7 +54,10 @@ class Command(BaseCommand):
         deleted = purge.delete_expired()
         steps, _ = expired_steps().delete()
         counters = sweep_expired_counters(apply=True)
-        self.stdout.write(f"삭제 {deleted}명, 진행 표시 {steps}행, 시도 횟수 {counters}행")
+        tokens, _ = LoginToken.expired().delete()
+        self.stdout.write(
+            f"삭제 {deleted}명, 진행 표시 {steps}행, 시도 횟수 {counters}행, 로그인 토큰 {tokens}개"
+        )
 
         try:
             sent, failed = purge.send_notices()

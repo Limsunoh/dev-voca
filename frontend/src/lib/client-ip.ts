@@ -5,8 +5,9 @@ import { headers } from "next/headers";
 /**
  * 접속 IP 를 백엔드에 싣기 시작하는 날(한국 시간). 처리방침 v3 가 "로그인·가입 시도 때
  * 접속 IP 가 Railway 로 넘어간다" 를 싣고 시행하는 날이다. 그 전에는 IP 를 보내지 않는다.
- * 백엔드의 IP_COUNT_FROM(backend/apps/accounts/throttles.py)과 처리방침 시행일
- * (PRIVACY_CHANGE.effective)이 이 값과 같은지는 client-ip.test.mts 가 본다.
+ * 백엔드의 IP_COUNT_FROM(backend/apps/accounts/throttles.py)과 처리방침 v3 시행일
+ * (2026-11-19, 14절에 글자로 적음)이 이 값과 같은지는 client-ip.test.mts 가 본다.
+ * PRIVACY_CHANGE.effective 는 v4 시행일(11-20)이라 견주지 않는다.
  *
  * ponytail: 날짜로 켜는 문이다. 시행일이 지나면 이 상수와 아래 날짜 비교를 지운다
  * (백엔드 IP_COUNT_FROM 의 주석에 지울 목록이 있다).
