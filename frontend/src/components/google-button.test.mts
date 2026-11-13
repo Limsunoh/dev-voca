@@ -60,6 +60,9 @@ describe("GoogleButton 처음 그리기", () => {
     assert.equal(scripts.length, 1);
     assert.equal(scripts[0].src, "https://accounts.google.com/gsi/client");
     assert.equal(typeof scripts[0].onReady, "function");
+    // 받는 도중 다시 붙은 버튼에는 Next 가 onReady 를 다시 안 부르고 onLoad 만
+    // 부른다. 이게 없으면 그 버튼은 구글 버튼이 영영 안 뜬다.
+    assert.equal(typeof scripts[0].onLoad, "function");
     // 확인 중 안내는 아직 없다.
     assert.doesNotMatch(html, /확인하는 중/);
     // 구글 버튼 자리는 나타나기 전까지 누를 수도 읽을 수도 없다.
