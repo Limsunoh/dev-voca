@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   const auth = cookieToken ?? undefined;
 
   try {
-    // 서버가 쿠키의 토큰을 거절하면(다른 기기에서 로그아웃 등) 쿠키를 지우고
+    // 서버가 쿠키의 토큰을 거절하면(다른 기기에서 비밀번호 변경 등) 쿠키를 지우고
     // 게스트 판으로 연다(withTokenOrGuest). 그대로 두면 "시작" 이 "토큰이
     // 유효하지 않습니다" 로 막힌다. 여기서 지워야 뒤이은 답 요청에 그 토큰이
     // 안 실린다.

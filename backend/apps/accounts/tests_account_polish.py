@@ -9,9 +9,9 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import Throttled
 
+from apps.accounts.models import LoginToken
 from apps.learning.models import DailyScore, QuizSession
 from apps.learning.throttles import LeaderboardThrottle
 from apps.vocab.models import Word
@@ -55,7 +55,7 @@ class ProfileUpdateLimitTest(TestCase):
     def setUp(self):
         cache.clear()
         self.user = User.objects.create_user(email="a@example.com", password=PASSWORD)
-        token = Token.objects.create(user=self.user)
+        token = LoginToken.objects.create(user=self.user)
         self.auth = {"HTTP_AUTHORIZATION": f"Token {token.key}"}
 
     def save(self, avatar):
@@ -71,7 +71,7 @@ class ProfileUpdateLimitTest(TestCase):
 
     def test_another_account_is_not_limited(self):
         other = User.objects.create_user(email="b@example.com", password=PASSWORD)
-        other_token = Token.objects.create(user=other)
+        other_token = LoginToken.objects.create(user=other)
         with mock.patch.object(ProfileUpdateThrottle, "get_rate", return_value="1/min"):
             self.save("a1")
             res = self.client.patch(
@@ -156,7 +156,7 @@ class ThrottleMessageEdgeTest(TestCase):
 
     def test_validation_and_method_errors_keep_their_shape(self):
         user = User.objects.create_user(email="a@example.com", password=PASSWORD)
-        token = Token.objects.create(user=user)
+        token = LoginToken.objects.create(user=user)
 
         bad_login = self.client.post(LOGIN_URL, {}, content_type="application/json")
         put = self.client.put(
@@ -178,7 +178,7 @@ class ProfileUpdateLimitEdgeTest(TestCase):
     def setUp(self):
         cache.clear()
         self.user = User.objects.create_user(email="a@example.com", password=PASSWORD)
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
         self.auth = {"HTTP_AUTHORIZATION": f"Token {self.token.key}"}
 
     def patch(self, data, **extra):
@@ -309,7 +309,7 @@ class ZeroRowsApiTest(TestCase):
         user = User.objects.create_user(
             email=f"{name}@example.com", password=PASSWORD, display_name=name
         )
-        return user, {"HTTP_AUTHORIZATION": f"Token {Token.objects.create(user=user).key}"}
+        return user, {"HTTP_AUTHORIZATION": f"Token {LoginToken.objects.create(user=user).key}"}
 
     def test_zero_day_streak_is_outside_the_list_but_has_my_row(self):
         scorer, _ = self.user("scorer")

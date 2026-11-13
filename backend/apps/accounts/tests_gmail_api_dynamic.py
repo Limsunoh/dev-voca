@@ -36,7 +36,8 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
+
+from apps.accounts.models import LoginToken
 
 from . import purge
 from .gmail_api import SEND_URL, TOKEN_URL, GmailApiBackend, GmailSendError
@@ -124,7 +125,7 @@ class EmailChangeThroughGmailTest(TestCase):
         self.user = User.objects.create_user(
             email="old@example.com", password=PASSWORD, display_name="주인"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def request_change(self):
         return self.client.post(

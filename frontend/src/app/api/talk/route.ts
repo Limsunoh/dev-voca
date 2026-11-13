@@ -116,7 +116,7 @@ export async function POST(request: Request) {
           .slice(0, MAX_HEARD)
       : [];
 
-    // 읽는 사이 토큰이 죽었으면(다른 기기에서 로그아웃) 채점도 401 이 난다.
+    // 읽는 사이 토큰이 죽었으면(다른 기기에서 비밀번호 변경) 채점도 401 이 난다.
     // 시작과 같이 쿠키를 지우고 게스트로 채점한다.
     const { value } = await withTokenOrGuest(
       auth ?? null,

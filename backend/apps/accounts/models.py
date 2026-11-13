@@ -616,3 +616,50 @@ class User(AbstractUser):
 
         # 구글 사진이나 올린 사진을 고른 채로 그것이 없어진 경우도 여기로 온다.
         return {"type": "preset", "key": AVATAR_PRESETS[(self.pk or 0) % len(AVATAR_PRESETS)]}
+
+
+def _new_login_token_key() -> str:
+    """새 로그인 토큰 값. DRF 토큰과 같은 꼴(16진수 40자)이라 옮겨 온 옛 값과 섞여도 된다.
+
+    0009 마이그레이션이 이 이름으로 부른다. 이름을 바꾸거나 지우면 마이그레이션이 깨진다.
+    """
+    return secrets.token_hex(20)
+
+
+class LoginToken(models.Model):
+    """로그인 한 번에 하나씩 내주는 토큰. 기기마다 따로 갖는다.
+
+    DRF 의 Token 을 쓰지 않는 이유: 그쪽은 계정당 하나(OneToOne)라 폰과 PC 가
+    같은 토큰을 나눠 가졌다. 한쪽에서 로그아웃하면 그 토큰이 지워져 다른 쪽도
+    같이 끊겼다. 0010 마이그레이션이 그때 쓰던 토큰을 이 표로 옮겼다.
+
+    토큰 값을 기본 키로 두지 않는 이유: 관리자 화면 주소가 기본 키로 만들어진다
+    (/admin/accounts/logintoken/<pk>/). 토큰이 주소에 들어가면 서버 로그와
+    브라우저 기록에 남는다. DRF 가 TokenProxy 를 따로 둔 것도 같은 이유다.
+
+    정해진 만료는 없다. 로그아웃(그 기기 것만)·비밀번호 변경·이메일 변경·계정
+    삭제 때 지운다. 처리방침의 "로그인 토큰" 보관 기간이 이 동작을 적고 있다.
+    만료를 넣으려면 그 문구부터 고친다.
+
+    이 표는 비우면 안 된다. 비우면 로그인한 사람이 모두 로그아웃되고, 0010 은 이미
+    적용돼 다시 옮기지 않는다. 이 표를 만든 배포 전으로 되돌리지도 않는다
+    (DEPLOY.md "배포 확인" 의 회원을 가리키는 표).
+    """
+
+    key = models.CharField(
+        "토큰", max_length=40, unique=True, default=_new_login_token_key, editable=False
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="login_tokens", verbose_name="사용자"
+    )
+    # auto_now_add 가 아닌 이유: 0010 이 옛 토큰을 옮길 때 원래 발급 시각을 그대로
+    # 넣는다. auto_now_add 는 넣은 값을 지금 시각으로 덮는다.
+    created = models.DateTimeField("발급 시각", default=timezone.now)
+
+    class Meta:
+        verbose_name = "로그인 토큰"
+        verbose_name_plural = "로그인 토큰"
+
+    def __str__(self) -> str:
+        # 토큰 값을 넣지 않는다. 관리자 작업 기록(LogEntry.object_repr)에 남는다.
+        return f"{self.user} 의 로그인"

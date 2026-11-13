@@ -28,9 +28,9 @@ from django.db.models.query import QuerySet
 from django.test import Client, TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
+from apps.accounts.models import LoginToken
 from apps.learning import daily_study, review
 from apps.learning.models import DailyScore, QuizAnswer, QuizSession, ReviewState
 from apps.learning.session import SessionError
@@ -59,7 +59,7 @@ class PracticeCase(TestCase):
     def setUp(self):
         cache.clear()
         self.user = make_user("연습")
-        self.key = Token.objects.create(user=self.user).key
+        self.key = LoginToken.objects.create(user=self.user).key
         self.word = make_word()
         self.others = [make_word() for _ in range(3)]
         self.token = question_token(self.word, self.others)
@@ -260,7 +260,7 @@ class IsolationTest(PracticeCase):
 
     def test_a_token_issued_to_one_person_writes_only_for_who_sends_it(self):
         """문제 토큰은 사람에 안 묶인다. 쓰는 줄은 보낸 사람의 것이다."""
-        other_key = Token.objects.create(user=self.other).key
+        other_key = LoginToken.objects.create(user=self.other).key
 
         self.grade(self.wrong_pick, key=other_key)
 
@@ -492,7 +492,7 @@ class ReviewGateTest(PracticeCase):
         staff.is_staff = True
         staff.is_superuser = True
         staff.save()
-        key = Token.objects.create(user=staff).key
+        key = LoginToken.objects.create(user=staff).key
         self._retract(self.word)
 
         res = self.grade(self.wrong_pick, key=key)
@@ -622,7 +622,7 @@ class AccountStateTest(PracticeCase):
         self.assertNoRows()
 
     def test_a_token_after_logout_is_401(self):
-        Token.objects.filter(key=self.key).delete()
+        LoginToken.objects.filter(key=self.key).delete()
 
         self.assertEqual(self.grade(self.wrong_pick).status_code, 401)
         self.assertNoRows()
@@ -825,7 +825,7 @@ class PracticeRaceTest(_KeepsCacheTable, TransactionTestCase):
     def setUp(self):
         cache.clear()
         self.user = make_user("경합")
-        self.key = Token.objects.create(user=self.user).key
+        self.key = LoginToken.objects.create(user=self.user).key
         self.word = make_word()
         self.others = [make_word() for _ in range(3)]
         self.token = question_token(self.word, self.others)

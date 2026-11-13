@@ -33,10 +33,10 @@ from django.db.models.signals import pre_delete
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 
 from apps.accounts import purge
 from apps.accounts.authentication import _mark_seen
+from apps.accounts.models import LoginToken
 from apps.accounts.throttles import EmailRateThrottle, sweep_expired_counters
 from apps.learning import review, session
 from apps.learning.models import (
@@ -154,7 +154,7 @@ class PurgeTestBase(TestCase):
         return user.purge_notice_sent_at is not None
 
     def visit(self, user):
-        token, _ = Token.objects.get_or_create(user=user)
+        token = LoginToken.objects.create(user=user)
         return self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {token.key}")
 
 
@@ -936,7 +936,7 @@ class CascadeTest(PurgeTestBase):
         DailyScore.objects.update_or_create(
             user=user, day=self.today(), defaults={"best_free_score": 5}
         )
-        Token.objects.get_or_create(user=user)
+        LoginToken.objects.create(user=user)
 
     def test_records_go_with_the_member_and_nobody_else_is_touched(self):
         seed_words(2)
@@ -953,7 +953,7 @@ class CascadeTest(PurgeTestBase):
 
         self.assertFalse(self.exists(gone))
         self.assertTrue(self.exists(stays))
-        for model in (QuizSession, DailyScore, DailyStudy, ReviewState, Token):
+        for model in (QuizSession, DailyScore, DailyStudy, ReviewState, LoginToken):
             with self.subTest(model=model.__name__):
                 self.assertEqual(model.objects.filter(user_id=gone.pk).count(), 0)
                 self.assertEqual(model.objects.filter(user=stays).count(), 1)
@@ -969,7 +969,7 @@ class CascadeTest(PurgeTestBase):
 
     def test_deleted_members_token_stops_working(self):
         gone = self.member("revoked", seen_days_ago=500, notice_days_ago=31)
-        token = Token.objects.create(user=gone).key
+        token = LoginToken.objects.create(user=gone).key
 
         self.apply()
 

@@ -762,13 +762,14 @@ class EmailChangeMailFailureTest(_ErrorMailCase):
         super().setUp()
         from django.contrib.auth import get_user_model
         from django.core.cache import cache
-        from rest_framework.authtoken.models import Token
+
+        from apps.accounts.models import LoginToken
 
         cache.clear()
         self.user = get_user_model().objects.create_user(
             email="old@example.com", password=BODY_MARK
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def request_change(self, side_effect):
         with mock.patch("apps.accounts.views.send_account_mail", side_effect=side_effect) as m:

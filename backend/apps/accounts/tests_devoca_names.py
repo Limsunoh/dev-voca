@@ -28,8 +28,8 @@ from django.contrib.auth import get_user_model
 from django.core import mail as django_mail
 from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase
-from rest_framework.authtoken.models import Token
 
+from apps.accounts.models import LoginToken
 from apps.learning.tests_daily_cleanup import PurgeTestBase
 
 from .forbidden_names import name_is_forbidden
@@ -316,7 +316,7 @@ class MeNameDevocaTest(TestCase):
         self.user = User.objects.create_user(
             email="me@example.com", password=PASSWORD, display_name="평범한이름"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def patch_me(self, **body):
         return self.client.patch(
@@ -455,7 +455,7 @@ class EmailChangeMailExactNameTest(ExactNameInMailAssertions, TestCase):
         self.user = User.objects.create_user(
             email="old@example.com", password=PASSWORD, display_name="주인"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def test_확인_메일의_이름이_정확히_DeVoca_다(self):
         res = self.client.post(
