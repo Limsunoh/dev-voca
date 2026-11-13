@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 from datetime import timedelta
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -103,22 +103,29 @@ class MistakesView(APIView):
 def _visible_targets() -> Q:
     """보여줄 수 있는 대상만 남기는 조건.
 
-    id 를 파이썬으로 끌어오지 않는다. `values("pk")` 를 그대로 넘기면
-    Django 가 하위 질의로 만들어 DB 안에서 끝낸다. 목록에 담아 넘기면
-    단어·문장 전부(900개 남짓)를 매 요청마다 읽어 오게 된다.
+    id 를 파이썬으로 끌어오지 않는다. 목록에 담아 넘기면 단어·문장 전부를
+    매 요청마다 읽어 오게 된다. 하위 질의로 DB 안에서 끝낸다.
+
+    하위 질의는 `IN (SELECT id ...)` 가 아니라 `EXISTS` 다. IN 둘을 OR 로
+    묶으면 Postgres 가 조인으로 못 바꾸고, 검수된 id 목록을 만들어 둔 뒤 틀린
+    항목마다 그 목록을 처음부터 훑는다. 목록이 메모리(work_mem)에 들어가면
+    해시로 찾아 빠르지만, 넘는 순간 절벽처럼 느려진다. 2026-11-13 측정에서
+    단어·문장이 33만 개씩일 때 틀린 것 1,524개인 사람의 오답 노트 응답이
+    11.5초였다(그중 개수 세기 쿼리 하나가 12초 남짓). EXISTS 는 줄마다 기본
+    키로 하나씩 찾아, 같은 쿼리가 2.3ms, 응답 전체가 11ms 가 됐다.
 
     종류마다 조건이 다른 이유: `ReviewState` 는 대상을 FK 로 안 묶는다
     (단어일 수도 문장일 수도 있어 한 칸에 안 들어간다). 그래서 종류를 보고
     각자의 표에 묻는다.
 
-    지워진 대상도 이 조건에서 함께 빠진다. 하위 질의에 그 id 가 없다.
+    지워진 대상도 이 조건에서 함께 빠진다. 찾을 줄이 없어 EXISTS 가 거짓이 된다.
     """
-    return Q(
-        target_type=TARGET_WORD,
-        target_id__in=Word.objects.visible().values("pk"),
-    ) | Q(
-        target_type=TARGET_SENTENCE,
-        target_id__in=Sentence.objects.visible().values("pk"),
+    word_visible = Exists(Word.objects.visible().filter(pk=OuterRef("target_id")))
+    sentence_visible = Exists(
+        Sentence.objects.visible().filter(pk=OuterRef("target_id"))
+    )
+    return (Q(target_type=TARGET_WORD) & word_visible) | (
+        Q(target_type=TARGET_SENTENCE) & sentence_visible
     )
 
 
