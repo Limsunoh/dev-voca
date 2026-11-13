@@ -20,8 +20,8 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connection
 from django.test import TestCase
-from rest_framework.authtoken.models import Token
 
+from apps.accounts.models import LoginToken
 from apps.learning.models import DailyStudy
 from apps.learning.tests_daily_study import START_URL, seed_words
 from apps.vocab.models import Word
@@ -86,7 +86,7 @@ class PatchAbuseTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(email="p@example.com", password=PASSWORD)
-        cls.token = Token.objects.create(user=cls.user)
+        cls.token = LoginToken.objects.create(user=cls.user)
 
     def patch(self, body, content_type="application/json"):
         return self.client.patch(

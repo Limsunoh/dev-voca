@@ -21,7 +21,8 @@ from django.db import DatabaseError, connection, migrations
 from django.db.migrations.loader import MigrationLoader
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
+
+from apps.accounts.models import LoginToken
 
 from . import throttles
 from .google import GoogleAuthError, fetch_google_user
@@ -222,12 +223,14 @@ class LoginTest(TestCase):
                 res = self.login(email=typed)
                 self.assertEqual(res.status_code, 200)
 
-    def test_same_token_on_repeat_login(self):
-        """로그인할 때마다 토큰이 새로 생기면 다른 기기가 로그아웃된다."""
+    def test_each_login_gets_its_own_token(self):
+        """같은 토큰을 나눠 주면 한 기기의 로그아웃이 다른 기기까지 끊는다(LoginToken)."""
         first = self.login().json()["token"]
         second = self.login().json()["token"]
 
-        self.assertEqual(first, second)
+        self.assertNotEqual(first, second)
+        for key in (first, second):
+            self.assertEqual(self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {key}").status_code, 200)
 
 
 class MeTest(TestCase):
@@ -237,7 +240,7 @@ class MeTest(TestCase):
             email="a@example.com", password=PASSWORD, display_name="테스터"
         )
         cls.other = User.objects.create_user(email="b@example.com", password=PASSWORD)
-        cls.token = Token.objects.create(user=cls.user)
+        cls.token = LoginToken.objects.create(user=cls.user)
 
     def auth(self):
         return {"HTTP_AUTHORIZATION": f"Token {self.token.key}"}
@@ -412,13 +415,28 @@ class LogoutTest(TestCase):
 
     def test_token_stops_working(self):
         """쿠키만 지우고 토큰을 남기면, 새어나간 토큰이 계속 통한다."""
-        token = Token.objects.create(user=self.user)
+        token = LoginToken.objects.create(user=self.user)
         auth = {"HTTP_AUTHORIZATION": f"Token {token.key}"}
 
         res = self.client.post(LOGOUT_URL, **auth)
 
         self.assertEqual(res.status_code, 204)
         self.assertEqual(self.client.get(ME_URL, **auth).status_code, 401)
+
+    def test_other_devices_stay_logged_in(self):
+        """폰에서 로그아웃했다고 PC 까지 끊기면 안 된다. 로그인마다 토큰이 따로다."""
+        body = {"email": self.user.email, "password": PASSWORD}
+        phone, pc = (
+            self.client.post(LOGIN_URL, body, content_type="application/json").json()["token"]
+            for _ in range(2)
+        )
+        self.assertNotEqual(phone, pc)
+
+        res = self.client.post(LOGOUT_URL, HTTP_AUTHORIZATION=f"Token {phone}")
+
+        self.assertEqual(res.status_code, 204)
+        self.assertEqual(self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {phone}").status_code, 401)
+        self.assertEqual(self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {pc}").status_code, 200)
 
     def test_requires_login(self):
         res = self.client.post(LOGOUT_URL)
@@ -524,7 +542,7 @@ class ThrottleTest(TestCase):
             user = User.objects.create_user(
                 email=f"{name}@example.com", password=PASSWORD
             )
-            tokens.append(Token.objects.create(user=user).key)
+            tokens.append(LoginToken.objects.create(user=user).key)
 
         # 계정을 바꿔가며, 중간에 로그인 안 한 채로도 보낸다. 어떻게
         # 나눠 보내도 합쳐서 세야 한다. 인증 여부로 통을 가르는 구현도
@@ -705,7 +723,7 @@ class GoogleLoginTest(TestCase):
         user = User.objects.create_user(
             email="both@example.com", password=PASSWORD
         )
-        token = Token.objects.create(user=user)
+        token = LoginToken.objects.create(user=user)
 
         with self.patch_google(email="both@example.com"):
             self.google()
@@ -1241,7 +1259,7 @@ class EmailChangeTest(TestCase):
         self.user = User.objects.create_user(
             email="old@example.com", password=PASSWORD, display_name="주인"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def request_change(self, **body):
         payload = {
@@ -1385,7 +1403,7 @@ class EmailChangeTest(TestCase):
 
     def test_바꾸면_다른_기기의_토큰이_끊긴다(self):
         """이메일이 바뀌는 것은 계정 주인이 바뀔 수 있는 사건이다."""
-        other_device = Token.objects.create(
+        other_device = LoginToken.objects.create(
             user=User.objects.create_user(
                 email="zzz@example.com", password=PASSWORD, display_name="남"
             )
@@ -1396,11 +1414,11 @@ class EmailChangeTest(TestCase):
 
         self.assertEqual(res.status_code, 200)
         # 옛 토큰은 사라진다.
-        self.assertFalse(Token.objects.filter(key=old_key).exists())
+        self.assertFalse(LoginToken.objects.filter(key=old_key).exists())
         # 새 토큰을 받아 링크를 누른 기기는 이어서 쓴다.
         self.assertTrue(res.json()["token"])
         # 남의 토큰까지 지우면 안 된다.
-        self.assertTrue(Token.objects.filter(key=other_device.key).exists())
+        self.assertTrue(LoginToken.objects.filter(key=other_device.key).exists())
 
     def test_지금_쓰는_주소로는_못_바꾼다(self):
         with mock.patch("apps.accounts.views.send_account_mail") as sent:
@@ -1417,7 +1435,7 @@ class EmailChangeTest(TestCase):
         google_user = User.objects.create_user(
             email="g@example.com", password=None, display_name="구글"
         )
-        google_token = Token.objects.create(user=google_user)
+        google_token = LoginToken.objects.create(user=google_user)
 
         res = self.client.post(
             EMAIL_CHANGE_URL,
@@ -1672,7 +1690,7 @@ class AvatarPhotoUploadTest(TestCase):
         self.user = User.objects.create_user(
             email="p@example.com", password=PASSWORD, display_name="사진사"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def auth(self):
         return {"HTTP_AUTHORIZATION": f"Token {self.token.key}"}
@@ -1821,7 +1839,7 @@ class AvatarPhotoFileTest(TestCase):
         self.user = User.objects.create_user(
             email="f@example.com", password=PASSWORD, display_name="주인"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
         self.client.post(
             PHOTO_URL,
             {"photo": _upload(_png())},
@@ -2005,7 +2023,7 @@ class AuthQueryWeightTest(TestCase):
         self.user = User.objects.create_user(
             email="weight@example.com", password=PASSWORD, display_name="무게"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def test_인증_질의가_사진_칸을_안_읽는다(self):
         from django.db import connection
@@ -2018,7 +2036,7 @@ class AuthQueryWeightTest(TestCase):
         self.assertEqual(res.status_code, 200)
 
         auth_queries = [
-            q["sql"] for q in ctx.captured_queries if "authtoken_token" in q["sql"]
+            q["sql"] for q in ctx.captured_queries if "accounts_logintoken" in q["sql"]
         ]
         self.assertTrue(auth_queries, "토큰 조회 질의를 못 찾았다")
 
@@ -2044,9 +2062,13 @@ class AuthQueryWeightTest(TestCase):
         with CaptureQueriesContext(connection) as ctx:
             self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {self.token.key}")
 
-        for q in ctx.captured_queries:
-            if "authtoken_token" in q["sql"]:
-                self.assertNotIn('"avatar_photo"', q["sql"])
+        auth_queries = [
+            q["sql"] for q in ctx.captured_queries if "accounts_logintoken" in q["sql"]
+        ]
+        # 못 찾으면 아래 검사가 아무것도 안 본 채 통과한다(표 이름이 바뀌었을 때).
+        self.assertTrue(auth_queries, "토큰 조회 질의를 못 찾았다")
+        for sql in auth_queries:
+            self.assertNotIn('"avatar_photo"', sql)
 
 
 class AvatarPhotoBombTest(TestCase):
@@ -2061,7 +2083,7 @@ class AvatarPhotoBombTest(TestCase):
         self.user = User.objects.create_user(
             email="bomb@example.com", password=PASSWORD, display_name="폭탄"
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def _png(self, w, h):
         import io as _io

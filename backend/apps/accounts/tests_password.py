@@ -11,7 +11,8 @@ tests.py 가 아니라 별 파일로 둔다. 그 파일이 이미 1180줄이고,
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
-from rest_framework.authtoken.models import Token
+
+from apps.accounts.models import LoginToken
 
 from .throttles import PasswordChangeThrottle
 
@@ -49,7 +50,7 @@ class PasswordChangeTest(TestCase):
             password=OLD_PASSWORD,
             display_name="주인",
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def _auth(self):
         return {"HTTP_AUTHORIZATION": f"Token {self.token.key}"}
@@ -166,11 +167,10 @@ class PasswordChangeTest(TestCase):
         이유(누가 들어와 있다)가 해결되지 않고, 지금 기기까지 끊으면
         바꾸자마자 로그인 화면으로 튕겨 성공했는지 알 수 없다.
 
-        DRF 토큰은 사용자당 하나라 다른 기기 몫을 따로 만들 수 없다.
-        그래서 "지금 토큰이 무효가 되었는가" 로 확인한다. 다른 기기가
-        들고 있는 것이 바로 이 값이다.
+        로그인 토큰은 기기마다 따로라 다른 기기 몫을 하나 더 만들어 둔다.
         """
         old_key = self.token.key
+        other_key = LoginToken.objects.create(user=self.user).key
 
         res = self.client.post(
             PASSWORD_URL,
@@ -184,15 +184,16 @@ class PasswordChangeTest(TestCase):
         new_key = res.json()["token"]
         # 새 토큰을 받았고 옛 값과 다르다. 같으면 다른 기기가 안 끊긴다.
         self.assertNotEqual(new_key, old_key)
-        self.assertFalse(Token.objects.filter(key=old_key).exists())
-        # 옛 토큰으로는 이제 못 들어온다 - 다른 기기가 이 상태가 된다.
-        stale = self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {old_key}")
-        self.assertEqual(stale.status_code, 401)
+        self.assertFalse(LoginToken.objects.filter(key=old_key).exists())
+        # 지금 기기의 옛 토큰도, 다른 기기의 토큰도 이제 못 들어온다.
+        for stale_key in (old_key, other_key):
+            stale = self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {stale_key}")
+            self.assertEqual(stale.status_code, 401)
         # 새 토큰은 바로 쓸 수 있다 - 지금 기기가 이 값으로 쿠키를 갱신한다.
         fresh = self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {new_key}")
         self.assertEqual(fresh.status_code, 200)
-        # 지우지 않고 만들었다면 둘이 남는다.
-        self.assertEqual(Token.objects.filter(user=self.user).count(), 1)
+        # 지우지 않고 만들었다면 셋이 남는다.
+        self.assertEqual(LoginToken.objects.filter(user=self.user).count(), 1)
 
     def test_new_password_actually_logs_in(self):
         """바꾼 비밀번호로 로그인되는가.
@@ -251,7 +252,7 @@ class PasswordFirstTimeTest(TestCase):
             password=None,
             display_name="구글사용자",
         )
-        self.token = Token.objects.create(user=self.user)
+        self.token = LoginToken.objects.create(user=self.user)
 
     def _auth(self):
         return {"HTTP_AUTHORIZATION": f"Token {self.token.key}"}

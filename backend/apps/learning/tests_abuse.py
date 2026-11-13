@@ -24,8 +24,8 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 
+from apps.accounts.models import LoginToken
 from apps.vocab import quiz
 from apps.vocab.models import Sentence, Word
 
@@ -331,7 +331,7 @@ class RoundFlowAbuseTest(TestCase):
     def setUpTestData(cls):
         make_words(45)
         cls.user = User.objects.create_user(email="a@example.com", password=PASSWORD)
-        cls.key = Token.objects.create(user=cls.user)
+        cls.key = LoginToken.objects.create(user=cls.user)
 
     def setUp(self):
         cache.clear()
@@ -631,7 +631,7 @@ class DailyCapTest(TestCase):
 
     def test_the_whole_day_through_the_api_is_capped(self):
         """API 로 하루 종일 돌려도 그날 점수는 한 판이다."""
-        key = Token.objects.create(user=self.user)
+        key = LoginToken.objects.create(user=self.user)
         auth = {"HTTP_AUTHORIZATION": f"Token {key.key}"}
 
         best = 0

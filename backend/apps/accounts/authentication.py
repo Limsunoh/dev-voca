@@ -1,7 +1,8 @@
 """토큰 인증.
 
-기본 TokenAuthentication 을 그대로 쓰지 않는 이유가 둘이다. 사진 바이트를
-안 끌고 오는 것과, 마지막 이용일을 남기는 것이다.
+기본 TokenAuthentication 을 그대로 쓰지 않는 이유가 셋이다. 기기별 토큰
+(LoginToken)을 보는 것, 사진 바이트를 안 끌고 오는 것, 마지막 이용일을
+남기는 것이다.
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions
 from rest_framework.authentication import TokenAuthentication
+
+from .models import LoginToken
 
 
 def _mark_seen(user) -> None:
@@ -50,6 +53,9 @@ class SlimTokenAuthentication(TokenAuthentication):
     하나뿐이고 그쪽은 자기 `only()` 로 따로 조회한다. 그래서 지연 로드가
     발동할 자리가 없다.
     """
+
+    # DRF 기본값은 계정당 하나인 authtoken.Token 이다(LoginToken 주석).
+    model = LoginToken
 
     def authenticate_credentials(self, key):
         model = self.get_model()
