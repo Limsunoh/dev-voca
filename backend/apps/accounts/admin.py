@@ -10,7 +10,6 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.db import transaction
 from django.db.models import Case, F, QuerySet, Value, When
-from rest_framework.authtoken.models import TokenProxy
 
 from .models import AVATAR_PHOTO, LoginToken, User, name_taken, shorten_display_name
 
@@ -155,11 +154,6 @@ class UserAdmin(BaseUserAdmin):
             for member in members:
                 self.log_change(request, member, "올린 사진을 지웠습니다.")
         self.message_user(request, f"사진 {len(members)}장을 지웠습니다.")
-
-
-# DRF 가 붙여 둔 "토큰" 화면을 뗀다. 그 표는 이제 아무도 안 읽어서, 거기서 토큰을
-# 지워도 아무도 로그아웃되지 않는다. 지웠으니 끊겼다고 믿게 되는 화면이다.
-admin.site.unregister(TokenProxy)
 
 
 @admin.register(LoginToken)

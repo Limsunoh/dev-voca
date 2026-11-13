@@ -24,7 +24,6 @@ from django.core.management import call_command
 from django.db import connection, connections
 from django.test import Client, TestCase, TransactionTestCase
 from django.utils import timezone
-from rest_framework.authtoken.models import Token as DrfToken
 
 from apps.accounts import purge
 from apps.accounts.models import LoginToken
@@ -236,23 +235,6 @@ class HeaderShapeTest(DeviceMixin, TestCase):
                 res = self.client.get(ME_URL, HTTP_AUTHORIZATION=header)
                 self.assertEqual(res.status_code, 401)
 
-    def test_옛_DRF_표에만_있는_토큰은_통하지_않는다(self):
-        """옛 표는 남아 있지만 아무도 읽지 않아야 한다. 읽으면 로그아웃이 무의미하다."""
-        old = DrfToken.objects.create(user=self.owner)
-        self.assertFalse(LoginToken.objects.filter(key=old.key).exists())
-
-        self.assertEqual(self.me(old.key), 401)
-
-    def test_옮겨_온_토큰으로_로그아웃하면_옛_표에_남아도_더는_안_통한다(self):
-        """0010 이 옛 값을 그대로 옮겼다. 로그아웃은 새 표에서만 지운다."""
-        old = DrfToken.objects.create(user=self.owner)
-        LoginToken.objects.create(user=self.owner, key=old.key)
-
-        self.assertEqual(self.logout(old.key), 204)
-
-        self.assertTrue(DrfToken.objects.filter(key=old.key).exists())
-        self.assertEqual(self.me(old.key), 401)
-
 
 class InactiveAccountTest(DeviceMixin, TestCase):
     """정지한 계정의 토큰은 어느 자리에서도 통하지 않는다."""
@@ -359,7 +341,7 @@ class PasswordChangeScopeTest(DeviceMixin, TestCase):
 
 
 class AccountDeletionTest(DeviceMixin, TestCase):
-    """탈퇴와 1년 미접속 파기는 그 계정의 토큰을 새 표·옛 표 모두에서 없앤다."""
+    """탈퇴와 1년 미접속 파기는 그 계정의 토큰을 모두 없앤다."""
 
     def stale(self, user):
         """파기 대상으로 만든다. 안내를 보낸 지 30일이 지났고 1년 가까이 안 썼다."""
@@ -371,15 +353,12 @@ class AccountDeletionTest(DeviceMixin, TestCase):
     def assert_only_others_left(self, others):
         self.assertFalse(User.objects.filter(pk=self.owner.pk).exists())
         self.assertEqual(LoginToken.objects.filter(user_id=self.owner.pk).count(), 0)
-        self.assertEqual(DrfToken.objects.filter(user_id=self.owner.pk).count(), 0)
         for key in others:
             self.assertEqual(self.me(key), 200)
 
-    def test_탈퇴하면_모든_기기의_토큰과_옛_표의_행이_사라진다(self):
+    def test_탈퇴하면_모든_기기의_토큰이_사라진다(self):
         mine = [self.device(self.owner) for _ in range(3)]
-        DrfToken.objects.create(user=self.owner)
         others = [self.device(self.other)]
-        DrfToken.objects.create(user=self.other)
 
         res = self.client.delete(
             ME_URL, {"current_password": PASSWORD}, content_type="application/json",
@@ -388,27 +367,12 @@ class AccountDeletionTest(DeviceMixin, TestCase):
 
         self.assertEqual(res.status_code, 204)
         self.assert_only_others_left(others)
-        self.assertTrue(DrfToken.objects.filter(user=self.other).exists())
         for key in mine:
             self.assertEqual(self.me(key), 401)
 
-    def test_옛_표의_값과_같은_토큰으로_탈퇴해도_실패하지_않는다(self):
-        """0010 이 옮긴 값을 쿠키에 든 채 탈퇴하는 사람. 두 표에 같은 값이 있다."""
-        old = DrfToken.objects.create(user=self.owner)
-        LoginToken.objects.create(user=self.owner, key=old.key)
-
-        res = self.client.delete(
-            ME_URL, {"current_password": PASSWORD}, content_type="application/json",
-            **auth(old.key),
-        )
-
-        self.assertEqual(res.status_code, 204)
-        self.assert_only_others_left([])
-
-    def test_파기하면_토큰과_옛_표의_행이_함께_지워진다(self):
+    def test_파기하면_토큰이_함께_지워진다(self):
         for _ in range(2):
             LoginToken.objects.create(user=self.owner)
-        DrfToken.objects.create(user=self.owner)
         others = [self.device(self.other)]
         self.stale(self.owner)
 
@@ -418,7 +382,6 @@ class AccountDeletionTest(DeviceMixin, TestCase):
 
     def test_daily_cleanup_apply_로_파기해도_토큰이_남지_않는다(self):
         LoginToken.objects.create(user=self.owner)
-        DrfToken.objects.create(user=self.owner)
         self.stale(self.owner)
 
         call_command("daily_cleanup", "--apply", stdout=StringIO())
@@ -427,7 +390,6 @@ class AccountDeletionTest(DeviceMixin, TestCase):
 
     def test_관리자_화면에서_회원을_지워도_토큰이_남지_않는다(self):
         LoginToken.objects.create(user=self.owner)
-        DrfToken.objects.create(user=self.owner)
         admin = User.objects.create_superuser(email="root@example.com", password=PASSWORD)
         self.client.force_login(admin)
 
@@ -688,9 +650,7 @@ class AdminScreenTest(DeviceMixin, TestCase):
                          403)
         self.assertEqual(LoginToken.objects.count(), 2)
 
-    def test_DRF_토큰_화면은_떼어졌다(self):
-        DrfToken.objects.create(user=self.owner)
-
+    def test_DRF_토큰_화면은_없다(self):
         self.assertEqual(self.admin.get(DRF_TOKEN_ADMIN_URL).status_code, 404)
         res = self.admin.get("/admin/")
         self.assertNotContains(res, DRF_TOKEN_ADMIN_URL)

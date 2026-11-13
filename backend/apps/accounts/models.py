@@ -15,6 +15,7 @@ import io
 import re
 import secrets
 import unicodedata
+from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
@@ -35,7 +36,10 @@ from .forbidden_names import name_is_forbidden
 #     그 배포 전에 v3 으로 동의한 사람은 IP 문구가 없는 v3 을 봤다(terms_agreed_at 로
 #     가린다). 둘 다 시행 전이고 IP 세기는 동의가 아니라 부정 이용 방지가 근거라 v4 로
 #     나누지 않았다.
-TERMS_VERSION = "v3"
+# v4: 처리방침에 로그인 토큰을 발급 30일 뒤 지운다고 적었다(2026-11-20 시행). v3 시행(11-19)
+#     전에 공고했지만 v3 에 합치지 않았다. 11-12 부터 v3 으로 동의한 사람은 만료 문구가
+#     없는 v3 을 봤다. 약관은 그대로다.
+TERMS_VERSION = "v4"
 
 # 화면에 그릴 수 있는 아바타. 실제 그림은 프론트가 SVG 로 들고 있고,
 # 여기서는 어느 것을 골랐는지만 저장한다. 이미지 파일을 서버에 두지
@@ -637,9 +641,10 @@ class LoginToken(models.Model):
     (/admin/accounts/logintoken/<pk>/). 토큰이 주소에 들어가면 서버 로그와
     브라우저 기록에 남는다. DRF 가 TokenProxy 를 따로 둔 것도 같은 이유다.
 
-    정해진 만료는 없다. 로그아웃(그 기기 것만)·비밀번호 변경·이메일 변경·계정
-    삭제 때 지운다. 처리방침의 "로그인 토큰" 보관 기간이 이 동작을 적고 있다.
-    만료를 넣으려면 그 문구부터 고친다.
+    발급하고 LIFETIME 이 지나면 매일 정리(daily_cleanup)가 지운다. 그 전에도
+    로그아웃(그 기기 것만)·비밀번호 변경·이메일 변경·계정 삭제 때 지운다.
+    처리방침 3절의 "로그인 토큰" 보관 기간이 이 동작을 적고 있다. 바꾸려면 그
+    문구부터 고친다(시행 7일 전 공지).
 
     이 표는 비우면 안 된다. 비우면 로그인한 사람이 모두 로그아웃되고, 0010 은 이미
     적용돼 다시 옮기지 않는다. 이 표를 만든 배포 전으로 되돌리지도 않는다
@@ -656,6 +661,11 @@ class LoginToken(models.Model):
     # 넣는다. auto_now_add 는 넣은 값을 지금 시각으로 덮는다.
     created = models.DateTimeField("발급 시각", default=timezone.now)
 
+    # 로그인 쿠키(frontend/src/lib/session.ts 의 MAX_AGE)와 같은 30일. 토큰은
+    # 쿠키를 붙일 때마다 새로 나오므로, 이만큼 지난 토큰을 든 쿠키는 이미 끝났다.
+    # 쿠키보다 짧게 잡으면 로그인해 있는 사람이 끊긴다.
+    LIFETIME = timedelta(days=30)
+
     class Meta:
         verbose_name = "로그인 토큰"
         verbose_name_plural = "로그인 토큰"
@@ -663,3 +673,8 @@ class LoginToken(models.Model):
     def __str__(self) -> str:
         # 토큰 값을 넣지 않는다. 관리자 작업 기록(LogEntry.object_repr)에 남는다.
         return f"{self.user} 의 로그인"
+
+    @classmethod
+    def expired(cls) -> models.QuerySet[LoginToken]:
+        """발급하고 LIFETIME 이 지난 토큰. 매일 정리가 지운다."""
+        return cls.objects.filter(created__lt=timezone.now() - cls.LIFETIME)

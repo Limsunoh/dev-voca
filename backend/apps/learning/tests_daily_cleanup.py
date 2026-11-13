@@ -19,9 +19,11 @@ import threading
 import unittest
 from datetime import datetime, timedelta
 from io import StringIO
+from pathlib import Path
 from unittest import mock
 from zoneinfo import ZoneInfo
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail as django_mail
 from django.core import signing
@@ -845,6 +847,45 @@ class CounterSweepTest(PurgeTestBase):
         self._seed()
         self.assertEqual(sweep_expired_counters(apply=False), 2)
         self.assertEqual(len(counter_keys()), 4)
+
+
+class LoginTokenExpiryTest(PurgeTestBase):
+    """발급 30일(로그인 쿠키와 같은 길이)이 지난 토큰만 지운다."""
+
+    def _token(self, owner, age: timedelta) -> LoginToken:
+        return LoginToken.objects.create(user=owner, created=self.clock - age)
+
+    def _seed(self):
+        owner = self.member("owner")
+        self.old = self._token(owner, timedelta(days=30, seconds=1))
+        self.edge = self._token(owner, timedelta(days=30))
+        self.fresh = self._token(owner, timedelta(days=29, hours=23))
+
+    def test_apply_removes_only_tokens_past_thirty_days(self):
+        self._seed()
+
+        output = self.apply()
+
+        self.assertIn("로그인 토큰 1개", output)
+        left = set(LoginToken.objects.values_list("pk", flat=True))
+        self.assertEqual(left, {self.edge.pk, self.fresh.pk})
+        # 쿠키가 아직 살아 있는 기기는 그대로 로그인돼 있다.
+        res = self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {self.fresh.key}")
+        self.assertEqual(res.status_code, 200)
+
+    def test_preview_counts_them_and_keeps_them(self):
+        self._seed()
+
+        self.assertIn("로그인 토큰 1개", self.run_cleanup())
+        self.assertEqual(LoginToken.objects.count(), 3)
+
+    def test_lifetime_matches_the_login_cookie(self):
+        """쿠키보다 짧으면 로그인해 있는 사람이 끊긴다. 길면 처리방침의 30일과 어긋난다."""
+        session = Path(settings.BASE_DIR).parent / "frontend" / "src" / "lib" / "session.ts"
+        self.assertIn(
+            "const MAX_AGE = 60 * 60 * 24 * 30;", session.read_text(encoding="utf-8")
+        )
+        self.assertEqual(LoginToken.LIFETIME, timedelta(days=30))
 
 
 class CounterSweepRealClockTest(TestCase):

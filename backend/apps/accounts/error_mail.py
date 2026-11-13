@@ -79,13 +79,15 @@ KNOWN_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
 # 운영 로그에 오류 메시지를 싣기 시작하는 날(한국 시간). 처리방침 14절이 "바꾸면 시행
 # 7일 전부터 서비스 화면에 알린다" 고 약속해서, 이 기능을 머지한 날(공고일)부터 7일
-# 뒤다. frontend/src/components/LegalDoc.tsx 의 PRIVACY_CHANGE.effective 와 같아야
-# 한다(legal-pages.test.mts 가 본다).
+# 뒤다. 처리방침 v3 의 시행일이고 14절에 글자로 적혀 있다(legal-pages.test.mts 가
+# 견준다). v4 를 v3 시행 전에 공고해 LegalDoc.tsx 의 PRIVACY_CHANGE.effective 는 v4
+# 시행일(11-20)이다. 그쪽에 맞춰 이 날짜를 옮기지 않는다.
 # ponytail: 날짜로 켜는 문이다. 시행일이 지나면 이 상수와 short_message 의 날짜 비교를
 # 지운다. 그때 테스트의 날짜 고정(tests_error_mail.py 의 messages_on/off,
 # tests_error_mail_dynamic.py 의 StderrCarriesNoValuesTest.setUp 과 MESSAGE_FROM 을
-# 쓰는 아래쪽 절들), legal-pages.test.mts 의 MESSAGE_FROM 대조, LegalDoc.tsx 의
-# "v3 의 시행일은 MESSAGE_FROM 과 같아야" 주석도 같이 지운다. `grep -rn MESSAGE_FROM` 로 찾는다.
+# 쓰는 아래쪽 절들), legal-pages.test.mts 의 MESSAGE_FROM 대조와 V3_EFFECTIVE·V3_GATES_LIVE,
+# LegalDoc.tsx 의 PRIVACY_CHANGE 주석 중 "서버의 날짜 문" 문단도 같이 지운다.
+# `grep -rn MESSAGE_FROM` 로 찾는다.
 MESSAGE_FROM = date(2026, 11, 19)
 
 # 운영 로그 한 줄에 싣는 오류 메시지의 최대 글자 수. SQL 전체가 든 DB 오류처럼 긴

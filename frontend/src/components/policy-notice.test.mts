@@ -6,7 +6,8 @@
  * 계약:
  *   - 알림은 한국 시간으로 시행일 0시 직전까지 뜨고, 0시부터 사라진다. 서버(Vercel)는
  *     UTC 로 돌아서, 날짜를 UTC 로 고르면 9시간 늦게 사라진다.
- *   - 알림 글의 날짜는 PRIVACY_CHANGE.effective 에서 나온다.
+ *   - 알림은 PRIVACY_CHANGE.effective 전날까지 뜨고, 글의 날짜는 firstChange(가장 먼저
+ *     바뀌는 날)에서 나온다.
  *   - 처리방침 버전 줄은 처리방침 시행일, 약관은 약관 시행일(EFFECTIVE_DATE)을 쓴다.
  *   - 처리방침이 적은 메시지 길이 상한이 서버의 MESSAGE_LIMIT 과 같다.
  *
@@ -70,8 +71,12 @@ describe("홈의 처리방침 알림", () => {
     assert.equal(renderToStaticMarkup(createElement(PolicyNotice)), "");
   });
 
-  it("알림 글의 날짜가 시행일과 같다", () => {
-    const [, m, d] = PRIVACY_CHANGE.effective.split("-").map(Number);
+  it("알림 글의 날짜는 가장 먼저 바뀌는 날(firstChange)이다", () => {
+    // v3 공지 기간 중에 v4 를 공고해 firstChange(v3 시행일)가 effective 보다 이르다.
+    // 공고일 7일 뒤보다 이르면 안 된다는 약속은 앞 버전의 공고가 지킨다.
+    assert.ok(PRIVACY_CHANGE.announced < PRIVACY_CHANGE.firstChange);
+    assert.ok(PRIVACY_CHANGE.firstChange <= PRIVACY_CHANGE.effective);
+    const [, m, d] = PRIVACY_CHANGE.firstChange.split("-").map(Number);
     const html = renderToStaticMarkup(
       createElement(PolicyNotice, { today: PRIVACY_CHANGE.announced }),
     );

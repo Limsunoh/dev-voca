@@ -8,7 +8,7 @@
  *   2. 있으면 비밀값(X-Next-Relay)은 늘 싣는다. 백엔드가 Next 에서 온 요청을 가르는 표시다.
  *   3. 접속 IP(X-Next-Client-IP)는 처리방침 v3 시행일(IP_FROM, 한국 시간)부터만 싣는다.
  *      x-forwarded-for 의 맨 앞(접속자)만 싣고, 없거나 비면 싣지 않는다.
- *   4. IP_FROM, 백엔드 IP_COUNT_FROM, 처리방침 시행일이 같다(v3 동안).
+ *   4. IP_FROM, 백엔드 IP_COUNT_FROM, 처리방침 v3 시행일(2026-11-19)이 같다(날짜 문이 남아 있는 동안).
  *
  * 하네스: client-ip.ts 맨 위의 `import "server-only"` 는 Next 번들러 밖에서 해석되지
  * 않아 CJS 로더에서 그 이름만 빈 객체로 돌려준다(session-stale-token.test.mts 와 같다).
@@ -37,7 +37,7 @@ loader._load = function (this: unknown, request: string, ...rest: unknown[]) {
 };
 
 const { IP_FROM, clientIpHeaders } = await import("./client-ip");
-const { DOC_VERSION, PRIVACY_CHANGE } = await import("../components/LegalDoc");
+const { DOC_VERSION } = await import("../components/LegalDoc");
 
 // 비밀값처럼 생긴 글자를 이름 옆에 적지 않는다(GitGuardian, #169·#170).
 const MARK = ["leakmark", "relay"].join("-");
@@ -95,11 +95,12 @@ describe("clientIpHeaders", () => {
   });
 });
 
-// v3 에만 해당한다. 날짜 문을 지울 때(client-ip.ts 의 ponytail 주석) 이 절도 지운다.
-describe("IP 를 넘기기 시작하는 날", { skip: DOC_VERSION !== "v3" }, () => {
+// v3 의 날짜 문이다. v4 를 v3 시행 전에 공고해 PRIVACY_CHANGE 는 v4 날짜라 v3
+// 시행일과 견준다. 날짜 문을 지울 때(client-ip.ts 의 ponytail 주석) 이 절도 지운다.
+describe("IP 를 넘기기 시작하는 날", { skip: !["v3", "v4"].includes(DOC_VERSION) }, () => {
   it("처리방침 v3 시행일과 같다", () => {
     // 먼저 보내면 처리방침이 알리기 전에 IP 가 Railway 로 넘어간다.
-    assert.equal(IP_FROM, PRIVACY_CHANGE.effective);
+    assert.equal(IP_FROM, "2026-11-19");
   });
 
   it("백엔드가 IP 로 세기 시작하는 날과 같다", () => {

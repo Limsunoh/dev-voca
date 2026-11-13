@@ -8,8 +8,8 @@ export type LegalSection = { id: string; title: string; body: ReactNode };
 
 // 가입할 때 저장하는 backend/apps/accounts/models.py 의 TERMS_VERSION 과 같아야
 // 누가 어느 문서에 동의했는지 가릴 수 있다. 어긋나면 테스트가 실패한다.
-// 약관과 처리방침이 버전 하나를 같이 쓴다. v3 은 처리방침만 바뀌었다.
-export const DOC_VERSION = "v3";
+// 약관과 처리방침이 버전 하나를 같이 쓴다. v3·v4 는 처리방침만 바뀌었다.
+export const DOC_VERSION = "v4";
 
 // 약관 시행일. 시행일은 화면을 올리는 날이다.
 export const EFFECTIVE_DATE = "2026년 11월 9일";
@@ -22,13 +22,19 @@ export const EFFECTIVE_DATE = "2026년 11월 9일";
  * 알림을 띄운다(PolicyNotice). 다음에 처리방침을 바꿀 때도 이 두 날짜만 고치면
  * 알림이 다시 뜬다.
  *
- * v3 의 시행일은 서버가 운영 로그에 오류 메시지를 싣기 시작하는 날
- * (backend/apps/accounts/error_mail.py 의 MESSAGE_FROM)과 같아야 한다. 어긋나면
- * 테스트가 실패한다.
+ * firstChange 는 홈 알림이 "N일부터 바뀝니다" 로 띄우는 날이다. 바뀌는 것 중
+ * 가장 먼저 켜지는 날이라 보통 effective 와 같다. v4 는 v3 의 공지 기간
+ * (11-12 ~ 11-19) 중에 공고해서, v3 의 내용이 켜지는 11-19 를 띄우고 알림은 v4
+ * 시행일까지 남긴다. v3 의 바뀐 내용과 시행일은 14절에 글자로 남긴다.
+ *
+ * 서버의 날짜 문: v3 시행일에 켜지는 error_mail.py 의 MESSAGE_FROM,
+ * throttles.py 의 IP_COUNT_FROM, lib/client-ip.ts 의 IP_FROM 은 그대로 11-19 다.
+ * 다음 개정에서는 firstChange 를 effective 와 같게 둔다.
  */
 export const PRIVACY_CHANGE = {
-  announced: "2026-11-12",
-  effective: "2026-11-19",
+  announced: "2026-11-13",
+  firstChange: "2026-11-19",
+  effective: "2026-11-20",
 };
 
 /** "2026-11-19" 를 "2026년 11월 19일" 로. 문서의 다른 날짜와 같은 꼴이다. */

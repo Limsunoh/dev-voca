@@ -216,7 +216,8 @@ class AvatarPhotoThrottle(SimpleRateThrottle):
 # 접속 IP 를 해시값으로 바꿔 1시간 단위로 센다" 를 싣고 시행하는 날이다. 처리방침 14절이
 # "바꾸면 시행 7일 전부터 화면에 알린다" 고 약속해서 그 전에는 아무것도 세지 않는다. Next 도
 # 이 날부터 IP 를 싣는다(frontend/src/lib/client-ip.ts 의 IP_FROM). 두 날짜와 처리방침
-# 시행일(PRIVACY_CHANGE.effective)이 같은지는 client-ip.test.mts 가 본다.
+# v3 시행일(2026-11-19, 14절에 글자로 적음)이 같은지는 client-ip.test.mts 가 본다.
+# PRIVACY_CHANGE.effective 는 v4 시행일(11-20)이라 견주지 않는다.
 # ponytail: 날짜로 켜는 문이다. 시행일이 지나면 이 상수와 _ClientIpThrottle 의 날짜 비교,
 # client-ip.ts 의 IP_FROM, 두 쪽 테스트의 날짜 고정을 지운다. `grep -rn IP_COUNT_FROM` 로 찾는다.
 IP_COUNT_FROM = date(2026, 11, 19)
