@@ -15,18 +15,16 @@ import json
 import re
 
 from django.core import signing
-from django.db.models import Q
 from django.test import TestCase
 
 from apps.learning import review
 
 from .models import Sentence, Word
 from .quiz import (
-    _PLACE_WORD,
-    _SCENE_END,
     TARGET_SENTENCE,
     TARGET_WORD,
     _is_place,
+    _place_filter,
     make_situation_question,
     sign_question,
 )
@@ -552,11 +550,14 @@ class SituationChoiceKindTest(TestCase):
         """_is_place 와 쿼리 필터가 같은 값을 자리로 봐야 한다.
 
         판정이 두 곳에 나뉘어 있다 - 묻는 말은 파이썬 `_is_place` 가
-        정하고, 보기는 Postgres `context__regex` 가 뽑는다. 둘이 갈리면
+        정하고, 보기는 `_place_filter` 의 쿼리가 뽑는다. 둘이 갈리면
         "어디서 보이나" 라고 묻고 장면을 보기로 주는 문제가 에러 없이 나온다.
 
-        Postgres 정규식에는 부정 선행 검사가 없어 filter/exclude 를 겹쳐
-        흉내 낸 자리라, 어느 한쪽만 고치면 바로 어긋난다.
+        쿼리는 같은 낱말 목록으로 LIKE 조건을 따로 만들고, "자리 낱말이
+        있으면서 장면 어미가 아닌 것" 을 & 와 ~ 로 겹쳐 표현한다. 어느 한쪽만
+        고치면 바로 어긋난다. 그래서 구현이 실제로 쓰는 `_place_filter` 를
+        부른다. 2026-11-13 에 정규식을 LIKE 로 바꾸기 전에는 이 테스트가
+        정규식 쿼리를 따로 만들어 봐서, 구현이 바뀌어도 그것을 못 봤다.
 
         자리 낱말을 가지면서 장면 어미로 끝나는 값을 반드시 넣는다.
         "로그를 볼 때" 처럼 두 규칙이 동시에 걸리는 값만이 어미 검사가
@@ -576,17 +577,8 @@ class SituationChoiceKindTest(TestCase):
             )
 
         pool = Sentence.objects.visible().exclude(context="")
-        place_ids = set(
-            pool.filter(context__regex=_PLACE_WORD.pattern)
-            .exclude(context__regex=_SCENE_END.pattern)
-            .values_list("pk", flat=True)
-        )
-        scene_ids = set(
-            pool.exclude(
-                Q(context__regex=_PLACE_WORD.pattern)
-                & ~Q(context__regex=_SCENE_END.pattern)
-            ).values_list("pk", flat=True)
-        )
+        place_ids = set(_place_filter(pool, True).values_list("pk", flat=True))
+        scene_ids = set(_place_filter(pool, False).values_list("pk", flat=True))
 
         disagree = [
             s.context for s in pool if _is_place(s.context) != (s.pk in place_ids)
@@ -599,9 +591,10 @@ class SituationChoiceKindTest(TestCase):
     def test_odd_context_values_do_not_break_the_query(self):
         """context 가 정규식 메타문자여도 500 이 아니라 문제이거나 None 이다.
 
-        이 값은 `context__regex` 로 Postgres 정규식에 들어간다. 관리자가
-        "[" 나 "\\" 하나만 넣어도 쿼리가 터지면 문제 내기 경로 전체가
-        죽는다. 값 자체는 쿼리의 대상이지 패턴이 아니므로 터지면 안 된다.
+        이 값은 `_place_filter` 의 LIKE 조건의 대상이다. 관리자가 "[" 나
+        "\\" 하나만 넣어도 쿼리가 터지면 문제 내기 경로 전체가 죽는다. 값
+        자체는 쿼리의 대상이지 패턴이 아니므로 터지면 안 된다. 2026-11-13
+        까지는 정규식(`context__regex`)이었다.
         """
         odd = [
             " ",

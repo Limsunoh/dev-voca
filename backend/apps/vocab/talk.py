@@ -34,6 +34,7 @@
 from __future__ import annotations
 
 import difflib
+import functools
 import re
 
 from django.core import signing
@@ -249,6 +250,18 @@ _WORD_SPLIT = re.compile(r"[\s\-/]+")
 _LETTERS = re.compile(r"[^A-Za-z]")
 
 
+# 결과를 기억한다. 출제(views.TalkViewSet.question)가 문제 하나마다 일상
+# 표현 전부를 이 함수에 대는데, 6,113개일 때 그것만 22ms 였다(2026-11-13
+# 측정). 같은 글자면 늘 같은 답이라 기억해도 틀릴 일이 없다. 단
+# _MANUAL_EXCLUDE·_READ_AS_WORD 가 코드 상수인 동안만 그렇다. 이 목록을
+# 관리자 화면이나 DB 에서 고치게 바꾸면 기억해 둔 답이 낡는다.
+#
+# 크기는 항목 수보다 넉넉해야 한다. 출제는 매번 전부를 같은 순서로 훑어서,
+# 크기가 항목 수보다 작으면 다음에 쓸 것부터 밀려나 한 번도 맞지 않는다
+# (quiz._term_pattern 이 2,048개에서 그렇게 무너졌다, CODE_INSIGHTS 11-12).
+# 그러면 경고 없이 예전 속도로 돌아간다. 지금 일상 표현과 개발 용어를
+# 합쳐 1만 개 가까이다(9,616개).
+@functools.lru_cache(maxsize=65536)
 def is_speakable(text: str) -> bool:
     """소리로 채점할 수 있는 항목인가."""
     if text in _MANUAL_EXCLUDE:

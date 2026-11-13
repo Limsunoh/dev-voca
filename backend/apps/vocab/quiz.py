@@ -821,10 +821,16 @@ def make_blank_question(
 # "~때/경우/중/뒤/전" 으로 끝나면 무슨 낱말이 들어 있든 장면이다. 이걸
 # 먼저 보고, 그다음에 자리 낱말을 본다. 이 기준으로 417개가 자리 94 /
 # 장면 323 으로 갈린다.
-_SCENE_END = re.compile(r"(때|경우|중|뒤|전|후|면)$")
-_PLACE_WORD = re.compile(
-    r"(교재|로그|문서|메시지|화면|출력|콘솔|리포트|본문|응답|Events|Description)"
+#
+# 낱말 목록은 여기 한 곳에 두고, 파이썬 정규식과 쿼리 조건을 둘 다 여기서
+# 만든다. 따로 적으면 한쪽만 고쳐져 둘의 판정이 갈린다(_place_filter 참고).
+_SCENE_ENDINGS = ("때", "경우", "중", "뒤", "전", "후", "면")
+_PLACE_WORDS = (
+    "교재", "로그", "문서", "메시지", "화면", "출력", "콘솔",
+    "리포트", "본문", "응답", "Events", "Description",
 )
+_SCENE_END = re.compile(f"({'|'.join(map(re.escape, _SCENE_ENDINGS))})$")
+_PLACE_WORD = re.compile(f"({'|'.join(map(re.escape, _PLACE_WORDS))})")
 
 def _place_filter(pool: QuerySet[Sentence], want_place: bool) -> QuerySet[Sentence]:
     """`_is_place` 와 같은 기준으로 거른 queryset.
@@ -833,18 +839,30 @@ def _place_filter(pool: QuerySet[Sentence], want_place: bool) -> QuerySet[Senten
     판정하고 보기는 DB 가 고르는데, 둘이 갈리면 정답이 자기가 걸러진 쪽
     풀에서 뽑혀 보기가 다시 섞인다.
 
-    그래서 여기서도 끝 공백을 떼고 본다(`Trim`). Postgres 의 `$` 는
-    파이썬과 달리 마지막 줄바꿈 앞에서 안 맞아서, 안 다듬으면
-    `"로그를 볼 때\\n"` 에서 둘이 어긋난다.
+    그래서 어미는 끝 공백을 뗀 값(`Trim`)에 묻는다. 다만 Postgres 의
+    TRIM 은 스페이스만 지우고 파이썬 strip() 은 줄바꿈·탭까지 지운다.
+    끝에 줄바꿈이나 탭이 붙은 값은 둘이 갈릴 수 있다. 2026-11-13 에 측정
+    DB 의 문장 5,366개에서 그런 값은 0개였다.
 
-    부정 선행 검사(negative lookahead)는 Postgres 정규식에 없으므로
-    쓰지 않고, filter 와 exclude 를 겹쳐 "어미가 장면이 아니면서 자리
-    낱말을 가진 것" 을 표현한다.
+    정규식(`~`)이 아니라 LIKE(`contains`·`endswith`)로 묻는다. 문장이
+    5,366개일 때 Postgres 가 한글 정규식을 모든 문장에 대느라 이 쿼리
+    하나에 42ms 가 걸렸다(2026-11-13 측정). 낱말을 그대로 찾는 일이라
+    LIKE 로 같은 답이 나온다. 두 쪽 다 대소문자를 가린다(Postgres 기준.
+    SQLite 의 contains 는 가리지 않는다).
+
+    "어미가 장면이 아니면서 자리 낱말을 가진 것" 은 두 조건을 & 와 ~ 로
+    겹쳐 표현한다. 낱말이 들어 있는지는 끝 공백과 상관없어 다듬지 않은
+    칸에 묻는다. 다듬은 값에 물으면 Postgres 가 조건마다 TRIM 을 다시 해
+    그것만으로 5ms 가 더 든다.
     """
     trimmed = pool.annotate(_ctx=Trim("context"))
-    is_place = Q(_ctx__regex=_PLACE_WORD.pattern) & ~Q(
-        _ctx__regex=_SCENE_END.pattern
-    )
+    has_word = Q()
+    for word in _PLACE_WORDS:
+        has_word |= Q(context__contains=word)
+    scene_end = Q()
+    for end in _SCENE_ENDINGS:
+        scene_end |= Q(_ctx__endswith=end)
+    is_place = has_word & ~scene_end
     return trimmed.filter(is_place) if want_place else trimmed.exclude(is_place)
 
 
@@ -853,9 +871,8 @@ def _is_place(context: str) -> bool:
 
     어미를 먼저 본다 - "~때" 로 끝나면 "화면" 이 들어 있어도 장면이다.
 
-    끝 공백을 떼고 본다. 파이썬과 Postgres 의 `$` 가 마지막 줄바꿈에서
-    다르게 맞기 때문이다. 쿼리 쪽은 `_place_filter` 가 같은 일을 한다(이유도
-    그 독스트링 참고).
+    끝 공백을 떼고 본다. 쿼리 쪽(`_place_filter`)과 다른 점(끝 줄바꿈·탭)은
+    그 독스트링 참고.
     """
     context = context.strip()
     if _SCENE_END.search(context):
