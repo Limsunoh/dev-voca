@@ -877,11 +877,14 @@ class TalkViewSet(viewsets.ViewSet):
                         전부. 일상 표현에만 걸린다
 
         약어·숫자·기호는 출제하지 않는다. 소리로 채점할 수 없어서다
-        (talk.is_speakable). 개발 용어 566개 중 361개만 나온다.
+        (talk.is_speakable). 2026-11-13 기준 개발 용어 3,503개 중 3,068개만
+        나온다(일상 표현은 6,113개 전부).
 
         그 필터를 SQL 로 옮기지 않고 파이썬에서 도는 이유: 판정이 "낱말로
         쪼개 각 낱말이 전부 대문자인지" 라 SQL 로 옮기면 정규식 세 개가
-        되고, 그것이 DB 엔진마다 다르게 동작한다. 566행은 다 읽어도 싸다.
+        되고, 그것이 DB 엔진마다 다르게 동작한다. 일상 표현이 6천 개를
+        넘어 판정이 문제마다 22ms 였는데, is_speakable 이 결과를 기억해
+        두 번째부터는 거의 들지 않는다.
         """
         if request.query_params.get("kind") == KIND_DEV:
             kind, model, field = KIND_WORD, Word, "term"
