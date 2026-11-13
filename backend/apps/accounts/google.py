@@ -1,7 +1,8 @@
 """구글 로그인.
 
-Next 서버가 구글에서 받은 코드를 이쪽으로 넘기면, 여기서 구글에 직접
-확인하고 계정을 찾거나 만든다.
+화면이 구글 버튼에서 받은 신분 토큰(verify_google_credential), 또는 Next
+서버가 구글 화면을 다녀와 받은 코드(fetch_google_user)를 넘기면, 여기서
+구글에 직접 확인한다. 계정을 찾거나 만드는 일은 뷰가 한다.
 
 코드가 아니라 사용자 정보를 그대로 받으면 안 된다. 그러면 누구든
 "나는 admin@example.com 이다" 라고 보내서 남의 계정으로 들어올 수 있다.
@@ -10,6 +11,8 @@ Next 서버가 구글에서 받은 코드를 이쪽으로 넘기면, 여기서 �
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 
 import httpx
@@ -110,6 +113,80 @@ def fetch_google_user(code: str, redirect_uri: str) -> dict:
     return {
         "email": email,
         "name": (info.get("name") or "").strip(),
+        "picture": _safe_picture(info.get("picture")),
+    }
+
+
+# 구글이 브라우저에 준 신분 토큰(ID 토큰)을 확인해 주는 곳.
+TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+
+# 구글 ID 토큰의 발급자. 구글 문서가 두 표기를 모두 쓴다.
+GOOGLE_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
+
+
+def verify_google_credential(credential: str, nonce_secret: str) -> dict:
+    """구글 로그인 버튼이 브라우저에 준 신분 토큰을 확인한다.
+
+    화면 아래 계정 창(FedCM)으로 로그인하면 페이지를 떠나지 않아 코드 대신
+    이 토큰이 온다. 구글이 서명한 JWT 라 아무나 만들 수 없지만, 그대로 믿지
+    않고 구글에 되물어 서명과 만료를 확인한다(tokeninfo).
+
+    그 뒤 우리 것인지 본다:
+    - aud 가 우리 클라이언트 ID 여야 한다. 다른 사이트용으로 발급된 토큰을
+      가져와 들어오는 것을 막는다.
+    - 토큰의 nonce 가 nonce_secret 의 sha256 이어야 한다. 화면은 버튼을 그릴
+      때 비밀값을 정해 httpOnly 쿠키에 두고, 구글에는 그 해시만 넘긴다. 토큰은
+      서명만 돼 있고 암호화돼 있지 않아 안의 nonce 는 누구나 읽지만, 비밀값은
+      그 브라우저의 쿠키에만 있다. 그래서 새어 나간 토큰을 다른 곳에서 다시
+      보내도 통과하지 못한다(OpenID Connect 가 권하는 방식).
+
+    돌려주는 것은 fetch_google_user 와 같다.
+
+    ponytail: 서명 확인을 구글 tokeninfo 에 맡겨 로그인마다 구글을 한 번
+    부른다. 로그인이 많아지면 google-auth 로 공개키를 받아 두고 직접 확인한다.
+
+    ponytail: 같은 토큰과 비밀값을 한 번만 쓰게 막지는 않는다. Next 에서 이리
+    오는 요청 본문이 통째로 새면 토큰이 만료될 때까지(약 1시간) 다시 쓸 수
+    있다. 본문을 남기는 로그가 없어 지금은 두고, 막으려면 쓴 nonce 를 DB 표에
+    유일 값으로 남긴다(캐시는 지워질 수 있어 안 된다, settings 의 CACHES 주석).
+    """
+    client_id = _require("GOOGLE_CLIENT_ID")
+    try:
+        with httpx.Client(timeout=TIMEOUT) as client:
+            # 주소(쿼리)가 아니라 본문에 싣는다. 주소는 로그에 남기 쉽다.
+            res = client.post(TOKENINFO_URL, data={"id_token": credential})
+    except httpx.HTTPError as exc:
+        raise GoogleAuthError("구글에 연결할 수 없습니다.") from exc
+    if res.status_code != 200:
+        # 서명이 틀렸거나 만료됐다.
+        raise GoogleAuthError("구글 로그인을 확인하지 못했습니다.")
+    try:
+        info = res.json()
+    except ValueError as exc:
+        raise GoogleAuthError("구글 응답을 읽지 못했습니다.") from exc
+    if not isinstance(info, dict):
+        raise GoogleAuthError("구글 응답을 읽지 못했습니다.")
+
+    if info.get("aud") != client_id or info.get("iss") not in GOOGLE_ISSUERS:
+        raise GoogleAuthError("구글 로그인을 확인하지 못했습니다.")
+    token_nonce = info.get("nonce")
+    expected = hashlib.sha256(nonce_secret.encode()).hexdigest()
+    # 바이트로 비교한다. 글자로 넘기면 한글 같은 값에서 TypeError 가 나 500 이 된다.
+    if not isinstance(token_nonce, str) or not hmac.compare_digest(
+        token_nonce.encode(), expected.encode()
+    ):
+        raise GoogleAuthError("구글 로그인을 확인하지 못했습니다.")
+
+    email = info.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise GoogleAuthError("구글 계정에 이메일이 없습니다.")
+    # tokeninfo 는 참거짓을 글자("true")로 준다.
+    if info.get("email_verified") not in (True, "true"):
+        raise GoogleAuthError("이메일이 확인되지 않은 구글 계정입니다.")
+    name = info.get("name")
+    return {
+        "email": email.strip(),
+        "name": name.strip() if isinstance(name, str) else "",
         "picture": _safe_picture(info.get("picture")),
     }
 

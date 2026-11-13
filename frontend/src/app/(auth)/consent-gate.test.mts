@@ -74,6 +74,17 @@ Object.assign(fakeGuestAction, {
   $$FORM_ACTION: () => ({ name: undefined, action: "/__guest__", encType: undefined, method: "POST", data: null }),
 });
 
+// 구글 스크립트를 붙이는 next/script. 이 파일은 모은 effect 를 전부 돌리는데,
+// 그 effect 가 가짜 document 에 script 태그를 만들려다 멈춘다.
+mock.module("next/script", { defaultExport: () => null });
+// 구글 버튼(GoogleButton)이 부르는 서버 액션. 실제 파일은 서버 전용 모듈을 불러
+// 테스트에서 읽히지 않는다. 준비가 null 이면 버튼은 예전 링크를 그대로 보인다.
+mock.module("@/app/(auth)/google-actions", {
+  namedExports: {
+    prepareGoogleButton: async () => null,
+    googleCredentialAction: async () => {},
+  },
+});
 mock.module("@/app/start/actions", {
   namedExports: { continueAsGuestAction: fakeGuestAction },
 });

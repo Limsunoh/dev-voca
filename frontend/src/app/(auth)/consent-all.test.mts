@@ -83,6 +83,14 @@ Object.assign(fakeGuestAction, {
   $$FORM_ACTION: () => ({ name: undefined, action: "/__guest__", encType: undefined, method: "POST", data: null }),
 });
 
+// 구글 버튼(GoogleButton)이 부르는 서버 액션. 실제 파일은 서버 전용 모듈을 불러
+// 테스트에서 읽히지 않는다. 준비가 null 이면 버튼은 예전 링크를 그대로 보인다.
+mock.module("@/app/(auth)/google-actions", {
+  namedExports: {
+    prepareGoogleButton: async () => null,
+    googleCredentialAction: async () => {},
+  },
+});
 mock.module("@/app/start/actions", {
   namedExports: { continueAsGuestAction: fakeGuestAction },
 });

@@ -53,7 +53,7 @@ function withoutComments(source: string): string {
 
 /** 코드가 쓰는 쿠키 이름. 상수로 정의한 자리에서 읽는다. */
 function cookiesInCode(): Set<string> {
-  const files = ["lib/session.ts", "app/api/auth/google/route.ts"];
+  const files = ["lib/session.ts", "app/api/auth/google/route.ts", "app/(auth)/google-actions.ts"];
   return new Set(files.flatMap((file) => withoutComments(read(file)).match(COOKIE) ?? []));
 }
 
@@ -94,6 +94,7 @@ describe("서비스 이름 바꾸기", () => {
       [...cookiesInCode()].sort(),
       [
         "devvoca_daily_length",
+        "devvoca_google_nonce",
         "devvoca_guest",
         "devvoca_oauth_consent",
         "devvoca_oauth_next",
