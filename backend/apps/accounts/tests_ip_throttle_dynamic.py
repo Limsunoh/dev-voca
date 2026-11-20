@@ -135,11 +135,15 @@ class SignUpIpBucketEdgeTest(_IpThrottleCase):
         self.assertEqual(len(ident), 64)
 
     def test_ipv6_cache_key_does_not_hold_the_raw_ip(self):
+        """키 뒤는 16진수 64자뿐이라 콜론이 든 IPv6 원문이 들어갈 자리가 없다.
+
+        "db8" 같은 조각으로 찾으면 실행마다 바뀌는 SECRET_KEY 때문에 해시에 우연히 나와
+        가끔 빨개진다.
+        """
         self.counting_from(date.min)
         request = RequestFactory().post(SIGNUP_URL, **relayed("2001:db8::1"))
         key = SignUpIpThrottle().get_cache_key(request, view=None)
-        self.assertNotIn("2001", key)
-        self.assertNotIn("db8", key)
+        self.assertRegex(key, r"^throttle_signup_ip_[0-9a-f]{64}$")
 
     def test_policy_date_boundary_in_korean_time(self):
         """시행일 전날까지는 아무것도 세지 않고, 시행일부터 센다.
