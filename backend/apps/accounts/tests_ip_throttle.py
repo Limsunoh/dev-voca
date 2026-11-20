@@ -268,11 +268,11 @@ class LoginIpThrottleTest(_IpThrottleCase):
 class WaitTextTest(SimpleTestCase):
     def test_minutes_over_a_minute(self):
         """시간 단위 제한이라 "3412초" 대신 분으로 적는다."""
-        from config.exceptions import _wait_text
+        from config.exceptions import wait_text
 
-        self.assertEqual(_wait_text(None), "잠시")
-        self.assertEqual(_wait_text(54), "54초")
+        self.assertEqual(wait_text(None), "잠시")
+        self.assertEqual(wait_text(54), "54초")
         # 1분 단위 제한은 DRF 가 올려서 60 이 된다. 예전 문구 그대로 초로 둔다.
-        self.assertEqual(_wait_text(60), "60초")
-        self.assertEqual(_wait_text(61), "2분")
-        self.assertEqual(_wait_text(3412), "57분")
+        self.assertEqual(wait_text(60), "60초")
+        self.assertEqual(wait_text(61), "2분")
+        self.assertEqual(wait_text(3412), "57분")

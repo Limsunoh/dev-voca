@@ -84,6 +84,7 @@ AVATAR_PHOTO_MAX_BYTES = 5 * 1024 * 1024
 # 5천만으로 둔다. 요즘 폰이 5천만 화소 안쪽이라 평범한 사진은 다 통과하고,
 # 그 위는 프로필 사진으로 쓸 이유가 없다.
 AVATAR_PHOTO_MAX_PIXELS = 50_000_000
+AVATAR_PHOTO_FORMATS = ("JPEG", "PNG", "WEBP")
 
 # 자동으로 지어주는 이름의 앞부분. 뒤에 네 자리를 붙여 일곱 글자가 된다.
 GENERATED_NAME_PREFIX = "학습자"
@@ -249,7 +250,9 @@ def shrink_avatar_photo(raw: bytes) -> bytes:
     # verify() 를 넣으면 그 뒤 이미지를 못 써서(Pillow 가 그렇게 정했다)
     # 같은 파일을 두 번 열어야 하는데, 얻는 것 없이 일만 두 배가 된다.
     try:
-        with Image.open(io.BytesIO(raw)) as image:
+        # 폰 사진은 이 셋이다. 나머지 형식은 여는 것부터 막는다. Pillow 취약점은
+        # 잘 안 쓰는 형식의 해석기에서 자주 나와서, 열 수 있는 형식을 줄이면 그만큼 덜 걸린다.
+        with Image.open(io.BytesIO(raw), formats=AVATAR_PHOTO_FORMATS) as image:
             # 픽셀 수를 여기서 본다. 위의 바이트 상한으로는 못 막는
             # 공격이 있다. 같은 색으로 채운 큰 그림은 압축이 아주 잘 돼서,
             # 12000x12000(1.4억 픽셀)짜리가 440KB 밖에 안 된다. 5MB 검사를
@@ -293,8 +296,13 @@ def shrink_avatar_photo(raw: bytes) -> bytes:
             return out.getvalue()
     except AvatarPhotoError:
         raise
+    except UnidentifiedImageError as exc:
+        # 사진이 아닌 파일, 받지 않는 형식(GIF, HEIC 등), 머리말부터 깨진 JPG 가 여기로
+        # 온다. "읽을 수 없다" 만 보이면 GIF 를 고른 사람은 파일이 깨진 줄 안다.
+        raise AvatarPhotoError(
+            "JPG, PNG, WEBP 사진만 올릴 수 있습니다. 다른 사진을 골라주세요."
+        ) from exc
     except (
-        UnidentifiedImageError,
         OSError,
         ValueError,
         # Pillow 가 스스로 폭탄이라 판단하는 경우(기본 한계의 두 배 초과).
@@ -302,9 +310,7 @@ def shrink_avatar_photo(raw: bytes) -> bytes:
         # 닿기도 전에 터져서 400 이 아니라 500 이 나간다.
         Image.DecompressionBombError,
     ) as exc:
-        # 사진이 아닌 파일, 깨진 파일, Pillow 가 거부하는 형식이 전부
-        # 여기로 온다. 원인을 나눠 알려줄 것이 없다. 사용자가 할 수
-        # 있는 일은 어느 쪽이든 "다른 사진을 고른다" 하나다.
+        # 열리기는 했는데 중간이 깨진 파일과 너무 큰 그림이 여기로 온다.
         raise AvatarPhotoError("사진 파일을 읽을 수 없습니다.") from exc
 
 

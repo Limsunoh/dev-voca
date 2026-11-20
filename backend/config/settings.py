@@ -437,6 +437,9 @@ REST_FRAMEWORK = {
         "apps.accounts.authentication.SlimTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
+    # 새 API 가 permission_classes 를 빠뜨리면 누구나 부를 수 있게 되는 것을 막는다.
+    # 지금 있는 API 는 모두 직접 정해 두었다(공개할 것은 AllowAny 나 ReadOnly 로).
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     # 속도 제한은 여기 두지 않는다. 이 구조에서는 오히려 해가 된다.
     #
     # 브라우저가 백엔드를 직접 부르지 않는다. 목록은 서버 컴포넌트가,
@@ -461,6 +464,12 @@ REST_FRAMEWORK = {
     # 통과한다.
     "DEFAULT_THROTTLE_RATES": {
         "auth_email": "1000/min" if sys.argv[1:2] == ["test"] else "10/min",
+        # 같은 이메일의 시간당 상한. 분당 10회만 있으면 IP 를 바꿔 가며 하루 1만 4천 번을
+        # 댈 수 있다(apps.accounts.throttles 의 EmailHourlyThrottle).
+        "auth_email_hour": "1000/min" if sys.argv[1:2] == ["test"] else "30/hour",
+        # Admin 로그인. 관리자는 한두 명이고 자주 로그인하지 않는다. 같은 계정은 API
+        # 로그인(auth_email_hour)으로도 대볼 수 있어 비밀번호 추측의 실제 상한은 둘의 합이다.
+        "admin_login": "1000/min" if sys.argv[1:2] == ["test"] else "10/hour",
         # 구글은 통을 하나만 둔다(apps.accounts.throttles 참고). 사이트
         # 전체가 함께 쓰는 값이라, 한 사람이 다 쓰면 그동안 모두가 막힌다.
         # 그래서 실제 사용량보다 훨씬 넉넉하게 잡는다 - 여기서 재는 것은

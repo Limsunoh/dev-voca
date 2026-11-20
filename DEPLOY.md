@@ -218,7 +218,7 @@ python backend/manage.py shell -c "from django.core.management.utils import get_
 |---|---|
 | `/` | 404 (백엔드에 루트 페이지가 없다. 정상) |
 | `/admin/` | 200 |
-| `/api/vocab/` | 200 |
+| `/api/vocab/` | 401 (로그인 없이 부르면 막는 것이 기본값이다. 정상) |
 | `/api/vocab/words/` | 200 |
 | `POST /api/accounts/google/` (본문 `{}`) | **400** |
 | `POST /api/accounts/login/` (없는 계정) | **400** |
@@ -227,7 +227,7 @@ python backend/manage.py shell -c "from django.core.management.utils import get_
 안 돈 것이다 - 배포 로그의 `migrate` 부분을 본다.
 
 **마지막 두 줄을 빼먹지 않는다.** 위 네 줄은 요청 제한을 거치지 않아
-**캐시 테이블이 없어도 전부 200** 이다. 2026-08-13 에 정확히 그래서
+**캐시 테이블이 없어도 위의 기대값 그대로** 나온다. 2026-08-13 에 정확히 그래서
 초록으로 착각했다. 여기서 500 이 나오면 캐시 테이블을 의심한다.
 
 ```
@@ -421,10 +421,25 @@ railway ssh --service web
 프로세스 메모리를 쓰지 않는 이유: 워커마다 따로 세서 실제 한도가 워커
 수만큼 늘어나고, 재시작하면 0 으로 돌아간다.
 
-테이블이 없으면 조회·문제풀기는 멀쩡하고 **가입·로그인·구글 로그인만**
-500 이 난다. 요청 제한이 붙은 뷰가 그 셋뿐이기 때문이다 - 로그아웃과
-`me/` 는 제한이 없어서 테이블이 없어도 멀쩡하다. 감지하려면 위
-`## 배포 후 확인` 의 마지막 두 줄을 쳐야 한다.
+테이블이 없으면 조회·문제풀기는 멀쩡하고 **요청 제한이 붙은 곳만** 500 이
+난다. 가입·로그인·구글 로그인·Admin 로그인, 비밀번호·이메일·프로필·사진
+바꾸기, 순위표가 그렇다. 로그아웃과 `me/` 조회는 제한이 없어서 테이블이
+없어도 멀쩡하다. 감지하려면 위 `## 배포 후 확인` 의 마지막 두 줄을 쳐야 한다.
+
+### Admin 로그인이 429 로 막혔을 때
+
+Admin 로그인은 이메일마다 한 시간에 10번까지다(`admin_login`). 남이 관리자
+이메일로 계속 틀린 비밀번호를 보내면 관리자도 막힌다. 그 이메일의 횟수만
+지우면 바로 다시 들어갈 수 있다. Git Bash 에서 돌린다(PowerShell 은 `\"` 를
+따옴표로 읽지 않는다). `True` 가 찍히면 지운 것이고, `False` 면 이메일이 틀렸거나
+이미 풀린 것이다.
+
+```
+railway ssh --service web "python backend/manage.py shell -c \"from django.core.cache import cache; from apps.accounts.throttles import AdminLoginThrottle as T, email_ident; print(cache.delete(T.cache_format % {'scope': T.scope, 'ident': email_ident('관리자 이메일')}))\""
+```
+
+계속 막히면 누군가 두드리고 있는 것이다. 운영 로그에서 `/admin/login/` 의
+429 를 보고, 필요하면 관리자 이메일을 공개하지 않은 주소로 바꾼다.
 
 테스트가 대신 봐주지 않는다. Django 테스트 러너가 테스트 DB 에 캐시
 테이블을 알아서 만들어주기 때문에, 배포 절차에서 빠져 있어도 로컬은 늘

@@ -14,10 +14,13 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from apps.accounts.views import admin_login
 from django.contrib import admin
 from django.urls import include, path
 
 urlpatterns = [
+    # Admin 로그인 시도를 센다. admin/ 보다 앞에 있어야 가로챈다.
+    path("admin/login/", admin_login),
     path("admin/", admin.site.urls),
     path("api/vocab/", include("apps.vocab.urls")),
     path("api/accounts/", include("apps.accounts.urls")),

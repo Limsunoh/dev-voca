@@ -17,7 +17,12 @@ from apps.learning.throttles import LeaderboardThrottle
 from apps.vocab.models import Word
 
 from .tests import PASSWORD
-from .throttles import EmailRateThrottle, PasswordChangeThrottle, ProfileUpdateThrottle
+from .throttles import (
+    EmailHourlyThrottle,
+    EmailRateThrottle,
+    PasswordChangeThrottle,
+    ProfileUpdateThrottle,
+)
 
 User = get_user_model()
 
@@ -134,6 +139,10 @@ class ThrottleMessageEdgeTest(TestCase):
         with (
             mock.patch.object(EmailRateThrottle, "get_rate", return_value="1/min"),
             mock.patch.object(EmailRateThrottle, "timer", side_effect=[now, now + 10]),
+            # 시간당 상한(EmailHourlyThrottle)은 위 클래스를 물려받아 가짜 시계와 1/min 을
+            # 같이 쓴다. 그대로 두면 시계 값을 빼앗고, 자기도 막혀 Retry-After 를 60 으로 키운다.
+            mock.patch.object(EmailHourlyThrottle, "get_rate", return_value="1000/min"),
+            mock.patch.object(EmailHourlyThrottle, "timer", return_value=now),
         ):
             self.client.post(LOGIN_URL, body, content_type="application/json")
             res = self.client.post(LOGIN_URL, body, content_type="application/json")

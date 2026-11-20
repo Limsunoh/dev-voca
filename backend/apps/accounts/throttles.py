@@ -2,7 +2,8 @@
 
 두 가지로 센다.
 
-- 이메일(EmailRateThrottle): 한 계정의 비밀번호를 반복해서 때리는 것.
+- 이메일(EmailRateThrottle 분당, EmailHourlyThrottle 시간당): 한 계정의 비밀번호를
+  반복해서 때리는 것. Admin 로그인(AdminLoginThrottle)도 이메일로 센다.
 - 접속 IP(SignUpIpThrottle, LoginIpThrottle): 이메일을 바꿔 가며 계정을 찍어
   내거나 여러 계정에 같은 비밀번호를 대보는 것. 이메일로는 한 번씩 다 통과한다.
 
@@ -17,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import logging
+import unicodedata
 from datetime import date
 
 from django.conf import settings
@@ -27,6 +29,23 @@ from rest_framework.request import Request
 from rest_framework.throttling import SimpleRateThrottle
 
 logger = logging.getLogger(__name__)
+
+
+def email_ident(email: str) -> str:
+    """이메일로 세는 제한의 키. 로그인이 같은 계정으로 보는 이메일은 같은 키가 된다.
+
+    Admin 폼은 이메일을 NFKC 로 바꾸고(전각 "ｂ" -> "b"), 계정은 email__iexact 로 찾는다.
+    iexact 는 PostgreSQL 의 UPPER 라 "ſ"(U+017F) 가 "S", "ı" 가 "I" 가 된다. .lower() 로
+    키를 만들면 이 변형들이 같은 계정에 로그인되면서 횟수는 따로 세어져 제한을 피한다.
+    그래서 같은 두 단계(NFKC, upper)를 거친다.
+
+    해시로 줄이는 이유: 이메일을 그대로 쓰면 키가 길어져 캐시 백엔드가 거부한다
+    (memcached 는 250자 제한). 길이가 고정되면 그 걱정이 없고, 캐시에 이메일 원문이
+    남지도 않는다. 서버 비밀값을 섞는 이유: 그냥 해시면 후보 이메일 목록과 대조해 캐시
+    표의 키에서 원래 이메일을 알아낼 수 있다.
+    """
+    folded = unicodedata.normalize("NFKC", email.strip()).upper()
+    return salted_hmac("accounts.throttles.email", folded, algorithm="sha256").hexdigest()
 
 
 def sweep_expired_counters(*, apply: bool) -> int:
@@ -62,19 +81,39 @@ class EmailRateThrottle(SimpleRateThrottle):
         if not isinstance(email, str) or not email.strip():
             return None
 
-        # 저장할 때와 같은 방식으로 낮춘다. 안 그러면 대소문자만 바꿔가며
-        # 같은 계정을 계속 때릴 수 있다.
-        #
-        # 해시로 줄이는 이유: 이메일을 그대로 쓰면 키가 길어져 캐시 백엔드가
-        # 거부한다(memcached 는 250자 제한). 길이가 고정되면 그 걱정이 없고,
-        # 캐시에 이메일 원문이 남지도 않는다.
-        #
-        # 서버 비밀값을 섞는 이유: 그냥 해시면 후보 이메일 목록과 대조해 캐시
-        # 표의 키에서 원래 이메일을 알아낼 수 있다.
-        ident = salted_hmac(
-            "accounts.throttles.email", email.strip().lower(), algorithm="sha256"
-        ).hexdigest()
-        return self.cache_format % {"scope": self.scope, "ident": ident}
+        return self.cache_format % {"scope": self.scope, "ident": email_ident(email)}
+
+
+class EmailHourlyThrottle(EmailRateThrottle):
+    """같은 이메일로 한 시간에 몇 번까지 로그인을 시도하나.
+
+    분당 제한(auth_email)만 있으면 접속 IP 를 바꿔 가며 한 계정을 하루 1만 4천 번
+    두드릴 수 있다.
+
+    대가: 이메일만 알면 남이 시간당 30번씩 보내 그 계정의 이메일 로그인을 계속 막아 둘
+    수 있다(창이 밀려가며 세므로 멈추면 한 시간 안에 풀린다). 구글 로그인은 막지 않는다.
+    """
+
+    scope = "auth_email_hour"
+
+
+class AdminLoginThrottle(EmailRateThrottle):
+    """관리자 로그인(/admin/login/) 시도. Admin 폼은 이메일을 username 칸에 싣는다.
+
+    DRF 화면이 아니라 Django 폼이라 request.data 가 없다. 세는 방식은 위와 같다.
+
+    대가: 관리자 이메일을 아는 사람은 시간당 10번씩 보내 Admin 로그인을 계속 막아 둘 수
+    있다. Admin 은 Next 를 거치지 않아 접속 IP 를 믿을 수 없어 이메일로만 센다. 풀어 주는
+    방법은 DEPLOY.md 의 "Admin 로그인이 429 로 막혔을 때".
+    """
+
+    scope = "admin_login"
+
+    def get_cache_key(self, request, view) -> str | None:
+        email = request.POST.get("username", "")
+        if not email.strip():
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": email_ident(email)}
 
 
 class GoogleRateThrottle(SimpleRateThrottle):
