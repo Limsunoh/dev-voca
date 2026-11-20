@@ -211,7 +211,7 @@ describe("처리방침과의 연결", () => {
     // 페이지 주석: "4절의 기간은 처리방침 3·4절을 옮긴 것이라 그쪽을 고치면
     // 여기도 고친다". 한쪽만 고쳐지면 두 문서가 다른 기간을 말한다.
     const retention = section(html.privacy, "retention");
-    for (const phrase of ["Vercel 1시간", "Railway\\s+7일", "30일 안"]) {
+    for (const phrase of ["Vercel 1시간", "Railway\\s+7일", "30일 안", "최대\\s+14일"]) {
       const re = new RegExp(phrase);
       assert.match(html.deleteAccount, re, `삭제 안내에 ${phrase} 없음`);
       assert.match(retention, re, `처리방침 3절에 ${phrase} 없음`);

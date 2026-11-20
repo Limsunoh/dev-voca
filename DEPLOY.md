@@ -303,9 +303,10 @@ Django 의 admin 앱이 사용자 모델에 의존하는데, 그 의존 대상�
 
 **DB 를 먼저 정리하고, 그다음 배포한다.**
 
-### 방법 1: DB 를 비우고 다시 만든다 (권장)
+### 방법 1: DB 를 비우고 다시 만든다
 
-계정이 아직 없고 단어·문장은 시드로 복원되므로 이쪽이 짧다.
+계정이 아직 없고 단어·문장은 시드로 복원되므로 이쪽이 짧다. 회원이 생긴 지금은 이
+방법을 쓰지 않는다. 운영 DB 를 되돌릴 일이 있으면 아래 "DB 백업" 절을 본다.
 
 **먼저 확인할 것**: 시드는 검수를 마친 항목만 넣는다. Admin 에서
 `/admin/vocab/word/?is_reviewed__exact=0` 이 비어 있는지 보고, 검수 대기
@@ -598,6 +599,118 @@ railway ssh --service web "python backend/manage.py shell -c 'from apps.accounts
 ```
 
 실패하면 `GmailSendError` 와 함께 원인(`invalid_grant` 등)이 찍힌다.
+
+## DB 백업
+
+Railway 의 볼륨 백업(대시보드 Backups 탭)은 Pro 요금제에서만 켜진다. Hobby 에서 켜려고
+하면 "Manual backups and backup schedules are only available for Pro workspaces" 로
+거절된다. 그래서 2026-11-21 부터 백업 전용 서비스 `db-backup` 이 매일 `pg_dump` 를 뜬다.
+처리방침 3·4·14절이 "매일, 14일 보관, Railway 싱가포르" 를, 6절이 "데이터베이스 백업
+보관" 을 Railway 에 맡긴다고, 계정 삭제 안내가 "최대 14일" 을 적고 있으니 하나라도 바꾸면 그 문서부터 고친다(처리방침 개정이라 7일 전 공고).
+Railway 를 Pro 로 올려 Railway 의 백업을 쓰게 되면 처리방침 3절의 "운영자가 꺼내 쓸 수
+없으며" 를 고친다.
+
+| 설정 | 값 |
+|---|---|
+| 이미지 | `postgres:18` (운영 DB 와 같은 큰 버전. `pg_dump` 는 서버보다 낮은 큰 버전으로는 못 뜬다. Railway 가 운영 DB 를 19 로 올리면 이것도 올린다) |
+| 지역 | `asia-southeast1-eqsg3a` (싱가포르, 운영 DB 와 같다) |
+| 볼륨 | `db-backup-volume` 을 `/backups` 에 |
+| 변수 | `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `BACKUP_KEEP_DAYS=14` |
+| Cron Schedule | `30 17 * * *` (UTC, 한국 새벽 2시 30분. 3시의 정기 정리보다 먼저 떠서, 정리가 잘못 지우더라도 그 직전 상태가 남는다) |
+
+시작 명령은 아래 한 줄이다. 순서는 이렇다.
+
+1. 보관 기간이 지난 파일을 지운다. 크론 시각이 조금씩 흔들려도 14일을 넘기지 않게
+   14일에서 3시간을 뺀 기준(`-mmin`)으로 본다. 맨 앞에 둔 이유: 뒤 단계가 실패하는
+   날에도 "14일이 지나면 지운다" 는 약속이 지켜진다. 대신 실패가 14일 넘게 이어지면
+   백업이 하나도 남지 않는다. 실패를 알려 주는 장치는 따로 없으니(정리 크론처럼 Sentry
+   로 보내지 않는다) 일주일에 한 번은 db-backup 의 배포 목록이 초록인지 본다.
+2. `.part` 이름으로 뜬다.
+3. 같은 컨테이너에 임시 Postgres 를 띄워 그 파일을 되살려 보고 표 몇 개의 행을 센다.
+   통과해야 `.dump` 로 이름을 바꾼다. 그래서 `/backups` 의 `devvoca-*.dump` 는 모두 되살려
+   본 파일이다. 되살리기가 실패하거나 단어가 0개면(빈 DB 를 뜬 것) 명령이 실패로 끝나
+   Railway 의 배포 목록에 빨갛게 남고, `.part` 는 다음 실행이 지운다. 크론 서비스라
+   재시도는 하지 않는다. 성공하면 로그에 `restore check words|sentences|users|answers:
+   3503|5329|5|25` 같은 줄이 남는다. 이 줄의 표 이름(vocab_word 등)을 바꾸는
+   마이그레이션을 하면 여기도 고친다.
+
+```
+sh -c 'set -eu; find /backups -name "*.part" -delete; find /backups -name "devvoca-*.dump" -mmin +$((BACKUP_KEEP_DAYS * 1440 - 180)) -print -delete; f=/backups/devvoca-$(date -u +%Y%m%dT%H%M%SZ).dump; pg_dump --dbname="$DATABASE_URL" --format=custom --file="$f.part"; d=/tmp/pgcheck; mkdir -p $d; chown postgres $d; gosu postgres initdb -D $d -A trust >/dev/null; gosu postgres pg_ctl -D $d -o "-c listen_addresses=" -w start >/dev/null; gosu postgres createdb check; gosu postgres pg_restore -d check --no-owner --no-privileges --exit-on-error "$f.part"; n=$(gosu postgres psql -d check -Atc "select (select count(*) from vocab_word), (select count(*) from vocab_sentence), (select count(*) from accounts_user), (select count(*) from learning_quizanswer)"); echo "restore check words|sentences|users|answers: $n"; test "${n%%|*}" -gt 0; gosu postgres pg_ctl -D $d -w stop >/dev/null; mv "$f.part" "$f"; ls -l /backups; df -h /backups'
+```
+
+### 되살리는 법
+
+**먼저 고른다.** 대부분은 몇 줄만 살리면 되는 일이다(잘못 지운 단어, 잘못 고친 회원).
+그때는 운영 DB 를 덮지 않는다(아래 A). 통째로 덮는 것(아래 B)은 운영 DB 를 쓸 수 없을
+때만 한다. 덮으면 백업 뒤에 생긴 가입·학습 기록은 사라지고, 그 뒤에 탈퇴했거나 바꾼
+것은 옛 상태로 되살아나 처리방침 3·4절과 어긋난다.
+
+**준비(A·B 공통).** `db-backup` 의 Cron Schedule 을 비우고 시작 명령을 `sleep infinity`
+로 바꿔 배포한 뒤 `railway ssh --service db-backup` 으로 들어간다. 크론 서비스는 도는 몇
+초 말고는 꺼져 있어 그냥은 들어갈 수 없다. `ls -l /backups` 에서 쓸 백업을 고른다.
+
+**A. 몇 줄만 살리기.** 위 시작 명령의 3단계처럼 임시 Postgres(`check`)에 백업을 넣고,
+필요한 행을 운영 DB 로 옮긴다. 열 이름을 모두 적어 옮긴다. `select *` 는 백업 뒤에 열이
+바뀌었으면 맞지 않고, 열을 빼먹으면 DB 기본값이 없는 열(created_at 등)에서 NOT NULL
+오류가 난다. 열 목록은 `\d vocab_word` 로 본다. `random_key` 는 빼고 넣어 DB 가 새로 채우게 한다(위 "배포 확인" 절의 마이그레이션
+규칙과 같은 이유). 지운 행은 INSERT 로, 잘못 고친 행은 임시 표에 넣은 뒤 UPDATE 로 되돌린다. 예:
+`gosu postgres psql -d check -c "\copy (select <random_key 를 뺀 열 목록> from vocab_word where id in (...)) to stdout" | psql "$DATABASE_URL" -c "\copy vocab_word (<같은 열 목록>) from stdin"`
+회원 정보를 옮길 때는 지금 운영 DB 에 없는 회원(그 사이 탈퇴한 사람)을 되살리지 않는다.
+끝나면 아래 "마무리" 로 간다.
+
+**B. 통째로 덮기.**
+
+1. 웹과 정리 크론을 멈춘다. 덮는 동안 요청이 들어오면 되살아난 탈퇴자가 순위표에
+   보이고, 지운 로그인 토큰이 다시 통하고, 새 가입이 이미 쓰인 회원 번호를 받는다.
+   - web: Healthcheck Path 를 비우고 시작 명령을 `python backend/manage.py migrate --noinput && sleep infinity` 로 바꿔 배포한다.
+     Healthcheck 가 걸려 있으면 새 배포가 `/healthz` 에 답하지 못해 실패하고 옛 gunicorn 이
+     계속 요청을 받는다. 배포 목록에서 새 배포가 Active 가 되고 Draining 30초가 지나 공개
+     주소의 `/healthz` 가 응답하지 않는 것을 본 뒤 다음으로 간다. web 에는 `railway ssh`
+     로 계속 들어갈 수 있다.
+   - cleanup: 시작 명령을 `true` 로 바꿔 배포한다. 일정을 비우면 일반 서비스로 떠서
+     정리가 바로 한 번 돌 수 있어서, 일정은 그대로 두고 아무것도 안 하게 한다.
+2. 지금 상태를 뜬다. 잘못 덮었을 때 돌아올 자리이고 아래 5번의 기준이다. 이름이
+   `devvoca-` 로 시작해 다른 백업처럼 정리되지만 아무 시각에나 만들어 하루 늦게 지워질
+   수 있으니, 일이 끝나면 손으로 지운다.
+   `pg_dump --dbname="$DATABASE_URL" --format=custom --file=/backups/devvoca-before-restore-$(date -u +%Y%m%dT%H%M%SZ).dump`
+3. 스키마를 비우고 넣는다. `--clean` 은 백업에 있던 것만 지워 그 뒤에 생긴 표가 남고,
+   그러면 migrate 가 "이미 있다" 로 실패한다. 넣다가 실패하면 2번 파일로 같은 명령을
+   다시 돌린다. pg_trgm 같은 확장은 덤프 안에 있어 다시 생긴다.
+   `psql "$DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"`
+   `pg_restore --dbname="$DATABASE_URL" --no-owner --no-privileges --single-transaction /backups/devvoca-<시각>.dump`
+4. 코드와 스키마를 맞춘다. 그 백업 뒤의 마이그레이션이 사고의 원인이면 코드를 그 전
+   커밋으로 되돌려 web 을 다시 배포하고, 아니면 지금 코드로 web 을 다시 배포한다. 1번의
+   시작 명령이 다시 돌며 migrate 가 백업 뒤의 마이그레이션을 적용한다. 5번의 Django
+   명령은 그다음에 한다. 스키마가 백업 때로 돌아간 채 지금 모델로 돌리면 실패한다.
+5. 2번 파일을 임시 Postgres 에 넣어 기준으로 삼고, 운영 DB 를 맞춘다.
+   - 로그인을 모두 끊는다: web 의 manage.py shell(대화형 `railway ssh` 에서는 python 이
+     PATH 에 없으니 `/app/.venv/bin/python backend/manage.py shell`)에서 `LoginToken.objects.all().delete()`,
+     `Session.objects.all().delete()`(관리자 화면 세션). 모두 다시 로그인한다.
+   - 회원 번호 시퀀스를 2번 DB 의 `select last_value from accounts_user_id_seq` 값으로
+     옮긴다(`select setval('accounts_user_id_seq', <그 값>)`). 덮으면 시퀀스도 백업 때로
+     돌아가 번호가 다시 쓰인다.
+   - 백업에는 있는데 2번에는 없는 회원(그 사이 탈퇴했거나 정리로 지운 사람)을 web 의
+     manage.py shell 에서 `User.objects.filter(id__in=[...]).delete()` 로 지운다. SQL 로
+     직접 지우지 않는다. Django 를 거쳐야 학습 기록까지 함께 지워진다.
+   - 두 쪽에 다 있는 회원은 `accounts_user` 행과 그룹·권한 표(`accounts_user_groups`,
+     `accounts_user_user_permissions`)를 2번의 것으로 맞춘다. 비밀번호, 이메일, 이름,
+     사진, 정지·관리 권한처럼 그 사이 바꾼 값이 모두 옛 값으로 돌아가 있다. 2번의 행을
+     임시 표로 `\copy` 한 뒤 `UPDATE ... FROM` 으로 덮는다. 두 회원이 이메일이나 이름을
+     맞바꿨다면 고유 제약에 걸리니 그 둘은 하나씩 맞춘다.
+   - 2번을 못 떴으면(운영 DB 가 이미 망가져서) 위 셋은 할 수 없다. 본인 탈퇴는 기록을
+     남기지 않아 그 사이 탈퇴한 사람을 찾을 방법이 없다. 그 사람들이 되살아나 처리방침과
+     어긋난다는 것을 알고 덮는다.
+6. web 의 Healthcheck Path(`/healthz`)와 시작 명령(위 "시작 명령" 절), cleanup 의 시작
+   명령을 원래대로 하고 배포한다. 그다음 "마무리" 로 간다.
+
+**마무리(A·B 공통).** `db-backup` 이 아직 `sleep infinity` 인 동안 위 시작 명령 맨 앞의
+지우기 `find` 를 손으로 한 번 돌린다(그동안 UTC 17:30 을 넘겼으면 그날 지울 파일이 남아
+있다). 그다음 시작 명령과 Cron Schedule 을 위 값으로 돌려놓는다. 이걸 빼면 매일 백업과
+14일 정리가 멈춘다.
+
+같은 Railway 지역에 있으므로 운영자의 실수(잘못된 마이그레이션, 지운 데이터)는 막지만
+Railway 지역 장애까지는 막지 못한다. 하루 파일은 2026-11 기준 2.6MB 라 14일치가 볼륨
+5GB 의 1% 도 안 된다.
 
 ## 아직 안 한 것
 
