@@ -247,9 +247,15 @@ class ReviewGateLeakTest(TestCase):
         self.assertFalse(can_review(staff), "정지된 staff 가 검수자로 판정됐다")
 
     def test_api_root_does_not_leak(self):
-        """DefaultRouter 의 API 루트가 데이터를 흘리지 않는다."""
+        """DefaultRouter 의 API 루트가 데이터를 흘리지 않는다.
+
+        API 권한 기본값이 로그인 필요라 루트는 로그인 없이 401 이다. 로그인하면 주소
+        목록만 나온다.
+        """
+        self.assertEqual(self.client.get("/api/vocab/").status_code, 401)
+
+        self.client.force_login(make_user("root-viewer"))
         res = self.client.get("/api/vocab/")
-        self.assertEqual(res.status_code, 200)
         self.assert_no_leak(res, "API 루트")
 
 

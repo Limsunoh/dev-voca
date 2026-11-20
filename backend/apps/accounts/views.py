@@ -11,14 +11,17 @@ XSS 하나로 계정을 빼앗기지 않는다.
 from __future__ import annotations
 
 import logging
+import math
 import uuid
 
+from config.exceptions import wait_text
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AbstractBaseUser
 from django.db import IntegrityError, transaction
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -54,9 +57,11 @@ from .serializers import (
     UserSerializer,
 )
 from .throttles import (
+    AdminLoginThrottle,
     AvatarPhotoThrottle,
     EmailChangeConfirmThrottle,
     EmailChangeThrottle,
+    EmailHourlyThrottle,
     EmailRateThrottle,
     GoogleRateThrottle,
     LoginIpThrottle,
@@ -112,7 +117,21 @@ def _auth_response(user: AbstractBaseUser, created: bool = False) -> Response:
     )
 
 
-class SignUpView(APIView):
+class FirstThrottleWins:
+    """처음 막힌 제한에서 멈춘다. 쓰는 쪽은 throttle_classes 맨 앞에 접속 IP 제한을 둔다.
+
+    DRF 는 하나가 막아도 나머지 제한을 모두 돌리고, 통과한 쪽은 기록을 남긴다. 그러면
+    IP 제한에 막힌 요청도 피해자 이메일의 횟수를 채워 그 계정을 잠그고, 이메일을 바꿔
+    가며 보내면 캐시 표에 행이 쌓여 다른 사람의 횟수까지 밀어낸다(DB 캐시는 넘치면 지운다).
+    """
+
+    def check_throttles(self, request: Request) -> None:
+        for throttle in self.get_throttles():
+            if not throttle.allow_request(request, self):
+                self.throttled(request, throttle.wait())
+
+
+class SignUpView(FirstThrottleWins, APIView):
     """이메일 가입. 가입과 동시에 로그인된다.
 
     같은 이메일을 반복해서 두드리는 것은 이메일로, 이메일을 바꿔 가며 계정을
@@ -120,7 +139,7 @@ class SignUpView(APIView):
     """
 
     permission_classes = [AllowAny]
-    throttle_classes = [EmailRateThrottle, SignUpIpThrottle]
+    throttle_classes = [SignUpIpThrottle, EmailRateThrottle]
 
     def post(self, request: Request) -> Response:
         serializer = SignUpSerializer(data=request.data)
@@ -129,7 +148,7 @@ class SignUpView(APIView):
         return _auth_response(user, created=True)
 
 
-class LoginView(APIView):
+class LoginView(FirstThrottleWins, APIView):
     """이메일 로그인.
 
     시도 제한이 없으면 한 계정의 비밀번호를 무한히 추측할 수 있다(이메일로
@@ -138,12 +157,35 @@ class LoginView(APIView):
     """
 
     permission_classes = [AllowAny]
-    throttle_classes = [EmailRateThrottle, LoginIpThrottle]
+    throttle_classes = [LoginIpThrottle, EmailRateThrottle, EmailHourlyThrottle]
 
     def post(self, request: Request) -> Response:
         serializer = LoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         return _auth_response(serializer.validated_data["user"])
+
+
+def admin_login(request: HttpRequest) -> HttpResponse:
+    """Admin 로그인 화면. 비밀번호를 내는 요청만 이메일당 횟수를 센다.
+
+    Django Admin 은 로그인 시도를 세지 않아 관리자 비밀번호를 무한히 대볼 수 있다.
+    관리자는 회원 이메일을 보고 콘텐츠를 공개하는 계정이다. config/urls.py 가 이
+    함수를 admin/ 보다 앞에 둬서 같은 주소를 가로챈다.
+    """
+    if request.method == "POST":
+        throttle = AdminLoginThrottle()
+        if not throttle.allow_request(request, None):
+            wait = throttle.wait()
+            seconds = math.ceil(wait) if wait is not None else None
+            response = HttpResponse(
+                f"시도가 너무 많습니다. {wait_text(seconds)} 뒤에 다시 해주세요.",
+                status=429,
+                content_type="text/plain; charset=utf-8",
+            )
+            if seconds is not None:
+                response["Retry-After"] = str(seconds)
+            return response
+    return admin.site.login(request)
 
 
 class GoogleLoginView(APIView):

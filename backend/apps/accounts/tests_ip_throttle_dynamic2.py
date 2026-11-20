@@ -213,8 +213,8 @@ class KoreanMidnightTest(_IpThrottleCase):
 
 class WaitTextEdgeTest(SimpleTestCase):
     def test_boundaries(self):
-        from config.exceptions import _wait_text
+        from config.exceptions import wait_text
 
-        self.assertEqual(_wait_text(59), "59초")
-        self.assertEqual(_wait_text(61), "2분")
-        self.assertEqual(_wait_text(3600), "60분")
+        self.assertEqual(wait_text(59), "59초")
+        self.assertEqual(wait_text(61), "2분")
+        self.assertEqual(wait_text(3600), "60분")
