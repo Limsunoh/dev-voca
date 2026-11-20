@@ -32,11 +32,11 @@ const { DOC_VERSION, koreanDate, PRIVACY_CHANGE } = await import(
   "../../components/LegalDoc"
 );
 
-// v3 시행일. v4 를 v3 시행 전에 공고해 PRIVACY_CHANGE 는 v4 날짜이고, v3 날짜는
-// 14절과 본문에 글자로 박혀 있다. 서버의 날짜 문(MESSAGE_FROM 등)은 이 날 켜진다.
+// v3 시행일. PRIVACY_CHANGE 는 최신 버전 날짜이고, v3 날짜는 14절과 본문에 글자로
+// 박혀 있다. 서버의 날짜 문(MESSAGE_FROM 등)은 이 날 켜진다.
 const V3_EFFECTIVE = "2026-11-19";
 // v3 의 날짜 문이 아직 코드에 있는 버전. 날짜 문을 지울 때 이것을 쓰는 절도 지운다.
-const V3_GATES_LIVE = ["v3", "v4"].includes(DOC_VERSION);
+const V3_GATES_LIVE = ["v3", "v4", "v5"].includes(DOC_VERSION);
 const { PolicyNotice } = await import("../../components/PolicyNotice");
 const { default: TermsPage } = await import("../terms/page");
 const { default: PrivacyPage } = await import("./page");
@@ -174,13 +174,30 @@ describe("처리방침 변경 공고", () => {
   });
 
   it("v4: 14절이 로그인 토큰 30일을 바뀐 내용으로 적는다", {
-    skip: DOC_VERSION !== "v4",
+    skip: !["v4", "v5"].includes(DOC_VERSION),
   }, () => {
     const changes = pages.privacy.match(
       /<section[^>]*id="changes"[^>]*>([\s\S]*?)<\/section>/,
     )?.[1];
     assert.ok(changes);
     assert.match(changes, /로그인 토큰을 발급하고 30일이 지나면 지웁니다/);
+  });
+
+  it("v5: Sentry 를 사목·3·6·7절과 14절에 적고, 이메일 시도 기록 1시간을 적는다", {
+    skip: DOC_VERSION !== "v5",
+  }, () => {
+    const section = (id: string) =>
+      pages.privacy.match(new RegExp(`<section[^>]*id="${id}"[^>]*>([\\s\\S]*?)</section>`))?.[1] ?? "";
+    for (const id of ["items", "retention", "processors", "transfer", "changes"]) {
+      assert.match(section(id), /Sentry/, id);
+    }
+    assert.match(section("transfer"), /compliance@sentry\.io/);
+    assert.match(section("items"), /IP\s+주소를 저장하지 않도록 설정했습니다/);
+    assert.match(section("items"), /앱 화면에서는 오류가 났을 때만\s+보냅니다/);
+    assert.match(section("retention"), /이메일 로그인 시도는 1분과 1시간\s+두 단위로 세고/);
+    assert.match(section("retention"), /관리자 화면 로그인 시도는/);
+    assert.match(section("changes"), /v4 와 다른 곳은/);
+    assert.match(pages["delete-account"], /Sentry 로 보낸 오류 기록/);
   });
 
   it("로그인 토큰은 발급 30일 뒤 지운다고 적는다", () => {

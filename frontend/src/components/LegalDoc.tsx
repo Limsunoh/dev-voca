@@ -8,8 +8,8 @@ export type LegalSection = { id: string; title: string; body: ReactNode };
 
 // 가입할 때 저장하는 backend/apps/accounts/models.py 의 TERMS_VERSION 과 같아야
 // 누가 어느 문서에 동의했는지 가릴 수 있다. 어긋나면 테스트가 실패한다.
-// 약관과 처리방침이 버전 하나를 같이 쓴다. v3·v4 는 처리방침만 바뀌었다.
-export const DOC_VERSION = "v4";
+// 약관과 처리방침이 버전 하나를 같이 쓴다. v3·v4·v5 는 처리방침만 바뀌었다.
+export const DOC_VERSION = "v5";
 
 // 약관 시행일. 시행일은 화면을 올리는 날이다.
 export const EFFECTIVE_DATE = "2026년 11월 9일";
@@ -19,22 +19,23 @@ export const EFFECTIVE_DATE = "2026년 11월 9일";
  *
  * 처리방침 14절이 "바꾸면 시행 7일 전부터 서비스 화면에 알린다" 고 약속한다.
  * 그래서 머지하는 날을 공고일로, 그 7일 뒤를 시행일로 두고, 시행일 전까지 홈에
- * 알림을 띄운다(PolicyNotice). 다음에 처리방침을 바꿀 때도 이 두 날짜만 고치면
+ * 알림을 띄운다(PolicyNotice). 다음에 처리방침을 바꿀 때도 이 날짜들만 고치면
  * 알림이 다시 뜬다.
  *
  * firstChange 는 홈 알림이 "N일부터 바뀝니다" 로 띄우는 날이다. 바뀌는 것 중
- * 가장 먼저 켜지는 날이라 보통 effective 와 같다. v4 는 v3 의 공지 기간
- * (11-12 ~ 11-19) 중에 공고해서, v3 의 내용이 켜지는 11-19 를 띄우고 알림은 v4
- * 시행일까지 남긴다. v3 의 바뀐 내용과 시행일은 14절에 글자로 남긴다.
+ * 가장 먼저 켜지는 날이라 보통 effective 와 같다. 앞 버전의 공지 기간 중에 새
+ * 버전을 공고하면 앞 버전이 켜지는 날을 띄운다(v4 가 v3 기간 중에 그랬다). 앞
+ * 버전들의 바뀐 내용과 시행일은 14절에 글자로 남긴다. 공고 전에 이미 하고 있던
+ * 일(v5 의 Sentry 는 11-20 부터)은 알림에 공고 전 날짜를 띄울 수 없으니 14절에
+ * 시작한 날을 적고 firstChange 는 effective 로 둔다.
  *
  * 서버의 날짜 문: v3 시행일에 켜지는 error_mail.py 의 MESSAGE_FROM,
  * throttles.py 의 IP_COUNT_FROM, lib/client-ip.ts 의 IP_FROM 은 그대로 11-19 다.
- * 다음 개정에서는 firstChange 를 effective 와 같게 둔다.
  */
 export const PRIVACY_CHANGE = {
-  announced: "2026-11-13",
-  firstChange: "2026-11-19",
-  effective: "2026-11-20",
+  announced: "2026-11-21",
+  firstChange: "2026-11-28",
+  effective: "2026-11-28",
 };
 
 /** "2026-11-19" 를 "2026년 11월 19일" 로. 문서의 다른 날짜와 같은 꼴이다. */

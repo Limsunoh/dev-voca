@@ -14,6 +14,9 @@
  *   IP 헤더가 실리고, Referer 에는 토큰이 든 주소가 올 수 있다.
  * - 쿠키, 요청 본문, 사용자 정보, 지역 변수 값.
  *
+ * - 오류가 없을 때의 "세션 시작" 표시. 화면 SDK 는 기본으로 화면을 열 때마다 보내는데,
+ *   처리방침 2절 사목이 "앱 화면에서는 오류가 났을 때만 보낸다" 고 적는다.
+ *
  * 수집을 끄는 것(dataCollection)과 나가기 직전에 지우는 것(scrubEvent)을 둘 다 둔다. SDK 가
  * 판마다 기본값과 옵션 이름을 바꿔 왔고(sendDefaultPii -> dataCollection, 11 판의 기본값은
  * 전부 모으기), 그때 한쪽이 조용히 풀려도 다른 쪽이 막는다.
@@ -107,4 +110,6 @@ export const SENTRY_OPTIONS = {
   },
   beforeSend: scrubEvent,
   beforeBreadcrumb: scrubBreadcrumb,
+  integrations: <T extends { name: string }>(defaults: T[]) =>
+    defaults.filter((integration) => integration.name !== "BrowserSession"),
 };

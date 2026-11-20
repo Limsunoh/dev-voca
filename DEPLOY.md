@@ -215,6 +215,13 @@ DSN 은 비밀값이 아니다(화면 코드에 그대로 실린다). `sentry ds
 로 다시 볼 수 있다. Preview 와 Development 에는 넣지 않는다. 미리보기 배포의 오류까지 섞인다.
 무엇을 빼고 보내는지는 `backend/config/sentry.py` 와 `frontend/src/lib/sentry.ts` 머리 주석에 있다.
 
+처리방침이 약속하는 Sentry 쪽 설정이 둘 있다. 코드가 아니라 Sentry 화면에서 정하는 값이라
+프로젝트를 새로 만들거나 요금제를 바꾸면 같이 본다.
+- 두 프로젝트 모두 Settings > Security & Privacy 의 IP 주소 저장 막기(Prevent Storing of IP
+  Addresses)를 켠다(처리방침 2절 사목, 6절).
+- 보관 기간은 무료 요금제(Developer) 기준 30일이다. 요금제를 바꾸면 처리방침 3절과 계정 삭제
+  안내(`app/delete-account`)의 기간도 고친다.
+
 SECRET_KEY 생성:
 
 ```
