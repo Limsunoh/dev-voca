@@ -1,5 +1,6 @@
 "use client"; // 에러 경계는 클라이언트 컴포넌트여야 한다.
 
+import { captureException } from "@sentry/nextjs";
 import { useEffect } from "react";
 
 import { HomeLink } from "@/components/HomeLink";
@@ -31,6 +32,8 @@ export default function RootError({
 }) {
   useEffect(() => {
     console.error(error);
+    // 서버에서 난 오류(digest 가 있음)는 instrumentation.ts 의 onRequestError 가 이미 보냈다.
+    if (!error.digest) captureException(error);
   }, [error]);
 
   return (

@@ -12,7 +12,7 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 | 항목 | 값 |
 |---|---|
 | 스택 | Next.js 16.4.5 + React 19.2.4 + Tailwind v4 |
-| 런타임 의존성 | `next`, `react`, `react-dom` **셋뿐** |
+| 런타임 의존성 | `next`, `react`, `react-dom` 셋과 오류 알림 `@sentry/nextjs` |
 | 폰트 | Noto Sans KR(본문) + JetBrains Mono(영어 용어·에러 메시지), `next/font/google` |
 | 팔레트 | 크림 바탕(`--background` #fff6e9) + 흰 카드(`--paper`) + 갈색 강조(`--brand` #683a24, 로고의 d) + 잉크(`--foreground` #191512). 코랄(`--coral` #ef5b3c)은 틀림·오류·되돌리기 어려운 동작·급한 남은 시간에만 쓴다(2026-11-11 사용자 결정). 로고 주황(`--brand-orange`)은 장식에만 |
 | 다크 모드 | 없다. 테마는 크림 하나다(이유는 `globals.css` 머리 주석) |
@@ -46,6 +46,8 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 
 `next`/`react`/`react-dom` 셋뿐인 상태가 devvoca의 자산이다. 배포가 가볍고 업그레이드가 단순하다. 늘리려면 근거를 남긴다.
 
+- 예외 하나: `@sentry/nextjs`(2026-11-20 사용자 결정). 폰 화면에서 난 오류는 서버 로그에 안 남아 볼 길이 이것뿐이었다. 화면 코드가 압축 기준 약 66KB 늘었다(전체 272KB -> 338KB). 성능 측정·화면 녹화는 켜지 않았다.
+
 - 장식 목적으로 런타임 패키지를 넣지 않는다. `@splinetool/runtime`(6.5MB)이나 `framer-motion`(4.6MB)은 현재 앱 전체보다 무겁다.
 - 애니메이션이 필요하면 CSS transition과 `@keyframes`를 먼저 쓴다. Tailwind v4에 이미 있다.
 - 이미지 자산(예: Shapefest의 512px 렌더)은 런타임 비용이 0이라 판단 기준이 다르다. 이쪽이 먼저다.
@@ -74,7 +76,7 @@ description: devvoca 프론트엔드의 화면을 만들거나 고칠 때 사용
 | 지원 프레임워크 | Ionic 공식 문서는 Angular/React/Vue 만 든다. **Next.js 는 없다** |
 | 라우터 | `@ionic/react-router` 가 `react-router` 를 요구한다. 우리는 App Router 를 쓴다 |
 | 렌더링 | `IonApp` 은 클라이언트 전용이다. 단어·문장 목록은 **서버 컴포넌트**로 Django API 를 호출한다 |
-| 용량 | `@ionic/core` 19.5MB + `ionicons` 5.9MB. 현재 런타임 의존성 총 3개 |
+| 용량 | `@ionic/core` 19.5MB + `ionicons` 5.9MB. 현재 런타임 의존성 총 4개(Sentry 포함) |
 
 Ionic 팀이 만든 Next.js 스타터조차 `next export` 로 SPA 를 뽑고 라우팅을 react-router 에 넘긴다. SSR 을 쓰지 않는다. 즉 Ionic 도입은 UI 라이브러리 추가가 아니라 **렌더링 구조 교체**다.
 
