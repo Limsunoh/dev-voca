@@ -384,7 +384,33 @@ CACHES = {
         # (cull) 공격자가 항목을 채우면 방어가 열린다. 그래서
         # apps.learning.models.RoundStep 표에 둔다.
         "OPTIONS": {"MAX_ENTRIES": 20000},
-    }
+    },
+    # 익히기 목록의 전체 개수(apps.vocab.pagination). 단어 100만 개면 셀 때마다
+    # 55ms 라 5분 동안 기억한다. 기억한 값을 쓰는 것은 앞쪽 쪽뿐이고, 낡았을 때
+    # 무엇이 틀릴 수 있는지는 pagination 머리말에 있다.
+    #
+    # 서버 프로세스 메모리에 둔다. 작업자(gunicorn worker)마다 따로 센다. 센
+    # 시각이 달라서, 단어가 공개·삭제된 뒤 5분 안에는 작업자마다 다른 개수를
+    # 줄 수 있다. 재시작하면 비고 다음 요청이 다시 센다. 기본 상한 300개를
+    # 넘으면 오래 안 쓴 것부터 지워서, 검색어를 바꿔 가며 채워도 메모리는
+    # 늘지 않고 다시 세는 일만 는다.
+    #
+    # 위의 요청 제한 표에 두지 않는 이유: 검색어를 바꿔 가며 표를 채우면 넘친
+    # 만큼 지우면서(cull) 로그인 시도 카운터까지 밀려난다. Redis 는 다른 서버에
+    # 다녀와야 해서 이 용도로는 메모리보다 느리다.
+    #
+    # 테스트에서는 기억하지 않는다(DummyCache). 테스트마다 DB 는 되돌려지는데
+    # 메모리는 남아, 앞 테스트에서 센 개수가 다음 테스트의 같은 목록에 나온다.
+    # 기억하는 동작은 vocab/tests_list_count.py 가 이 설정을 바꿔 시험한다.
+    "counts": {
+        "BACKEND": (
+            "django.core.cache.backends.dummy.DummyCache"
+            if sys.argv[1:2] == ["test"]
+            else "django.core.cache.backends.locmem.LocMemCache"
+        ),
+        "LOCATION": "list-counts",
+        "TIMEOUT": 300,
+    },
 }
 
 REST_FRAMEWORK = {
