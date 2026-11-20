@@ -273,7 +273,10 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         정렬한다. 지금 규모(수백 건)에서는 문제가 없지만 수만 건을 넘어가면
         다시 봐야 한다. 그때는 시드로 구간을 잡아 뽑는 방식이 필요하다.
         """
-        seed = self.request.query_params.get("shuffle", "").strip()
+        # NUL 을 빼는 이유: 이 값만 DRF 검증을 거치지 않고 SQL 까지 가는데,
+        # PostgreSQL 글자 칸은 NUL 을 못 담아 ?shuffle=%00 이 500 이 됐다.
+        # strip() 은 NUL 을 공백으로 보지 않는다.
+        seed = self.request.query_params.get("shuffle", "").replace("\x00", "").strip()
         if not seed:
             return queryset
         if self.request.query_params.get("ordering"):
