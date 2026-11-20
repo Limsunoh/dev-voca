@@ -103,7 +103,8 @@ export function buildQuery(params: Record<string, string | undefined>): string {
  * RoundBoard 가 옛 토큰으로 끝내기를 불러 판 기록이 통째로 빠지고, 비밀번호
  * 변경이 저장된 뒤 끊기면 새 토큰을 못 받아 로그아웃된다. 백엔드의 gunicorn 도
  * 막지 못한다 - 스레드 방식(Procfile --threads)이라 오래 걸리는 요청을 끊지
- * 않는다(DEPLOY.md). 쓰기는 누른 버튼이
+ * 않는다(DEPLOY.md). DB 쿼리는 하나당 이 값과 같은 10초에 끊긴다
+ * (backend/config/wsgi.py). 쓰기는 누른 버튼이
  * 이미 "처리 중" 을 보여 줘서 멈춘 것처럼 보이지 않는다.
  */
 const READ_TIMEOUT_MS = 10_000;

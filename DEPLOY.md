@@ -42,10 +42,16 @@ python backend/manage.py migrate --noinput && python backend/manage.py collectst
 스레드가 계속 살아 있다고 알린다. 오래 멈춘 요청은 스레드 여덟 개 중 하나를 붙잡고 있게
 된다. 그래서 요청의 길이를 정하는 것은 호출마다 건 제한 시간이다. Gmail 은 단계마다 3초
 (apps/accounts/gmail_api.py 의 TIMEOUT, 최악 24초), 구글 로그인은 단계마다 10초
-(apps/accounts/google.py 의 TIMEOUT)다. DB 쿼리와 행 잠금 대기에는 아직 상한이 없다
-(statement_timeout, lock_timeout 을 두지 않았다).
+(apps/accounts/google.py 의 TIMEOUT)다. DB 쿼리는 하나에 10초다. 행 잠금을 기다리는
+시간도 여기 든다(statement_timeout, backend/config/wsgi.py 가 웹 서버에만 건다). 시작
+명령의 migrate 와 정리 크론은 manage.py 로 돌아 상한이 없다. 관리자 화면의 일괄 처리도
+10초에 걸리므로, 큰 표를 한꺼번에 고칠 때는 `railway ssh` 로 manage.py shell 에서 한다.
+10초를 Railway 변수로 옮기지 않는다. 변수는 같은 시작 명령의 migrate 와 `railway ssh` 로
+돌리는 manage.py 에도 들어가고, 정리 크론이 `${{web.…}}` 로 참조하면 그쪽에도 들어간다.
+그러면 마이그레이션도 10초에 잘린다. 웹 서버를
+ASGI 로 바꾸면 이 상한을 거는 코드도 `backend/config/asgi.py` 로 옮긴다.
 
-**지금 이 값은 저장소가 아니라 서비스 설정에 있다** - Settings > Deploy >
+**지금 시작 명령은 저장소가 아니라 서비스 설정에 있다** - Settings > Deploy >
 Custom Start Command. 거기에 값이 있으면 `Procfile` 은 무시된다. 저장소의
 `Procfile` 은 같은 내용을 적어두기만 한 것이고, 고쳐도 배포는 안 바뀐다.
 
@@ -57,6 +63,13 @@ railway status --json    # serviceInstances ... startCommand
 
 **`migrate` 가 그 한 줄 안에 들어 있어야 한다.** 빠지면 마이그레이션이
 도는 곳이 하나도 없어진다. 대시보드를 고칠 때 같이 지우기 쉬운 자리다.
+
+### 파이썬 버전
+
+저장소 맨 위 `.python-version` 이 정한다. Railway 의 빌더(Railpack)도 CI 도 이 파일을
+읽는다. 없으면 Railpack 이 자기 기본값을 써서, 기본값이 오르면 운영 파이썬도 말없이
+바뀐다(2026-11-20 까지 그렇게 3.13 이 돌았다). 빌드 로그의 `python │ 3.13.x` 줄에서
+무엇을 읽었는지 보인다.
 
 ### 배포 확인(Healthcheck)과 옛 배포 내리기
 
