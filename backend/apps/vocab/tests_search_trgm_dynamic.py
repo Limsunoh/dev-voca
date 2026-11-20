@@ -23,6 +23,7 @@ Postgres 전용 시나리오에는 skipUnless 를 붙였다. SQLite 에서는 �
 """
 
 import importlib
+import re
 import unittest
 
 from django.contrib.auth import get_user_model
@@ -347,8 +348,14 @@ class SearchSameWithOrWithoutIndexTests(TrgmFixtureMixin, TestCase):
             expected = [f"{t}_{c}_trgm" for t, c in TRGM_COLUMNS if t == table]
             for term in ("slowq", "데이터베", "slow query"):
                 with self.subTest(url=url, term=term):
+                    # 쪽 나누기는 번호 20개를 고른 뒤 그 행만 다시 가져온다(pagination.py).
+                    # 그 쿼리는 번호로 찾으므로 pk 인덱스를 타는 게 맞아 뺀다.
                     plans = with_only_trgm_indexes(
-                        lambda: [explain(sql) for sql in self.snapshot(url, term)["sqls"]]
+                        lambda: [
+                            explain(sql)
+                            for sql in self.snapshot(url, term)["sqls"]
+                            if not re.search(r'"id" IN \(\d', sql)
+                        ]
                     )
                     self.assertGreaterEqual(len(plans), 2, "count 와 목록 SQL 이 모두 잡혀야 한다")
                     for plan in plans:

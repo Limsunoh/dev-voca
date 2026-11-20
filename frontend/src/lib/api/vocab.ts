@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import {
+  ApiError,
   buildQuery,
   fetchChoices,
   fetchDetail,
@@ -164,6 +165,11 @@ export const HOME_WORDS = 7;
  * 그날은 오늘의 단어도, 그 아래 목록도 전날 예상과 다르다. 정말 고정하려면
  * 백엔드에 daily 엔드포인트가 필요한데, 지금은 그만한 값어치가 없다.
  *
+ * 백엔드는 1페이지의 count 를 5분 동안 서버 작업자마다 따로 기억한다
+ * (backend/apps/vocab/pagination.py). 그래서 바뀐 직후 5분 안에는
+ * 새로고침할 때마다 바뀌기 전과 뒤의 묶음이 번갈아 나올 수 있다. 줄어든
+ * 직후에는 낡은 count 로 계산한 쪽이 없어 묶음이 짧게 나올 수도 있다.
+ *
  * 목록 API 만 쓰는 이유: 전용 엔드포인트를 만들 만큼 무겁지 않고,
  * 검수 게이트(is_reviewed)를 백엔드가 이미 걸어둔 경로를 그대로 탄다.
  *
@@ -209,7 +215,13 @@ export async function getDailyWords(size: number): Promise<WordListItem[]> {
     [...needed]
       .filter((page) => page !== 1)
       .map(async (page) => {
-        pages.set(page, await getWords({ page: String(page) }));
+        try {
+          pages.set(page, await getWords({ page: String(page) }));
+        } catch (error) {
+          // 1페이지의 count 보다 실제로 줄어 그 쪽이 없으면 404 다. 묶음 전체를
+          // 버리면 홈의 오늘의 단어가 통째로 빠지니 받은 만큼만 쓴다(아래 경고).
+          if (!(error instanceof ApiError && error.status === 404)) throw error;
+        }
       }),
   );
 
