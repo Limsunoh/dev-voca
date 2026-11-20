@@ -144,7 +144,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
     alias_field: str | None = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, ReadableOrdering]
-    # 뒤쪽 절반의 쪽을 거꾸로 읽어 빠르게 하는 쪽 나누기(pagination.py).
+    # 번호만 정렬하고 뒤쪽 절반은 거꾸로 읽으며 개수를 기억하는 쪽 나누기(pagination.py).
     pagination_class = ContentPagination
     # is_exam·exam_subject 로 정처기 범위를 좁힌다.
     #
