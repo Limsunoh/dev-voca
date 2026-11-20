@@ -292,6 +292,13 @@ else:
         }
     }
 
+# DB 에 연결을 맺는 데 5초까지만 기다린다. 모든 명령에 건다. 웹 서버는 스레드
+# 여덟 개로 요청을 받는데, DB 가 멈추면 연결을 기다리는 요청이 스레드를 붙잡는다.
+# 접속 주소에 connect_timeout 이 이미 있으면 그 값을 둔다.
+# 쿼리 하나의 상한은 웹 서버에만 config/wsgi.py 가 건다(10초).
+if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
+    DATABASES["default"].setdefault("OPTIONS", {}).setdefault("connect_timeout", 5)
+
 
 # 사용자 모델을 갈아끼운다. 로그인 키가 username 이 아니라 email 이다.
 #

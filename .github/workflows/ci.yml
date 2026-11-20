@@ -18,10 +18,13 @@ jobs:
     # **PostgreSQL 컨테이너에서 돈다.** sqlite 는 NUL 바이트·컬럼 길이 초과·
     # select_for_update 를 조용히 통과시켜서, 로컬만 sqlite 로 두면 "로컬은
     # 초록인데 CI 에서만 터지는" 결함이 계속 샌다. 이 저장소는 로컬도
-    # PostgreSQL 이라(docker-compose.yml) 로컬 통과가 곧 CI 통과다.
+    # PostgreSQL 이라(docker-compose.yml) 로컬 통과가 대개 CI 통과다. 다만
+    # 로컬은 아직 PostgreSQL 16·파이썬 3.11 이고 CI 와 운영은 18·3.13 이다.
     services:
       postgres:
-        image: postgres:16
+        # 운영(Railway)과 같은 18. 로컬 docker-compose 는 아직 16 이다 - 18 은
+        # 16 의 데이터 폴더를 못 읽어서, 측정 DB 까지 덤프해 옮겨야 한다.
+        image: postgres:18
         # **비밀번호를 아예 두지 않는다.** trust 는 이 컨테이너에 붙는 것을
         # 무조건 허용한다. 잡이 도는 동안만 살고 러너 밖으로 열려 있지 않아
         # 안전하고, 파일에 비밀번호 같은 문자열이 남지 않아 비밀 스캐너가
@@ -69,7 +72,8 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          # 운영(Railway)이 읽는 파일을 같이 읽어 버전이 따로 놀지 않게 한다.
+          python-version-file: .python-version
           cache: pip
 
       - name: 실행마다 새 SECRET_KEY
