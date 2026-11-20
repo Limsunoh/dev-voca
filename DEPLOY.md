@@ -185,6 +185,23 @@ backend/apps/accounts/throttles.py). 백엔드는 이 값이 맞는 요청만 Ne
 - 로컬(DEBUG)은 RELAY_SECRET 이 없어 전부 한 통에 들므로 settings 가 테스트처럼 넉넉한
   비율을 쓴다.
 
+### 오류 알림 (Sentry)
+
+Sentry 조직 `lim-sun-oh` 의 프로젝트 둘로 보낸다. 값이 없으면 Sentry 만 꺼지고 나머지는 그대로
+돈다(Gmail 오류 메일은 Sentry 와 따로 계속 온다). 새 오류가 나면 Sentry 가 조직 멤버에게 메일을
+보낸다(프로젝트를 만들 때 생긴 "high priority issues" 규칙).
+
+| 어디 | 변수 | 값 |
+|---|---|---|
+| Railway `web` | `SENTRY_DSN` | `devvoca-backend` 프로젝트의 DSN |
+| Railway `cleanup` | `SENTRY_DSN` | `${{web.SENTRY_DSN}}` (새벽 정리가 터져도 알림이 온다) |
+| Vercel Production | `NEXT_PUBLIC_SENTRY_DSN` | `devvoca-frontend` 프로젝트의 DSN. 빌드 때 화면 코드에 박히므로 바꾸면 다시 배포 |
+| Vercel Production | `SENTRY_AUTH_TOKEN` | Sentry 조직 토큰(소스맵 올리기 전용, sensitive). 없으면 소스맵만 안 올라가고 빌드는 된다 |
+
+DSN 은 비밀값이 아니다(화면 코드에 그대로 실린다). `sentry dsn list lim-sun-oh/devvoca-backend`
+로 다시 볼 수 있다. Preview 와 Development 에는 넣지 않는다. 미리보기 배포의 오류까지 섞인다.
+무엇을 빼고 보내는지는 `backend/config/sentry.py` 와 `frontend/src/lib/sentry.ts` 머리 주석에 있다.
+
 SECRET_KEY 생성:
 
 ```

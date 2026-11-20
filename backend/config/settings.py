@@ -12,6 +12,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.log import DEFAULT_LOGGING
 from dotenv import load_dotenv
 
+from config import sentry
+
 # backend/config/settings.py -> backend/ -> devvoca/
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
@@ -185,6 +187,9 @@ LOGGING = copy.deepcopy(DEFAULT_LOGGING)
 LOGGING["handlers"]["mail_admins"]["class"] = (
     "apps.accounts.error_mail.ThrottledAdminEmailHandler"
 )
+
+# SENTRY_DSN 이 있으면(운영) 오류를 Sentry 로도 보낸다. 무엇을 빼고 보내는지는 config/sentry.py.
+sentry.init()
 
 
 INSTALLED_APPS = [
