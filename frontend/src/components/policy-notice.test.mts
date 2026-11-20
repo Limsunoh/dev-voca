@@ -72,8 +72,8 @@ describe("홈의 처리방침 알림", () => {
   });
 
   it("알림 글의 날짜는 가장 먼저 바뀌는 날(firstChange)이다", () => {
-    // v3 공지 기간 중에 v4 를 공고해 firstChange(v3 시행일)가 effective 보다 이르다.
-    // 공고일 7일 뒤보다 이르면 안 된다는 약속은 앞 버전의 공고가 지킨다.
+    // 보통 firstChange 는 effective 와 같다. 앞 버전의 공지 기간 중에 공고하면(v4)
+    // 앞 버전 시행일이라 더 이르고, 공고일 7일 뒤라는 약속은 앞 버전의 공고가 지킨다.
     assert.ok(PRIVACY_CHANGE.announced < PRIVACY_CHANGE.firstChange);
     assert.ok(PRIVACY_CHANGE.firstChange <= PRIVACY_CHANGE.effective);
     const [, m, d] = PRIVACY_CHANGE.firstChange.split("-").map(Number);

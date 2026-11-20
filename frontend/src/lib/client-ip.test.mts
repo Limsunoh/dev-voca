@@ -95,9 +95,8 @@ describe("clientIpHeaders", () => {
   });
 });
 
-// v3 의 날짜 문이다. v4 를 v3 시행 전에 공고해 PRIVACY_CHANGE 는 v4 날짜라 v3
-// 시행일과 견준다. 날짜 문을 지울 때(client-ip.ts 의 ponytail 주석) 이 절도 지운다.
-describe("IP 를 넘기기 시작하는 날", { skip: !["v3", "v4"].includes(DOC_VERSION) }, () => {
+// v3 의 날짜 문이다. PRIVACY_CHANGE 는 최신 버전 날짜라 v3 시행일과 견준다. 날짜 문을 지울 때(client-ip.ts 의 ponytail 주석) 이 절도 지운다.
+describe("IP 를 넘기기 시작하는 날", { skip: !["v3", "v4", "v5"].includes(DOC_VERSION) }, () => {
   it("처리방침 v3 시행일과 같다", () => {
     // 먼저 보내면 처리방침이 알리기 전에 IP 가 Railway 로 넘어간다.
     assert.equal(IP_FROM, "2026-11-19");

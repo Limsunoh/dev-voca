@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 
-import { maskUrl, scrubBreadcrumb, scrubEvent } from "./sentry";
+import { maskUrl, SENTRY_OPTIONS, scrubBreadcrumb, scrubEvent } from "./sentry";
 
 it("주소의 토큰·번호를 가리고 쿼리와 # 뒤를 버린다", () => {
   assert.equal(
@@ -63,4 +63,17 @@ it("화면 이동과 fetch 기록의 주소도 가린다", () => {
     to: "/learn/words/:id",
     status_code: 500,
   });
+});
+
+it("화면을 열 때마다 보내는 세션 표시를 끄고 나머지 기본 기능은 둔다", () => {
+  // 처리방침 2절 사목이 "앱 화면에서는 오류가 났을 때만 보낸다" 고 적는다.
+  const kept = SENTRY_OPTIONS.integrations([
+    { name: "GlobalHandlers" },
+    { name: "BrowserSession" },
+    { name: "Breadcrumbs" },
+  ]);
+  assert.deepEqual(
+    kept.map((integration) => integration.name),
+    ["GlobalHandlers", "Breadcrumbs"],
+  );
 });
