@@ -212,6 +212,18 @@ describe("처리방침 변경 공고", () => {
     assert.doesNotMatch(pages.privacy, /정해진 만료 없이/);
   });
 
+  it("운영자 DB 백업을 시작한 날과 14일 보관을 적고, 옛 단정이 남지 않는다", () => {
+    // 3절이 실제 백업 설정(DEPLOY.md 의 "DB 백업" 절: 매일, 14일)과 맞아야 한다.
+    // 옛 문구 "운영자가 따로 만드는 백업은 없습니다" 가 남으면 백업이 없다고 읽힌다.
+    const retention = pages.privacy.match(
+      /<section[^>]*id="retention"[^>]*>([\s\S]*?)<\/section>/,
+    )?.[1];
+    assert.ok(retention);
+    assert.match(retention, /2026년 11월 21일부터 운영자가 매일 한 번 데이터베이스\s+전체를 백업/);
+    assert.match(retention, /14일이 지난 백업은\s+자동으로 지웁니다/);
+    assert.doesNotMatch(pages.privacy, /따로 만드는 백업은 없습니다/);
+  });
+
   it("IP 주소는 원문이 아니라 해시값으로만 둔다고 적는다", () => {
     // 가입·로그인 시도를 IP 주소로도 센다(백엔드 요청 제한). 원문을 저장한다고
     // 읽히면 안 되고, "IP 를 저장하지 않는다" 는 옛 단정이 남아도 안 된다.
