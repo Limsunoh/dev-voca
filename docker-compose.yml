@@ -1,6 +1,8 @@
 services:
   db:
-    image: postgres:16-alpine
+    # 운영(Railway)·CI 와 같은 PostgreSQL 18, 같은 데비안(glibc) 이미지다. 예전의
+    # postgres:16-alpine 은 글자를 문자 코드 순으로 정렬해 운영과 목록 순서가 달랐다.
+    image: postgres:18
     container_name: devvoca-db
     # 로컬 개발용 고정값. .env 를 참조하지 않는 이유는, compose 가 .env 를
     # 자동으로 읽으면서 Django SECRET_KEY 안의 $ 를 변수로 오해하기 때문.
@@ -12,13 +14,20 @@ services:
     # 호스트에 이미 PostgreSQL 이 5432 를 쓰고 있어서 5433 으로 내보낸다.
     ports:
       - "5433:5432"
+    # 18 이미지는 데이터를 /var/lib/postgresql/18/docker 에 두므로 그 위 폴더를 붙인다.
+    # 16 때의 볼륨(devvoca-pgdata)은 18 이 읽지 못해 이름을 새로 했다. 옛 볼륨은
+    # 지우지 않았다. 옮긴 방법은 이 파일 맨 아래에 적었다.
     volumes:
-      - devvoca-pgdata:/var/lib/postgresql/data
+      - devvoca-pgdata18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U devvoca"]
       interval: 5s
       timeout: 3s
       retries: 5
 
+# 16 에서 옮겨 온 방법(2026-11-21): 옛 컨테이너에서 DB 마다 pg_dump -Fc 로 내보내고,
+# 이 파일로 새 컨테이너를 띄운 뒤 createdb 와 pg_restore 로 넣었다. 옛 compose 파일로
+# `docker compose up` 을 하면 컨테이너가 16 과 옛 볼륨으로 되돌아간다. 그때 18 의 데이터는
+# devvoca-pgdata18 볼륨에 그대로 있으니 이 파일로 다시 띄우면 된다.
 volumes:
-  devvoca-pgdata:
+  devvoca-pgdata18:
