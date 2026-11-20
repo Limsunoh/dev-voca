@@ -16,6 +16,8 @@ learning 에 둔 이유: accounts 는 다른 앱을 부르지 않는다. learnin
 
 from __future__ import annotations
 
+import logging
+
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
@@ -25,6 +27,8 @@ from apps.accounts.mail import GMAIL_BACKEND, MailNotConfigured
 from apps.accounts.models import LoginToken
 from apps.accounts.throttles import sweep_expired_counters
 from apps.learning.session import expired_steps
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -36,6 +40,16 @@ class Command(BaseCommand):
             action="store_true",
             help="실제로 메일을 보내고 지운다",
         )
+
+    def execute(self, *args, **options):
+        # 아래 실패(메일 설정 없음, Gmail 토큰 풀림, 한 통도 못 보냄)는 CommandError 로 끝난다.
+        # Django 는 그것을 표준 오류에 쓰고 sys.exit(1) 로 끝내서 Sentry 가 처리 안 된 예외로
+        # 잡지 못한다. 오류 기록으로 한 번 남기면 Sentry 가 이벤트로 보낸다(config/sentry.py).
+        try:
+            return super().execute(*args, **options)
+        except CommandError:
+            logger.error("새벽 정리 실패", exc_info=True)
+            raise
 
     def handle(self, *args, **options) -> None:
         if not options["apply"]:

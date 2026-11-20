@@ -142,7 +142,11 @@ def masked_path(record: LogRecord) -> str:
     이름이 메일에 실리지 않게 한다. 쿼리 문자열은 아예 넣지 않는다.
     """
     request = getattr(record, "request", None)
-    path = getattr(request, "path", "") or ""
+    return mask_path(getattr(request, "path", "") or "")
+
+
+def mask_path(path: str) -> str:
+    """주소의 경로에서 KEEP_SEGMENT 가 아닌 조각을 ":id" 로 바꾼다. Sentry 로 보낼 때도 쓴다."""
     parts = [
         part if not part or KEEP_SEGMENT.fullmatch(part) else ":id" for part in path.split("/")
     ]

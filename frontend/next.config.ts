@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 const SECURITY_HEADERS = [
@@ -58,4 +59,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// 빌드할 때 소스맵을 Sentry 에 올려 폰 화면 오류를 원래 코드 줄로 본다. 올린 뒤에는
+// 배포물에서 지운다(deleteSourcemapsAfterUpload 기본값). SENTRY_AUTH_TOKEN 은 Vercel 의
+// Production 에만 있어서, 로컬과 CI 빌드는 올리지 않고 그대로 끝난다.
+export default withSentryConfig(nextConfig, {
+  org: "lim-sun-oh",
+  project: "devvoca-frontend",
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  widenClientFileUpload: true,
+  // 서버 라이브러리를 빌드 때 자동 계측하는 기능(성능 측정용)이다. 우리는 오류만 받는다.
+  // 켜 두면 .next 안에 패키지 바로가기(junction)를 만드는데, 이 저장소가 있는 D: 는
+  // exFAT 이라 바로가기를 못 만들어 로컬 next build 가 Turbopack 오류로 멈춘다.
+  buildTimeInstrumentation: false,
+  telemetry: false,
+  silent: !process.env.CI,
+});
