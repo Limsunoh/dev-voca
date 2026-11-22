@@ -9,7 +9,7 @@
  *   - 목차의 링크는 모두 실제 절을 가리킨다.
  *   - 문서 버전은 가입할 때 저장하는 TERMS_VERSION 과 같다.
  *   - 처리방침 시행일은 공고일 7일 뒤다. 서버가 오류 메시지를 남기기 시작하는
- *     날(error_mail.py 의 MESSAGE_FROM)은 14절에 적은 v3 시행일과 같다.
+ *     날(error_mail.py 의 MESSAGE_FROM)은 v3 시행일과 같다.
  *   - 로그인 토큰은 발급 30일 뒤 지운다고 적고, "정해진 만료 없이" 가 남지 않는다.
  *   - 홈의 처리방침 알림은 시행일 전날까지만 뜨고 14절로 간다.
  *   - IP 주소는 원문이 아니라 서버 비밀값을 섞은 해시값으로만 둔다고 적고,
@@ -28,12 +28,12 @@ mock.module("next/link", {
     createElement("a", { href: props.href }, props.children),
 });
 
-const { DOC_VERSION, koreanDate, PRIVACY_CHANGE } = await import(
+const { DOC_VERSION, PRIVACY_CHANGE } = await import(
   "../../components/LegalDoc"
 );
 
-// v3 시행일. PRIVACY_CHANGE 는 최신 버전 날짜이고, v3 날짜는 14절과 본문에 글자로
-// 박혀 있다. 서버의 날짜 문(MESSAGE_FROM 등)은 이 날 켜진다.
+// v3 시행일. PRIVACY_CHANGE 는 최신 버전 날짜다. 14절은 그 버전의 바뀐 내용만 적어서
+// v3 날짜는 지금 문서에 없다. 서버의 날짜 문(MESSAGE_FROM 등)은 이 날 켜졌다.
 const V3_EFFECTIVE = "2026-11-19";
 // v3 의 날짜 문이 아직 코드에 있는 버전. 날짜 문을 지울 때 이것을 쓰는 절도 지운다.
 const V3_GATES_LIVE = ["v3", "v4", "v5"].includes(DOC_VERSION);
@@ -119,7 +119,7 @@ describe("처리방침 변경 공고", () => {
   // 다음 버전에서 시행일을 고칠 때 MESSAGE_FROM 을 같이 미루면, 이미 켜진 메시지
   // 기록이 말없이 꺼진다. 그래서 PRIVACY_CHANGE 가 아니라 v3 시행일과 견준다.
   // 날짜 문을 지울 때(error_mail.py 의 ponytail 주석) 이 테스트도 지운다.
-  it("v3: 서버가 오류 메시지를 남기기 시작하는 날이 14절의 v3 시행일과 같다", {
+  it("v3: 서버가 오류 메시지를 남기기 시작하는 날이 v3 시행일과 같다", {
     skip: !V3_GATES_LIVE,
   }, () => {
     // 서버가 먼저 켜지면 처리방침이 알리기 전에 메시지를 남긴다.
@@ -131,7 +131,6 @@ describe("처리방침 변경 공고", () => {
     assert.ok(m, "MESSAGE_FROM 을 못 찾았다");
     const server = [m[1], m[2].padStart(2, "0"), m[3].padStart(2, "0")].join("-");
     assert.equal(server, V3_EFFECTIVE);
-    assert.ok(pages.privacy.includes(`${koreanDate(V3_EFFECTIVE)} 시행`), "14절에 v3 시행일이 없다");
   });
 
   it("14절이 공고일과 시행일을 적는다", () => {

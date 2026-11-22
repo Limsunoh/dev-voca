@@ -20,7 +20,7 @@ User = get_user_model()
 
 ADD_URL = "/admin/accounts/user/add/"
 LOGIN_URL = "/admin/login/"
-TAKEN = "이미 쓰고 있는 이름입니다."
+TAKEN = "이미 쓰고 있는 닉네임입니다."
 
 # 다듬으면 사라지거나 공백이 되는 글자.
 HIDDEN_CHARS = {

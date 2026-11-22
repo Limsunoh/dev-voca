@@ -99,7 +99,7 @@ AVATAR_PHOTO_FORMATS = ("JPEG", "PNG", "WEBP")
 # 자동으로 지어주는 이름의 앞부분. 뒤에 네 자리를 붙여 일곱 글자가 된다.
 GENERATED_NAME_PREFIX = "학습자"
 
-# 보여지는 이름의 최대 길이.
+# 닉네임의 최대 길이.
 #
 # 짧게 두는 이유: 순위표는 이름을 한 줄에 여러 개 늘어놓는 화면이다.
 # 길면 줄바꿈이 나거나 잘려서, 화면이 이름 길이에 휘둘린다. 좁은 폰에서
@@ -132,7 +132,7 @@ _BLANK_LOOKING = re.compile("[\u115f\u1160\u3164\uffa0\u2800]")
 
 
 def normalize_display_name(value: str | None) -> str:
-    """보여지는 이름을 비교 가능한 형태로 다듬는다.
+    """닉네임을 비교 가능한 형태로 다듬는다.
 
     같은 이름으로 보이는데 DB 에서는 다른 문자열인 경우를 없앤다.
     순위표에 남의 이름 행세를 하는 행이 끼는 것을 막는 것이 목적이다.
@@ -396,7 +396,7 @@ class User(AbstractUser):
     # 실제로 빈 값이 저장되는 일은 없다. blank=True 는 "입력을 비워도
     # 된다" 는 뜻이고, 유일성은 아래 Meta.constraints 가 본다.
     display_name = models.CharField(
-        "보여지는 이름", max_length=DISPLAY_NAME_MAX, blank=True
+        "닉네임", max_length=DISPLAY_NAME_MAX, blank=True
     )
 
     # 구글이 준 계정 사진 주소. 로그인할 때마다 갱신한다 - 구글에서 사진을
@@ -527,7 +527,7 @@ class User(AbstractUser):
         ]
 
     def save(self, *args, **kwargs) -> None:
-        """이메일과 보여지는 이름을 저장 직전에 정리한다.
+        """이메일과 닉네임을 저장 직전에 정리한다.
 
         매니저가 아니라 여기서 하는 이유: Admin 의 계정 추가 폼은
         create_user 를 거치지 않고 곧바로 save() 를 부른다. 매니저에만

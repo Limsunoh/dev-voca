@@ -134,6 +134,6 @@ describe("문서의 날짜", () => {
     assert.ok(limit, "MESSAGE_LIMIT 을 못 찾았다");
     assert.ok(privacy.includes(`${limit}자까지만`), `처리방침에 ${limit}자가 없다`);
     // 시작일(2026년 11월 19일)은 11-22 에 본문에서 뺐다. 서버 기록은 7일만 남아
-    // 그 전 기록이 곧 없어지고, v3 시행일은 14절의 이전 버전 줄에 남는다.
+    // 그 전 기록이 곧 없어진다. v3 시행일은 legal-pages 테스트가 MESSAGE_FROM 과 견준다.
   });
 });

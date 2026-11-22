@@ -28,7 +28,7 @@ from .tests import CONSENT, EMAIL_CHANGE_URL, PASSWORD, SIGNUP_URL
 User = get_user_model()
 
 BRAND_PREFIX = "[DeVoca]"
-FORBIDDEN_MESSAGE = ["쓸 수 없는 이름입니다. 다른 이름을 입력해주세요."]
+FORBIDDEN_MESSAGE = ["쓸 수 없는 닉네임입니다. 다른 닉네임을 입력해주세요."]
 
 # 하이픈 자리에 올 수 있는 글자들. 화면에서는 모두 비슷한 가로줄로 보인다.
 HYPHEN_LOOKALIKES = (
