@@ -65,7 +65,7 @@ export default async function ProfilePage() {
 
       <section className="mt-6" aria-labelledby="profile-edit">
         <h2 id="profile-edit" className="sr-only">
-          사진과 이름
+          사진과 닉네임
         </h2>
         <ProfileForm
           action={updateProfileAction}

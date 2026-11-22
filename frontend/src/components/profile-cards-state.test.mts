@@ -426,11 +426,11 @@ describe("ProfileForm: 저장 안 한 변경 안내", () => {
     assert.equal(guard?.confirmLabel, "나가기");
   });
 
-  it("이름을 바꾸면 '바꾼 이름은' 이 뜨고 가드가 켜진다", () => {
+  it("이름을 바꾸면 '바꾼 닉네임은' 이 뜨고 가드가 켜진다", () => {
     typeInto("display_name", "초롱2");
-    assert.equal(hint(), "바꾼 이름은 아직 저장하지 않았습니다.");
+    assert.equal(hint(), "바꾼 닉네임은 아직 저장하지 않았습니다.");
     assert.equal(guard?.dirty, true);
-    assert.equal(guard?.detail, "바꾼 이름이 저장되지 않습니다.");
+    assert.equal(guard?.detail, "바꾼 닉네임이 저장되지 않습니다.");
   });
 
   it("사진을 고르면 '고른 사진은'", () => {
@@ -439,11 +439,11 @@ describe("ProfileForm: 저장 안 한 변경 안내", () => {
     assert.equal(guard?.detail, "고른 사진이 저장되지 않습니다.");
   });
 
-  it("둘 다 바꾸면 '고른 사진과 바꾼 이름은'", () => {
+  it("둘 다 바꾸면 '고른 사진과 바꾼 닉네임은'", () => {
     pick("a3");
     typeInto("display_name", "새이름");
-    assert.equal(hint(), "고른 사진과 바꾼 이름은 아직 저장하지 않았습니다.");
-    assert.equal(guard?.detail, "고른 사진과 바꾼 이름이 저장되지 않습니다.");
+    assert.equal(hint(), "고른 사진과 바꾼 닉네임은 아직 저장하지 않았습니다.");
+    assert.equal(guard?.detail, "고른 사진과 바꾼 닉네임이 저장되지 않습니다.");
   });
 
   it("저장값으로 되돌리면 안내가 사라진다", () => {
@@ -457,7 +457,7 @@ describe("ProfileForm: 저장 안 한 변경 안내", () => {
 
   it("뒤 공백 하나도 저장 안 한 변경이다", () => {
     typeInto("display_name", "초롱 ");
-    assert.equal(hint(), "바꾼 이름은 아직 저장하지 않았습니다.");
+    assert.equal(hint(), "바꾼 닉네임은 아직 저장하지 않았습니다.");
   });
 
   it("안내는 저장 버튼보다 위에 있다", () => {
@@ -484,7 +484,7 @@ describe("ProfileForm: 저장 안 한 변경 안내", () => {
     arrive(PROFILE, { saved: true, savedName: "초롱3" });
     typeInto("display_name", "초롱4");
     assert.doesNotMatch(html, SAVED);
-    assert.equal(hint(), "바꾼 이름은 아직 저장하지 않았습니다.");
+    assert.equal(hint(), "바꾼 닉네임은 아직 저장하지 않았습니다.");
   });
 
   it("저장한 뒤 바꾼 비교 기준은 새로 저장된 값이다", () => {
@@ -492,13 +492,13 @@ describe("ProfileForm: 저장 안 한 변경 안내", () => {
     arrive(PROFILE, { saved: true, savedName: "초롱3" });
     // 처음 이름으로 돌아가는 것도 이제는 변경이다.
     typeInto("display_name", "초롱");
-    assert.equal(hint(), "바꾼 이름은 아직 저장하지 않았습니다.");
+    assert.equal(hint(), "바꾼 닉네임은 아직 저장하지 않았습니다.");
   });
 
   it("저장에 실패하면 안내가 남고 오류 상자가 뜬다", () => {
     typeInto("display_name", "초롱2");
     arrive(PROFILE, { error: "이미 쓰고 있는 이름입니다." });
-    assert.equal(hint(), "바꾼 이름은 아직 저장하지 않았습니다.");
+    assert.equal(hint(), "바꾼 닉네임은 아직 저장하지 않았습니다.");
     assert.match(html, /role="alert"[^>]*>이미 쓰고 있는 이름입니다\./);
     assert.doesNotMatch(html, SAVED);
     assert.equal(guard?.dirty, true);
@@ -512,10 +512,10 @@ describe("ProfileForm: 저장 안 한 변경 안내", () => {
     assert.equal(guard?.dirty, false);
   });
 
-  it("사진을 올려도 바꾼 이름은 여전히 안내한다", () => {
+  it("사진을 올려도 바꾼 닉네임은 여전히 안내한다", () => {
     typeInto("display_name", "초롱2");
     arrive(UPLOAD, { at: 1000, photoUrl: "/media/p.webp" });
-    assert.equal(hint(), "바꾼 이름은 아직 저장하지 않았습니다.");
+    assert.equal(hint(), "바꾼 닉네임은 아직 저장하지 않았습니다.");
   });
 
   it("서버로 가는 아바타는 hidden 칸이 들고, 고른 것을 따라간다", () => {
@@ -534,7 +534,7 @@ describe("ProfileForm: 저장 안 한 변경 안내", () => {
     typeInto("display_name", "초롱34");
     arrive(PROFILE, { saved: true, savedName: "초롱3", sentName: "초롱3" });
     assert.equal(valueOf("display_name"), "초롱34");
-    assert.equal(hint(), "바꾼 이름은 아직 저장하지 않았습니다.");
+    assert.equal(hint(), "바꾼 닉네임은 아직 저장하지 않았습니다.");
     assert.equal(guard?.dirty, true);
   });
 

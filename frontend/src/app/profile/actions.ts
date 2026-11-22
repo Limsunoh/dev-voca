@@ -61,7 +61,7 @@ export async function updateProfileAction(
   const avatar = String(formData.get("avatar") ?? "");
 
   if (!displayName) {
-    return { error: "이름을 입력해주세요." };
+    return { error: "닉네임을 입력해주세요." };
   }
 
   let saved;

@@ -125,7 +125,7 @@ describe("문서의 날짜", () => {
     assert.ok(!privacy.includes(`· 시행일 ${EFFECTIVE_DATE}`));
   });
 
-  it("처리방침 2절 사목이 서버의 메시지 길이 상한과 시작일을 적는다", () => {
+  it("처리방침 2절 사목이 서버의 메시지 길이 상한을 적는다", () => {
     const source = readFileSync(
       new URL("../../../backend/apps/accounts/error_mail.py", import.meta.url),
       "utf-8",
@@ -133,8 +133,7 @@ describe("문서의 날짜", () => {
     const limit = source.match(/^MESSAGE_LIMIT = (\d+)/m)?.[1];
     assert.ok(limit, "MESSAGE_LIMIT 을 못 찾았다");
     assert.ok(privacy.includes(`${limit}자까지만`), `처리방침에 ${limit}자가 없다`);
-    // 시작일은 v3 시행일로 박혀 있다. 다음 개정에서 PRIVACY_CHANGE 를 고쳐도
-    // 바뀌면 안 된다(실제로 그날부터 남기고 있으므로).
-    assert.ok(privacy.includes("2026년 11월 19일부터 남기며"));
+    // 시작일(2026년 11월 19일)은 11-22 에 본문에서 뺐다. 서버 기록은 7일만 남아
+    // 그 전 기록이 곧 없어지고, v3 시행일은 14절의 이전 버전 줄에 남는다.
   });
 });

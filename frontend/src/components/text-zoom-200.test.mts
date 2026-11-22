@@ -137,7 +137,7 @@ describe("확인 창: 좁으면 버튼을 쌓고 넓으면 같은 폭으로 나�
       createElement(LeaveConfirm, {
         openRef: { current: null },
         title: "저장하지 않고 나갈까요?",
-        detail: "바꾼 이름이 저장되지 않습니다.",
+        detail: "바꾼 닉네임이 저장되지 않습니다.",
         confirmLabel: "나가기",
         cancelLabel,
         onConfirm: () => {},

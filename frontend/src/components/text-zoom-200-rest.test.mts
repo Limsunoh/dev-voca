@@ -41,7 +41,7 @@ describe("계정 삭제 창: 확인 창(LeaveConfirm)과 같은 세 가지로 �
     createElement(LeaveConfirm, {
       openRef: { current: null },
       title: "저장하지 않고 나갈까요?",
-      detail: "바꾼 이름이 저장되지 않습니다.",
+      detail: "바꾼 닉네임이 저장되지 않습니다.",
       confirmLabel: "나가기",
       onConfirm: () => {},
     }),
