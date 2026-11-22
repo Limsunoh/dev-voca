@@ -208,6 +208,7 @@ Sentry 조직 `lim-sun-oh` 의 프로젝트 둘로 보낸다. 값이 없으면 S
 |---|---|---|
 | Railway `web` | `SENTRY_DSN` | `devvoca-backend` 프로젝트의 DSN |
 | Railway `cleanup` | `SENTRY_DSN` | `${{web.SENTRY_DSN}}` (새벽 정리가 터져도 알림이 온다) |
+| Railway `db-backup` | `SENTRY_DSN` | `${{web.SENTRY_DSN}}` (백업이 끝났다는 신호를 보낸다. 아래 "DB 백업" 절) |
 | Vercel Production | `NEXT_PUBLIC_SENTRY_DSN` | `devvoca-frontend` 프로젝트의 DSN. 빌드 때 화면 코드에 박히므로 바꾸면 다시 배포 |
 | Vercel Production | `SENTRY_AUTH_TOKEN` | Sentry 조직 토큰(소스맵 올리기 전용, sensitive). 없으면 소스맵만 안 올라가고 빌드는 된다 |
 
@@ -616,7 +617,7 @@ Railway 를 Pro 로 올려 Railway 의 백업을 쓰게 되면 처리방침 3절
 | 이미지 | `postgres:18` (운영 DB 와 같은 큰 버전. `pg_dump` 는 서버보다 낮은 큰 버전으로는 못 뜬다. Railway 가 운영 DB 를 19 로 올리면 이것도 올린다) |
 | 지역 | `asia-southeast1-eqsg3a` (싱가포르, 운영 DB 와 같다) |
 | 볼륨 | `db-backup-volume` 을 `/backups` 에 |
-| 변수 | `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `BACKUP_KEEP_DAYS=14` |
+| 변수 | `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `BACKUP_KEEP_DAYS=14`, `SENTRY_DSN=${{web.SENTRY_DSN}}` |
 | Cron Schedule | `30 17 * * *` (UTC, 한국 새벽 2시 30분. 3시의 정기 정리보다 먼저 떠서, 정리가 잘못 지우더라도 그 직전 상태가 남는다) |
 
 시작 명령은 아래 한 줄이다. 순서는 이렇다.
@@ -624,8 +625,7 @@ Railway 를 Pro 로 올려 Railway 의 백업을 쓰게 되면 처리방침 3절
 1. 보관 기간이 지난 파일을 지운다. 크론 시각이 조금씩 흔들려도 14일을 넘기지 않게
    14일에서 3시간을 뺀 기준(`-mmin`)으로 본다. 맨 앞에 둔 이유: 뒤 단계가 실패하는
    날에도 "14일이 지나면 지운다" 는 약속이 지켜진다. 대신 실패가 14일 넘게 이어지면
-   백업이 하나도 남지 않는다. 실패를 알려 주는 장치는 따로 없으니(정리 크론처럼 Sentry
-   로 보내지 않는다) 일주일에 한 번은 db-backup 의 배포 목록이 초록인지 본다.
+   백업이 하나도 남지 않는다. 그래서 실패한 날은 메일이 오게 했다(4번).
 2. `.part` 이름으로 뜬다.
 3. 같은 컨테이너에 임시 Postgres 를 띄워 그 파일을 되살려 보고 표 몇 개의 행을 센다.
    통과해야 `.dump` 로 이름을 바꾼다. 그래서 `/backups` 의 `devvoca-*.dump` 는 모두 되살려
@@ -634,9 +634,28 @@ Railway 를 Pro 로 올려 Railway 의 백업을 쓰게 되면 처리방침 3절
    재시도는 하지 않는다. 성공하면 로그에 `restore check words|sentences|users|answers:
    3503|5329|5|25` 같은 줄이 남는다. 이 줄의 표 이름(vocab_word 등)을 바꾸는
    마이그레이션을 하면 여기도 고친다.
+4. 여기까지 통과하면 Sentry 의 감시 `db-backup`(devvoca-backend 프로젝트)에 "끝났다"
+   신호(체크인)를 보낸다. 한국 새벽 3시 30분(UTC 18:30)까지 신호가 없으면 Sentry 가
+   "Cron failure: db-backup" 이슈를 만들고, 위 "오류 알림" 절의 high priority 규칙이
+   조직 멤버에게 메일을 보낸다. 명령이 중간에 실패해도, 멈춰서 안 끝나도, Railway 가
+   아예 안 돌려도 신호가 없으니 같은 메일이 온다. 다음 날 백업이 성공하면 이슈는
+   저절로 닫힌다. 이미지에 curl 이 없어 openssl 로 보낸다. 로그 끝의 `sentry check-in:
+   HTTP/1.1 202 Accepted` 가 보냈다는 표시다. 이 줄의 뒤가 비어 있으면 백업은 됐고
+   신호만 못 간 것이다. 그날도 메일은 온다.
+
+명령 전체를 `timeout -k 60 50m` 으로 감쌌다. 한 번 멈춘 실행이 끝나지 않으면 Railway
+는 다음 날 실행을 말없이 건너뛴다. 50분에 끊어 그날을 실패로 끝내고 다음 날은 다시
+돌게 한다. 50분은 Sentry 가 기다리는 60분보다 짧게 잡았다. 성공한 날의 신호는 늘 그
+안에 들어온다.
+
+Sentry 감시 설정은 일정 `30 17 * * *`(UTC), 기다리는 시간(check-in margin) 60분, 실패
+1번에 이슈, 성공 1번에 닫힘이다. 2026-11-22 에 체크인 요청으로 만들었다. Railway 의 Cron
+Schedule 을 바꾸면 Sentry 의 Crons > db-backup 일정도 같이 바꾼다. 안 바꾸면 백업이
+성공한 날에도 메일이 온다. 무료 요금제(Developer)는 감시가 하나까지라, 정리 크론에도
+붙이면 요금이 든다.
 
 ```
-sh -c 'set -eu; find /backups -name "*.part" -delete; find /backups -name "devvoca-*.dump" -mmin +$((BACKUP_KEEP_DAYS * 1440 - 180)) -print -delete; f=/backups/devvoca-$(date -u +%Y%m%dT%H%M%SZ).dump; pg_dump --dbname="$DATABASE_URL" --format=custom --file="$f.part"; d=/tmp/pgcheck; mkdir -p $d; chown postgres $d; gosu postgres initdb -D $d -A trust >/dev/null; gosu postgres pg_ctl -D $d -o "-c listen_addresses=" -w start >/dev/null; gosu postgres createdb check; gosu postgres pg_restore -d check --no-owner --no-privileges --exit-on-error "$f.part"; n=$(gosu postgres psql -d check -Atc "select (select count(*) from vocab_word), (select count(*) from vocab_sentence), (select count(*) from accounts_user), (select count(*) from learning_quizanswer)"); echo "restore check words|sentences|users|answers: $n"; test "${n%%|*}" -gt 0; gosu postgres pg_ctl -D $d -w stop >/dev/null; mv "$f.part" "$f"; ls -l /backups; df -h /backups'
+timeout -k 60 50m sh -c 'set -eu; find /backups -name "*.part" -delete; find /backups -name "devvoca-*.dump" -mmin +$((BACKUP_KEEP_DAYS * 1440 - 180)) -print -delete; f=/backups/devvoca-$(date -u +%Y%m%dT%H%M%SZ).dump; pg_dump --dbname="$DATABASE_URL" --format=custom --file="$f.part"; d=/tmp/pgcheck; mkdir -p $d; chown postgres $d; gosu postgres initdb -D $d -A trust >/dev/null; gosu postgres pg_ctl -D $d -o "-c listen_addresses=" -w start >/dev/null; gosu postgres createdb check; gosu postgres pg_restore -d check --no-owner --no-privileges --exit-on-error "$f.part"; n=$(gosu postgres psql -d check -Atc "select (select count(*) from vocab_word), (select count(*) from vocab_sentence), (select count(*) from accounts_user), (select count(*) from learning_quizanswer)"); echo "restore check words|sentences|users|answers: $n"; test "${n%%|*}" -gt 0; gosu postgres pg_ctl -D $d -w stop >/dev/null; mv "$f.part" "$f"; ls -l /backups; df -h /backups; k=${SENTRY_DSN#https://}; h=${k#*@}; h=${h%%/*}; r=$(printf "GET /api/${k##*/}/cron/db-backup/${k%%@*}/?status=ok HTTP/1.1\r\nHost: $h\r\nConnection: close\r\n\r\n" | timeout 30 openssl s_client -quiet -connect "$h:443" -servername "$h" 2>/dev/null | head -n 1); echo "sentry check-in: $r"'
 ```
 
 ### 되살리는 법
@@ -649,6 +668,8 @@ sh -c 'set -eu; find /backups -name "*.part" -delete; find /backups -name "devvo
 **준비(A·B 공통).** `db-backup` 의 Cron Schedule 을 비우고 시작 명령을 `sleep infinity`
 로 바꿔 배포한 뒤 `railway ssh --service db-backup` 으로 들어간다. 크론 서비스는 도는 몇
 초 말고는 꺼져 있어 그냥은 들어갈 수 없다. `ls -l /backups` 에서 쓸 백업을 고른다.
+그동안은 백업이 돌지 않아 한국 새벽 3시 30분을 넘기면 Sentry 의 실패 메일이 온다.
+예상한 메일이다.
 
 **A. 몇 줄만 살리기.** 위 시작 명령의 3단계처럼 임시 Postgres(`check`)에 백업을 넣고,
 필요한 행을 운영 DB 로 옮긴다. 열 이름을 모두 적어 옮긴다. `select *` 는 백업 뒤에 열이
