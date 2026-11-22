@@ -90,6 +90,8 @@ export function logIn(body: {
  * 구글이 준 신분 토큰이나 코드를 넘기면 백엔드가 구글에 되물어 확인하고,
  * 계정을 찾거나 만든다. 사용자 정보를 직접 넘기지 않는 이유: 그러면 누구든
  * 남의 이메일을 적어 보내 그 계정으로 들어올 수 있다.
+ *
+ * headers 에는 실제 접속 IP 를 싣는다(lib/client-ip.ts). 이메일 로그인과 같다.
  */
 export function logInWithGoogle(
   body: (
@@ -107,8 +109,9 @@ export function logInWithGoogle(
     disclosure_agreed?: boolean;
     age_confirmed?: boolean;
   },
+  headers?: Record<string, string>,
 ): Promise<AuthResult> {
-  return request("/api/accounts/google/", { method: "POST", body });
+  return request("/api/accounts/google/", { method: "POST", body, headers });
 }
 
 /** 토큰을 서버에서도 무효로 만든다. */

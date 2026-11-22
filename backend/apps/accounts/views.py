@@ -63,7 +63,7 @@ from .throttles import (
     EmailChangeThrottle,
     EmailHourlyThrottle,
     EmailRateThrottle,
-    GoogleRateThrottle,
+    GoogleIpThrottle,
     LoginIpThrottle,
     PasswordChangeThrottle,
     ProfileUpdateThrottle,
@@ -214,9 +214,8 @@ class GoogleLoginView(APIView):
     """
 
     permission_classes = [AllowAny]
-    # 누가 보냈는지로 나누지 않고 전체 합계로 센다(throttles 참고).
-    # 요청자를 구분할 방법이 없어서 나누는 척하면 오히려 뚫린다.
-    throttle_classes = [GoogleRateThrottle]
+    # Next 가 비밀값과 함께 넘긴 접속 IP 로 센다(throttles 참고).
+    throttle_classes = [GoogleIpThrottle]
 
     @staticmethod
     def _google_user(data: dict) -> dict | Response:

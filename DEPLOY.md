@@ -172,15 +172,15 @@ Host 가 `healthcheck.railway.app` 이라 일반 뷰로 두면 400·301 이 된�
 | `DJANGO_ALLOWED_HOSTS` | `xxx.up.railway.app` (스킴 없이) | 기동 실패 |
 | `DJANGO_DEBUG` | `0` | 에러 페이지에 소스 노출. 가입·로그인 IP 제한도 사실상 꺼진다(DEBUG 면 1분 1000번) |
 | `DATABASE_URL` | PostgreSQL 추가 시 자동 | 로컬 기본값을 침 |
-| `RELAY_SECRET` | 무작위 긴 값. **Vercel 에도 같은 이름·같은 값** | 가입·로그인 IP 제한이 모든 사람을 한 통으로 센다 |
+| `RELAY_SECRET` | 무작위 긴 값. **Vercel 에도 같은 이름·같은 값** | 가입·로그인(구글 포함) IP 제한이 모든 사람을 한 통으로 센다 |
 
-`RELAY_SECRET` 은 Next 서버가 가입·로그인 요청에 싣는 값이다(frontend/src/lib/client-ip.ts,
+`RELAY_SECRET` 은 Next 서버가 가입·로그인 요청(구글 로그인 포함, 2026-11-22 부터)에 싣는 값이다(frontend/src/lib/client-ip.ts,
 backend/apps/accounts/throttles.py). 백엔드는 이 값이 맞는 요청만 Next 에서 온 것으로 보고
 접속 IP 로 세고, 나머지는 백엔드를 바로 부른 요청으로 보고 한 통에 담는다. 2026-11-19
 (처리방침 v3 시행일) 전에는 Next 가 IP 를 싣지 않고 백엔드도 아무것도 세지 않는다.
 
 - 한쪽에만 넣거나 값이 다르면 실제 사용자도 모두 한 통에 들어, 가입이 사이트 전체로
-  한 시간 30건에 묶인다.
+  한 시간 30건, 구글 로그인이 한 시간 60건에 묶인다.
   - 값이 다르면: 백엔드가 운영 로그에 `X-Next-Relay 비밀값이 맞지 않음(보낸 값 지문 ...)`
     을 남긴다(값은 안 찍고 지문 8자만, 지문마다 한 번). 같은 지문이 계속 나오면 Next 쪽
     값이 어긋난 것이니 두 곳 값을 맞춘다. 지문이 매번 다르면 머리를 지어 보내는 봇이다.
@@ -240,7 +240,7 @@ python backend/manage.py shell -c "from django.core.management.utils import get_
 | `/admin/` | 200 |
 | `/api/vocab/` | 401 (로그인 없이 부르면 막는 것이 기본값이다. 정상) |
 | `/api/vocab/words/` | 200 |
-| `POST /api/accounts/google/` (본문 `{}`) | **400** |
+| `POST /api/accounts/google/` (본문 `{}`) | **400** (429 도 캐시는 친 것이다. 바로 부른 요청 한 통이 찼다) |
 | `POST /api/accounts/login/` (없는 계정) | **400** |
 
 `/admin/` 이 200 인데 `/api/vocab/words/` 가 500 이면 vocab 마이그레이션이
@@ -266,7 +266,8 @@ curl -so /dev/null -w "login  %{http_code}\n" -X POST $H/api/accounts/login/ \
   그 제한은 캐시를 안 친다** - 400 이 나와도 이메일 제한은 검증하지 않은 것이다.
   없는 계정으로 보내면 400 이면서 캐시는 확실히 친다. 2026-11-19 부터는 접속 IP
   제한(LoginIpThrottle)이 이메일과 상관없이 캐시를 친다.
-- `google/` 은 본문과 무관한 고정 키를 쓰므로 `{}` 로 충분하다. 그리고
+- `google/` 은 바로 부른 요청을 IP 와 상관없이 `direct` 한 통으로 세므로 `{}` 로
+  충분하다(2026-11-22 부터. 그 전에는 사이트 전체 한 통이었다). 그리고
   `{}` 면 코드 검사에서 먼저 400 이라 **구글로 실제 요청이 나가지 않는다.**
   `{"code":"x"}` 처럼 보내면 매번 구글에 실패 요청을 보내게 되고, 그때는
   키가 없거나 네트워크가 막혀도 똑같이 400 이라 의미를 읽을 수 없다.

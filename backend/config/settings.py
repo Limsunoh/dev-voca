@@ -477,11 +477,10 @@ REST_FRAMEWORK = {
         # Admin 로그인. 관리자는 한두 명이고 자주 로그인하지 않는다. 같은 계정은 API
         # 로그인(auth_email_hour)으로도 대볼 수 있어 비밀번호 추측의 실제 상한은 둘의 합이다.
         "admin_login": "1000/min" if sys.argv[1:2] == ["test"] else "10/hour",
-        # 구글은 통을 하나만 둔다(apps.accounts.throttles 참고). 사이트
-        # 전체가 함께 쓰는 값이라, 한 사람이 다 쓰면 그동안 모두가 막힌다.
-        # 그래서 실제 사용량보다 훨씬 넉넉하게 잡는다 - 여기서 재는 것은
-        # 개인의 시도 횟수가 아니라 우리 서버가 구글을 두드리는 총량이다.
-        "auth_google": "2000/min" if sys.argv[1:2] == ["test"] else "120/min",
+        # 구글 로그인도 접속 IP 마다 센다(apps.accounts.throttles 의 GoogleIpThrottle,
+        # 아래 signup_ip·login_ip 와 같은 방식). 통은 login_ip 와 따로다. 로컬(DEBUG)은
+        # RELAY_SECRET 이 없어 모두 direct 한 통에 들므로 넉넉하게 둔다.
+        "google_ip": "1000/min" if sys.argv[1:2] == ["test"] or DEBUG else "60/hour",
         # 가입·로그인을 접속 IP 로도 센다(apps.accounts.throttles 의 SignUpIpThrottle,
         # LoginIpThrottle). 휴대폰 통신사나 강의실·회사는 여러 사람이 같은 IP 를 쓰므로
         # 사람 기준으로 넉넉하게 잡는다(강의실 30명이 한 시간에 같이 가입해도 된다).

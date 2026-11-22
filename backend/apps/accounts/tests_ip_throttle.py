@@ -1,4 +1,4 @@
-"""가입·로그인을 접속 IP 로 세는 제한(throttles.SignUpIpThrottle, LoginIpThrottle).
+"""가입·로그인을 접속 IP 로 세는 제한(throttles.SignUpIpThrottle, LoginIpThrottle, GoogleIpThrottle).
 
 처리방침 v3 시행일(IP_COUNT_FROM) 전에는 아무것도 세지 않는다. 시행일부터 Next 서버가
 비밀값과 함께 넘긴 IP(IPv6 는 /64)마다 세고, 비밀값이 없거나 틀린 요청(백엔드를 바로
@@ -19,8 +19,10 @@ from django.utils.crypto import salted_hmac
 
 from . import throttles
 from .error_mail import MESSAGE_FROM
+from .google import GoogleAuthError
 from .throttles import (
     IP_COUNT_FROM,
+    GoogleIpThrottle,
     LoginIpThrottle,
     SignUpIpThrottle,
     came_through_next,
@@ -29,6 +31,7 @@ from .throttles import (
 
 SIGNUP_URL = "/api/accounts/signup/"
 LOGIN_URL = "/api/accounts/login/"
+GOOGLE_URL = "/api/accounts/google/"
 CONSENT = {"terms_agreed": True, "disclosure_agreed": True, "age_confirmed": True}
 
 
@@ -263,6 +266,138 @@ class LoginIpThrottleTest(_IpThrottleCase):
             LOGIN_URL, body, content_type="application/json", **relayed("203.0.113.8")
         )
         self.assertEqual(res.status_code, 200)
+
+
+@override_settings(RELAY_SECRET=RELAY_MARK)
+class GoogleIpThrottleTest(_IpThrottleCase):
+    """구글 로그인도 접속 IP 로 센다. 예전에는 사이트 전체가 한 통이라 한 사람이 모두를 막았다."""
+
+    throttle = GoogleIpThrottle
+
+    def setUp(self):
+        super().setUp()
+        # 오늘 날짜에 기대지 않는다(IP_COUNT_FROM 전이면 아무것도 세지 않는다).
+        self.counting_from(date.min)
+        # 구글을 실제로 부르지 않는다. 막지 않으면 통과 이유가 제한이 아니라 구글의 거절이 된다.
+        google = mock.patch(
+            "apps.accounts.views.fetch_google_user",
+            side_effect=GoogleAuthError("확인하지 못했습니다."),
+        )
+        google.start()
+        self.addCleanup(google.stop)
+
+    def google(self, n: int, **meta):
+        body = {"code": f"code-{n}", "redirect_uri": "http://localhost:3000/api/auth/google/callback"}
+        return self.client.post(GOOGLE_URL, body, content_type="application/json", **meta)
+
+    def test_one_ip_using_up_its_bucket_does_not_block_another_ip(self):
+        self.assertEqual(self.google(1, **relayed("203.0.113.7")).status_code, 400)
+        self.assertEqual(self.google(2, **relayed("203.0.113.7")).status_code, 400)
+        self.assertEqual(self.google(3, **relayed("203.0.113.7")).status_code, 429)
+        self.assertEqual(self.google(4, **relayed("203.0.113.8")).status_code, 400)
+
+    def test_direct_requests_do_not_block_people_coming_through_next(self):
+        """백엔드를 바로 부르는 봇은 지어 보낸 IP 와 상관없이 한 통에 들고, 그 통이 차도
+        Next 를 거친 사람은 막히지 않는다."""
+        self.assertEqual(self.google(1, HTTP_X_NEXT_CLIENT_IP="198.51.100.1").status_code, 400)
+        self.assertEqual(self.google(2, HTTP_X_NEXT_CLIENT_IP="198.51.100.2").status_code, 400)
+        self.assertEqual(self.google(3, HTTP_X_NEXT_CLIENT_IP="198.51.100.3").status_code, 429)
+        self.assertEqual(self.google(4, **relayed("203.0.113.7")).status_code, 400)
+
+    def test_google_and_email_login_buckets_are_separate(self):
+        """구글 시도가 같은 IP 의 이메일 로그인 횟수를 쓰지 않는다."""
+        login_rate = mock.patch.object(LoginIpThrottle, "get_rate", return_value="2/min")
+        login_rate.start()
+        self.addCleanup(login_rate.stop)
+        for n in range(1, 4):
+            self.google(n, **relayed("203.0.113.7"))
+        body = {"email": "nobody@example.com", "password": mark("not-it")}
+        res = self.client.post(
+            LOGIN_URL, body, content_type="application/json", **relayed("203.0.113.7")
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_email_login_does_not_use_up_the_google_bucket(self):
+        """반대 방향. 같은 IP 의 이메일 로그인 실패가 구글 로그인 횟수를 쓰지 않는다."""
+        login_rate = mock.patch.object(LoginIpThrottle, "get_rate", return_value="2/min")
+        login_rate.start()
+        self.addCleanup(login_rate.stop)
+        body = {"email": "nobody@example.com", "password": mark("not-it")}
+        for _ in range(3):
+            self.client.post(
+                LOGIN_URL, body, content_type="application/json", **relayed("203.0.113.7")
+            )
+        self.assertEqual(self.google(1, **relayed("203.0.113.7")).status_code, 400)
+
+    def test_wrong_secret_cannot_make_new_buckets_with_made_up_addresses(self):
+        """비밀값이 틀리면 X-Next-Client-IP·X-Forwarded-For·접속 주소를 바꿔 보내도 한 통이다."""
+        wrong = mark("guess")
+        self.assertEqual(
+            self.google(
+                1,
+                **relayed("198.51.100.1", secret=wrong),
+                HTTP_X_FORWARDED_FOR="198.51.100.1",
+                REMOTE_ADDR="10.0.0.1",
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.google(
+                2,
+                **relayed("198.51.100.2", secret=wrong),
+                HTTP_X_FORWARDED_FOR="198.51.100.2",
+                REMOTE_ADDR="10.0.0.2",
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.google(
+                3, HTTP_X_FORWARDED_FOR="198.51.100.3", REMOTE_ADDR="10.0.0.3"
+            ).status_code,
+            429,
+        )
+
+    def test_attaching_a_login_token_does_not_skip_counting(self):
+        """로그인 토큰을 붙인 요청도 같은 IP 통에서 센다. 토큰만 붙이면 안 세는 구멍이 없다."""
+        from django.contrib.auth import get_user_model
+
+        from .models import LoginToken
+
+        user = get_user_model().objects.create_user(email="tok@example.com", password=mark("pw"))
+        auth = {"HTTP_AUTHORIZATION": f"Token {LoginToken.objects.create(user=user).key}"}
+        self.assertEqual(self.google(1, **relayed("203.0.113.7")).status_code, 400)
+        self.assertEqual(self.google(2, **relayed("203.0.113.7"), **auth).status_code, 400)
+        self.assertEqual(self.google(3, **relayed("203.0.113.7"), **auth).status_code, 429)
+        self.assertEqual(self.google(4, **relayed("203.0.113.7")).status_code, 429)
+
+    def test_ipv6_64_and_ipv4_mapped_spellings_share_a_bucket(self):
+        """한 /64 안의 주소, ::ffff: 로 적은 IPv4 는 같은 사람으로 센다."""
+        self.assertEqual(self.google(1, **relayed("2001:db8:1:2::1")).status_code, 400)
+        self.assertEqual(self.google(2, **relayed("2001:db8:1:2::ffff")).status_code, 400)
+        self.assertEqual(self.google(3, **relayed("2001:db8:1:2:aaaa::9")).status_code, 429)
+        self.assertEqual(self.google(4, **relayed("203.0.113.9")).status_code, 400)
+        self.assertEqual(self.google(5, **relayed("::ffff:203.0.113.9")).status_code, 400)
+        self.assertEqual(self.google(6, **relayed("203.0.113.9")).status_code, 429)
+
+    def test_credential_and_code_paths_share_one_bucket(self):
+        """신분 토큰 길과 코드 길을 번갈아 써서 한도를 두 배로 늘릴 수 없다."""
+        credential = {"credential": "jwt", "nonce": "n1"}
+        with mock.patch(
+            "apps.accounts.views.verify_google_credential",
+            side_effect=GoogleAuthError("확인하지 못했습니다."),
+        ) as verify:
+            first = self.client.post(
+                GOOGLE_URL, credential, content_type="application/json",
+                **relayed("203.0.113.7"),
+            )
+            second = self.google(2, **relayed("203.0.113.7"))
+            third = self.client.post(
+                GOOGLE_URL, credential, content_type="application/json",
+                **relayed("203.0.113.7"),
+            )
+        self.assertEqual([first.status_code, second.status_code, third.status_code], [400, 400, 429])
+        # 막힌 셋째는 구글을 부르지 않았다.
+        self.assertEqual(verify.call_count, 1)
 
 
 class WaitTextTest(SimpleTestCase):

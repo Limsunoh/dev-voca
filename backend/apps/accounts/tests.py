@@ -37,7 +37,7 @@ from .models import (
     name_taken,
     shrink_avatar_photo,
 )
-from .throttles import EmailRateThrottle, GoogleRateThrottle
+from .throttles import EmailRateThrottle, GoogleIpThrottle
 
 # 마이그레이션 모듈은 이름이 숫자로 시작해 평범한 import 가 안 된다.
 # 함수만 꺼내지 않고 모듈째 잡아둔다. 함수가 operations 에 실제로 걸려
@@ -497,7 +497,7 @@ class ThrottleTest(TestCase):
         거절이 되어, 무엇을 확인했는지 알 수 없다.
         """
         rate = mock.patch.object(
-            GoogleRateThrottle, "get_rate", return_value="3/min"
+            GoogleIpThrottle, "get_rate", return_value="3/min"
         )
         rate.start()
         self.addCleanup(rate.stop)
@@ -588,8 +588,8 @@ class GoogleLoginTest(TestCase):
     """
 
     def setUp(self):
-        # 구글 제한은 통이 하나라 클래스가 달라도 횟수가 이어진다.
-        # 비워두지 않으면 나중에 제한을 낮출 때 엉뚱한 테스트가 깨진다.
+        # 테스트 요청은 Next 의 비밀값을 싣지 않아 구글 제한의 direct 한 통에 모두
+        # 든다. 테스트끼리 횟수가 섞이지 않게 비운다.
         cache.clear()
 
     def google(self, **body):
