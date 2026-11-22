@@ -17,7 +17,7 @@ from django.core.cache import cache
 from django.test import TestCase, override_settings
 
 from .google import GoogleAuthError, verify_google_credential
-from .throttles import GoogleRateThrottle
+from .throttles import GoogleIpThrottle
 
 User = get_user_model()
 
@@ -261,9 +261,9 @@ class CredentialViewEdgeTest(TokeninfoMixin, TestCase):
         self.assertEqual(res.status_code, 400)
 
     def test_throttle_applies_to_credential_path(self):
-        """신분 토큰 길도 같은 한 통(GoogleRateThrottle)으로 센다."""
+        """신분 토큰 길도 같은 제한(GoogleIpThrottle)으로 센다. 바로 부른 요청은 한 통이다."""
         with (
-            mock.patch.object(GoogleRateThrottle, "get_rate", return_value="3/min"),
+            mock.patch.object(GoogleIpThrottle, "get_rate", return_value="3/min"),
             mock.patch(
                 "apps.accounts.views.verify_google_credential",
                 side_effect=GoogleAuthError("확인하지 못했습니다."),

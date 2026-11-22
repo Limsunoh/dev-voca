@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { logInWithGoogle } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
+import { clientIpHeaders } from "@/lib/client-ip";
 import { callbackUrl } from "@/lib/google";
 import { safeNext } from "@/lib/routes";
 import { carryGuestDailyLength, setToken } from "@/lib/session";
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    const relay = await clientIpHeaders();
     const { token, user } = await logInWithGoogle({
       code,
       // 구글이 코드를 발급할 때 쓴 주소와 같아야 한다. 백엔드가 구글에
@@ -60,7 +62,7 @@ export async function GET(request: Request) {
       ...(consented
         ? { terms_agreed: true, disclosure_agreed: true, age_confirmed: true }
         : {}),
-    });
+    }, relay);
     await setToken(token);
     await carryGuestDailyLength(token, user);
   } catch (error) {

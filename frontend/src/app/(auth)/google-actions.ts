@@ -7,6 +7,7 @@ import { redirect, RedirectType } from "next/navigation";
 
 import { logInWithGoogle } from "@/lib/api/accounts";
 import { ApiError } from "@/lib/api/client";
+import { clientIpHeaders } from "@/lib/client-ip";
 import { safeNext } from "@/lib/routes";
 import { carryGuestDailyLength, setToken } from "@/lib/session";
 
@@ -97,13 +98,14 @@ export async function googleCredentialAction(input: {
 
   if (typeof credential === "string" && credential && secret) {
     try {
+      const relay = await clientIpHeaders();
       const { token, user } = await logInWithGoogle({
         credential,
         nonce: secret,
         ...(args.consent === true
           ? { terms_agreed: true, disclosure_agreed: true, age_confirmed: true }
           : {}),
-      });
+      }, relay);
       await setToken(token);
       await carryGuestDailyLength(token, user);
       outcome = "ok";

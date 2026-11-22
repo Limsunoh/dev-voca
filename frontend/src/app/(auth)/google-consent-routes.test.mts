@@ -46,6 +46,19 @@ mock.module("next/headers", {
   },
 });
 
+/**
+ * 실제 접속 IP 머리 대역(lib/client-ip.ts). 그 파일은 next/headers 의 headers() 를 쓰는데
+ * 위 대역에는 cookies() 만 있다. 머리를 만드는 규칙은 lib/client-ip.test.mts 가 본다.
+ */
+const RELAY = { "X-Next-Relay": ["leakmark", "relay"].join("-"), "X-Next-Client-IP": "203.0.113.7" };
+mock.module("@/lib/client-ip", {
+  namedExports: {
+    async clientIpHeaders() {
+      return RELAY;
+    },
+  },
+});
+
 const loader = Module as unknown as {
   _load: (request: string, ...rest: unknown[]) => unknown;
 };
@@ -158,7 +171,7 @@ describe("구글 시작: 동의 쿠키를 굽는 조건", () => {
 
 // ---- 콜백 -------------------------------------------------------------------
 
-type Sent = { path: string; body: Record<string, unknown> };
+type Sent = { path: string; body: Record<string, unknown>; headers: Headers };
 
 let sent: Sent[] = [];
 
@@ -168,6 +181,7 @@ function backend(status: number, body: unknown): void {
     sent.push({
       path: String(input),
       body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+      headers: new Headers(init?.headers),
     });
     return new Response(JSON.stringify(body), {
       status,
@@ -209,6 +223,9 @@ describe("구글 콜백: 동의 값 싣기", () => {
 
     assert.equal(sent.length, 1);
     assert.equal(sent[0].path, "http://fake-api.test/api/accounts/google/");
+    // 백엔드가 구글 로그인 시도를 접속 IP 로 센다. 안 실으면 모두가 한 통에 든다.
+    assert.equal(sent[0].headers.get("X-Next-Client-IP"), RELAY["X-Next-Client-IP"]);
+    assert.equal(sent[0].headers.get("X-Next-Relay"), RELAY["X-Next-Relay"]);
     assert.deepEqual(sent[0].body, {
       code: "c1",
       redirect_uri: `${ORIGIN}/api/auth/google/callback`,

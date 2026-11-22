@@ -60,12 +60,27 @@ mock.module("next/navigation", {
   },
 });
 
+/**
+ * 실제 접속 IP 머리 대역(lib/client-ip.ts). 그 파일은 next/headers 의 headers() 를 쓰는데
+ * 위 대역에는 cookies() 만 있다. 머리를 만드는 규칙은 lib/client-ip.test.mts 가 본다.
+ */
+const RELAY = { "X-Next-Relay": ["leakmark", "relay"].join("-"), "X-Next-Client-IP": "203.0.113.7" };
+mock.module("@/lib/client-ip", {
+  namedExports: {
+    async clientIpHeaders() {
+      return RELAY;
+    },
+  },
+});
+
 let calls: Record<string, unknown>[] = [];
+let relays: (Record<string, string> | undefined)[] = [];
 let reply: () => Promise<unknown> = async () => ({ token: "tok", user: { id: 1 } });
 mock.module("@/lib/api/accounts", {
   namedExports: {
-    async logInWithGoogle(body: Record<string, unknown>) {
+    async logInWithGoogle(body: Record<string, unknown>, headers?: Record<string, string>) {
       calls.push(body);
+      relays.push(headers);
       return reply();
     },
   },
@@ -106,6 +121,7 @@ beforeEach(() => {
   written.clear();
   deleted = [];
   calls = [];
+  relays = [];
   sessions.length = 0;
   reply = async () => ({ token: "tok", user: { id: 1 } });
   process.env.GOOGLE_CLIENT_ID = "test-client.apps.googleusercontent.com";
@@ -176,6 +192,8 @@ describe("googleCredentialAction", () => {
     const res = await run({ credential: "jwt", next: "/learn/words" });
     assert.deepEqual(res, { to: "/learn/words", type: "replace" });
     assert.deepEqual(calls, [{ credential: "jwt", nonce: "n1" }]);
+    // 백엔드가 구글 로그인 시도를 접속 IP 로 센다. 안 실으면 모두가 한 통에 든다.
+    assert.deepEqual(relays, [RELAY]);
     assert.deepEqual(sessions, ["set tok", "carry tok"]);
     assert.ok(deleted.includes(NONCE), "nonce 쿠키를 안 지웠다");
   });

@@ -4,8 +4,9 @@
 
 - 이메일(EmailRateThrottle 분당, EmailHourlyThrottle 시간당): 한 계정의 비밀번호를
   반복해서 때리는 것. Admin 로그인(AdminLoginThrottle)도 이메일로 센다.
-- 접속 IP(SignUpIpThrottle, LoginIpThrottle): 이메일을 바꿔 가며 계정을 찍어
-  내거나 여러 계정에 같은 비밀번호를 대보는 것. 이메일로는 한 번씩 다 통과한다.
+- 접속 IP(SignUpIpThrottle, LoginIpThrottle, GoogleIpThrottle): 이메일을 바꿔 가며
+  계정을 찍어 내거나 여러 계정에 같은 비밀번호를 대보는 것. 이메일로는 한 번씩 다
+  통과한다. 구글 로그인은 이메일을 모르므로 IP 로만 센다.
 
 IP 는 그냥 볼 수 없다. 브라우저는 백엔드를 직접 부르지 않고 Next 서버가 대신
 불러서, 백엔드가 보는 접속 주소는 늘 Next 서버(Vercel)다. 그래서 Next 가 실제
@@ -114,32 +115,6 @@ class AdminLoginThrottle(EmailRateThrottle):
         if not email.strip():
             return None
         return self.cache_format % {"scope": self.scope, "ident": email_ident(email)}
-
-
-class GoogleRateThrottle(SimpleRateThrottle):
-    """구글 로그인 시도 제한.
-
-    이메일로 셀 수 없다. 구글 요청에는 코드나 신분 토큰만 들어 있고 이메일은
-    구글에 물어봐야 나온다.
-
-    요청자별로도 못 센다. 이 프로젝트는 모든 요청이 Next 서버 하나로
-    보인다. 가입·로그인은 Next 가 비밀값과 함께 접속 IP 를 실어 보내
-    IP 로 세지만(SignUpIpThrottle), 구글 중계(app/api/auth/google)는 아직
-    싣지 않는다. 비밀값 없이 주소를 알려주는 머리는 아무나 지어낼 수 있다.
-    인증 여부로 나누는 것도 안 된다. 토큰만 붙이면 세지 않는 구현이 있어, 계정 하나 만들면 그대로 뚫린다.
-
-    그래서 통을 하나만 둔다. 여기서 재는 것은 "누가 얼마나" 가 아니라
-    "우리 서버가 구글을 얼마나 두드리는가" 다. 그 총량에 상한을 두면
-    남이 우리를 통해 구글을 때리는 것도 함께 막힌다.
-
-    대가로 한 사람이 한도를 다 쓰면 그동안 모두가 막힌다. 그래서 실제
-    사용량보다 훨씬 넉넉하게 잡는다.
-    """
-
-    scope = "auth_google"
-
-    def get_cache_key(self, request, view) -> str:
-        return self.cache_format % {"scope": self.scope, "ident": "all"}
 
 
 class EmailChangeThrottle(SimpleRateThrottle):
@@ -369,3 +344,27 @@ class SignUpIpThrottle(_ClientIpThrottle):
 
 class LoginIpThrottle(_ClientIpThrottle):
     scope = "login_ip"
+
+
+class GoogleIpThrottle(_ClientIpThrottle):
+    """구글 로그인 시도 제한. 이메일 로그인처럼 접속 IP 로 센다.
+
+    구글 요청에는 코드나 신분 토큰만 들어 있어 이메일로 셀 수 없다. 예전에는 사이트
+    전체를 한 통(1분에 120번)으로 셌는데, 그러면 한 사람이 그만큼 두드려 그동안 모두의
+    구글 로그인을 막을 수 있었다. 이제 Next 를 거친 요청은 접속 IP 마다 따로 세고,
+    백엔드를 바로 부른 요청은 "direct" 한 통에 담는다. 실제 사용자는 늘 Next 를 거치므로
+    봇이 direct 통을 다 써도 막히지 않는다.
+
+    로그인 여부로 통을 나누지 않는다(부모 클래스가 사용자를 보지 않는다). 토큰을 붙이면
+    세지 않는 구현이면 계정 하나만 만들어 제한을 없앨 수 있다.
+
+    예전 한 통에는 "우리 서버가 구글을 두드리는 총량" 을 묶는 뜻도 있었다. 그 총량
+    상한은 일부러 두지 않는다. 다시 두면 누군가 그 상한을 채우는 순간 또 모두가 막힌다.
+    이제 IP 하나는 한 시간에 60번까지라, 한 시간 내내 예전 상한(시간당 7200번)만큼
+    보내려면 IP 가 120개(IPv6 는 /64 120개) 필요하다. 60번을 1분 안에 몰아 보내면 IP
+    몇 개로도 그 1분은 예전 상한을 넘지만, 그 IP 들은 나머지 한 시간 동안 막힌다.
+    ponytail: 총량 상한 없음. 구글이 우리 서버를 막기 시작하면 넉넉한 전체 상한을 IP
+    제한과 함께 단다(IP 하나로는 못 채우는 크기로).
+    """
+
+    scope = "google_ip"

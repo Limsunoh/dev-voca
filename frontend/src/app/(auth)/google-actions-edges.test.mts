@@ -51,6 +51,18 @@ mock.module("next/navigation", {
   },
 });
 
+/**
+ * 실제 접속 IP 머리 대역(lib/client-ip.ts). 그 파일은 next/headers 의 headers() 를 쓰는데
+ * 위 대역에는 cookies() 만 있다. 머리가 실리는지는 google-actions.test.mts 가 본다.
+ */
+mock.module("@/lib/client-ip", {
+  namedExports: {
+    async clientIpHeaders() {
+      return {};
+    },
+  },
+});
+
 let calls: Record<string, unknown>[] = [];
 let reply: () => Promise<unknown> = async () => ({ token: "tok", user: { id: 1 } });
 mock.module("@/lib/api/accounts", {
