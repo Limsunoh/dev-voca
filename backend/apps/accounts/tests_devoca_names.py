@@ -46,7 +46,7 @@ from .tests import (
 
 User = get_user_model()
 
-FORBIDDEN_MESSAGE = ["쓸 수 없는 이름입니다. 다른 이름을 입력해주세요."]
+FORBIDDEN_MESSAGE = ["쓸 수 없는 닉네임입니다. 다른 닉네임을 입력해주세요."]
 
 # 화면에서 DeVoca / 데보카 로 읽히는 이름. 보이지 않는 글자는 \u 로 적는다.
 IMPERSONATIONS = (

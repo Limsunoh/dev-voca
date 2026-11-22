@@ -47,12 +47,12 @@ def validate_display_name(value: str, *, instance=None) -> str:
     name = normalize_display_name(value)
 
     if not name:
-        raise serializers.ValidationError("이름을 입력해주세요.")
+        raise serializers.ValidationError("닉네임을 입력해주세요.")
 
     # 길이를 모델의 max_length 에 맡기면 저장할 때 걸려 500 이 된다.
     if len(name) > DISPLAY_NAME_MAX:
         raise serializers.ValidationError(
-            f"이름은 {DISPLAY_NAME_MAX}자까지 쓸 수 있습니다."
+            f"닉네임은 {DISPLAY_NAME_MAX}자까지 쓸 수 있습니다."
         )
 
     # 지금 쓰는 이름을 그대로 보낸 것은 막지 않는다. 내정보 저장은 아바타만
@@ -60,10 +60,10 @@ def validate_display_name(value: str, *, instance=None) -> str:
     # 계정 등)을 쓰는 사람이 아바타도 못 바꾼다.
     unchanged = instance is not None and instance.display_name == name
     if not unchanged and name_is_forbidden(name):
-        raise serializers.ValidationError("쓸 수 없는 이름입니다. 다른 이름을 입력해주세요.")
+        raise serializers.ValidationError("쓸 수 없는 닉네임입니다. 다른 닉네임을 입력해주세요.")
 
     if name_taken(name, exclude_pk=instance.pk if instance else None):
-        raise serializers.ValidationError("이미 쓰고 있는 이름입니다.")
+        raise serializers.ValidationError("이미 쓰고 있는 닉네임입니다.")
 
     return name
 
@@ -78,7 +78,7 @@ def _conflict_message(exc: IntegrityError) -> dict:
     이름은 위에서 한 번 걸러지므로 남는 쪽이 이메일일 가능성이 높다.
     """
     if "display_name" in str(exc):
-        return {"display_name": ["이미 쓰고 있는 이름입니다."]}
+        return {"display_name": ["이미 쓰고 있는 닉네임입니다."]}
     return {"email": ["이미 가입된 이메일입니다."]}
 
 
@@ -178,7 +178,7 @@ class UserSerializer(serializers.ModelSerializer):
             # 위에서 확인했지만 그 사이 다른 요청이 같은 이름을 먼저
             # 가져갈 수 있다. DB 가 막아준 것을 500 대신 안내로 바꾼다.
             raise serializers.ValidationError(
-                {"display_name": ["이미 쓰고 있는 이름입니다."]}
+                {"display_name": ["이미 쓰고 있는 닉네임입니다."]}
             ) from exc
 
 

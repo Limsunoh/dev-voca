@@ -50,7 +50,7 @@ from .tests import (
 
 User = get_user_model()
 
-FORBIDDEN_MESSAGE = ["쓸 수 없는 이름입니다. 다른 이름을 입력해주세요."]
+FORBIDDEN_MESSAGE = ["쓸 수 없는 닉네임입니다. 다른 닉네임을 입력해주세요."]
 CHANGELIST_URL = "/admin/accounts/user/"
 ACTION = "delete_uploaded_photo"
 
@@ -767,8 +767,8 @@ BLANK_LOOKING = {
     "U+FFA0": "\uffa0",
     "U+2800": "\u2800",
 }
-NAME_REQUIRED = ["이름을 입력해주세요."]
-NAME_TAKEN = ["이미 쓰고 있는 이름입니다."]
+NAME_REQUIRED = ["닉네임을 입력해주세요."]
+NAME_TAKEN = ["이미 쓰고 있는 닉네임입니다."]
 
 
 class BlankLookingNormalizeTest(SimpleTestCase):

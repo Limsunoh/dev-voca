@@ -497,9 +497,9 @@ describe("ProfileForm: 저장 안 한 변경 안내", () => {
 
   it("저장에 실패하면 안내가 남고 오류 상자가 뜬다", () => {
     typeInto("display_name", "초롱2");
-    arrive(PROFILE, { error: "이미 쓰고 있는 이름입니다." });
+    arrive(PROFILE, { error: "이미 쓰고 있는 닉네임입니다." });
     assert.equal(hint(), "바꾼 닉네임은 아직 저장하지 않았습니다.");
-    assert.match(html, /role="alert"[^>]*>이미 쓰고 있는 이름입니다\./);
+    assert.match(html, /role="alert"[^>]*>이미 쓰고 있는 닉네임입니다\./);
     assert.doesNotMatch(html, SAVED);
     assert.equal(guard?.dirty, true);
   });

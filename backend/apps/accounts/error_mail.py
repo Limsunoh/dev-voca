@@ -79,9 +79,10 @@ KNOWN_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
 # 운영 로그에 오류 메시지를 싣기 시작하는 날(한국 시간). 처리방침 14절이 "바꾸면 시행
 # 7일 전부터 서비스 화면에 알린다" 고 약속해서, 이 기능을 머지한 날(공고일)부터 7일
-# 뒤다. 처리방침 v3 의 시행일이고 14절에 글자로 적혀 있다(legal-pages.test.mts 가
-# 견준다). LegalDoc.tsx 의 PRIVACY_CHANGE.effective 는 최신 버전의 시행일이다. 그쪽에
-# 맞춰 이 날짜를 옮기지 않는다.
+# 뒤다. 처리방침 v3 의 시행일이다(legal-pages.test.mts 의 V3_EFFECTIVE 와 견준다).
+# 처리방침 14절은 지금 버전의 바뀐 내용만 적어서 v3 날짜는 문서에 없다.
+# LegalDoc.tsx 의 PRIVACY_CHANGE.effective 는 최신 버전의 시행일이다. 그쪽에 맞춰
+# 이 날짜를 옮기지 않는다.
 # ponytail: 날짜로 켜는 문이다. 시행일이 지나면 이 상수와 short_message 의 날짜 비교를
 # 지운다. 그때 테스트의 날짜 고정(tests_error_mail.py 의 messages_on/off,
 # tests_error_mail_dynamic.py 의 StderrCarriesNoValuesTest.setUp 과 MESSAGE_FROM 을
