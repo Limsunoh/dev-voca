@@ -8,7 +8,7 @@
  * 날짜를 글자로 박아 둔다.
  *   - 홈 알림은 한국 시간 11-21 ~ 11-27 내내 뜨고 "11월 28일부터 바뀝니다" 라고 쓴다.
  *   - 한국 시간 11-28 0시(UTC 11-27 15시)부터 안 뜬다.
- *   - 처리방침 버전 줄과 14절은 v5 공고일·시행일을, 14절은 v4 의 공고일·시행일도 적는다.
+ *   - 처리방침 버전 줄과 14절은 v5 공고일·시행일을, 14절은 앞 버전들의 시행일을 한 줄로 적는다.
  *
  * v5 가 아니면 건너뛴다. 다음 개정 때 이 파일을 지운다.
  */
@@ -81,19 +81,22 @@ describe("v5 처리방침 본문의 날짜", { skip: !IS_V5 }, () => {
     assert.ok(privacy.includes("버전 v5 · 시행일 2026년 11월 28일"), "버전 줄");
   });
 
-  it("14절이 v5 공고일·시행일과 v4·v3 의 공고일·시행일을 모두 적는다", () => {
+  it("14절이 v5 공고일·시행일과 앞 버전들의 시행일을 적는다", () => {
     assert.ok(changes, "14절을 못 찾았다");
     assert.ok(changes.includes("공고일: 2026년 11월 21일"));
     assert.ok(changes.includes("시행일: 2026년 11월 28일"));
-    assert.ok(changes.includes("v4(2026년 11월 13일 공고, 2026년 11월 20일 시행)"));
-    assert.ok(changes.includes("v3(2026년 11월 12일 공고, 2026년 11월 19일 시행)"));
+    // 앞 버전마다 바뀐 곳을 늘어놓지 않고 시행일만 한 줄로 남긴다(11-22 에 줄였다).
+    assert.match(
+      changes,
+      /이전 버전: v4\(2026년 11월 20일 시행\), v3\(2026년 11월 19일 시행\),\s+v2\(2026년 11월 9일 시행\)/,
+    );
   });
 
-  it("14절은 v5 → v4 → v3 순서로 적는다", () => {
+  it("14절은 v5 바뀐 내용을 먼저, 이전 버전 줄을 맨 끝에 적는다", () => {
     const v5 = changes.indexOf("Sentry(미국)");
-    const v4 = changes.indexOf("로그인 토큰을 발급하고 30일");
-    const v3 = changes.indexOf("v3(2026년 11월 12일 공고");
-    assert.ok(v5 >= 0 && v4 >= 0 && v3 >= 0, changes);
-    assert.ok(v5 < v4 && v4 < v3);
+    const older = changes.indexOf("이전 버전:");
+    assert.ok(v5 >= 0 && older >= 0, changes);
+    assert.ok(v5 < older);
+    assert.ok(!changes.slice(older).includes("바뀐"), "이전 버전 줄 뒤에 다른 이력이 남았다");
   });
 });

@@ -142,7 +142,7 @@ export function ConsentChecks({
 export function GoogleNameNote() {
   return (
     <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
-      순위표에 오르면 구글 이름과 사진이 보입니다. 내정보에서 이름이나 아바타를
+      순위표에 오르면 구글 이름과 사진이 보입니다. 내정보에서 닉네임이나 아바타를
       바꿀 수 있습니다.
     </p>
   );

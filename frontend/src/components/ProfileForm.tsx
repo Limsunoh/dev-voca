@@ -203,7 +203,7 @@ export function ProfileForm({
   const avatarChanged = avatar !== savedAvatar;
   const nameChanged = name !== savedName;
   const dirty = avatarChanged || nameChanged;
-  const unsaved = [avatarChanged && "고른 사진", nameChanged && "바꾼 이름"]
+  const unsaved = [avatarChanged && "고른 사진", nameChanged && "바꾼 닉네임"]
     .filter(Boolean)
     .join("과 ");
   const leaveDialog = useUnsavedGuard({
@@ -381,7 +381,7 @@ export function ProfileForm({
             fontWeight: "var(--weight-bold)",
           }}
         >
-          보여지는 이름
+          닉네임
         </label>
         <input
           id="display_name"
@@ -410,7 +410,7 @@ export function ProfileForm({
           className="mt-2 text-xs"
           style={{ color: "var(--text-dim)" }}
         >
-          순위표에 이 이름이 뜹니다. 다른 사람이 쓰는 이름은 쓸 수 없습니다.
+          순위표에 뜰 닉네임입니다. 남이 쓰는 닉네임은 쓸 수 없습니다.
         </p>
       </section>
 

@@ -147,43 +147,7 @@ describe("처리방침 변경 공고", () => {
     assert.match(changes, new RegExp(`시행일: ${korean(effective)}`));
   });
 
-  // v3 에서 바뀐 내용이다. v3 시행 전에 v4 를 공고해 v4 의 14절에도 남는다.
-  // 다음 개정에서 14절을 새로 쓰면 이 테스트는 건너뛴다.
-  it("v3: 14절이 오류 메시지와 IP 주소 세기를 바뀐 내용으로 적는다", {
-    skip: !V3_GATES_LIVE,
-  }, () => {
-    const changes = pages.privacy.match(
-      /<section[^>]*id="changes"[^>]*>([\s\S]*?)<\/section>/,
-    )?.[1];
-    assert.ok(changes);
-    assert.match(changes, /오류 메시지/);
-    assert.match(changes, /IP 주소/);
-  });
-
-  it("14절이 구글 로그인 계정 창(11월 13일부터 적용)을 적는다", () => {
-    // #192 가 v3 공지 기간에 더한 항목이다. v4 의 14절을 다시 쓰며 합칠 때 빠지기
-    // 쉬웠다. 본문(2·6·7·10절)의 구글 문장은 그대로 있는데 14절만 빠지면 "v2 와
-    // 같다" 고 잘못 알린다.
-    const changes = pages.privacy.match(
-      /<section[^>]*id="changes"[^>]*>([\s\S]*?)<\/section>/,
-    )?.[1];
-    assert.ok(changes);
-    assert.match(changes, /구글 로그인 부분은 2026년 11월 13일부터\s+적용합니다/);
-    assert.match(changes, /10절의 쿠키 목록과 마지막 문단/);
-    assert.match(changes, /로그인\s+토큰, 4절 6번/);
-  });
-
-  it("v4: 14절이 로그인 토큰 30일을 바뀐 내용으로 적는다", {
-    skip: !["v4", "v5"].includes(DOC_VERSION),
-  }, () => {
-    const changes = pages.privacy.match(
-      /<section[^>]*id="changes"[^>]*>([\s\S]*?)<\/section>/,
-    )?.[1];
-    assert.ok(changes);
-    assert.match(changes, /로그인 토큰을 발급하고 30일이 지나면 지웁니다/);
-  });
-
-  it("v5: Sentry 를 사목·3·6·7절과 14절에 적고, 이메일 시도 기록 1시간을 적는다", {
+  it("v5: Sentry 를 사목·3·6·7절과 14절에 적는다", {
     skip: DOC_VERSION !== "v5",
   }, () => {
     const section = (id: string) =>
@@ -194,9 +158,9 @@ describe("처리방침 변경 공고", () => {
     assert.match(section("transfer"), /compliance@sentry\.io/);
     assert.match(section("items"), /IP\s+주소를 저장하지 않도록 설정했습니다/);
     assert.match(section("items"), /앱 화면에서는 오류가 났을 때만\s+보냅니다/);
-    assert.match(section("retention"), /이메일 로그인 시도는 1분과 1시간\s+두 단위로 세고/);
-    assert.match(section("retention"), /관리자 화면 로그인 시도는/);
-    assert.match(section("changes"), /v4 와 다른 곳은/);
+    // v5 에서 새로 센 관리자 화면 로그인 시도는 3절과 14절 바뀐 내용에 남는다.
+    assert.match(section("retention"), /관리자 화면 로그인 시도는 이메일로/);
+    assert.match(section("changes"), /관리자 화면\s+로그인 시도도 이메일 해시값으로 셉니다/);
     assert.match(pages["delete-account"], /Sentry 로 보낸 오류 기록/);
   });
 
@@ -227,15 +191,16 @@ describe("처리방침 변경 공고", () => {
   it("IP 주소는 원문이 아니라 해시값으로만 둔다고 적는다", () => {
     // 가입·로그인 시도를 IP 주소로도 센다(백엔드 요청 제한). 원문을 저장한다고
     // 읽히면 안 되고, "IP 를 저장하지 않는다" 는 옛 단정이 남아도 안 된다.
-    // 날짜는 IP 로 세기 시작한 날이라 글자로 박혀 있어야 한다(PRIVACY_CHANGE 와 무관).
-    const retention = pages.privacy.match(
-      /<section[^>]*id="retention"[^>]*>([\s\S]*?)<\/section>/,
-    )?.[1];
-    assert.ok(retention);
-    assert.match(retention, /2026년\s+11월 19일부터는 이메일 로그인·가입 시도를 접속한 IP 주소로도 셉니다/);
-    assert.match(retention, /원문을 저장하지 않고/);
+    const section = (id: string) =>
+      pages.privacy.match(new RegExp(`<section[^>]*id="${id}"[^>]*>([\\s\\S]*?)</section>`))?.[1] ?? "";
+    assert.match(section("items"), /IP 주소를\s+서버 비밀값을 섞은 해시값으로 바꿔/);
+    assert.match(section("retention"), /둘 다 서버 비밀값을 섞은\s+해시값으로 바꿔 둡니다/);
+    assert.match(section("processors"), /해시값으로 바꾸는 데만 쓰고 원문은\s+저장하지 않습니다/);
     assert.doesNotMatch(pages.privacy, /IP 주소나 브라우저 정보를 저장하지 않습니다/);
-    assert.doesNotMatch(pages.privacy + pages["delete-account"], /알아볼 수 없게 바꾼/);
+    // IPv4 는 43억 개뿐이라 비밀값을 가진 사람은 전부 해시해 원문을 찾을 수 있다(08879bc).
+    // 해시를 "되돌릴 수 없게 바꾼 값" 같은 센 말로 풀지 않는다(계정 삭제를 되돌릴 수
+    // 없다는 3절 문장은 다른 이야기라 막지 않는다).
+    assert.doesNotMatch(pages.privacy + pages["delete-account"], /알아볼 수 없게 바꾼|되돌릴 수 없게 바꾼/);
   });
 
   it("홈 알림은 시행일 전날까지 뜨고 14절로 간다", () => {
