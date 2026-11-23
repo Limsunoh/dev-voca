@@ -278,7 +278,7 @@ export function AuthForm({
             // 백엔드 DISPLAY_NAME_MAX 와 같아야 한다. 프로필 화면도 같은 값.
             maxLength={12}
             defaultValue={state.values?.display_name}
-            hint="순위표에 뜰 닉네임입니다. 비워두면 알아서 지어드립니다."
+            hint="순위표에 뜰 닉네임입니다. 12자까지 쓸 수 있고, 비워두면 알아서 지어드립니다."
           />
         )}
 

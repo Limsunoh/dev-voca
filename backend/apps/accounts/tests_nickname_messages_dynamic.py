@@ -74,16 +74,13 @@ class NicknameApiMixin:
         self.assertNotIn(OLD_WORD, body_text(res))
 
     def assertTooLongRejected(self, res):
-        """글자 그대로 12자를 넘긴 값은 400 이고 옛 말이 없다.
+        """12자를 넘긴 값은 우리 문구(TOO_LONG)로 막힌다.
 
-        문구는 단정하지 않는다. ModelSerializer 가 모델의 max_length 로 만든 칸이
-        다듬기 전에 먼저 막아 DRF 기본 문구("이 필드의 글자 수가 12 이하인지
-        확인하세요.")가 나간다. 다듬기는 글자를 줄이기만 해서, 우리 문구(TOO_LONG)는
-        NFC 로 늘어나는 드문 글자에만 닿는다(test_다듬으면_길어지는_값은_닉네임_길이_문구다).
+        예전에는 ModelSerializer 가 모델의 max_length 로 만든 칸이 먼저 막아 DRF 기본
+        문구("이 필드의 글자 수가 12 이하인지 확인하세요.")가 나갔다(serializers 의
+        display_name_field).
         """
-        self.assertEqual(res.status_code, 400, res.content)
-        self.assertEqual(list(res.json()), ["display_name"])
-        self.assertNotIn(OLD_WORD, body_text(res))
+        self.assertNicknameError(res, TOO_LONG)
 
 
 class SignUpNicknameMessageTest(NicknameApiMixin, TestCase):
@@ -120,6 +117,13 @@ class SignUpNicknameMessageTest(NicknameApiMixin, TestCase):
         res = self.signup("  " + "나" * DISPLAY_NAME_MAX + "  ")
 
         self.assertEqual(res.status_code, 201, res.content)
+
+    def test_보이지_않는_글자는_다듬은_뒤에_센다(self):
+        """폭 없는 공백이 섞여 원문은 24자지만 다듬으면 12자다. 예전에는 DRF 가 원문으로 막았다."""
+        res = self.signup("나\u200b" * DISPLAY_NAME_MAX)
+
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(User.objects.get(email="new@example.com").display_name, "나" * DISPLAY_NAME_MAX)
 
     def test_금칙어는_쓸_수_없다는_문구다(self):
         for value in ("관리자", "ADMIN운영자", "ＡＤＭＩＮ관리자", "dev voca"):
