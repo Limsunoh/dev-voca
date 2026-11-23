@@ -43,7 +43,7 @@ ADMINS = [("ops", "ops@example.com")]
 SLOW_MAIL_SECONDS = 3.0
 # 예외에 담는 메시지. 덩어리 검사가 메시지 꼬리가 붙은 머리 줄도 받는지 보는 데 쓴다.
 MESSAGE = "leakmark-" + "message"
-# 시행일(error_mail.MESSAGE_FROM 이 생기면 그날)부터는 머리 줄 끝에 " - 오류 메시지" 가 붙는다.
+# 머리 줄 끝에는 " - 오류 메시지" 가 붙는다(error_mail.short_message).
 # 여기서 보는 것은 덩어리가 섞이지 않는가라서 그 꼬리는 무엇이든 받는다.
 HEADER = re.compile(r"^\[서버 오류\] (\S+) (\S+) (\S*)(?: - .*)?$")
 

@@ -8,7 +8,6 @@ tests_ip_throttle.py, tests_ip_throttle_dynamic.py 가 보지 않던 조합만 �
 - 공백 붙은 비밀값이 direct 가 아니라 IP 통으로 세지는지
 - IPv4-mapped 의 16진 표기, mapped 에 존을 붙인 표기
 - 시간 단위 제한의 429 문구가 "N분" 이고 Retry-After 가 1분을 넘는지
-- 한국 시간 0시 경계(UTC 15:00)에서 날짜 문이 열리는지
 
 비율은 앞의 두 파일처럼 get_rate 를 바꿔 좁힌다.
 """
@@ -17,8 +16,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import date, datetime
-from datetime import timezone as dt_timezone
 from unittest import mock
 
 from django.test import RequestFactory, SimpleTestCase, override_settings
@@ -34,7 +31,6 @@ from .tests_ip_throttle import (
     relayed,
 )
 from .throttles import (
-    IP_COUNT_FROM,
     LoginIpThrottle,
     SignUpIpThrottle,
     came_through_next,
@@ -45,7 +41,7 @@ WRONG_MARK = mark("wrong-relay")
 
 
 def next_without_ip(secret: str = RELAY_MARK) -> dict[str, str]:
-    """시행일 전 Next 가 싣는 꼴, 또는 Next 가 IP 를 못 읽은 꼴. 비밀값만 있다."""
+    """Next 가 IP 를 못 읽었을 때 싣는 꼴. 비밀값만 있다."""
     return {"HTTP_X_NEXT_RELAY": secret}
 
 
@@ -56,7 +52,6 @@ class SignUpDirectBucketMixTest(_IpThrottleCase):
     def setUp(self):
         super().setUp()
         self.n = 0
-        self.counting_from(date.min)
         # 경고는 지문마다 프로세스에서 한 번만 찍는다. 앞 테스트가 찍은 지문을 비운다.
         throttles._WARNED.clear()
         self.addCleanup(throttles._WARNED.clear)
@@ -138,12 +133,6 @@ class SignUpDirectBucketMixTest(_IpThrottleCase):
         for leaked in (WRONG_MARK, other, RELAY_MARK, "198.51.100.7"):
             self.assertNotIn(leaked, text)
 
-    def test_wrong_secret_warns_even_before_policy_date(self):
-        """날짜 문이 닫힌 동안에도 어긋난 비밀값은 알린다. 세기 시작하는 날 전에 고칠 수 있다."""
-        self.counting_from(date.max)
-        with self.assertLogs("apps.accounts.throttles", level="WARNING"):
-            self.assertEqual(self.signup(**next_without_ip(WRONG_MARK)).status_code, 201)
-
 
 @override_settings(RELAY_SECRET=RELAY_MARK)
 class LoginNextWithoutIpTest(_IpThrottleCase):
@@ -151,7 +140,6 @@ class LoginNextWithoutIpTest(_IpThrottleCase):
 
     def test_next_without_ip_is_not_counted_on_login(self):
         """로그인도 가입과 같다. Next 가 IP 를 못 실은 요청은 세지 않는다."""
-        self.counting_from(date.min)
         for n in range(4):
             body = {"email": f"nl{n}@example.com", "password": mark("not-it")}
             res = self.client.post(
@@ -182,33 +170,6 @@ class WhitespaceServerSecretTest(SimpleTestCase):
             with self.subTest(sent=repr(sent)):
                 request = RequestFactory().post("/", HTTP_X_NEXT_RELAY=sent)
                 self.assertFalse(came_through_next(request))
-
-
-@override_settings(RELAY_SECRET=RELAY_MARK)
-class KoreanMidnightTest(_IpThrottleCase):
-    """날짜 문은 한국 시간으로 연다. 시행일 0시(KST)는 UTC 로 전날 15:00 이다.
-
-    timezone.localdate 를 고정하지 않고 timezone.now 만 바꿔, TIME_ZONE 설정까지 함께 본다.
-    """
-
-    throttle = SignUpIpThrottle
-
-    def key_at(self, utc: datetime) -> str | None:
-        request = RequestFactory().post(SIGNUP_URL, **relayed("203.0.113.7"))
-        with mock.patch("django.utils.timezone.now", return_value=utc):
-            return SignUpIpThrottle().get_cache_key(request, view=None)
-
-    def test_opens_at_korean_midnight(self):
-        day_before = date.fromordinal(IP_COUNT_FROM.toordinal() - 1)
-        last_moment = datetime(
-            day_before.year, day_before.month, day_before.day, 14, 59, 59, 999999,
-            tzinfo=dt_timezone.utc,
-        )
-        opening = datetime(
-            day_before.year, day_before.month, day_before.day, 15, 0, 0, tzinfo=dt_timezone.utc
-        )
-        self.assertIsNone(self.key_at(last_moment))
-        self.assertIsNotNone(self.key_at(opening))
 
 
 class WaitTextEdgeTest(SimpleTestCase):

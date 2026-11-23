@@ -11,9 +11,9 @@ tests_error_mail.py 가 기본 동작(한 통, 같은 오류 묶기, 상한)을 
 - 주소의 숫자·긴 조각은 인코딩을 돌려도 가려지고, 예외의 메시지·원인·메모는 안 실린다.
 - 뷰가 처리해 답한 502·503 과 예외 없는 기록은 알리지 않는다.
 - 하루 상한은 실제 로거를 거쳐도 지켜진다.
-- 시행일(MESSAGE_FROM, 한국 시간 자정)부터 운영 로그 줄에 오류 메시지가 붙되, 한 줄로
+- 운영 로그 줄에는 오류 메시지가 붙되(처리방침 v3 시행일인 2026-11-19 부터), 한 줄로
   펴져 가짜 줄을 못 만들고, 원인·메모·묶음의 하위 예외와 요청의 다른 값은 안 실리며,
-  메일에는 어느 날이든 메시지가 없다.
+  메일에는 메시지가 없다.
 """
 
 from __future__ import annotations
@@ -26,11 +26,8 @@ import runpy
 import sys
 import threading
 import time
-from datetime import UTC, date, datetime, timedelta
-from datetime import time as dtime
 from pathlib import Path
 from unittest import mock
-from zoneinfo import ZoneInfo
 
 import httpx
 from django.conf import settings
@@ -49,7 +46,6 @@ from .error_mail import (
     DAY_SECONDS,
     MAX_PER_DAY,
     MAX_PER_WINDOW,
-    MESSAGE_FROM,
     MESSAGE_LIMIT,
     ThrottledAdminEmailHandler,
     short_message,
@@ -832,7 +828,7 @@ class DailyCapThroughLoggerTest(_ErrorMailCase):
         self.assertEqual(len(mail.outbox), MAX_PER_DAY + 1)
 
 
-# ---- 운영 로그(표준 오류)에 요청 값이 실리지 않는다 ----------------------------------
+# ---- 운영 로그(표준 오류)에는 오류 메시지 말고 요청 값이 실리지 않는다 ------------------
 
 
 class ExplodingBackend(BaseEmailBackend):
@@ -851,34 +847,18 @@ QUERY_MARK = mark("query")
 RAW_NUMBER = "8675309"
 
 
-@override_settings(**PRODUCTION_LIKE)
-class StderrCarriesNoValuesTest(_ErrorMailCase):
-    """표준 오류 한 줄과 호출 경로에는 종류·방식·가린 주소·코드 줄만 남는다.
+class _StderrCapture:
+    """운영 로그(표준 오류)를 잡아 요청 값이 실렸는지 보는 도우미.
 
     소스 줄에 글자로 박힌 문자열은 코드라 실려도 된다. 여기서 넣는 값은 모두 요청으로
-    들어와 변수로 흐른다(boom_echo).
-
-    처리방침 v3 시행일(MESSAGE_FROM) 전의 모습이다. 시행일부터는 오류 메시지가 그 줄에
-    붙어 boom_echo 가 메시지에 담은 값이 실린다(tests_error_mail.py 가 본다). 날짜를
-    고정하지 않으면 이 테스트들이 시행일 아침에 저절로 빨개진다.
+    들어와 변수로 흐른다(boom_echo). boom_echo 는 주소 조각과 쿼리의 이메일을 오류
+    메시지에 담아서, 그 둘은 "[서버 오류]" 줄의 메시지로 딱 한 번만 실린다. 주소에서는
+    가려지고 호출 경로나 다른 줄로는 새지 않는다. VALUES 는 메시지에 담지 않는 값이라
+    로그 어디에도, 메일에도 없어야 한다. 예외는 메시지에 담는 시험뿐이다. RAW_NUMBER 는
+    주소 조각으로 보낼 때, PII_EMAIL 은 /boom-chained/·/boom-loud/ 의 메시지로 실린다.
     """
 
-    def setUp(self):
-        super().setUp()
-        before = mock.patch("apps.accounts.error_mail.MESSAGE_FROM", date.max)
-        before.start()
-        self.addCleanup(before.stop)
-
-    VALUES = (
-        PII_SEGMENT,
-        PII_QUERY_EMAIL,
-        QUERY_MARK,
-        HEADER_MARK,
-        COOKIE_MARK,
-        BODY_MARK,
-        PII_EMAIL,
-        RAW_NUMBER,
-    )
+    VALUES = (QUERY_MARK, HEADER_MARK, COOKIE_MARK, BODY_MARK, PII_EMAIL, RAW_NUMBER)
 
     def run_and_capture(self, fn) -> str:
         with mock.patch("sys.stderr", new_callable=io.StringIO) as err:
@@ -888,6 +868,9 @@ class StderrCarriesNoValuesTest(_ErrorMailCase):
     def assert_no_values(self, log: str) -> None:
         for value in self.VALUES:
             self.assertNotIn(value, log)
+
+    def mail_text(self) -> str:
+        return "\n".join(m.subject + "\n" + m.body for m in mail.outbox)
 
     def echo_post(self):
         self.client.cookies["sessionid"] = COOKIE_MARK
@@ -899,36 +882,66 @@ class StderrCarriesNoValuesTest(_ErrorMailCase):
         )
         self.assertEqual(res.status_code, 500)
 
-    def test_query_body_header_cookie_and_message_not_in_stderr(self):
+
+@override_settings(**PRODUCTION_LIKE)
+class StderrCarriesOnlyMessageTest(_StderrCapture, _ErrorMailCase):
+    """표준 오류 한 줄과 호출 경로에는 종류·방식·가린 주소·코드 줄과 오류 메시지만 남는다."""
+
+    def test_query_body_header_cookie_not_in_stderr(self):
+        # boom_echo 가 메시지에 담은 두 값만 실리고, 메일에는 없다.
         log = self.run_and_capture(self.echo_post)
-        self.assertIn("[서버 오류] RuntimeError POST /boom-echo/:id/", log)
+        self.assertEqual(
+            server_lines(log),
+            [f"[서버 오류] RuntimeError POST /boom-echo/:id/ - {PII_SEGMENT} {PII_QUERY_EMAIL}"],
+        )
         self.assertIn("tests_error_mail_dynamic.py", log)
         self.assert_no_values(log)
+        # 메시지 꼬리 말고는 어디에도 없다. 메일이 실패하는 길(EmitFailureTest)에서
+        # 처리기가 기록의 인자(가리지 않은 주소)를 따로 찍으면 여기서 잡힌다.
+        self.assertEqual(log.count(PII_SEGMENT), 1)
+        self.assertEqual(log.count(PII_QUERY_EMAIL), 1)
+        self.assertNotIn(PII_SEGMENT, self.mail_text())
+        self.assertNotIn(PII_QUERY_EMAIL, self.mail_text())
 
     def test_made_up_method_is_hidden_in_stderr(self):
+        # 주소 조각(숫자)은 주소에서는 가려지고, boom_echo 가 담은 메시지로만 실린다.
         log = self.run_and_capture(
             lambda: self.client.generic("KIM-CHEOLSU", f"/boom-echo/{RAW_NUMBER}/")
         )
-        self.assertIn("[서버 오류] RuntimeError 기타 /boom-echo/:id/", log)
+        self.assertEqual(
+            server_lines(log), [f"[서버 오류] RuntimeError 기타 /boom-echo/:id/ - {RAW_NUMBER}"]
+        )
+        self.assertEqual(log.count(RAW_NUMBER), 1)
         self.assertNotIn("KIM-CHEOLSU", log)
-        self.assert_no_values(log)
 
-    def test_chained_cause_note_and_loud_str_not_in_stderr(self):
+    def test_chained_cause_and_note_not_in_stderr(self):
+        # 메시지(str)는 실리지만 원인 예외(KeyError)·메모·repr 은 안 실린다.
         def go():
             self.client.get("/boom-chained/")
             self.client.get("/boom-loud/")
 
         log = self.run_and_capture(go)
-        self.assertEqual(log.count("[서버 오류]"), 2)
-        self.assert_no_values(log)
+        self.assertEqual(
+            server_lines(log),
+            [
+                f"[서버 오류] ValueError GET /boom-chained/ - 이미 있는 이메일: {PII_EMAIL}",
+                f"[서버 오류] LoudError GET /boom-loud/ - str {PII_EMAIL}",
+            ],
+        )
+        self.assertEqual(log.count(PII_EMAIL), 2)
+        self.assertNotIn("memo", log)
+        self.assertNotIn("repr", log)
+        self.assertNotIn("KeyError", log)
 
     def test_newline_in_path_cannot_forge_a_log_line(self):
         log = self.run_and_capture(lambda: self.client.get("/boom-echo/a%0A[서버 오류] 가짜/"))
-        self.assertEqual(log.count("[서버 오류]"), 1)
+        self.assertEqual(
+            server_lines(log), ["[서버 오류] RuntimeError GET /boom-echo/:id/ - a [서버 오류] 가짜"]
+        )
 
 
 @override_settings(**PRODUCTION_LIKE, EMAIL_BACKEND=f"{__name__}.ExplodingBackend")
-class EmitFailureTest(StderrCarriesNoValuesTest):
+class EmitFailureTest(StderrCarriesOnlyMessageTest):
     """메일 백엔드가 터져도 응답은 500 이고, 메일은 한 번만 부르고, 값은 로그에 안 샌다.
 
     처리기 안 예외가 밖으로 새면 Django 가 그것을 새 500 으로 다시 기록해 메일을 또
@@ -969,24 +982,12 @@ class GmailRuntimeErrorCallsOnceTest(_ErrorMailCase):
         self.assertEqual(FakeClient.calls, 1)
 
 
-# ---- 시행일(MESSAGE_FROM)부터 운영 로그에 붙는 오류 메시지 ---------------------------------
-#
-# 날짜 문을 지울 때(error_mail.py 의 ponytail 주석) MessageEffectiveDateKstTest 와
-# MailNeverCarriesMessageTest 의 시행일 전날 경우도 같이 지운다. 나머지는 "메시지가 붙은
-# 뒤" 의 모습이라 그대로 둔다.
+# ---- 운영 로그에 붙는 오류 메시지 ----------------------------------------------------
 
 MESSAGE_MARK = mark("message")
 CAUSE_MARK = mark("cause")
 NOTE_MARK = mark("note")
 SUB_MARK = mark("sub-exception")
-
-
-def messages_on():
-    return mock.patch("apps.accounts.error_mail.MESSAGE_FROM", date.min)
-
-
-def on_day(day: date):
-    return mock.patch("apps.accounts.error_mail.timezone.localdate", return_value=day)
 
 
 def boom_message(request, n):
@@ -1044,33 +1045,8 @@ def exc_record(exc: BaseException) -> logging.LogRecord:
     )
 
 
-class MessageEffectiveDateKstTest(SimpleTestCase):
-    """시행일 경계는 한국 시간 자정이다. timezone.now 를 UTC 시각으로 고정해 본다.
-
-    localdate 를 통째로 바꾸면 TIME_ZONE 이 UTC 로 바뀌거나 비교가 UTC 날짜로 바뀌어도
-    모른다. 여기서는 실제 변환(Asia/Seoul)을 거친다.
-    """
-
-    def message_at(self, moment: datetime) -> str:
-        with mock.patch("django.utils.timezone.now", return_value=moment.astimezone(UTC)):
-            return short_message(exc_record(RuntimeError("m")))
-
-    def test_off_one_second_before_kst_midnight_and_on_from_midnight(self):
-        midnight = datetime.combine(MESSAGE_FROM, dtime(0), tzinfo=ZoneInfo("Asia/Seoul"))
-        # UTC 로는 전날 15시다. UTC 날짜로 비교하면 9시간 늦게 켜진다.
-        self.assertEqual(self.message_at(midnight - timedelta(seconds=1)), "")
-        self.assertEqual(self.message_at(midnight), "m")
-        self.assertEqual(self.message_at(midnight + timedelta(hours=9)), "m")
-        self.assertEqual(self.message_at(midnight + timedelta(days=400)), "m")
-
-
 class ShortMessageAbuseTest(SimpleTestCase):
-    """메시지를 한 줄로 펴고 자르는 것의 경계. 시행일 뒤로 고정한다."""
-
-    def setUp(self):
-        patcher = messages_on()
-        patcher.start()
-        self.addCleanup(patcher.stop)
+    """메시지를 한 줄로 펴고 자르는 것의 경계."""
 
     def short(self, exc: BaseException) -> str:
         return short_message(exc_record(exc))
@@ -1132,70 +1108,8 @@ class ShortMessageAbuseTest(SimpleTestCase):
 
 
 @override_settings(**PRODUCTION_LIKE)
-class MessageInLogNotElsewhereTest(StderrCarriesNoValuesTest):
-    """시행일 뒤: 운영 로그 줄에는 메시지만 더 붙고, 요청의 다른 값과 메일에는 없다.
-
-    StderrCarriesNoValuesTest 의 시험이 상속돼 시행일 뒤로 한 번 더 돈다. boom_echo 는
-    주소 조각과 쿼리의 이메일을 메시지에 담으므로, 그 둘을 보는 시험만 여기서 덮어 쓴다.
-    """
-
-    VALUES = (QUERY_MARK, HEADER_MARK, COOKIE_MARK, BODY_MARK, PII_EMAIL, RAW_NUMBER)
-
-    def setUp(self):
-        super().setUp()
-        # 부모 setUp 이 MESSAGE_FROM 을 date.max 로 둔 위에 다시 덮는다.
-        patcher = messages_on()
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def mail_text(self) -> str:
-        return "\n".join(m.subject + "\n" + m.body for m in mail.outbox)
-
-    def test_query_body_header_cookie_and_message_not_in_stderr(self):
-        # 시행일 뒤에는 boom_echo 가 메시지에 담은 두 값만 실리고, 메일에는 없다.
-        log = self.run_and_capture(self.echo_post)
-        self.assertEqual(
-            server_lines(log),
-            [f"[서버 오류] RuntimeError POST /boom-echo/:id/ - {PII_SEGMENT} {PII_QUERY_EMAIL}"],
-        )
-        self.assert_no_values(log)
-        self.assertNotIn(PII_SEGMENT, self.mail_text())
-        self.assertNotIn(PII_QUERY_EMAIL, self.mail_text())
-
-    def test_made_up_method_is_hidden_in_stderr(self):
-        # 주소 조각(숫자)은 주소에서는 가려지고, boom_echo 가 담은 메시지로만 실린다.
-        log = self.run_and_capture(
-            lambda: self.client.generic("KIM-CHEOLSU", f"/boom-echo/{RAW_NUMBER}/")
-        )
-        self.assertEqual(
-            server_lines(log), [f"[서버 오류] RuntimeError 기타 /boom-echo/:id/ - {RAW_NUMBER}"]
-        )
-        self.assertNotIn("KIM-CHEOLSU", log)
-
-    def test_chained_cause_note_and_loud_str_not_in_stderr(self):
-        # 메시지(str)는 실리지만 원인 예외(KeyError)·메모·repr 은 안 실린다.
-        def go():
-            self.client.get("/boom-chained/")
-            self.client.get("/boom-loud/")
-
-        log = self.run_and_capture(go)
-        self.assertEqual(
-            server_lines(log),
-            [
-                f"[서버 오류] ValueError GET /boom-chained/ - 이미 있는 이메일: {PII_EMAIL}",
-                f"[서버 오류] LoudError GET /boom-loud/ - str {PII_EMAIL}",
-            ],
-        )
-        self.assertEqual(log.count(PII_EMAIL), 2)
-        self.assertNotIn("memo", log)
-        self.assertNotIn("repr", log)
-        self.assertNotIn("KeyError", log)
-
-    def test_newline_in_path_cannot_forge_a_log_line(self):
-        log = self.run_and_capture(lambda: self.client.get("/boom-echo/a%0A[서버 오류] 가짜/"))
-        self.assertEqual(
-            server_lines(log), ["[서버 오류] RuntimeError GET /boom-echo/:id/ - a [서버 오류] 가짜"]
-        )
+class MessageInLogNotElsewhereTest(_StderrCapture, _ErrorMailCase):
+    """운영 로그 줄에는 메시지만 더 붙고, 요청의 다른 값과 메일에는 없다."""
 
     def test_message_is_the_only_new_value_in_the_log(self):
         def go():
@@ -1291,35 +1205,26 @@ class MessageInLogNotElsewhereTest(StderrCarriesNoValuesTest):
 
 @override_settings(**PRODUCTION_LIKE)
 class MailNeverCarriesMessageTest(_ErrorMailCase):
-    """알림 메일에는 시행일 전날·당일·다음 날 모두 메시지가 없다. 로그는 당일부터 붙는다."""
+    """알림 메일에는 메시지가 없다. 운영 로그 줄에는 붙는다."""
 
-    def test_mail_has_no_message_on_any_day(self):
-        cases = (
-            (MESSAGE_FROM - timedelta(days=1), False),
-            (MESSAGE_FROM, True),
-            (MESSAGE_FROM + timedelta(days=1), True),
-        )
-        for day, logged in cases:
-            with self.subTest(day=day):
-                reset_counts()
-                mail.outbox.clear()
-                with on_day(day), mock.patch("sys.stderr", new_callable=io.StringIO) as err:
-                    res = self.client.get("/boom-message/3/")
-                self.assertEqual(res.status_code, 500)
-                self.assertEqual(len(mail.outbox), 1)
-                sent = mail.outbox[0]
-                self.assertNotIn(MESSAGE_MARK, sent.subject + sent.body)
-                self.assertEqual(sent.subject, "[DeVoca 오류] RuntimeError GET /boom-message/:id/")
-                self.assertEqual(MESSAGE_MARK in err.getvalue(), logged)
+    def test_mail_has_no_message(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+            res = self.client.get("/boom-message/3/")
+        self.assertEqual(res.status_code, 500)
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertNotIn(MESSAGE_MARK, sent.subject + sent.body)
+        self.assertEqual(sent.subject, "[DeVoca 오류] RuntimeError GET /boom-message/:id/")
+        self.assertIn(MESSAGE_MARK, err.getvalue())
 
 
 @override_settings(**PRODUCTION_LIKE, EMAIL_BACKEND=f"{__name__}.ExplodingBackend")
-class EmitFailureAfterEffectiveTest(_ErrorMailCase):
-    """시행일 뒤에 메일 백엔드가 터져도 실패 표시는 종류와 파일:줄 한 줄뿐이다."""
+class EmitFailureWithMessageTest(_ErrorMailCase):
+    """메시지가 있는 오류로 메일 백엔드가 터져도 실패 표시는 종류와 파일:줄 한 줄뿐이다."""
 
     def test_failure_line_is_one_line_without_any_message(self):
         ExplodingBackend.calls = 0
-        with messages_on(), mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as err:
             self.assertEqual(self.client.get("/boom-message/1/").status_code, 500)
         log = err.getvalue()
         self.assertEqual(ExplodingBackend.calls, 1)

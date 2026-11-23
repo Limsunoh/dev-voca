@@ -8,7 +8,7 @@ import io
 import os
 import unicodedata
 import uuid
-from datetime import date, timedelta
+from datetime import timedelta
 from importlib import import_module
 from unittest import mock
 
@@ -1085,11 +1085,11 @@ class ThrottleCacheTableTest(TransactionTestCase):
         이 테스트만으로는 "이메일이 없어서" 와 "요청 제한이 없어서" 를
         구분하지 못한다. 제한이 붙어 있다는 것은 ThrottleTest 가 본다.
 
-        접속 IP 제한(LoginIpThrottle)은 날짜를 지나면 이메일과 상관없이 캐시를
-        친다. 여기서 보는 것은 이메일 제한이라 그것은 꺼 둔다.
+        접속 IP 제한(LoginIpThrottle)은 이메일과 상관없이 캐시를 친다. 여기서
+        보는 것은 이메일 제한이라 그것은 꺼 둔다(키가 None 이면 세지 않는다).
         """
         self._drop_table()
-        patcher = mock.patch.object(throttles, "IP_COUNT_FROM", date.max)
+        patcher = mock.patch.object(throttles.LoginIpThrottle, "get_cache_key", return_value=None)
         patcher.start()
         self.addCleanup(patcher.stop)
 

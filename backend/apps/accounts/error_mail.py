@@ -27,7 +27,7 @@ Django 는 ADMINS 가 있으면 500 마다 AdminEmailHandler 로 메일을 보�
 추적 내용을 어디에도 쓰지 않아서, 이것이 없으면 걸러진 오류나 운영 데이터에서만 나는
 오류는 흔적이 없다.
 
-그 한 줄에는 처리방침 v3 시행일(MESSAGE_FROM)부터 오류 메시지도 싣는다. 종류와 자리만
+그 한 줄에는 오류 메시지도 싣는다(처리방침 v3 시행일인 2026-11-19 부터). 종류와 자리만
 으로는 "이미 있는 이메일" 인지 "DB 연결이 끊겼다" 인지 몰라 로컬에서 같은 요청을 다시
 만들어야 했다. 메시지에 이메일이 섞일 수 있다는 것은 처리방침 2·3·4절에 적었다. 메일에는
 계속 넣지 않는다. 메일은 운영자 Gmail 보낸편지함에 30일 남아, 처리방침이 운영 로그에
@@ -52,7 +52,6 @@ import sys
 import threading
 import time
 import traceback
-from datetime import date
 from logging import LogRecord
 
 from django.conf import settings
@@ -76,20 +75,6 @@ KEEP_SEGMENT = re.compile(r"[a-z][a-z_-]{0,23}")
 
 # 그대로 쓰는 요청 방식. 요청 방식은 보내는 쪽이 아무 글자나 넣을 수 있다.
 KNOWN_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
-
-# 운영 로그에 오류 메시지를 싣기 시작하는 날(한국 시간). 처리방침 14절이 "바꾸면 시행
-# 7일 전부터 서비스 화면에 알린다" 고 약속해서, 이 기능을 머지한 날(공고일)부터 7일
-# 뒤다. 처리방침 v3 의 시행일이다(legal-pages.test.mts 의 V3_EFFECTIVE 와 견준다).
-# 처리방침 14절은 지금 버전의 바뀐 내용만 적어서 v3 날짜는 문서에 없다.
-# LegalDoc.tsx 의 PRIVACY_CHANGE.effective 는 최신 버전의 시행일이다. 그쪽에 맞춰
-# 이 날짜를 옮기지 않는다.
-# ponytail: 날짜로 켜는 문이다. 시행일이 지나면 이 상수와 short_message 의 날짜 비교를
-# 지운다. 그때 테스트의 날짜 고정(tests_error_mail.py 의 messages_on/off,
-# tests_error_mail_dynamic.py 의 StderrCarriesNoValuesTest.setUp 과 MESSAGE_FROM 을
-# 쓰는 아래쪽 절들), legal-pages.test.mts 의 MESSAGE_FROM 대조와 V3_EFFECTIVE·V3_GATES_LIVE,
-# LegalDoc.tsx 의 PRIVACY_CHANGE 주석 중 "서버의 날짜 문" 문단도 같이 지운다.
-# `grep -rn MESSAGE_FROM` 로 찾는다.
-MESSAGE_FROM = date(2026, 11, 19)
 
 # 운영 로그 한 줄에 싣는 오류 메시지의 최대 글자 수. SQL 전체가 든 DB 오류처럼 긴
 # 메시지가 Railway 로그 화면을 덮지 않게 자른다.
@@ -163,15 +148,13 @@ def request_method(record: LogRecord) -> str:
 def short_message(record: LogRecord) -> str:
     """운영 로그에 싣는 오류 메시지. 한 줄로 펴고 MESSAGE_LIMIT 자에서 자른다.
 
-    시행일 전이면 빈 글자다. 줄바꿈과 제어 문자를 빈칸으로 바꾸는 것은 길이 때문만이
-    아니다. 메시지에 요청 값이 들어오면 줄바꿈 뒤에 "[서버 오류] ..." 를 이어 가짜 줄을
-    만들거나, 터미널 색·글자 방향을 바꾸는 문자로 로그 화면을 어지럽힐 수 있다.
+    줄바꿈과 제어 문자를 빈칸으로 바꾸는 것은 길이 때문만이 아니다. 메시지에 요청 값이
+    들어오면 줄바꿈 뒤에 "[서버 오류] ..." 를 이어 가짜 줄을 만들거나, 터미널 색·글자
+    방향을 바꾸는 문자로 로그 화면을 어지럽힐 수 있다.
 
     이 메시지는 처리방침에 적은 기록이라 7일 남는다. 예외 메시지에 요청 본문을 통째로
     넣지 않는다. 넣으면 비밀번호가 그대로 남는다.
     """
-    if timezone.localdate() < MESSAGE_FROM:
-        return ""
     exc = record.exc_info[1] if record.exc_info else None
     if exc is None:
         return ""
@@ -259,7 +242,7 @@ class ThrottledAdminEmailHandler(AdminEmailHandler):
         #
         # 로깅 처리기의 관례인 self.handleError 는 쓰지 않는다. 그것은 이 예외에 이어진
         # 원래 요청 예외의 메시지와, 가리지 않은 원래 주소(기록의 인자)를 표준 오류에
-        # 그대로 찍는다. 주소 가리기, 메시지 길이 상한, 시행일 문을 모두 건너뛴다.
+        # 그대로 찍는다. 주소 가리기, 한 줄로 펴기, 메시지 길이 상한을 모두 건너뛴다.
         # 그래서 예외 종류 이름 한 줄만 남긴다.
         try:
             self._emit(record)
@@ -284,7 +267,7 @@ class ThrottledAdminEmailHandler(AdminEmailHandler):
             return
         method = request_method(record)
         path = masked_path(record)
-        # 운영 로그에는 걸러지는 것까지 매번 남긴다. 시행일부터는 오류 메시지도 싣는다.
+        # 운영 로그에는 걸러지는 것까지 매번 남긴다. 오류 메시지도 싣는다.
         line = f"[서버 오류] {exception_name(record)} {method} {path}"
         message = short_message(record)
         if message:
