@@ -151,7 +151,7 @@ describe("묶음 순서가 실린 상세", () => {
     });
   });
 
-  it("두 개짜리 묶음(5분 첫 묶음)도 그 안에서 넘긴다", async () => {
+  it("두 개짜리 묶음도 그 안에서 넘긴다", async () => {
     const nav = todayNav(await render(939, { today: "57-939" }));
     assert.equal(position(nav!), "2 / 2");
     assert.deepEqual(hrefs(nav!), [routes.todayWord(57, [57, 939])]);
