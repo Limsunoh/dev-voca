@@ -7,7 +7,7 @@
  *   - "보여지는 이름" 은 "닉네임", "프로필 그림" 은 "프로필 사진" 이다. 옛 말이 화면 글자에도,
  *     속성(aria-label·title·alt·placeholder)에도 남지 않는다.
  *   - 입력칸은 글자만 바뀌었다. name="display_name", maxLength 12 는 그대로다.
- *   - 처리방침 14절은 공고일·시행일과 이번 버전의 바뀐 내용 세 항목뿐이다. 앞 버전 이력은
+ *   - 처리방침 14절은 공고일·시행일과 이번 버전의 바뀐 내용 네 항목뿐이다. 앞 버전 이력은
  *     "이전 버전" 줄까지 모두 지웠다(2026-11-22 사용자 결정). v2·v3·v4 가 다시 나오지 않는다.
  *   - 14절 밖의 본문에 남는 날짜는 버전 줄, 3절 백업 시작일, 7절 v5 공고일 셋뿐이다.
  *   - 처리방침 3·4절과 계정 삭제 안내 4절의 기간 숫자가 서로 맞다.
@@ -191,8 +191,8 @@ describe("입력칸은 글자만 바뀌었다", () => {
 describe("처리방침 14절", V5_ONLY, () => {
   const lis = items(changes);
 
-  it("공고일·시행일, 바뀐 내용 세 항목 - 다섯 항목뿐이다", () => {
-    assert.equal(lis.length, 5, lis.join("\n"));
+  it("공고일·시행일, 바뀐 내용 네 항목 - 여섯 항목뿐이다", () => {
+    assert.equal(lis.length, 6, lis.join("\n"));
     assert.equal(lis[0], "공고일: 2026년 11월 21일");
     assert.equal(lis[1], "시행일: 2026년 11월 28일");
     assert.match(lis[2], /^바뀐 내용: /);
@@ -205,11 +205,13 @@ describe("처리방침 14절", V5_ONLY, () => {
     }
   });
 
-  it("시행 전부터 하고 있는 세 가지의 시작일은 남는다", () => {
+  it("시행 전부터 하고 있는 네 가지의 시작일은 남는다", () => {
     assert.match(changesText, /Sentry 로 보내기는 2026년 11월 20일부터 하고 있습니다/);
     assert.match(changesText, /백업은 시행일을 기다리지 않고 2026년 11월 21일부터 하고 있습니다/);
     assert.match(changesText, /구글 가입·로그인 시도도[^.]*IP 주소의 해시값으로/);
     assert.match(changesText, /시행일을 기다리지 않고 2026년 11월 22일부터 합니다/);
+    assert.match(changesText, /30일 동안 이용하지 않으면 로그인이 끝납니다/);
+    assert.match(changesText, /시행일을 기다리지 않고 2026년 11월 23일부터 합니다/);
   });
 });
 
