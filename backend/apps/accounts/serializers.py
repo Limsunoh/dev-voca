@@ -32,6 +32,28 @@ from .models import (
 User = get_user_model()
 
 
+def display_name_field() -> serializers.CharField:
+    """닉네임 칸. 가입과 내정보 수정이 같이 쓴다.
+
+    모델에서 칸을 만들게 두지 않는다. 그러면 모델의 max_length(12)가 다듬기 전 값으로
+    먼저 막아, 아래 validate_display_name 의 "닉네임은 12자까지 쓸 수 있습니다." 대신
+    DRF 기본 문구("이 필드의 글자 수가 12 이하인지 확인하세요.")가 나가고, 보이지 않는
+    글자가 섞인 이름은 다듬으면 12자인데도 막힌다. 길이는 다듬은 뒤에 거기서 센다.
+
+    비어도 받는다(allow_blank). 막는 것은 validate_display_name 이 "닉네임을 입력해주세요."
+    로 한다. 여기서 막으면 DRF 기본 문구가 나간다.
+
+    원문 64자는 넉넉한 바깥 상한이다. 없으면 본문 상한(수 MB)까지 들어온 값을 다듬느라
+    글자마다 도는 루프를 끝까지 돈다. 넘으면 문구는 12자 그대로다.
+    """
+    return serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=64,
+        error_messages={"max_length": f"닉네임은 {DISPLAY_NAME_MAX}자까지 쓸 수 있습니다."},
+    )
+
+
 def validate_display_name(value: str, *, instance=None) -> str:
     """이름을 다듬고, 쓸 수 없는 이름과 이미 쓰는 이름을 막는다.
 
@@ -112,6 +134,8 @@ class UserSerializer(serializers.ModelSerializer):
     # 바이트가 아니라 주소다. 사진 자체는 별도 엔드포인트가 내려준다
     # (이유는 models.py 의 avatar_photo_url 에 적어뒀다).
     uploaded_photo = serializers.SerializerMethodField()
+
+    display_name = display_name_field()
 
     class Meta:
         model = User
@@ -213,6 +237,7 @@ class SignUpSerializer(serializers.ModelSerializer):
     age_confirmed = serializers.BooleanField(
         write_only=True, error_messages=_consent_errors(AGE_REQUIRED)
     )
+    display_name = display_name_field()
 
     class Meta:
         model = User
