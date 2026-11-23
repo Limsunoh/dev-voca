@@ -62,8 +62,10 @@ export function buildCsp(
     // (순위표, 내 정보). 올린 사진은 우리 주소(/api/accounts/photo/)로 중계한다.
     // data: 는 구글 로그인 스크립트가 버튼의 로고 그라데이션을 그릴 때 쓴다. 없으면 가끔
     // "Failed to load Google logo gradient. Add data: to ... img-src" 를 남긴다.
+    // blob: 은 내정보의 사진 오려 내기 창(PhotoCropper)이 고른 사진을 보여 줄 때 쓴다. 이
+    // 기기에서 고른 파일을 그 자리에서 만든 주소라 밖에서 들어오는 것이 아니다.
     // 글꼴은 default-src 를 따른다. 빌드 때 받아 우리 주소로 내보낸다(next/font).
-    "img-src 'self' data: https://*.googleusercontent.com",
+    "img-src 'self' data: blob: https://*.googleusercontent.com",
     `connect-src 'self' ${GIS}${sentry ? ` ${sentry}` : ""}`,
     `frame-src ${GIS}`,
     // strict-dynamic 이면 script-src 의 'self' 가 무시돼, 따로 적지 않으면 sw.js 등록이 막힌다.

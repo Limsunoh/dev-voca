@@ -62,12 +62,14 @@ describe("buildCsp", () => {
     assert.deepEqual(d["worker-src"], ["'self'"]);
   });
 
-  it("그림은 우리 주소, data:, 구글 프로필 사진만 받는다", () => {
+  it("그림은 우리 주소, data:, blob:, 구글 프로필 사진만 받는다", () => {
     // 순위표·내 정보가 구글이 준 사진 주소(lh3.googleusercontent.com)를 그대로 그린다.
     // 빠지면 구글로 가입한 사람의 사진이 전부 빈칸이 된다. data: 는 구글 로그인 버튼 로고.
+    // blob: 이 빠지면 4MB 넘는 사진의 오려 내기 창이 "이 사진은 열 수 없습니다" 로 닫힌다.
     assert.deepEqual(parse(buildCsp("n"))["img-src"], [
       "'self'",
       "data:",
+      "blob:",
       "https://*.googleusercontent.com",
     ]);
   });

@@ -1027,15 +1027,18 @@ class BlankLookingNameRouteTest(TestCase):
                 self.assertEqual(res.status_code, 201)
                 self.assertEqual(self.name_of(email), name)
 
-    def test_가입_12자에_빈칸_글자를_붙이면_길이로_막힌다(self):
-        """필드의 글자 수 검사가 다듬기 전 값을 본다. 500 없이 계정도 안 생긴다."""
-        for label, char in BLANK_LOOKING.items():
+    def test_가입_12자에_빈칸_글자를_붙여도_다듬은_뒤_12자면_가입된다(self):
+        """길이는 다듬은 뒤에 센다(serializers 의 display_name_field). 예전에는 다듬기 전
+        값으로 세어 막혔다."""
+        for index, (label, char) in enumerate(BLANK_LOOKING.items()):
             with self.subTest(label):
-                res = self.signup("가" * DISPLAY_NAME_MAX + char)
+                email = f"b{index}@example.com"
+                name = chr(ord("가") + index) * DISPLAY_NAME_MAX
 
-                self.assertEqual(res.status_code, 400)
-                self.assertIn("display_name", res.json())
-                self.assertFalse(User.objects.filter(email="a@example.com").exists())
+                res = self.signup(f"{name}{char}", email)
+
+                self.assertEqual(res.status_code, 201, res.content)
+                self.assertEqual(self.name_of(email), name)
 
     def test_구글_12자에서_자른_자리의_빈칸_글자도_남지_않는다(self):
         for index, (label, char) in enumerate(BLANK_LOOKING.items()):

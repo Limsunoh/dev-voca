@@ -76,7 +76,8 @@ function useActionState<S>(_action: unknown, init: S) {
   // 진짜 React 는 처음 것 하나를 계속 돌려준다. 그대로 돌려주면 매번 "새 결과"
   // 로 보여 렌더가 끝나지 않는다.
   if (!(i in actionStates)) actionStates[i] = init;
-  return [actionStates[i] as S, () => {}] as const;
+  // 세 번째는 진짜 React 처럼 "처리 중" 이다(ProfileForm 이 오려 낸 사진을 올릴 때 본다).
+  return [actionStates[i] as S, () => {}, false] as const;
 }
 
 mock.module("react", {
