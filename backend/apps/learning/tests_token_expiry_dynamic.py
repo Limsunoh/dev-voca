@@ -280,5 +280,7 @@ class PreviewWritesNothingTest(RealClockBase):
 
         self.assertEqual(writes_in(captured), [])
         self.assertIn("로그인 토큰 1개", output)
-        self.assertEqual(self.me(expired.key), 200)
+        # 지우지 않았는지는 행으로 본다. 30일이 지난 토큰은 지우기 전에도 인증에서 거절한다.
+        self.assertTrue(self.alive(expired))
+        self.assertEqual(self.me(expired.key), 401)
         self.assertEqual(self.me(fresh.key), 200)

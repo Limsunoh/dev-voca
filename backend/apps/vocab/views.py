@@ -58,7 +58,7 @@ from .talk import (
     unsign,
 )
 from .talk import grade as grade_heard
-from .throttles import TalkGradeThrottle, TalkQuestionThrottle
+from .throttles import PracticeGradeThrottle, TalkGradeThrottle, TalkQuestionThrottle
 
 
 def can_review(user) -> bool:
@@ -126,6 +126,20 @@ class ReadableOrdering(filters.OrderingFilter):
         return queryset.order_by(*keys)
 
 
+class CappedSearchFilter(filters.SearchFilter):
+    """검색어를 앞에서부터 MAX_TERMS 낱말까지만 쓴다.
+
+    SearchFilter 는 낱말마다 검색 칸 넷을 LIKE 로 묻고 순위 계산(_rank_by_search)도
+    낱말마다 붙인다. 낱말 수에 상한이 없으면 `?search=a b c ...` 처럼 수천 낱말을 보내
+    쿼리 하나를 10초 상한까지 돌릴 수 있었다. 사람이 찾는 말은 몇 낱말이다.
+    """
+
+    MAX_TERMS = 10
+
+    def get_search_terms(self, request) -> list[str]:
+        return super().get_search_terms(request)[: self.MAX_TERMS]
+
+
 class LearningItemViewSet(viewsets.ModelViewSet):
     """학습 콘텐츠(단어/문장) 공용 베이스.
 
@@ -143,7 +157,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
 
     permission_classes = [IsAuthenticatedOrReadOnly]
     alias_field: str | None = None
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, ReadableOrdering]
+    filter_backends = [DjangoFilterBackend, CappedSearchFilter, ReadableOrdering]
     # 번호만 정렬하고 뒤쪽 절반은 거꾸로 읽으며 개수를 기억하는 쪽 나누기(pagination.py).
     pagination_class = ContentPagination
     # is_exam·exam_subject 로 정처기 범위를 좁힌다.
@@ -210,7 +224,7 @@ class LearningItemViewSet(viewsets.ModelViewSet):
         if self.request.query_params.get("ordering"):
             return queryset
 
-        terms = [t for t in filters.SearchFilter().get_search_terms(self.request) if t]
+        terms = [t for t in CappedSearchFilter().get_search_terms(self.request) if t]
         if not terms:
             return queryset
 
@@ -458,7 +472,7 @@ class WordViewSet(LearningItemViewSet):
             }
         )
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], throttle_classes=[PracticeGradeThrottle])
     def grade(self, request: Request) -> Response:
         """고른 보기가 정답인지 알려주고 해설을 준다.
 
@@ -789,7 +803,7 @@ class SentenceViewSet(LearningItemViewSet):
             }
         )
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], throttle_classes=[PracticeGradeThrottle])
     def grade(self, request: Request) -> Response:
         """고른 보기가 정답인지 알려주고 해설을 준다.
 
