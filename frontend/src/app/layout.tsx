@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Noto_Sans_KR } from "next/font/google";
+import { connection } from "next/server";
 
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TabBar } from "@/components/TabBar";
@@ -55,11 +56,19 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // 모든 화면을 요청 때 그린다. CSP 의 nonce 는 요청마다 바뀌어서(proxy.ts) 빌드 때 미리
+  // 만든 화면에는 붙지 않고, 그러면 그 화면의 스크립트가 전부 막힌다. 대부분의 화면은
+  // 로그인 쿠키를 읽어 원래 요청 때 그렸고, 미리 만들던 것은 처리방침·약관·계정 삭제
+  // 안내와 없는 주소 화면뿐이었다. Next 16 문서는 route segment config 의 dynamic 대신
+  // 이것을 권한다(dynamic 은 cacheComponents 를 켜면 빌드 오류가 난다). 지우면 빌드와
+  // 테스트는 초록인 채 그 화면들만 운영에서 죽는다. proxy.test.mts 가 이 줄을 지킨다.
+  // 화면 파일에 dynamic = "force-static" 을 두면 그 화면에서는 이 줄이 아무 일도 안 한다.
+  await connection();
   return (
     <html
       lang="ko"
