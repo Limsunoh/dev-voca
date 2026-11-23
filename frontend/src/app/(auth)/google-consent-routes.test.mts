@@ -319,7 +319,8 @@ describe("구글 콜백: 어디로 돌아가나", () => {
 
     const res = await back();
 
-    assert.equal(jar.get("devvoca_token"), "t1");
+    // 쿠키 값은 "토큰.발급시각" 이다(lib/token-cookie.ts).
+    assert.match(jar.get("devvoca_token") ?? "", /^t1\.\d+$/);
     assert.equal(res.headers.get("location"), `${ORIGIN}/board`);
     assertAllCleared();
   });

@@ -23,7 +23,7 @@ from django.contrib.auth.models import AbstractBaseUser
 from django.db import IntegrityError, transaction
 from django.http import Http404, HttpRequest, HttpResponse
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import exceptions, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -75,14 +75,17 @@ from .throttles import (
 logger = logging.getLogger(__name__)
 
 
-def _link_login_token(request: Request) -> str:
-    """이메일 변경 링크의 대조값에 섞을 로그인 토큰 값. 신청한 기기의 토큰이다.
+def _link_device(request: Request) -> str:
+    """이메일 변경 링크의 대조값에 섞을 값. 신청한 기기의 로그인(LoginToken.device)이다.
 
     링크는 그 로그인이 살아 있는 동안만 통한다. 그 기기에서 로그아웃하거나,
     비밀번호·이메일을 바꿔 토큰이 모두 지워지면 죽는다. 다른 기기의 로그인·
     로그아웃과는 상관없다. 확인 뷰는 이 계정에 남은 토큰마다 대조값을 만들어
     맞는 것이 있는지 본다(email_change.email_mark). 처리방침이 "로그아웃·비밀번호
     변경을 하면 대기 중인 링크는 무효" 라고 적고 있다.
+
+    토큰 값이 아니라 device 를 쓰는 이유: 토큰은 쓰는 동안 하루마다 바뀐다
+    (LoginToken.renew). 토큰 값에 묶으면 링크를 누르기 전에 토큰이 바뀌어 죽는다.
 
     관리자 화면 세션으로 신청하면 들고 온 토큰이 없다. 그때는 이 계정의 토큰
     하나를 쓰고, 없으면 만든다. 빈 값으로 만든 링크는 토큰이 다 지워진 뒤에
@@ -92,14 +95,14 @@ def _link_login_token(request: Request) -> str:
     직원 계정에만 있는 길이다.
     """
     if isinstance(request.auth, LoginToken):
-        return request.auth.key
+        return request.auth.device
 
     with transaction.atomic():
-        get_user_model().objects.select_for_update().only("pk").get(pk=request.user.pk)
+        LoginToken.lock_member(request.user.pk)
         tokens = LoginToken.objects.filter(user=request.user)
         return (
-            tokens.values_list("key", flat=True).first()
-            or LoginToken.objects.create(user=request.user).key
+            tokens.values_list("device", flat=True).first()
+            or LoginToken.objects.create(user=request.user).device
         )
 
 
@@ -371,10 +374,13 @@ class GoogleLoginView(APIView):
 
 
 class LogoutView(APIView):
-    """로그아웃. 이 요청이 들고 온 토큰만 지운다.
+    """로그아웃. 이 요청이 들고 온 기기의 토큰만 지운다.
 
     쿠키만 지우고 토큰을 남겨두면, 그 사이 토큰이 새어나간 경우 계속
     쓸 수 있다. 서버에서도 무효로 만든다.
+
+    같은 device 를 다 지운다. 이어 가기(LoginToken.renew)로 바뀐 직전 토큰이
+    유예 시간 동안 살아 있어서, 들고 온 토큰만 지우면 그것이 남는다.
 
     계정의 토큰을 다 지우지 않는 이유: 폰에서 로그아웃했다고 PC 까지
     끊기면 안 된다. 다른 기기를 다 끊고 싶으면 비밀번호를 바꾼다.
@@ -387,8 +393,38 @@ class LogoutView(APIView):
 
     def post(self, request: Request) -> Response:
         if isinstance(request.auth, LoginToken):
-            request.auth.delete()
+            LoginToken.end_login(request.user.pk, request.auth.device)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TokenRenewView(APIView):
+    """로그인 이어 가기. 화면 서버(Next 의 proxy)가 하루에 한 번쯤 부른다.
+
+    앱이 이 백엔드를 직접 부르게 되면(CLAUDE.md "Apple 이나 네이티브 앱") 앱도 이것을
+    쓰면 된다. 하루가 안 된 토큰은 그대로 돌려주므로 실행할 때마다 불러도 된다.
+
+    토큰은 발급 30일에 끝난다. 이것이 없으면 매일 쓰는 사람도 로그인하고 30일째에
+    로그아웃된다. 하루가 지난 토큰으로 부르면 새 토큰을 내준다. 판단은
+    LoginToken.renew 에 있다.
+
+    issued_at 은 돌려준 토큰의 발급 시각(초)이다. 화면 서버가 쿠키에 같이 적어 두고
+    다음 이어 가기를 언제 부를지 정한다. 매번 묻지 않으려는 것이다.
+
+    관리자 화면 세션(SessionAuthentication)은 이어 갈 토큰이 없다.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request) -> Response:
+        if not isinstance(request.auth, LoginToken):
+            return Response(
+                {"detail": "토큰으로 로그인한 요청만 이어 갈 수 있습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        token = request.auth.renew()
+        if token is None:
+            raise exceptions.AuthenticationFailed("로그인이 끝났습니다. 다시 로그인해주세요.")
+        return Response({"token": token.key, "issued_at": int(token.created.timestamp())})
 
 
 class PasswordChangeView(APIView):
@@ -428,7 +464,7 @@ class PasswordChangeView(APIView):
         # 이 계정의 토큰을 지금 요청이 들고 온 것까지 전부 지운다.
         # 남겨두고 재사용하면 "다른 기기를 끊었다" 가 성립하지 않는다.
         # 지금 기기는 바로 아래에서 새 토큰을 받는다.
-        LoginToken.objects.filter(user=request.user).delete()
+        LoginToken.end_all(request.user.pk)
         token = LoginToken.objects.create(user=request.user)
 
         return Response(
@@ -558,7 +594,7 @@ class EmailChangeRequestView(FirstThrottleWins, APIView):
             user_id=request.user.pk,
             current_email=request.user.email,
             new_email=new_email,
-            login_token=_link_login_token(request),
+            device=_link_device(request),
         )
 
         # 링크는 화면(Next) 주소로 만든다. 요청 헤더에서 뽑지 않는 이유는
@@ -647,9 +683,9 @@ class EmailChangeConfirmView(APIView):
 
             # 신청 뒤에 주소가 또 바뀌었거나 변경이 한 번 끝났으면 값이 다르다.
             # 그대로 진행하면 나중에 바꾼 주소가 옛 주소로 되돌아간다.
-            # 신청한 기기의 토큰이 남아 있어야 맞는 값이 나온다(_link_login_token).
-            keys = LoginToken.objects.filter(user=user).values_list("key", flat=True)
-            if old_mark not in {email_mark(user.email, key) for key in keys}:
+            # 신청한 기기의 토큰이 남아 있어야 맞는 값이 나온다(_link_device).
+            devices = LoginToken.objects.filter(user=user).values_list("device", flat=True)
+            if old_mark not in {email_mark(user.email, device) for device in devices}:
                 return Response(
                     {"detail": "이미 처리되었거나 만료된 링크입니다."},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -684,7 +720,7 @@ class EmailChangeConfirmView(APIView):
             # 주인이 바뀔 수 있는 사건이라, 옛 주소로 로그인해 있던 세션을
             # 남겨두면 안 된다. 새 토큰을 발급해 돌려주므로, 링크를 누른
             # 기기는 그대로 이어서 쓴다.
-            LoginToken.objects.filter(user=user).delete()
+            LoginToken.end_all(user.pk)
 
         # 지운 뒤에 새 토큰을 낸다. 순서를 바꾸면 방금 낸 토큰까지 지워져
         # 링크를 누른 기기도 끊긴다.

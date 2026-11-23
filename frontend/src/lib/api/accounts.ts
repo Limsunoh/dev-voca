@@ -119,6 +119,42 @@ export function logOut(token: string): Promise<void> {
   return request("/api/accounts/logout/", { method: "POST", token });
 }
 
+// 로그인 이어 가기를 기다리는 시간. 이것이 끝나야 화면을 그리기 시작한다.
+const RENEW_TIMEOUT_MS = 3_000;
+
+/**
+ * 로그인 이어 가기(백엔드 TokenRenewView). proxy 가 하루에 한 번쯤 부른다.
+ *
+ * request() 를 안 쓰는 이유: 쓰기인데도 대기 시간을 짧게 건다. 백엔드가 멈추면 화면이
+ * 그만큼 늦게 뜬다. 끊어도 되는 쓰기다. 백엔드가 새 토큰을 만든 뒤 끊겨도 옛 토큰이
+ * 한 시간 더 통하고, 다음 이동 때 같은 새 토큰을 돌려받는다(LoginToken.renew).
+ *
+ * 토큰이 죽었으면 ApiError(401) 를 던진다. 다른 실패도 던진다.
+ */
+export async function renewToken(
+  token: string,
+): Promise<{ token: string; issued_at: number }> {
+  const res = await fetch(`${apiBase()}/api/accounts/token/renew/`, {
+    method: "POST",
+    headers: { Accept: "application/json", Authorization: `Token ${token}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(RENEW_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    throw new ApiError(`로그인을 이어 가지 못했습니다. (${res.status})`, res.status);
+  }
+  const data = await res.json();
+  // 토큰은 쿠키 값에 그대로 들어간다. 16진수가 아니면 쿠키가 깨질 수 있어 받지 않는다.
+  if (
+    typeof data?.token !== "string" ||
+    !/^[0-9a-f]+$/i.test(data.token) ||
+    !Number.isSafeInteger(data?.issued_at)
+  ) {
+    throw new ApiError("로그인을 이어 가지 못했습니다. (응답 형식)", res.status);
+  }
+  return { token: data.token, issued_at: data.issued_at };
+}
+
 /**
  * 내 정보. 쿠키의 토큰이 아직 쓸 수 있는지 확인하는 데도 쓴다.
  *

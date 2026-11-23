@@ -121,7 +121,7 @@ class TokenPayloadTest(EmailChangeFlowMixin, TestCase):
         """그냥 해시면 흔한 주소를 넣어 보는 것만으로 알아낼 수 있다."""
         mark = json.loads(decoded_payload(self.issued_token()))["o"]
 
-        self.assertEqual(mark, email_mark(OLD, self.token.key))
+        self.assertEqual(mark, email_mark(OLD, self.token.device))
         self.assertRegex(mark, r"^[0-9a-f]{64}$")
         self.assertNotIn(
             mark,
@@ -156,7 +156,7 @@ class EmailMarkTest(SimpleTestCase):
 
     def test_읽을_때_세_값이_나온다(self):
         token = make_token(
-            user_id=7, current_email=OLD, new_email="N@Example.com", login_token=LOGIN
+            user_id=7, current_email=OLD, new_email="N@Example.com", device=LOGIN
         )
 
         self.assertEqual(read_token(token), (7, email_mark(OLD, LOGIN), "n@example.com"))
@@ -224,7 +224,7 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
             user_id=self.user.pk,
             current_email=OLD.upper(),
             new_email=NEW,
-            login_token=self.token.key,
+            device=self.token.device,
         )
 
         self.assertEqual(self.confirm(token).status_code, 200)
@@ -236,7 +236,7 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
         self.assert_rejected(res)
 
     def test_모양이_다른_토큰은_500_없이_거절된다(self):
-        mark = email_mark(OLD, self.token.key)
+        mark = email_mark(OLD, self.token.device)
         pk = self.user.pk
         cases = {
             "키 없음": {},
@@ -264,7 +264,7 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
     def test_토큰을_고치거나_형식이_틀리면_거절된다(self):
         good = self.issued_token()
         other_salt = signing.dumps(
-            {"u": self.user.pk, "o": email_mark(OLD, self.token.key), "n": NEW}, salt="x"
+            {"u": self.user.pk, "o": email_mark(OLD, self.token.device), "n": NEW}, salt="x"
         )
         cases = {
             "서명 변조": good[:-2] + ("aa" if not good.endswith("aa") else "bb"),
@@ -295,7 +295,7 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
         rest = self.issued_token().split(":", 1)[1]
         forged = signing.b64_encode(
             json.dumps(
-                {"u": self.user.pk, "o": email_mark(OLD, self.token.key), "n": THIRD}
+                {"u": self.user.pk, "o": email_mark(OLD, self.token.device), "n": THIRD}
             ).encode()
         ).decode()
 
@@ -345,7 +345,7 @@ class TokenConfirmRaceTest(TransactionTestCase):
             user_id=self.user.pk,
             current_email=OLD,
             new_email=new_email,
-            login_token=self.token.key,
+            device=self.token.device,
         )
 
     def confirm_together(self, *tokens):

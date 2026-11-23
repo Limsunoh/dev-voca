@@ -28,9 +28,9 @@ function matches(path: string, headers?: Record<string, string>): boolean {
 }
 
 describe("proxy", () => {
-  it("요청 머리와 응답 머리에 같은 CSP 를 싣고, 요청마다 nonce 가 바뀐다", () => {
-    const nonceOf = () => {
-      const res = proxy(new NextRequest(`${ORIGIN}/learn/words`));
+  it("요청 머리와 응답 머리에 같은 CSP 를 싣고, 요청마다 nonce 가 바뀐다", async () => {
+    const nonceOf = async () => {
+      const res = await proxy(new NextRequest(`${ORIGIN}/learn/words`));
       const csp = res.headers.get("content-security-policy");
       // NextResponse.next({ request: { headers } }) 는 바꾼 요청 머리를 이 이름으로 넘긴다.
       // Next 내부 이름이라 Next 를 올리면 가장 먼저 깨질 수 있다.
@@ -40,9 +40,9 @@ describe("proxy", () => {
       assert.ok(!csp.includes("'unsafe-eval'"), "운영 정책에 eval 이 열렸다");
       return csp.match(/'nonce-([^']+)'/)?.[1];
     };
-    const first = nonceOf();
+    const first = await nonceOf();
     assert.ok(first);
-    assert.notEqual(first, nonceOf());
+    assert.notEqual(first, await nonceOf());
   });
 
   it("화면 주소는 점이 들어가도 proxy 를 지난다", () => {

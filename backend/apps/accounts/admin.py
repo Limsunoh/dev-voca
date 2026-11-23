@@ -160,6 +160,11 @@ class UserAdmin(BaseUserAdmin):
 class LoginTokenAdmin(admin.ModelAdmin):
     """기기별 로그인 토큰. 지우면 그 기기만 로그아웃된다.
 
+    쓰는 동안 하루마다 새 토큰으로 바뀌어(LoginToken.renew) 한 기기에 행이 여럿일 수
+    있다. "바뀐 시각" 이 찍힌 행은 넘어간 옛 토큰이라 지워도 로그아웃되지 않는다. "받음" 이
+    꺼진 행은 아직 한 번도 안 쓰인 새 토큰이다. 옛 토큰은 발급 30일에 매일 정리가 지운다
+    (그 전에 다시 오면 새어 나간 것으로 보고 그 로그인을 끊는 데 쓴다).
+
     계정 전체를 막으려면 사용자의 "활성" 을 끈다. 토큰을 다 지워도 비밀번호를
     아는 사람은 다시 로그인한다.
 
@@ -167,10 +172,10 @@ class LoginTokenAdmin(admin.ModelAdmin):
     로그인한 것처럼 쓸 수 있다. 새로 만들 이유도 없어서 추가는 막는다.
     """
 
-    list_display = ("user", "created")
+    list_display = ("user", "created", "delivered", "replaced_at")
     search_fields = ("user__email",)
-    fields = ("user", "created")
-    readonly_fields = ("user", "created")
+    fields = ("user", "created", "delivered", "replaced_at")
+    readonly_fields = ("user", "created", "delivered", "replaced_at")
 
     def get_queryset(self, request) -> QuerySet[LoginToken]:
         # 회원 행에서 사진 바이트는 빼고 붙인다(SlimTokenAuthentication 과 같은 이유).
@@ -182,7 +187,8 @@ class LoginTokenAdmin(admin.ModelAdmin):
     def lookup_allowed(self, lookup, value, request=None) -> bool:
         # 목록 주소의 검색어(?key__startswith=...)로 토큰 값을 거르지 못하게 한다.
         # Django 는 자기 표의 칸이면 list_filter 에 없어도 받아 주는데, 결과가 1건인지
-        # 0건인지로 40자를 한 글자씩 맞힐 수 있다. 막으면 400 이 난다.
-        if lookup.split("__", 1)[0] == "key":
+        # 0건인지로 40자를 한 글자씩 맞힐 수 있다. 막으면 400 이 난다. device 도 같다.
+        # 이메일 변경 링크의 대조값에 섞는 값이다(views._link_device).
+        if lookup.split("__", 1)[0] in ("key", "device"):
             return False
         return super().lookup_allowed(lookup, value, request)

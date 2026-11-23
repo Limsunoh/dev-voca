@@ -880,12 +880,17 @@ class LoginTokenExpiryTest(PurgeTestBase):
         self.assertEqual(LoginToken.objects.count(), 3)
 
     def test_lifetime_matches_the_login_cookie(self):
-        """쿠키보다 짧으면 로그인해 있는 사람이 끊긴다. 길면 처리방침의 30일과 어긋난다."""
-        session = Path(settings.BASE_DIR).parent / "frontend" / "src" / "lib" / "session.ts"
-        self.assertIn(
-            "const MAX_AGE = 60 * 60 * 24 * 30;", session.read_text(encoding="utf-8")
-        )
+        """쿠키보다 짧으면 로그인해 있는 사람이 끊긴다. 길면 처리방침의 30일과 어긋난다.
+
+        이어 가기 간격도 화면과 같아야 한다. 화면이 더 자주 부르면 헛걸음이고, 덜 자주
+        부르면 백엔드가 정한 하루보다 늦게 바뀐다.
+        """
+        cookie = Path(settings.BASE_DIR).parent / "frontend" / "src" / "lib" / "token-cookie.ts"
+        text = cookie.read_text(encoding="utf-8")
+        self.assertIn("export const TOKEN_MAX_AGE = 60 * 60 * 24 * 30;", text)
         self.assertEqual(LoginToken.LIFETIME, timedelta(days=30))
+        self.assertIn("export const RENEW_AFTER_SECONDS = 60 * 60 * 24;", text)
+        self.assertEqual(LoginToken.RENEW_AFTER, timedelta(days=1))
 
 
 class CounterSweepRealClockTest(TestCase):

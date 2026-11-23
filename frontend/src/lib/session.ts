@@ -6,6 +6,13 @@ import { cache } from "react";
 import { getMe, updateMe, type User } from "./api/accounts";
 import { ApiError } from "./api/client";
 import { type DailyLength, isDailyLength } from "./daily-length";
+import {
+  formatTokenCookie,
+  parseTokenCookie,
+  TOKEN_COOKIE,
+  TOKEN_MAX_AGE,
+  tokenCookieOptions,
+} from "./token-cookie";
 
 /**
  * 로그인 상태 보관. 서버에서만 쓴다.
@@ -18,30 +25,21 @@ import { type DailyLength, isDailyLength } from "./daily-length";
  * 의존성이 늘지 않는다.
  */
 
-const COOKIE_NAME = "devvoca_token";
 const GUEST_COOKIE = "devvoca_guest";
 // 게스트가 고른 하루 공부량. 로그인하면 계정으로 옮기고 지운다.
 const GUEST_LENGTH_COOKIE = "devvoca_daily_length";
 
-// 30일. 학습 앱이라 자주 로그인시킬 이유가 없다. 백엔드 토큰은 이 쿠키를 붙일
-// 때마다 새로 나오고, 발급 30일이 지나면 매일 정리가 지운다(accounts.LoginToken
-// 의 LIFETIME). 이 값을 늘리면 쿠키가 살아 있는데 토큰이 먼저 지워져 로그인이
-// 풀린다. 그쪽과 처리방침 3절의 30일을 같이 고친다.
-const MAX_AGE = 60 * 60 * 24 * 30;
+// 게스트 쿠키들도 로그인 쿠키와 같은 30일이다(아래 setGuest 주석).
+const MAX_AGE = TOKEN_MAX_AGE;
 
+/**
+ * 방금 받은 토큰을 로그인 쿠키에 넣는다. 쿠키 값의 꼴과 설정은 lib/token-cookie.ts.
+ *
+ * 발급 시각은 지금으로 적는다. 백엔드가 방금 만든 토큰이라 몇 초 차이뿐이다.
+ */
 export async function setToken(token: string): Promise<void> {
   const store = await cookies();
-  store.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    // 운영은 https 다. 개발에서 켜면 http://localhost 에 쿠키가 안 붙는다.
-    secure: process.env.NODE_ENV === "production",
-    // lax 면 다른 사이트에서 넘어온 요청에는 쿠키가 안 실린다.
-    // 로그인 상태로 남의 사이트 링크를 눌러도 그쪽 요청이 내 권한을
-    // 빌려 쓰지 못한다.
-    sameSite: "lax",
-    path: "/",
-    maxAge: MAX_AGE,
-  });
+  store.set(TOKEN_COOKIE, formatTokenCookie(token, Date.now() / 1000), tokenCookieOptions());
 }
 
 /**
@@ -55,7 +53,7 @@ export async function setToken(token: string): Promise<void> {
  */
 export async function forgetToken(): Promise<void> {
   const store = await cookies();
-  store.delete(COOKIE_NAME);
+  store.delete(TOKEN_COOKIE);
 }
 
 export async function clearToken(): Promise<void> {
@@ -140,7 +138,7 @@ export async function carryGuestDailyLength(token: string, user: User): Promise<
 
 export async function getToken(): Promise<string | null> {
   const store = await cookies();
-  return store.get(COOKIE_NAME)?.value ?? null;
+  return parseTokenCookie(store.get(TOKEN_COOKIE)?.value)?.token ?? null;
 }
 
 /**

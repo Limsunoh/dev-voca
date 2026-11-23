@@ -18,8 +18,8 @@ import unicodedata
 from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-from django.db import models
-from django.db.models.functions import Lower
+from django.db import models, transaction
+from django.db.models.functions import Cast, Lower, Random
 from django.utils import timezone
 
 from apps.learning.models import StudyLength
@@ -641,13 +641,16 @@ class User(AbstractUser):
 def _new_login_token_key() -> str:
     """새 로그인 토큰 값. DRF 토큰과 같은 꼴(16진수 40자)이라 옮겨 온 옛 값과 섞여도 된다.
 
+    LoginToken.device 의 기본값으로도 쓴다. 0013 이 옛 토큰의 device 를 토큰 값으로 채우므로
+    두 칸의 길이(40자)가 같아야 한다.
+
     0009 마이그레이션이 이 이름으로 부른다. 이름을 바꾸거나 지우면 마이그레이션이 깨진다.
     """
     return secrets.token_hex(20)
 
 
 class LoginToken(models.Model):
-    """로그인 한 번에 하나씩 내주는 토큰. 기기마다 따로 갖는다.
+    """로그인 토큰. 로그인 한 번마다 따로라 기기마다 따로 갖는다.
 
     DRF 의 Token 을 쓰지 않는 이유: 그쪽은 계정당 하나(OneToOne)라 폰과 PC 가
     같은 토큰을 나눠 가졌다. 한쪽에서 로그아웃하면 그 토큰이 지워져 다른 쪽도
@@ -663,6 +666,15 @@ class LoginToken(models.Model):
     처리방침 3절의 "로그인 토큰" 보관 기간이 이 동작을 적고 있다. 바꾸려면 그
     문구부터 고친다(시행 7일 전 공지).
 
+    쓰는 동안은 로그인이 이어진다(renew). 발급하고 하루가 지난 토큰으로 이어 가기를
+    부르면 새 토큰을 내준다. 같은 로그인에서 이어 받은 토큰은 device 가 같다. 옛 토큰은
+    새 토큰이 처음 쓰일 때(mark_delivered) 바뀐 것으로 적히고 REPLACED_GRACE 뒤에 죽는다.
+    죽은 옛 토큰도 발급 30일까지는 표에 남는다. 그 사이 그것이 다시 오면 새어 나간 것으로
+    보고 그 로그인을 통째로 끊는다(SlimTokenAuthentication). 로그인을 끝낼 때는 end_login,
+    end_all 을 쓴다.
+    그래서 30일은 "로그인하고 30일" 이 아니라 "30일 동안 안 쓰면" 이 된다. 토큰
+    하나하나는 여전히 발급 30일 안에 지워져 처리방침 문구는 그대로 맞다.
+
     이 표는 비우면 안 된다. 비우면 로그인한 사람이 모두 로그아웃되고, 0010 은 이미
     적용돼 다시 옮기지 않는다. 이 표를 만든 배포 전으로 되돌리지도 않는다
     (DEPLOY.md "배포 확인" 의 회원을 가리키는 표).
@@ -677,11 +689,42 @@ class LoginToken(models.Model):
     # auto_now_add 가 아닌 이유: 0010 이 옛 토큰을 옮길 때 원래 발급 시각을 그대로
     # 넣는다. auto_now_add 는 넣은 값을 지금 시각으로 덮는다.
     created = models.DateTimeField("발급 시각", default=timezone.now)
+    # 로그인 한 번을 가리키는 값. 이름은 이 표의 다른 말("기기마다 따로")에 맞췄다. 같은
+    # 폰에서 다시 로그인하면 새 값이다. 로그인할 때 새로 정하고 renew 가 물려준다.
+    # 로그아웃은 이 값이 같은 토큰을 다 지우고, 이메일 변경 링크는 토큰 값이 아니라 이 값에
+    # 묶인다(views._link_device). 토큰이 바뀌어도 대기 중인 링크가 살게.
+    # 0013 이 옛 토큰에는 토큰 값을 그대로 넣었다. 그 전에 보낸 링크가 계속 맞는다.
+    #
+    # db_default 는 이 칸을 모르는 코드가 넣는 행을 위한 것이다. Railway 는 새 배포의
+    # migrate 가 끝난 뒤에도 몇 초 동안 옛 코드가 요청을 받는데(0010 머리말), 옛 코드의
+    # 로그인이 이 칸 없이 행을 넣다가 NOT NULL 에 걸려 500 이 나지 않게 DB 가 무작위 값을
+    # 채운다. Random 은 Postgres 와 SQLite(USE_SQLITE) 둘 다에 있다. ORM 으로 만드는 행은
+    # default 가 이긴다.
+    device = models.CharField(
+        "기기",
+        max_length=40,
+        default=_new_login_token_key,
+        db_default=Cast(Random(), models.CharField()),
+        editable=False,
+    )
+    # renew 가 만든 새 토큰은 받은 쪽이 아직 안 썼다(False). 응답이 중간에 끊겨 쿠키에
+    # 못 들어갔을 수 있어서, 처음 쓰일 때까지 옛 토큰을 살려 둔다(mark_delivered).
+    # 로그인으로 만든 토큰은 앞 토큰이 없어 처음부터 True 다.
+    delivered = models.BooleanField("받음", default=True, db_default=True, editable=False)
+    # 같은 로그인의 새 토큰이 처음 쓰인 시각. 이 뒤로 REPLACED_GRACE 동안만 통한다.
+    replaced_at = models.DateTimeField("바뀐 시각", null=True, blank=True, editable=False)
 
-    # 로그인 쿠키(frontend/src/lib/session.ts 의 MAX_AGE)와 같은 30일. 토큰은
-    # 쿠키를 붙일 때마다 새로 나오므로, 이만큼 지난 토큰을 든 쿠키는 이미 끝났다.
-    # 쿠키보다 짧게 잡으면 로그인해 있는 사람이 끊긴다.
+    # 로그인 쿠키(frontend/src/lib/token-cookie.ts 의 TOKEN_MAX_AGE)와 같은 30일.
+    # 쿠키보다 짧게 잡으면 로그인해 있는 사람이 끊긴다. 쓰는 동안은 하루마다 새 토큰과
+    # 함께 쿠키도 30일짜리로 다시 붙는다(proxy.ts).
     LIFETIME = timedelta(days=30)
+    # 이어 가기를 불러도 이보다 어린 토큰은 그대로 돌려준다. 화면은 이동할 때마다
+    # 부를 수 있어서, 없으면 요청마다 토큰이 바뀌고 행이 쌓인다. 화면 쪽 값
+    # (frontend/src/lib/token-cookie.ts 의 RENEW_AFTER_SECONDS)과 같다.
+    RENEW_AFTER = timedelta(days=1)
+    # 새 토큰이 쓰이기 시작한 뒤 옛 토큰이 더 통하는 시간. 새 쿠키를 받기 전에 출발한
+    # 요청(다른 탭, 화면이 부르는 중계)이 옛 토큰을 싣고 온다.
+    REPLACED_GRACE = timedelta(hours=1)
 
     class Meta:
         verbose_name = "로그인 토큰"
@@ -693,9 +736,103 @@ class LoginToken(models.Model):
 
     @classmethod
     def expired(cls) -> models.QuerySet[LoginToken]:
-        """발급하고 LIFETIME 이 지난 토큰. 매일 정리가 지운다."""
+        """발급하고 LIFETIME 이 지난 토큰. 매일 정리가 지운다.
+
+        바뀌고 유예가 지난 옛 토큰은 인증에서는 거절하지만(is_expired) 여기서 고르지
+        않는다. 남겨 둬야 그것이 다시 왔을 때 새어 나간 것을 알아본다. 먼저 지우면 그냥
+        "없는 토큰" 이 되어, 빼 간 쪽이 이어 받은 토큰이 그대로 산다.
+        """
         return cls.objects.filter(created__lt=timezone.now() - cls.LIFETIME)
 
+    @classmethod
+    def end_login(cls, user_id: int, device: str) -> None:
+        """그 로그인(device)의 토큰을 모두 지운다. 로그아웃과 재사용 감지가 쓴다."""
+        with transaction.atomic():
+            cls.lock_member(user_id)
+            cls.objects.filter(user_id=user_id, device=device).delete()
+
+    @classmethod
+    def end_all(cls, user_id: int) -> None:
+        """그 계정의 토큰을 모두 지운다. 비밀번호 변경과 이메일 변경이 쓴다.
+
+        뒤이어 내주는 새 토큰은 새 로그인(device)이라 renew 와 겹치지 않는다. 그래서 새
+        토큰을 만드는 것까지 이 잠금 안에 둘 필요는 없다.
+        """
+        with transaction.atomic():
+            cls.lock_member(user_id)
+            cls.objects.filter(user_id=user_id).delete()
+
+    @staticmethod
+    def lock_member(user_id: int) -> User | None:
+        """회원 행을 잠근다. 이미 있는 로그인의 토큰을 새로 만들거나 지우는 곳이 먼저 부른다.
+
+        renew 가 새 토큰을 만드는 동안 지우는 쪽의 DELETE 가 먼저 시작되면, 새 토큰이
+        지울 대상에서 빠져 살아남는다(Postgres 의 READ COMMITTED). 같은 행을 잠그면
+        둘이 차례로 돈다. 계정 삭제(MeView.delete)와 이메일 변경 확인도 회원 행을 먼저
+        잠가 순서가 같다. 새 로그인을 만드는 곳(로그인, 가입)은 있는 로그인과 겹치지 않아
+        잠그지 않는다.
+        """
+        return User.objects.select_for_update().only("pk").filter(pk=user_id).first()
+
+    def replaced_past_grace(self) -> bool:
+        """새 토큰으로 넘어가고 유예까지 지났나. 이 토큰이 다시 오면 새어 나간 것이다.
+
+        바뀐 지 유예 안이면 False 다. 새 쿠키를 받기 전에 출발한 정상 요청일 수 있다.
+        """
+        return (
+            self.replaced_at is not None
+            and self.replaced_at < timezone.now() - self.REPLACED_GRACE
+        )
+
     def is_expired(self) -> bool:
-        """expired() 와 같은 기준. 인증이 매 요청 본다(SlimTokenAuthentication)."""
-        return self.created < timezone.now() - self.LIFETIME
+        """인증에서 거절할 토큰인가. 인증이 매 요청 본다(SlimTokenAuthentication)."""
+        return self.created < timezone.now() - self.LIFETIME or self.replaced_past_grace()
+
+    def renew(self) -> LoginToken | None:
+        """로그인을 이어 갈 토큰. 하루가 지났으면 같은 로그인(device)의 새 토큰을 낸다.
+
+        - 같은 로그인에 이 토큰보다 새 토큰이 이미 있으면 그것을 돌려준다. 이어 가기가
+          동시에 둘 왔거나, 새 토큰을 실은 응답이 끊겨 옛 토큰으로 다시 온 경우다. 또
+          만들면 쿠키에 못 들어간 토큰이 쌓인다.
+        - 하루가 안 됐으면 이 토큰을 그대로 돌려준다.
+        - 그 사이 로그아웃 등으로 지워졌으면 None.
+
+        옛 토큰은 여기서 끝내지 않는다. 새 토큰이 처음 쓰일 때 끝낸다(mark_delivered).
+        여기서 끝내면 새 토큰을 실은 응답을 잃은 사람이 옛 토큰만 든 채 로그아웃된다.
+
+        회원 행을 잠그고 본다(lock_member). 안 잠그면 동시에 온 이어 가기 둘이 새 토큰을
+        하나씩 만들고, 로그아웃 같은 지우는 쪽과 겹치면 여기서 만든 새 토큰이 살아남는다.
+        """
+        with transaction.atomic():
+            member = self.lock_member(self.user_id)
+            if member is None:
+                return None
+            latest = (
+                LoginToken.objects.filter(user_id=self.user_id, device=self.device)
+                .order_by("-created", "-pk")
+                .first()
+            )
+            if latest is None:
+                return None
+            if latest.pk != self.pk:
+                return latest
+            if latest.created > timezone.now() - self.RENEW_AFTER:
+                return latest
+            return LoginToken.objects.create(
+                user_id=self.user_id, device=self.device, delivered=False
+            )
+
+    def mark_delivered(self) -> None:
+        """renew 가 만든 이 토큰이 처음 쓰였다. 같은 로그인의 앞 토큰들을 바뀐 것으로 적는다.
+
+        인증이 부른다. 받은 쪽이 이 토큰을 들고 왔으니 새 쿠키가 들어간 것이다. 두 요청이
+        동시에 와도 replaced_at 이 빈 행만 고치므로 처음 시각이 남는다.
+        """
+        LoginToken.objects.filter(
+            user_id=self.user_id,
+            device=self.device,
+            created__lt=self.created,
+            replaced_at__isnull=True,
+        ).update(replaced_at=timezone.now())
+        LoginToken.objects.filter(pk=self.pk).update(delivered=True)
+        self.delivered = True
