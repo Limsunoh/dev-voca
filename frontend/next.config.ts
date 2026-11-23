@@ -1,8 +1,12 @@
 import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
+// CSP 는 여기 없다. 요청마다 nonce 가 바뀌어 proxy.ts 가 화면 응답에만 싣는다(lib/csp.ts).
+// 여기에 고정 정책을 더하면 응답에 정책이 둘이 되고, 브라우저는 둘 다 지켜서 nonce 가 없는
+// 쪽이 화면 스크립트를 전부 막는다.
 const SECURITY_HEADERS = [
-  // 다른 사이트의 iframe 안에 로그인·문제풀기를 띄우지 못하게 한다.
+  // 다른 사이트의 iframe 안에 로그인·문제풀기를 띄우지 못하게 한다. CSP 의
+  // frame-ancestors 와 같은 일이지만, 그것을 모르는 브라우저와 CSP 가 안 붙는 경로(api 등)를 덮는다.
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
