@@ -439,16 +439,21 @@ class AdminDeviceCookieThrottleTest(AdminDeviceCookieCase):
 
     def test_위조_쿠키는_이메일_통으로_센다(self):
         self.fill_email_bucket()
+        valid = device_cookie_value(self.BOSS)
+        # 서명 끝 글자를 늘 다른 글자로 바꾼다. 서명에 시각이 들어가 실행마다 바뀌고 끝 글자는
+        # 16가지 중 하나라, 고정 글자("A")로 바꾸면 16번에 한 번은 진짜 쿠키가 된다.
+        tampered = valid[:-1] + ("B" if valid[-1] != "B" else "C")
         forged = [
             f"{email_ident(self.BOSS)}:{'d' * 32}",  # 서명 없음
-            device_cookie_value(self.BOSS)[:-1] + "A",  # 서명 끝 한 글자 바꿈
-            device_cookie_value(self.BOSS).replace("d" * 32, "e" * 32),  # 기기 값 바꿈
+            tampered,  # 서명 끝 한 글자 바꿈
+            valid.replace("d" * 32, "e" * 32),  # 기기 값 바꿈
             signing.get_cookie_signer(salt="다른-salt").sign(f"{email_ident(self.BOSS)}:x"),
-            device_cookie_value(self.BOSS).split(":")[0] + "::",
+            valid.split(":")[0] + "::",
             "",
         ]
-        for value in forged:
-            with self.subTest(value=value[:40]):
+        # 앞 40자는 이메일 키라 모두 같다. 실패한 항목을 가리려면 번호와 끝을 본다.
+        for i, value in enumerate(forged):
+            with self.subTest(i=i, tail=value[-12:]):
                 self.assertEqual(self.post(self.browser_with(value), self.BOSS, PASSWORD).status_code, 429)
 
     def test_기기_값이_빈_쿠키는_이메일_통으로_센다(self):
