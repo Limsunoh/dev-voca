@@ -163,15 +163,17 @@ describe("처리방침 변경 공고", () => {
     assert.match(pages["delete-account"], /Sentry 로 보낸 오류 기록/);
   });
 
-  it("로그인 토큰은 발급 30일 뒤 지운다고 적는다", () => {
+  it("로그인 토큰은 발급 30일 뒤 지우고, 쓰는 동안은 이어 간다고 적는다", () => {
     // 백엔드 LoginToken.LIFETIME 과 로그인 쿠키(token-cookie.ts 의 TOKEN_MAX_AGE)가 30일이다
     // (tests_daily_cleanup.py 가 둘을 견준다). 옛 문구가 남으면 만료가 없다고 읽힌다.
+    // 하루마다 새 토큰으로 바꾸므로(LoginToken.renew) "로그인하고 30일" 로 읽히면 안 된다.
     const retention = pages.privacy.match(
       /<section[^>]*id="retention"[^>]*>([\s\S]*?)<\/section>/,
     )?.[1];
     assert.ok(retention);
     assert.match(retention, /로그인 토큰: 발급 후 30일이 지나면/);
-    assert.match(retention, /로그인 쿠키: 30일/);
+    assert.match(retention, /30일 동안\s+이용하지 않으면 로그인이 끝납니다/);
+    assert.match(retention, /로그인 쿠키: 로그인하거나 새 토큰을 받은 때부터 30일/);
     assert.doesNotMatch(pages.privacy, /정해진 만료 없이/);
   });
 

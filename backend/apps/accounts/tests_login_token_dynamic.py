@@ -866,8 +866,22 @@ class ConcurrencyTest(TransactionTestCase):
         self.assertFalse(LoginToken.objects.filter(key__in=[phone, laptop]).exists())
 
 
-class SabotageTest(DeviceMixin, TestCase):
-    """방어를 일부러 빼면 위 테스트들이 빨개지는지 확인한다(구현 파일은 건드리지 않는다)."""
+class SabotageTest(TestCase):
+    """방어를 일부러 빼면 위 테스트들이 빨개지는지 확인한다(구현 파일은 건드리지 않는다).
+
+    안쪽 테스트는 case(result) 로 부른다. case.run(result) 는 Django 가 테스트마다 붙이는
+    준비(self.client 등)를 건너뛰어, 그 클래스를 따로 돌리면 안쪽 테스트가 준비 오류로
+    죽는다. 그 오류도 "잡았다" 로 세면 방어가 없어도 통과한다. 그래서 오류는 0, 실패는
+    하나여야 잡은 것으로 본다.
+
+    DeviceMixin 을 물려받지 않는다. 바깥 테스트가 먼저 회원(owner@example.com)을 만들면
+    안쪽 테스트의 setUp 이 같은 이메일로 만들다 IntegrityError 로 죽는다. 예전에는 이
+    오류를 "잡았다" 로 세어 세 테스트가 늘 통과했다.
+    """
+
+    def assertCaught(self, result: unittest.TestResult) -> None:
+        self.assertEqual(result.errors, [], "안쪽 테스트가 실패가 아니라 오류로 끝났다")
+        self.assertEqual(len(result.failures), 1, "방어를 뺐는데 안쪽 테스트가 통과했다")
 
     def test_로그아웃이_계정_토큰을_다_지우면_범위_테스트가_잡는다(self):
         def wipe_all(self_view, request):
@@ -878,9 +892,9 @@ class SabotageTest(DeviceMixin, TestCase):
 
         with mock.patch("apps.accounts.views.LogoutView.post", wipe_all):
             result = unittest.TestResult()
-            LogoutScopeTest("test_내_기기_하나만_지우고_다른_기기와_남의_토큰은_남는다").run(result)
+            LogoutScopeTest("test_내_기기_하나만_지우고_다른_기기와_남의_토큰은_남는다")(result)
 
-        self.assertEqual(len(result.failures) + len(result.errors), 1)
+        self.assertCaught(result)
 
     def test_확인_뷰가_아무_계정_토큰이나_대조하면_링크_테스트가_잡는다(self):
         real_filter = LoginToken.objects.filter
@@ -892,11 +906,9 @@ class SabotageTest(DeviceMixin, TestCase):
 
         with mock.patch.object(LoginToken.objects, "filter", side_effect=any_user):
             result = unittest.TestResult()
-            EmailLinkDeviceTest("test_남의_토큰과_같은_대조값은_내_계정에서_통하지_않는다").run(
-                result
-            )
+            EmailLinkDeviceTest("test_남의_토큰과_같은_대조값은_내_계정에서_통하지_않는다")(result)
 
-        self.assertEqual(len(result.failures) + len(result.errors), 1)
+        self.assertCaught(result)
 
     def test_인증이_정지_계정을_통과시키면_정지_테스트가_잡는다(self):
         from .authentication import SlimTokenAuthentication
@@ -907,6 +919,6 @@ class SabotageTest(DeviceMixin, TestCase):
 
         with mock.patch.object(SlimTokenAuthentication, "authenticate_credentials", lax):
             result = unittest.TestResult()
-            InactiveAccountTest("test_정지_계정_토큰은_모든_기기에서_401").run(result)
+            InactiveAccountTest("test_정지_계정_토큰은_모든_기기에서_401")(result)
 
-        self.assertEqual(len(result.failures) + len(result.errors), 1)
+        self.assertCaught(result)
