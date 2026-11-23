@@ -132,6 +132,14 @@ Host 가 `healthcheck.railway.app` 이라 일반 뷰로 두면 400·301 이 된�
   `DROP TABLE authtoken_token;` 과 `DELETE FROM django_migrations WHERE app = 'authtoken';`
   을 다시 한다. 남은 행은 지금 코드가 읽지 않는 옛 토큰이라 그대로 지워도 된다(되돌린
   동안 로그인한 사람은 한 번 로그아웃된다).
+- 로그인 이어 가기(`LoginToken.renew`, 2026-11-23) 전으로도 되돌리지 않는다. 새 프론트는 화면을
+  처음 여는 순간 로그인 쿠키를 `토큰.발급시각` 꼴로 다시 쓴다(`frontend/src/lib/token-cookie.ts`).
+  옛 프론트는 그 값을 통째로 토큰으로 보내 401 을 받고 쿠키를 지우므로, 프론트만 되돌려도
+  (Vercel Instant Rollback) 그 사이 앱을 연 사람이 모두 한 번 로그아웃된다. 백엔드만
+  되돌리면 지난 30일 동안 새 토큰으로 넘어간 옛 토큰이 모두 다시 통하고(옛 코드는 바뀐
+  시각을 보지 않는다), 이어 가기 주소가 없어 proxy 가 화면마다 404 를 한 번씩 받는다
+  (로그인은 유지되고 화면만 조금 늦다).
+  머지 직후 Vercel 이 Railway 보다 먼저 뜨는 몇 분도 이 404 가 난다.
 
 ### release: 는 쓰지 않는다
 
@@ -545,7 +553,11 @@ https://dev-voca.vercel.app
 - 수명이 다한 문제풀기 진행 표시(`RoundStep`)를 지운다.
 - 수명이 다한 시도 횟수 행(`throttle_cache`)을 지운다.
 - 발급하고 30일이 지난 로그인 토큰(`LoginToken`)을 지운다. 로그인 쿠키와 같은 길이라
-  지워지는 토큰을 든 쿠키는 이미 끝났다. 처리방침 3절이 이 기간을 적고 있다.
+  지워지는 토큰을 든 쿠키는 이미 끝났다. 처리방침 3절이 이 기간을 적고 있다. 쓰는 동안은
+  화면 서버(`frontend/src/proxy.ts`)가 하루마다 새 토큰으로 바꿔 준다(`LoginToken.renew`).
+  바뀐 옛 토큰은 새 토큰이 처음 쓰이고 1시간 뒤부터 인증에서 거절하지만, 이 정리는 발급
+  30일이 돼서야 지운다. 그 사이 옛 토큰이 다시 오면 새어 나간 것으로 보고 그 로그인을 끊는 데
+  쓴다.
 
 **지우는 작업이라 기본은 미리 보기다.** `--apply` 를 줘야 메일을 보내고 지운다.
 
@@ -574,7 +586,7 @@ railway ssh --service web "python backend/manage.py daily_cleanup"
 
 정리가 실패하면(예외) Sentry 로 오류가 간다(daily_cleanup 의 `execute`). 아예 안 돌면 오류가 없으니,
 다음 날 새벽 백업이 되살린 사본에서 정리가 지웠어야 할 행을 세어 알린다("DB 백업" 4번).
-로그인 토큰은 정리가 멈춰도 30일이 지나면 인증에서 거절한다(SlimTokenAuthentication).
+로그인 토큰은 정리가 멈춰도 30일이 지나면(바뀐 옛 토큰은 새 토큰이 처음 쓰이고 1시간 뒤) 인증에서 거절한다(SlimTokenAuthentication).
 
 ### 메일 발송 (Gmail API)
 

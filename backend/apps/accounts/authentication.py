@@ -69,13 +69,33 @@ class SlimTokenAuthentication(TokenAuthentication):
         except model.DoesNotExist:
             raise exceptions.AuthenticationFailed(_("Invalid token.")) from None
 
-        # 30일 만료를 여기서도 본다. 매일 정리(daily_cleanup)가 지우는 것만 믿으면, 정리가
-        # 멈춘 동안 새어 나간 토큰이 기한 없이 통한다. 지우는 것은 정리에 맡긴다.
+        # 30일 만료와 바뀐 토큰의 유예(LoginToken.REPLACED_GRACE)를 여기서도 본다. 매일
+        # 정리(daily_cleanup)가 지우는 것만 믿으면, 정리가 멈춘 동안 새어 나간 토큰이 기한
+        # 없이 통한다. 만료된 토큰을 지우는 것은 정리에 맡긴다. 다만 유예가 지난 옛 토큰은
+        # 여기서 그 로그인을 끊는다(아래).
+        #
+        # 바뀌고 유예가 지난 토큰이 오면 그 로그인을 통째로 끊는다. 제대로 된 브라우저는
+        # 새 토큰을 쓰기 시작한 뒤 옛 토큰을 다시 내지 않는다. 오는 것은 옛 토큰을 빼 간
+        # 쪽이다. 이어 가기로 로그인이 끝없이 이어지게 되면서, 새어 나간 토큰을 그대로
+        # 두면 그쪽도 끝없이 이어 간다. 끊으면 원래 주인도 다시 로그인해야 하지만, 빼 간
+        # 쪽이 이어 받은 토큰까지 함께 죽는다.
         if token.is_expired():
+            # 유예 안의 옛 토큰은 is_expired 가 아니라서 여기까지 오지 않는다.
+            #
+            # 이 배포 전에 받은 토큰(0013 이 device 를 토큰 값으로 채운 것)은 끊지 않고 이
+            # 요청만 거절한다. 11-13 전에는 계정당 토큰이 하나라 폰과 PC 가 같은 값을 나눠
+            # 가졌다. 한쪽이 이어 간 뒤 다른 쪽이 그 값으로 오는 것은 새어 나간 것이 아니다.
+            # 그 토큰은 늦어도 발급 30일(12-13 무렵)이면 끝난다.
+            if token.replaced_past_grace() and token.device != token.key:
+                LoginToken.end_login(token.user_id, token.device)
             raise exceptions.AuthenticationFailed(_("Invalid token."))
 
         if not token.user.is_active:
             raise exceptions.AuthenticationFailed(_("User inactive or deleted."))
+
+        # 이어 가기로 받은 새 토큰이 처음 왔다. 앞 토큰을 끝낸다(LoginToken.mark_delivered).
+        if not token.delivered:
+            token.mark_delivered()
 
         _mark_seen(token.user)
 

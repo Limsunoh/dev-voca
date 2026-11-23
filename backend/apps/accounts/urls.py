@@ -11,6 +11,7 @@ from .views import (
     MeView,
     PasswordChangeView,
     SignUpView,
+    TokenRenewView,
 )
 
 app_name = "accounts"
@@ -20,6 +21,8 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("google/", GoogleLoginView.as_view(), name="google"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    # 로그인 이어 가기. 화면 서버(frontend/src/proxy.ts)가 하루에 한 번쯤 부른다.
+    path("token/renew/", TokenRenewView.as_view(), name="token-renew"),
     path("me/", MeView.as_view(), name="me"),
     path(
         "email-change/",

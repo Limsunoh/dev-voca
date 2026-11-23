@@ -520,11 +520,16 @@ class EmailLinkDeviceTest(DeviceMixin, TestCase):
         user_id, mark, _ = read_token(link)
         self.assertEqual(user_id, self.owner.pk)
         others = LoginToken.objects.filter(user_id=self.other.pk)
-        for key in others.values_list("key", flat=True):
-            self.assertNotEqual(email_mark(self.owner.email, key), mark)
+        for device in others.values_list("device", flat=True):
+            self.assertNotEqual(email_mark(self.owner.email, device), mark)
         LoginToken.objects.filter(key=self.phone).update(user=self.other)
 
         self.assert_rejected(link)
+
+
+def device_of(key: str) -> str:
+    """그 토큰의 device. 이메일 변경 링크는 토큰 값이 아니라 이 값에 묶인다."""
+    return LoginToken.objects.get(key=key).device
 
 
 class SessionLinkBindingTest(DeviceMixin, TestCase):
@@ -554,14 +559,14 @@ class SessionLinkBindingTest(DeviceMixin, TestCase):
 
         self.assertEqual(LoginToken.objects.filter(user=self.owner).count(), 2)
         _, mark, _ = read_token(link)
-        bound = [key for key in keys if email_mark(self.owner.email, key) == mark]
+        bound = [key for key in keys if email_mark(self.owner.email, device_of(key)) == mark]
         self.assertEqual(len(bound), 1)
 
     def test_묶인_토큰이_지워지면_다른_토큰이_남아_있어도_거절된다(self):
         keys = [self.device(self.owner) for _ in range(2)]
         link = self.issue()
         _, mark, _ = read_token(link)
-        (bound,) = [key for key in keys if email_mark(self.owner.email, key) == mark]
+        (bound,) = [key for key in keys if email_mark(self.owner.email, device_of(key)) == mark]
 
         LoginToken.objects.filter(key=bound).delete()
 
@@ -571,7 +576,7 @@ class SessionLinkBindingTest(DeviceMixin, TestCase):
         keys = [self.device(self.owner) for _ in range(2)]
         link = self.issue()
         _, mark, _ = read_token(link)
-        (loose,) = [key for key in keys if email_mark(self.owner.email, key) != mark]
+        (loose,) = [key for key in keys if email_mark(self.owner.email, device_of(key)) != mark]
 
         LoginToken.objects.filter(key=loose).delete()
 
@@ -583,7 +588,7 @@ class SessionLinkBindingTest(DeviceMixin, TestCase):
 
         link = self.issue()
 
-        mine = list(LoginToken.objects.filter(user=self.owner).values_list("key", flat=True))
+        mine = list(LoginToken.objects.filter(user=self.owner).values_list("device", flat=True))
         self.assertEqual(len(mine), 1)
         self.assertEqual(read_token(link)[1], email_mark(self.owner.email, mine[0]))
 

@@ -53,7 +53,13 @@ function withoutComments(source: string): string {
 
 /** 코드가 쓰는 쿠키 이름. 상수로 정의한 자리에서 읽는다. */
 function cookiesInCode(): Set<string> {
-  const files = ["lib/session.ts", "app/api/auth/google/route.ts", "app/(auth)/google-actions.ts"];
+  const files = [
+    "lib/session.ts",
+    // 로그인 쿠키 이름(devvoca_token)은 여기 있다. session.ts 와 proxy.ts 가 같이 쓴다.
+    "lib/token-cookie.ts",
+    "app/api/auth/google/route.ts",
+    "app/(auth)/google-actions.ts",
+  ];
   return new Set(files.flatMap((file) => withoutComments(read(file)).match(COOKIE) ?? []));
 }
 

@@ -164,7 +164,7 @@ describe("처리방침 변경 공고", () => {
   });
 
   it("로그인 토큰은 발급 30일 뒤 지운다고 적는다", () => {
-    // 백엔드 LoginToken.LIFETIME 과 로그인 쿠키(session.ts 의 MAX_AGE)가 30일이다
+    // 백엔드 LoginToken.LIFETIME 과 로그인 쿠키(token-cookie.ts 의 TOKEN_MAX_AGE)가 30일이다
     // (tests_daily_cleanup.py 가 둘을 견준다). 옛 문구가 남으면 만료가 없다고 읽힌다.
     const retention = pages.privacy.match(
       /<section[^>]*id="retention"[^>]*>([\s\S]*?)<\/section>/,
