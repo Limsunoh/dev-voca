@@ -586,8 +586,9 @@ def issue_chunk(study: DailyStudy) -> list[Word]:
 def _pick_for_study(study: DailyStudy) -> list[Word]:
     """이번 묶음에 학습할 단어를 고른다.
 
-    첫 묶음은 홈이 "오늘의 단어" 로 미리 보여준 것이다(preview_words). 홈에서
-    본 단어와 일일공부에서 배우는 단어가 다르면 공부량이 두 배가 된다.
+    첫 묶음은 그날 미리 뽑아 둔 것이다(preview_words). 11-12 에는 홈이 이것을
+    "오늘의 단어" 로 미리 보였고, 둘이 다르면 공부량이 두 배가 됐다. 11-23 부터
+    홈은 일일공부를 끝낸 뒤에만 단어를 보이므로 시작 전에는 화면에 안 나온다.
 
     그 뒤 묶음은 이번 판에서 이미 학습한 것을 빼고 새로 고른다. 안 빼면 앞
     묶음에서 본 단어가 다음 묶음에 또 나오는데, 그건 복습이 아니라 버그로
@@ -625,8 +626,8 @@ def today_words(user, study: DailyStudy | None) -> list[Word]:
 def preview_words(user_id: int, day: date, size: int) -> list[Word]:
     """그날 첫 묶음 size 개. 미리 뽑아 둔 것을 앞에서부터 쓰고, 모자라면 채운다.
 
-    홈(today_words)과 시작(_pick_for_study)이 같이 부른다. 두 자리가 같은
-    함수를 지나야 홈에서 본 단어로 첫 묶음이 시작된다.
+    일일공부 상태 조회(today_words)와 시작(_pick_for_study)이 같이 부른다. 두
+    자리가 같은 함수를 지나야 조회가 실어 준 단어로 첫 묶음이 시작된다.
 
     저장한 목록이 바뀌는 경우 둘:
     - 뽑은 뒤 검수가 취소됐다. 그 단어는 목록에서 빼고(visible()), 모자라면

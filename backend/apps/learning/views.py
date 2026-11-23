@@ -275,6 +275,12 @@ class DailyStudyStartView(APIView):
         # 홈의 오늘의 단어. 시작 전이면 첫 묶음을 미리 뽑아 두고, 시작했으면
         # 오늘 배운 단어다(today_words). 홈과 일일공부가 같은 단어를 보게 한다.
         #
+        # 11-23 부터 홈은 오늘 일일공부를 끝낸 뒤에만 이 단어를 그린다. 시작 전
+        # 미리 뽑기는 화면에 안 나오지만 그대로 둔다. 시작할 때 그 묶음이 첫
+        # 묶음이 되므로(_pick_for_study) 여기서 뽑든 시작할 때 뽑든 결과가 같고,
+        # 쓰기는 그날 첫 조회 한 번뿐이다. 지우면 미리 뽑기를 시험하는
+        # tests_daily_preview*.py 두 파일을 다시 짜야 한다.
+        #
         # 실패해도 조회는 살린다. 이 응답은 일일공부 화면과 홈이 같이 쓰는데,
         # 오늘의 단어 때문에 일일공부를 못 열면 안 된다. 비어 있으면 홈은 날짜로
         # 고른 단어를 그린다.
@@ -299,6 +305,10 @@ class DailyStudyStartView(APIView):
                         # 문제 수만 있으면 길이 선택이 "얼마나 오래
                         # 걸리나" 로만 읽힌다.
                         "words": STUDY_PLANS[value].from_study,
+                        # 한 묶음에서 익히는 단어 수와 묶음 개수. 시작 전 홈
+                        # 카드가 "5개씩 익히고" 와 묶음 막대를 그린다.
+                        "chunk_size": STUDY_PLANS[value].chunk_size,
+                        "chunk_count": STUDY_PLANS[value].chunk_count,
                     }
                     for value, label in StudyLength.choices
                 ],

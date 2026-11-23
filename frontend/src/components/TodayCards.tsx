@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/api/client";
 import {
   fetchDailyStatus,
   type StudyCard,
+  type StudyLength,
   type StudyProgress,
 } from "@/lib/api/daily";
 import { fetchDue, type ReviewDue } from "@/lib/api/review";
@@ -16,11 +17,18 @@ export type Today = {
   daily: StudyProgress | null;
   due: ReviewDue | null;
   /**
-   * 홈의 오늘의 단어로 쓸 내 단어(일일공부 첫 묶음이나 오늘 배운 단어). 일일공부
-   * 상태와 같은 응답에 실려 와서 여기서 같이 받는다 - 따로 부르면 홈의 왕복이
-   * 하나 는다. 비어 있으면 홈은 날짜로 고른 단어를 쓴다(pickTodayWords).
+   * 홈의 오늘의 단어로 쓸 내 단어. 홈은 오늘 일일공부를 끝낸 뒤에만 단어를
+   * 그리므로 오늘 배운 단어다. 일일공부 상태와 같은 응답에 실려 와서 여기서
+   * 같이 받는다 - 따로 부르면 홈의 왕복이 하나 는다. 비어 있으면 홈은 날짜로
+   * 고른 단어를 쓴다(pickTodayWords).
    */
   words: StudyCard[];
+  /**
+   * 고를 수 있는 길이들. 홈이 시작 전 카드에 "단어 몇 개, 문제 몇 개" 를 그린다.
+   * null 이면 일일공부 상태를 못 받은 것이다(게스트, 백엔드 실패). 그때 홈은
+   * 오늘 일일공부를 끝냈는지 모르므로 일일공부를 앞세우지 않는다.
+   */
+  lengths: StudyLength[] | null;
 };
 
 /**
@@ -37,7 +45,7 @@ export type Today = {
  * 홈·허브를 열 때마다 두 줄씩 쌓여 진짜 오류가 묻힌다.
  */
 export async function loadToday(token: string | null): Promise<Today> {
-  if (!token) return { daily: null, due: null, words: [] };
+  if (!token) return { daily: null, due: null, words: [], lengths: null };
   const [status, due] = await Promise.all([
     fetchDailyStatus(token).catch(
       logUnlessRejected("일일공부 상태를 불러오지 못했습니다."),
@@ -48,6 +56,7 @@ export async function loadToday(token: string | null): Promise<Today> {
     daily: status?.today ?? null,
     due,
     words: status?.today_words ?? [],
+    lengths: status?.lengths ?? null,
   };
 }
 

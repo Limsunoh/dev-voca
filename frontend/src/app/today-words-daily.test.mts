@@ -4,9 +4,10 @@
  * 실행: cd frontend && npm test
  *
  * 로그인한 사람은 일일공부 상태(GET /api/learning/daily/)가 실어 주는
- * today_words 를 오늘의 단어로 그린다. 시작 전이면 서버가 미리 뽑은 첫 묶음,
- * 시작했으면 오늘 배운 단어다. 그것이 없으면(게스트, 옛 백엔드, 실패) 날짜로
- * 고른 단어로 떨어지고, 홈은 어떤 경우에도 뜬다.
+ * today_words 를 오늘의 단어로 그린다. 홈이 단어를 그리는 것은 오늘 일일공부를
+ * 끝낸 뒤라(11-23, 그 전에는 일일공부 카드만 - home-study-first-dynamic.test.mts)
+ * 오늘 배운 단어다. 그것이 없으면(게스트, 옛 백엔드, 실패) 날짜로 고른 단어로
+ * 떨어지고, 홈은 어떤 경우에도 뜬다.
  *
  * 홈에서 연 단어 상세의 이전 / n / 다음 줄도 같은 묶음을 써야 한다. 홈이 그
  * 순서를 주소에 실어 주고(routes.todayWord), 상세는 서버에 다시 묻지 않는다.
@@ -112,9 +113,22 @@ globalThis.fetch = (async (input: string | URL | Request) => {
   paths.push(url.pathname);
   if (url.pathname === "/api/learning/daily/") {
     if (dailyStatus !== 200) return json(dailyStatus, { detail: "서버 오류" });
+    // 오늘 몫을 끝낸 상태다. 회원 홈은 일일공부를 끝내야 오늘의 단어를 그린다
+    // (그 전에는 일일공부 카드만 - page.tsx studyFirst).
     return json(200, {
       lengths: [],
-      today: null,
+      today: {
+        length: "10m",
+        total: 25,
+        answered: 25,
+        correct: 20,
+        score: 30,
+        bonus: 10,
+        done: true,
+        chunk_size: 5,
+        chunk_count: 4,
+        chunk_index: 3,
+      },
       daily_length: "10m",
       token: null,
       question: null,
@@ -184,7 +198,7 @@ describe("pickTodayWords", () => {
     assert.equal(listCalls(), 0);
   });
 
-  it("두 개뿐이면(5분 첫 묶음) 두 개 그대로다 - 날짜 단어로 채우지 않는다", async () => {
+  it("두 개뿐이면 두 개 그대로다 - 날짜 단어로 채우지 않는다", async () => {
     const got = await pickTodayWords([card(1), card(2)]);
     assert.deepEqual(
       got.map((w) => w.id),

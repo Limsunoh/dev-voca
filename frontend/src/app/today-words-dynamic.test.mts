@@ -109,9 +109,22 @@ globalThis.fetch = (async (input: string | URL | Request) => {
   paths.push(url.pathname);
   if (url.pathname === "/api/learning/daily/") {
     if (dailyStatus !== 200) return json(dailyStatus, { detail: "거절" });
+    // 오늘 몫을 끝낸 상태다. 회원 홈은 일일공부를 끝내야 오늘의 단어를 그린다
+    // (그 전에는 일일공부 카드만 - page.tsx studyFirst).
     return json(200, {
       lengths: [],
-      today: null,
+      today: {
+        length: "30m",
+        total: 40,
+        answered: 40,
+        correct: 30,
+        score: 55,
+        bonus: 25,
+        done: true,
+        chunk_size: 5,
+        chunk_count: 6,
+        chunk_index: 5,
+      },
       daily_length: "30m",
       token: null,
       question: null,
@@ -361,7 +374,7 @@ describe("홈 - 일일공부 상태가 이상할 때", () => {
     assert.equal(bigWord(html), undefined);
   });
 
-  it("5분 첫 묶음(2개)은 날짜 단어를 섞지 않고 둘 다 같은 순서를 싣는다", async () => {
+  it("내 단어가 두 개뿐이어도 날짜 단어를 섞지 않고 둘 다 같은 순서를 싣는다", async () => {
     cookie = "member-token";
     todayWords = [card(40), card(41)];
     const html = renderToStaticMarkup(await Home());

@@ -496,12 +496,53 @@ class ApiTest(TestCase):
         for row in body["lengths"]:
             self.assertEqual(
                 set(row),
-                {"value", "label", "questions", "bonus", "words"},
+                {
+                    "value",
+                    "label",
+                    "questions",
+                    "bonus",
+                    "words",
+                    "chunk_size",
+                    "chunk_count",
+                },
                 "칸이 바뀌었다",
             )
+            # 홈 카드가 "단어 N개를 M개씩" 과 묶음 막대를 같이 그린다. 어긋나면
+            # 문장과 막대가 다른 말을 한다.
+            self.assertEqual(row["words"], row["chunk_size"] * row["chunk_count"])
             # 학습 단어 수가 문제 수를 넘으면 화면이 "8개 공부하고 5문제"
             # 처럼 앞뒤가 안 맞는 안내를 하게 된다.
             self.assertLessEqual(row["words"], row["questions"])
+
+    def test_the_announced_chunks_match_the_opened_round(self):
+        """시작 전 홈 카드가 그린 묶음이 실제로 열린 판과 같다.
+
+        홈은 시작 전에는 lengths 로("단어 20개를 5개씩"), 시작한 뒤에는 오늘
+        판(today)으로 막대를 그린다. 둘이 다르면 "시작하기" 를 누른 순간 막대
+        칸 수가 바뀐다. 콘텐츠가 넉넉한 DB(운영)에서는 같아야 한다.
+        """
+        for value, _label in StudyLength.choices:
+            with self.subTest(length=value):
+                self.client.force_login(make_user(f"묶음{value}"))
+                row = next(
+                    one
+                    for one in self.client.get(START_URL).json()["lengths"]
+                    if one["value"] == value
+                )
+                res = self.client.post(
+                    START_URL, {"length": value}, content_type="application/json"
+                )
+                self.assertEqual(res.status_code, 201, res.content)
+
+                today = self.client.get(START_URL).json()["today"]
+                self.assertEqual(today["length"], value)
+                self.assertEqual(today["chunk_size"], row["chunk_size"])
+                self.assertEqual(today["chunk_count"], row["chunk_count"])
+                self.assertEqual(
+                    today["chunk_size"] * today["chunk_count"], row["words"]
+                )
+                self.assertEqual(today["total"], row["questions"])
+                self.assertGreater(row["chunk_size"], 0)
 
     def test_a_full_run_ends_by_itself(self):
         """마지막 문제를 풀면 서버가 닫는다. 끝내기 요청이 없다."""
