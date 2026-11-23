@@ -2,16 +2,12 @@
 
 tests_ip_throttle.py 가 "비밀값이 맞으면 IP 로, 아니면 한 통" 이라는 뼈대를 본다면,
 여기서는 그 경계를 비틀어 본다. 같은 IP 를 다르게 적어 통을 가르려는 시도, 비밀값을
-조금만 바꾼 것, IP 칸에 엉뚱한 값을 넣은 것, 날짜 문 바로 앞뒤, 막힌 요청이 정말 아무
-것도 만들지 않는지.
+조금만 바꾼 것, IP 칸에 엉뚱한 값을 넣은 것, 막힌 요청이 정말 아무 것도 만들지 않는지.
 
 비율은 tests_ip_throttle.py 와 같이 get_rate 를 바꿔 2/min 으로 좁힌다.
 """
 
 from __future__ import annotations
-
-from datetime import date
-from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, override_settings
@@ -25,7 +21,7 @@ from .tests_ip_throttle import (
     mark,
     relayed,
 )
-from .throttles import IP_COUNT_FROM, LoginIpThrottle, SignUpIpThrottle, came_through_next
+from .throttles import LoginIpThrottle, SignUpIpThrottle, came_through_next
 
 
 @override_settings(RELAY_SECRET=RELAY_MARK)
@@ -46,7 +42,6 @@ class SignUpIpBucketEdgeTest(_IpThrottleCase):
 
     def test_ipv6_spellings_share_one_bucket(self):
         """같은 IPv6 를 0 을 채워 쓰거나 대문자로 써도 같은 통이다."""
-        self.counting_from(date.min)
         self.assertEqual(
             self.codes(
                 relayed("2001:db8::1"),
@@ -57,7 +52,6 @@ class SignUpIpBucketEdgeTest(_IpThrottleCase):
         )
 
     def test_surrounding_whitespace_is_the_same_ip(self):
-        self.counting_from(date.min)
         self.assertEqual(
             self.codes(relayed("203.0.113.7"), relayed("  203.0.113.7\t"), relayed("203.0.113.7 ")),
             [201, 201, 429],
@@ -69,7 +63,6 @@ class SignUpIpBucketEdgeTest(_IpThrottleCase):
         비밀값은 Next 만 가지고, Next 는 Vercel 이 준 IP 를 싣는다. IP 를 못 실은 것은
         Next 쪽 문제라 그 사용자를 바로 부른 봇의 통에 섞지 않는다.
         """
-        self.counting_from(date.min)
         for raw in (
             "203.0.113.50, 10.0.0.1",
             "unknown",
@@ -106,13 +99,11 @@ class SignUpIpBucketEdgeTest(_IpThrottleCase):
             self.assertTrue(came_through_next(request))
 
     def test_non_ascii_secret_header_is_direct_not_500(self):
-        self.counting_from(date.min)
         meta = relayed("203.0.113.7", secret=mark("éé"))
         self.assertEqual(self.codes(meta, meta, meta), [201, 201, 429])
 
     def test_blocked_request_creates_no_account(self):
         """429 로 막힌 가입은 계정을 만들지 않는다."""
-        self.counting_from(date.min)
         users = get_user_model().objects
         self.codes(relayed("203.0.113.7"), relayed("203.0.113.7"))
         before = users.count()
@@ -123,7 +114,6 @@ class SignUpIpBucketEdgeTest(_IpThrottleCase):
 
     def test_cache_key_is_salted_with_server_secret(self):
         """키는 서버 비밀값을 섞은 해시다. 그냥 해시면 IP 목록과 대조해 원래 IP 가 나온다."""
-        self.counting_from(date.min)
         request = RequestFactory().post(SIGNUP_URL, **relayed("203.0.113.7"))
         key = SignUpIpThrottle().get_cache_key(request, view=None)
         with override_settings(SECRET_KEY=mark("other-server-key")):
@@ -140,30 +130,12 @@ class SignUpIpBucketEdgeTest(_IpThrottleCase):
         "db8" 같은 조각으로 찾으면 실행마다 바뀌는 SECRET_KEY 때문에 해시에 우연히 나와
         가끔 빨개진다.
         """
-        self.counting_from(date.min)
         request = RequestFactory().post(SIGNUP_URL, **relayed("2001:db8::1"))
         key = SignUpIpThrottle().get_cache_key(request, view=None)
         self.assertRegex(key, r"^throttle_signup_ip_[0-9a-f]{64}$")
 
-    def test_policy_date_boundary_in_korean_time(self):
-        """시행일 전날까지는 아무것도 세지 않고, 시행일부터 센다.
-
-        날짜 고정(counting_from)을 쓰지 않고 실제 IP_COUNT_FROM 에 오늘을 맞춘다.
-        """
-        day_before = date.fromordinal(IP_COUNT_FROM.toordinal() - 1)
-        with mock.patch("django.utils.timezone.localdate", return_value=day_before):
-            self.assertEqual(self.codes(*[relayed("203.0.113.7")] * 4), [201] * 4)
-            # 바로 부른 요청도 시행일 전에는 세지 않는다.
-            self.assertEqual(self.codes({}, {}, {}), [201] * 3)
-        with mock.patch("django.utils.timezone.localdate", return_value=IP_COUNT_FROM):
-            self.assertEqual(
-                self.codes(relayed("203.0.113.8"), relayed("203.0.113.8"), relayed("203.0.113.8")),
-                [201, 201, 429],
-            )
-
     def test_signup_bucket_does_not_block_login(self):
         """가입 통을 다 쓴 IP 도 로그인은 된다(통이 따로다)."""
-        self.counting_from(date.min)
         self.codes(relayed("203.0.113.7"), relayed("203.0.113.7"))
         body = {"email": "edge1@example.com", "password": mark("signup-pass")}
         res = self.client.post(
@@ -182,13 +154,11 @@ class LoginIpBucketEdgeTest(_IpThrottleCase):
 
     def test_malformed_bodies_still_count_in_direct_bucket(self):
         """이메일이 없는 본문도 IP 통에서는 센다. 빈 본문으로 통을 비켜 갈 수 없다."""
-        self.counting_from(date.min)
         for body in ("", "[]", '{"email": ""}'):
             self.client.post(LOGIN_URL, body, content_type="application/json")
         self.assertEqual(self.login("x@example.com").status_code, 429)
 
     def test_spraying_across_ipv6_spellings_is_blocked(self):
-        self.counting_from(date.min)
         self.assertEqual(self.login("a@example.com", **relayed("2001:db8::1")).status_code, 400)
         self.assertEqual(self.login("b@example.com", **relayed("2001:0db8::0:1")).status_code, 400)
         self.assertEqual(

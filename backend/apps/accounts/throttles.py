@@ -22,7 +22,6 @@ import ipaddress
 import logging
 import secrets
 import unicodedata
-from datetime import date
 
 from django.conf import settings
 from django.db import connection
@@ -304,16 +303,6 @@ class AvatarPhotoThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": f"u{user.pk}"}
 
 
-# 가입·로그인을 접속 IP 로 세기 시작하는 날(한국 시간). 처리방침 v3 가 "로그인·가입 시도 때
-# 접속 IP 를 해시값으로 바꿔 1시간 단위로 센다" 를 싣고 시행하는 날이다. 처리방침 14절이
-# "바꾸면 시행 7일 전부터 화면에 알린다" 고 약속해서 그 전에는 아무것도 세지 않는다. Next 도
-# 이 날부터 IP 를 싣는다(frontend/src/lib/client-ip.ts 의 IP_FROM). 두 날짜와 처리방침
-# v3 시행일(2026-11-19)이 같은지는 client-ip.test.mts 가 본다.
-# PRIVACY_CHANGE.effective 는 최신 버전의 시행일이라 견주지 않는다.
-# ponytail: 날짜로 켜는 문이다. 시행일이 지나면 이 상수와 _ClientIpThrottle 의 날짜 비교,
-# client-ip.ts 의 IP_FROM, 두 쪽 테스트의 날짜 고정을 지운다. `grep -rn IP_COUNT_FROM` 로 찾는다.
-IP_COUNT_FROM = date(2026, 11, 19)
-
 # Next 서버가 싣는 머리(frontend/src/lib/client-ip.ts). WSGI 가 HTTP_ 를 붙이고 - 를 _ 로 바꾼다.
 RELAY_SECRET_HEADER = "HTTP_X_NEXT_RELAY"
 CLIENT_IP_HEADER = "HTTP_X_NEXT_CLIENT_IP"
@@ -386,7 +375,7 @@ def client_ip_bucket(request: Request) -> str | None:
 
 
 class _ClientIpThrottle(SimpleRateThrottle):
-    """접속 IP 로 센다. IP_COUNT_FROM 전에는 아무것도 세지 않는다.
+    """접속 IP 로 센다(처리방침 v3 시행일인 2026-11-19 부터).
 
     - Next 를 거친 요청: 접속 IP(IPv6 는 /64)마다 따로 센다. IP 원문은 캐시 키에 두지
       않고, 이메일과 같이 서버 비밀값을 섞은 해시로 바꾼다. Next 가 IP 를 싣지 못한
@@ -401,12 +390,7 @@ class _ClientIpThrottle(SimpleRateThrottle):
     """
 
     def get_cache_key(self, request: Request, view) -> str | None:
-        # 비밀값 확인은 날짜 앞에서 한다. IP 를 보지 않는 일이라 처리방침과 상관없고,
-        # 시행일 전에도 값이 어긋났다는 경고가 운영 로그에 나와 미리 맞출 수 있다.
-        through_next = came_through_next(request)
-        if timezone.localdate() < IP_COUNT_FROM:
-            return None
-        if not through_next:
+        if not came_through_next(request):
             ident = "direct"
         else:
             bucket = client_ip_bucket(request)

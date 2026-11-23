@@ -28,9 +28,6 @@ export const EFFECTIVE_DATE = "2026년 11월 9일";
  * 지금 버전의 바뀐 내용만 적고 앞 버전 이력은 남기지 않는다. 공고 전에 이미 하고 있던
  * 일(v5 의 Sentry 는 11-20 부터)은 알림에 공고 전 날짜를 띄울 수 없으니 14절에
  * 시작한 날을 적고 firstChange 는 effective 로 둔다.
- *
- * 서버의 날짜 문: v3 시행일에 켜지는 error_mail.py 의 MESSAGE_FROM,
- * throttles.py 의 IP_COUNT_FROM, lib/client-ip.ts 의 IP_FROM 은 그대로 11-19 다.
  */
 export const PRIVACY_CHANGE = {
   announced: "2026-11-21",

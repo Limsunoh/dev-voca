@@ -1,8 +1,7 @@
 """가입·로그인을 접속 IP 로 세는 제한(throttles.SignUpIpThrottle, LoginIpThrottle, GoogleIpThrottle).
 
-처리방침 v3 시행일(IP_COUNT_FROM) 전에는 아무것도 세지 않는다. 시행일부터 Next 서버가
-비밀값과 함께 넘긴 IP(IPv6 는 /64)마다 세고, 비밀값이 없거나 틀린 요청(백엔드를 바로
-부른 것)은 IP 를 보지 않고 한 통으로 센다.
+Next 서버가 비밀값과 함께 넘긴 IP(IPv6 는 /64)마다 세고, 비밀값이 없거나 틀린 요청(백엔드를
+바로 부른 것)은 IP 를 보지 않고 한 통으로 센다. 처리방침 v3 시행일인 2026-11-19 부터 센다.
 
 비율은 테스트에서 2/min 으로 좁힌다. override_settings 로는 안 되고 get_rate 를 바꾼다
 (DRF 가 스로틀을 만들 때 설정을 한 번 읽고 굳힌다, tests.py 의 EmailRateThrottle 테스트).
@@ -10,7 +9,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from unittest import mock
 
 from django.core.cache import cache
@@ -18,10 +16,8 @@ from django.test import RequestFactory, SimpleTestCase, TestCase, override_setti
 from django.utils.crypto import salted_hmac
 
 from . import throttles
-from .error_mail import MESSAGE_FROM
 from .google import GoogleAuthError
 from .throttles import (
-    IP_COUNT_FROM,
     GoogleIpThrottle,
     LoginIpThrottle,
     SignUpIpThrottle,
@@ -49,16 +45,6 @@ LOGIN_MARK = mark("ip-login")
 def relayed(ip: str, secret: str = RELAY_MARK) -> dict[str, str]:
     """Next 서버(frontend/src/lib/client-ip.ts)가 싣는 머리."""
     return {"HTTP_X_NEXT_RELAY": secret, "HTTP_X_NEXT_CLIENT_IP": ip}
-
-
-class PolicyDateTest(SimpleTestCase):
-    def test_ip_counting_starts_with_privacy_v3(self):
-        """처리방침 v3 시행일(오류 메시지 기록과 같은 날)보다 먼저 세면 안 된다.
-
-        프론트 쪽 날짜(client-ip.ts 의 IP_FROM)와 처리방침의 시행일 대조는
-        client-ip.test.mts 가 본다.
-        """
-        self.assertEqual(IP_COUNT_FROM, MESSAGE_FROM)
 
 
 @override_settings(RELAY_SECRET=RELAY_MARK)
@@ -141,11 +127,6 @@ class _IpThrottleCase(TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def counting_from(self, day: date) -> None:
-        patcher = mock.patch.object(throttles, "IP_COUNT_FROM", day)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
 
 @override_settings(RELAY_SECRET=RELAY_MARK)
 class SignUpIpThrottleTest(_IpThrottleCase):
@@ -157,13 +138,11 @@ class SignUpIpThrottleTest(_IpThrottleCase):
 
     def test_direct_requests_share_one_bucket_whatever_ip_they_claim(self):
         """백엔드를 바로 부른 봇은 IP 를 지어 보내도 한 통에 든다."""
-        self.counting_from(date.min)
         self.assertEqual(self.signup(1, HTTP_X_NEXT_CLIENT_IP="198.51.100.1").status_code, 201)
         self.assertEqual(self.signup(2, HTTP_X_NEXT_CLIENT_IP="198.51.100.2").status_code, 201)
         self.assertEqual(self.signup(3, HTTP_X_NEXT_CLIENT_IP="198.51.100.3").status_code, 429)
 
     def test_wrong_secret_counts_as_direct(self):
-        self.counting_from(date.min)
         wrong = mark("guess")
         self.assertEqual(self.signup(1, **relayed("198.51.100.1", secret=wrong)).status_code, 201)
         self.assertEqual(self.signup(2, **relayed("198.51.100.2", secret=wrong)).status_code, 201)
@@ -171,53 +150,32 @@ class SignUpIpThrottleTest(_IpThrottleCase):
 
     def test_relayed_requests_are_counted_per_ip(self):
         """한 IP 가 막혀도 다른 IP 의 사람은 가입할 수 있다."""
-        self.counting_from(date.min)
         self.assertEqual(self.signup(1, **relayed("203.0.113.7")).status_code, 201)
         self.assertEqual(self.signup(2, **relayed("203.0.113.7")).status_code, 201)
         self.assertEqual(self.signup(3, **relayed("203.0.113.7")).status_code, 429)
         self.assertEqual(self.signup(4, **relayed("203.0.113.8")).status_code, 201)
 
     def test_ipv6_addresses_in_one_64_share_a_bucket(self):
-        self.counting_from(date.min)
         self.assertEqual(self.signup(1, **relayed("2001:db8:1:2::1")).status_code, 201)
         self.assertEqual(self.signup(2, **relayed("2001:db8:1:2::2")).status_code, 201)
         self.assertEqual(self.signup(3, **relayed("2001:db8:1:2::3")).status_code, 429)
 
     def test_relayed_ip_bucket_is_separate_from_direct_bucket(self):
         """봇이 직접 부르는 통을 다 써도 Next 를 거친 사람은 막히지 않는다."""
-        self.counting_from(date.min)
         self.signup(1)
         self.signup(2)
         self.assertEqual(self.signup(3).status_code, 429)
         self.assertEqual(self.signup(4, **relayed("203.0.113.7")).status_code, 201)
 
     def test_relayed_without_ip_is_not_counted(self):
-        """Next 는 시행일 전에는 IP 없이 비밀값만 싣는다. 그 요청을 봇의 통에 넣지 않는다."""
-        self.counting_from(date.min)
+        """Next 가 IP 를 못 실으면(x-forwarded-for 가 없을 때) 비밀값만 온다. 그 요청을
+        봇의 통에 넣지 않는다."""
         meta = {"HTTP_X_NEXT_RELAY": RELAY_MARK}
         for n in range(1, 5):
             self.assertEqual(self.signup(n, **meta).status_code, 201)
 
-    def test_wrong_secret_warns_even_before_policy_date(self):
-        """시행일 전에 값이 어긋난 것을 알아야 미리 맞춘다. 세지는 않는다."""
-        self.counting_from(date.max)
-        throttles._WARNED.clear()
-        self.addCleanup(throttles._WARNED.clear)
-        with self.assertLogs("apps.accounts.throttles", level="WARNING"):
-            res = self.signup(1, **relayed("203.0.113.7", secret=mark("drift")))
-        self.assertEqual(res.status_code, 201)
-
-    def test_nothing_is_counted_before_policy_date(self):
-        """처리방침 v3 시행 전에는 IP 도, 바로 부른 요청의 한 통도 세지 않는다."""
-        self.counting_from(date.max)
-        for n in range(1, 4):
-            self.assertEqual(self.signup(n, **relayed("203.0.113.7")).status_code, 201)
-        for n in range(10, 14):
-            self.assertEqual(self.signup(n).status_code, 201)
-
     def test_cache_key_is_a_salted_hash_of_the_bucket(self):
         """키는 서버 비밀값을 섞은 해시다. IP 원문도, 비밀값 없는 해시도 아니다."""
-        self.counting_from(date.min)
         request = RequestFactory().post(SIGNUP_URL, **relayed("203.0.113.7"))
         key = SignUpIpThrottle().get_cache_key(request, view=None)
         expected = salted_hmac("accounts.throttles.ip", "203.0.113.7", algorithm="sha256")
@@ -227,7 +185,6 @@ class SignUpIpThrottleTest(_IpThrottleCase):
     @override_settings(RELAY_SECRET="")
     def test_without_secret_everyone_shares_the_direct_bucket(self):
         """한쪽에만 비밀값을 넣으면 실제 사용자도 한 통에 든다(DEPLOY.md 가 경고하는 것)."""
-        self.counting_from(date.min)
         self.assertEqual(self.signup(1, **relayed("203.0.113.7")).status_code, 201)
         self.assertEqual(self.signup(2, **relayed("203.0.113.8")).status_code, 201)
         self.assertEqual(self.signup(3, **relayed("203.0.113.9")).status_code, 429)
@@ -251,14 +208,12 @@ class LoginIpThrottleTest(_IpThrottleCase):
 
     def test_spraying_many_accounts_from_one_ip_is_blocked(self):
         """계정마다 한 번씩 대보는 것은 이메일 제한에 안 걸린다. IP 로 막는다."""
-        self.counting_from(date.min)
         self.assertEqual(self.login("a@example.com", **relayed("203.0.113.7")).status_code, 400)
         self.assertEqual(self.login("b@example.com", **relayed("203.0.113.7")).status_code, 400)
         self.assertEqual(self.login("c@example.com", **relayed("203.0.113.7")).status_code, 429)
         self.assertEqual(self.login("d@example.com", **relayed("203.0.113.8")).status_code, 400)
 
     def test_correct_login_still_works_from_another_ip(self):
-        self.counting_from(date.min)
         self.login("a@example.com", **relayed("203.0.113.7"))
         self.login("b@example.com", **relayed("203.0.113.7"))
         body = {"email": "ip-login@example.com", "password": LOGIN_MARK}
@@ -276,8 +231,6 @@ class GoogleIpThrottleTest(_IpThrottleCase):
 
     def setUp(self):
         super().setUp()
-        # 오늘 날짜에 기대지 않는다(IP_COUNT_FROM 전이면 아무것도 세지 않는다).
-        self.counting_from(date.min)
         # 구글을 실제로 부르지 않는다. 막지 않으면 통과 이유가 제한이 아니라 구글의 거절이 된다.
         google = mock.patch(
             "apps.accounts.views.fetch_google_user",
