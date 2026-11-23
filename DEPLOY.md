@@ -173,6 +173,13 @@ Host 가 `healthcheck.railway.app` 이라 일반 뷰로 두면 400·301 이 된�
 | `DJANGO_DEBUG` | `0` | 에러 페이지에 소스 노출. 가입·로그인 IP 제한도 사실상 꺼진다(DEBUG 면 1분 1000번) |
 | `DATABASE_URL` | PostgreSQL 추가 시 자동 | 로컬 기본값을 침 |
 | `RELAY_SECRET` | 무작위 긴 값. **Vercel 에도 같은 이름·같은 값** | 가입·로그인(구글 포함) IP 제한이 모든 사람을 한 통으로 센다 |
+| `SECURE_HSTS_SECONDS` | `31536000`(1년) | 브라우저가 첫 접속을 http 로 할 수 있다. Admin 로그인을 가로채기 쉬워진다 |
+
+`SECURE_HSTS_SECONDS` 는 web 서비스에만 넣는다. 브라우저로 이 주소에 들어오는 것은 Admin
+뿐이라(사용자 화면은 Next 가 서버에서 부른다) 그 로그인을 지키는 값이다. 하위 도메인까지
+걸지 않는다(`SECURE_HSTS_INCLUDE_SUBDOMAINS` 기본 False). `up.railway.app` 의 다른 주소는
+남의 서비스다. 2026-11-23 에 0 에서 1년으로 바로 올렸다. 짧은 값부터 켜는 이유는 https 가
+흔들릴 때 되돌리려는 것인데, 이 주소의 https 는 Railway 가 늘 붙여 흔들릴 일이 없다.
 
 `RELAY_SECRET` 은 Next 서버가 가입·로그인 요청(구글 로그인 포함, 2026-11-22 부터)에 싣는 값이다(frontend/src/lib/client-ip.ts,
 backend/apps/accounts/throttles.py). 백엔드는 이 값이 맞는 요청만 Next 에서 온 것으로 보고
@@ -451,9 +458,14 @@ railway ssh --service web
 
 ### Admin 로그인이 429 로 막혔을 때
 
-Admin 로그인은 이메일마다 한 시간에 10번까지다(`admin_login`). 남이 관리자
-이메일로 계속 틀린 비밀번호를 보내면 관리자도 막힌다. 그 이메일의 횟수만
-지우면 바로 다시 들어갈 수 있다. Git Bash 에서 돌린다(PowerShell 은 `\"` 를
+Admin 로그인은 이메일마다 한 시간에 10번까지다(`admin_login`). 그 이메일로 로그인에
+성공한 브라우저는 기기 쿠키(`admin_device`, 180일)를 받고, 다음부터 그 브라우저의
+시도는 이메일이 아니라 기기마다 한 시간에 10번으로 센다. 그래서 남이 관리자 이메일로
+계속 틀린 비밀번호를 보내도, 전에 로그인해 본 브라우저는 막히지 않는다. 막히는 것은
+처음 쓰는 브라우저(또는 쿠키를 지운 브라우저)다. 그 이메일의 횟수만
+지우면 바로 다시 들어갈 수 있다. 반대로 쿠키가 있는 브라우저에서 직접 열 번 틀려
+막혔으면 아래 명령으로는 안 풀린다. 그 브라우저의 `admin_device` 쿠키를 지우면 이메일
+통으로 돌아가고, 아니면 한 시간을 기다린다. Git Bash 에서 돌린다(PowerShell 은 `\"` 를
 따옴표로 읽지 않는다). `True` 가 찍히면 지운 것이고, `False` 면 이메일이 틀렸거나
 이미 풀린 것이다.
 
@@ -560,6 +572,10 @@ railway ssh --service web "python backend/manage.py daily_cleanup"
 **등록하지 않으면 1년 파기는 돌지 않는다.** 처리방침에 적힌 내용과 달라지므로
 정식 공개 전에 등록한다.
 
+정리가 실패하면(예외) Sentry 로 오류가 간다(daily_cleanup 의 `execute`). 아예 안 돌면 오류가 없으니,
+다음 날 새벽 백업이 되살린 사본에서 정리가 지웠어야 할 행을 세어 알린다("DB 백업" 4번).
+로그인 토큰은 정리가 멈춰도 30일이 지나면 인증에서 거절한다(SlimTokenAuthentication).
+
 ### 메일 발송 (Gmail API)
 
 Railway 는 Hobby 요금제에서 바깥으로 나가는 SMTP 를 막는다. 앱 비밀번호
@@ -625,7 +641,7 @@ Railway 를 Pro 로 올려 Railway 의 백업을 쓰게 되면 처리방침 3절
 1. 보관 기간이 지난 파일을 지운다. 크론 시각이 조금씩 흔들려도 14일을 넘기지 않게
    14일에서 3시간을 뺀 기준(`-mmin`)으로 본다. 맨 앞에 둔 이유: 뒤 단계가 실패하는
    날에도 "14일이 지나면 지운다" 는 약속이 지켜진다. 대신 실패가 14일 넘게 이어지면
-   백업이 하나도 남지 않는다. 그래서 실패한 날은 메일이 오게 했다(4번).
+   백업이 하나도 남지 않는다. 그래서 실패한 날은 메일이 오게 했다(5번).
 2. `.part` 이름으로 뜬다.
 3. 같은 컨테이너에 임시 Postgres 를 띄워 그 파일을 되살려 보고 표 몇 개의 행을 센다.
    통과해야 `.dump` 로 이름을 바꾼다. 그래서 `/backups` 의 `devvoca-*.dump` 는 모두 되살려
@@ -634,7 +650,20 @@ Railway 를 Pro 로 올려 Railway 의 백업을 쓰게 되면 처리방침 3절
    재시도는 하지 않는다. 성공하면 로그에 `restore check words|sentences|users|answers:
    3503|5329|5|25` 같은 줄이 남는다. 이 줄의 표 이름(vocab_word 등)을 바꾸는
    마이그레이션을 하면 여기도 고친다.
-4. 여기까지 통과하면 Sentry 의 감시 `db-backup`(devvoca-backend 프로젝트)에 "끝났다"
+4. 되살린 사본에서 정기 정리(아래 "정기 정리", 매일 UTC 18:00)가 지웠어야 할 행을 센다.
+   발급 31일이 지난 로그인 토큰과, 만료된 지 하루가 지난 시도 횟수 행이다. 전날 정리가
+   돌았으면 둘 다 0 이다. 0 이 아니면 백업 파일은 그대로 저장한 뒤 명령을 실패로 끝내
+   5번의 신호를 보내지 않는다. 로그의 `cleanup check stale rows: N` 이 그 수다. 정리
+   크론에 따로 감시를 붙이지 않고 여기서 보는 이유: Sentry 무료 요금제(Developer)는 감시가
+   하나뿐이고 더 살 수도 없다(요금제를 올려야 한다). 처리방침 3절의 "토큰은 발급 30일 뒤
+   지운다", "시도 기록은 최대 1시간 뒤 매일 정리할 때 지운다" 가 지켜지는지를 직접 본다.
+   정리가 멈춰도 그 사이 지울 행이 하나도 안 생겼으면 메일이 안 온다. 약속이 깨진 날에만
+   온다. 정리 일정을 백업보다 앞으로 옮기거나 두 시각의 간격을 바꾸면 기준(31일, 하루)을
+   다시 따진다. 기준은 이 검사가 정리(UTC 18:00)보다 먼저, 곧 백업이 30분 안에 여기까지
+   온다는 전제다. 쿼리가 오류로 끝나면(표 이름 `accounts_logintoken`·`throttle_cache` 가
+   바뀐 경우) 값이 `err` 가 되어 같은 길로 간다. 3번처럼 이 두 표 이름을 바꾸는
+   마이그레이션을 하면 여기도 고친다.
+5. 여기까지 통과하면 Sentry 의 감시 `db-backup`(devvoca-backend 프로젝트)에 "끝났다"
    신호(체크인)를 보낸다. 한국 새벽 3시 30분(UTC 18:30)까지 신호가 없으면 Sentry 가
    "Cron failure: db-backup" 이슈를 만들고, 위 "오류 알림" 절의 high priority 규칙이
    조직 멤버에게 메일을 보낸다. 명령이 중간에 실패해도, 멈춰서 안 끝나도, Railway 가
@@ -651,11 +680,11 @@ Railway 를 Pro 로 올려 Railway 의 백업을 쓰게 되면 처리방침 3절
 Sentry 감시 설정은 일정 `30 17 * * *`(UTC), 기다리는 시간(check-in margin) 60분, 실패
 1번에 이슈, 성공 1번에 닫힘이다. 2026-11-22 에 체크인 요청으로 만들었다. Railway 의 Cron
 Schedule 을 바꾸면 Sentry 의 Crons > db-backup 일정도 같이 바꾼다. 안 바꾸면 백업이
-성공한 날에도 메일이 온다. 무료 요금제(Developer)는 감시가 하나까지라, 정리 크론에도
-붙이면 요금이 든다.
+성공한 날에도 메일이 온다. 무료 요금제(Developer)는 감시가 하나까지라 정리 크론에는
+따로 붙이지 않고 4번이 대신 본다.
 
 ```
-timeout -k 60 50m sh -c 'set -eu; find /backups -name "*.part" -delete; find /backups -name "devvoca-*.dump" -mmin +$((BACKUP_KEEP_DAYS * 1440 - 180)) -print -delete; f=/backups/devvoca-$(date -u +%Y%m%dT%H%M%SZ).dump; pg_dump --dbname="$DATABASE_URL" --format=custom --file="$f.part"; d=/tmp/pgcheck; mkdir -p $d; chown postgres $d; gosu postgres initdb -D $d -A trust >/dev/null; gosu postgres pg_ctl -D $d -o "-c listen_addresses=" -w start >/dev/null; gosu postgres createdb check; gosu postgres pg_restore -d check --no-owner --no-privileges --exit-on-error "$f.part"; n=$(gosu postgres psql -d check -Atc "select (select count(*) from vocab_word), (select count(*) from vocab_sentence), (select count(*) from accounts_user), (select count(*) from learning_quizanswer)"); echo "restore check words|sentences|users|answers: $n"; test "${n%%|*}" -gt 0; gosu postgres pg_ctl -D $d -w stop >/dev/null; mv "$f.part" "$f"; ls -l /backups; df -h /backups; k=${SENTRY_DSN#https://}; h=${k#*@}; h=${h%%/*}; r=$(printf "GET /api/${k##*/}/cron/db-backup/${k%%@*}/?status=ok HTTP/1.1\r\nHost: $h\r\nConnection: close\r\n\r\n" | timeout 30 openssl s_client -quiet -connect "$h:443" -servername "$h" 2>/dev/null | head -n 1); echo "sentry check-in: $r"'
+timeout -k 60 50m sh -c 'set -eu; find /backups -name "*.part" -delete; find /backups -name "devvoca-*.dump" -mmin +$((BACKUP_KEEP_DAYS * 1440 - 180)) -print -delete; f=/backups/devvoca-$(date -u +%Y%m%dT%H%M%SZ).dump; pg_dump --dbname="$DATABASE_URL" --format=custom --file="$f.part"; d=/tmp/pgcheck; mkdir -p $d; chown postgres $d; gosu postgres initdb -D $d -A trust >/dev/null; gosu postgres pg_ctl -D $d -o "-c listen_addresses=" -w start >/dev/null; gosu postgres createdb check; gosu postgres pg_restore -d check --no-owner --no-privileges --exit-on-error "$f.part"; n=$(gosu postgres psql -d check -Atc "select (select count(*) from vocab_word), (select count(*) from vocab_sentence), (select count(*) from accounts_user), (select count(*) from learning_quizanswer)"); echo "restore check words|sentences|users|answers: $n"; test "${n%%|*}" -gt 0; s=$(gosu postgres psql -d check -Atc "select (select count(*) from accounts_logintoken where created < now() - make_interval(days => 31)) + (select count(*) from throttle_cache where expires < now() - make_interval(days => 1))") || s=err; echo "cleanup check stale rows: $s"; gosu postgres pg_ctl -D $d -w stop >/dev/null; mv "$f.part" "$f"; ls -l /backups; df -h /backups; test "$s" -eq 0; k=${SENTRY_DSN#https://}; h=${k#*@}; h=${h%%/*}; r=$(printf "GET /api/${k##*/}/cron/db-backup/${k%%@*}/?status=ok HTTP/1.1\r\nHost: $h\r\nConnection: close\r\n\r\n" | timeout 30 openssl s_client -quiet -connect "$h:443" -servername "$h" 2>/dev/null | head -n 1); echo "sentry check-in: $r"'
 ```
 
 ### 되살리는 법
@@ -736,8 +765,6 @@ Railway 지역 장애까지는 막지 못한다. 하루 파일은 2026-11 기준
 
 ## 아직 안 한 것
 
-- HSTS (`SECURE_HSTS_SECONDS`) - 도메인 확정 후 짧은 값부터 켠다.
-  브라우저가 기억해버려 되돌리기 어렵다.
 - 레이트리밋 - 로그인·가입은 이메일 단위와 접속 IP 단위(2026-11-19 부터, Next 가
   비밀값과 함께 넘긴 IP)로 걸어뒀다. 나머지 조회 경로는 모든 요청이 Next 서버 하나로
   보여 그냥은 IP 로 셀 수 없다. 필요해지면 그 경로에도 lib/client-ip.ts 의 머리를

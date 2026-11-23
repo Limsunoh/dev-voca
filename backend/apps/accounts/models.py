@@ -657,8 +657,9 @@ class LoginToken(models.Model):
     (/admin/accounts/logintoken/<pk>/). 토큰이 주소에 들어가면 서버 로그와
     브라우저 기록에 남는다. DRF 가 TokenProxy 를 따로 둔 것도 같은 이유다.
 
-    발급하고 LIFETIME 이 지나면 매일 정리(daily_cleanup)가 지운다. 그 전에도
-    로그아웃(그 기기 것만)·비밀번호 변경·이메일 변경·계정 삭제 때 지운다.
+    발급하고 LIFETIME 이 지나면 인증에서 거절하고(SlimTokenAuthentication), 매일
+    정리(daily_cleanup)가 지운다. 그 전에도 로그아웃(그 기기 것만)·비밀번호 변경·
+    이메일 변경·계정 삭제 때 지운다.
     처리방침 3절의 "로그인 토큰" 보관 기간이 이 동작을 적고 있다. 바꾸려면 그
     문구부터 고친다(시행 7일 전 공지).
 
@@ -694,3 +695,7 @@ class LoginToken(models.Model):
     def expired(cls) -> models.QuerySet[LoginToken]:
         """발급하고 LIFETIME 이 지난 토큰. 매일 정리가 지운다."""
         return cls.objects.filter(created__lt=timezone.now() - cls.LIFETIME)
+
+    def is_expired(self) -> bool:
+        """expired() 와 같은 기준. 인증이 매 요청 본다(SlimTokenAuthentication)."""
+        return self.created < timezone.now() - self.LIFETIME

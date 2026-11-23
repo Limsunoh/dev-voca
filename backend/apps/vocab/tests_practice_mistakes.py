@@ -21,6 +21,7 @@ from contextlib import contextmanager
 from datetime import timedelta
 from unittest import mock
 
+from django.conf import settings
 from django.core import signing
 from django.core.cache import cache
 from django.db import connection
@@ -92,13 +93,19 @@ class PracticeCase(TestCase):
 
     @contextmanager
     def assertWritesNothing(self):
-        """요청이 어느 표에도 INSERT·UPDATE·DELETE 를 안 낸다."""
+        """요청이 어느 표에도 INSERT·UPDATE·DELETE 를 안 낸다.
+
+        요청 제한 카운터(throttle_cache)는 뺀다. 채점에 요청 제한이 붙어(PracticeGradeThrottle)
+        잘못된 요청도 횟수는 센다. 여기서 보려는 것은 학습 기록이다.
+        """
         with CaptureQueriesContext(connection) as ctx:
             yield
+        cache_table = settings.CACHES["default"]["LOCATION"]
         writes = [
             q["sql"]
             for q in ctx.captured_queries
             if q["sql"].lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE"))
+            and cache_table not in q["sql"]
         ]
         self.assertEqual(writes, [])
 

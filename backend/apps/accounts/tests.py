@@ -1560,7 +1560,9 @@ class EmailChangeThrottleScopeTest(TestCase):
             importlib.reload(importlib.import_module("config.settings"))
 
         def per_min(scope):
-            return int(prod[scope].partition("/")[0])
+            # "3/hour" 와 "120/min" 처럼 단위가 다르다. DRF 처럼 첫 글자로 단위를 읽는다.
+            num, _, period = prod[scope].partition("/")
+            return int(num) * 60 / {"s": 1, "m": 60, "h": 3600, "d": 86400}[period[0]]
 
         self.assertGreater(
             per_min("email_change_confirm"), per_min("email_change")
@@ -1595,14 +1597,19 @@ def _big_png():
     잡음으로 채우는 이유: PNG 는 무손실 압축이라 단색으로 만들면 아무리
     크게 잡아도 몇 KB 로 줄어든다. 잡음은 압축이 안 먹어서 픽셀 수만큼
     커진다.
+
+    요청 본문 상한(config.body_limit, 6MB)보다는 작아야 한다. 넘으면 뷰에 닿기 전에
+    413 으로 끝나 사진 상한의 안내 문구를 확인하지 못한다.
     """
+    from config.body_limit import MAX_BODY_BYTES
     from PIL import Image
 
-    side = 1600
+    side = 1370
     image = Image.frombytes("RGB", (side, side), os.urandom(side * side * 3))
     out = io.BytesIO()
     image.save(out, format="PNG")
-    assert len(out.getvalue()) > AVATAR_PHOTO_MAX_BYTES
+    # 1370 x 1370 x 3 바이트 잡음은 약 5.4MB 다. 64KB 는 multipart 경계와 폼 칸 몫이다.
+    assert AVATAR_PHOTO_MAX_BYTES < len(out.getvalue()) < MAX_BODY_BYTES - 64 * 1024
     return out.getvalue()
 
 

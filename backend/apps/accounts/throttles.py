@@ -3,7 +3,8 @@
 두 가지로 센다.
 
 - 이메일(EmailRateThrottle 분당, EmailHourlyThrottle 시간당): 한 계정의 비밀번호를
-  반복해서 때리는 것. Admin 로그인(AdminLoginThrottle)도 이메일로 센다.
+  반복해서 때리는 것. Admin 로그인(AdminLoginThrottle)도 이메일로 센다. 다만 그 이메일로
+  로그인해 본 브라우저는 기기 쿠키로 따로 센다.
 - 접속 IP(SignUpIpThrottle, LoginIpThrottle, GoogleIpThrottle): 이메일을 바꿔 가며
   계정을 찍어 내거나 여러 계정에 같은 비밀번호를 대보는 것. 이메일로는 한 번씩 다
   통과한다. 구글 로그인은 이메일을 모르므로 IP 로만 센다.
@@ -19,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import logging
+import secrets
 import unicodedata
 from datetime import date
 
@@ -98,14 +100,62 @@ class EmailHourlyThrottle(EmailRateThrottle):
     scope = "auth_email_hour"
 
 
+# 관리자 로그인 기기 쿠키(AdminLoginThrottle). 값은 "이메일 키:무작위" 를 서명한 것이다.
+ADMIN_DEVICE_COOKIE = "admin_device"
+ADMIN_DEVICE_SALT = "accounts.throttles.admin_device"
+ADMIN_DEVICE_MAX_AGE = 180 * 24 * 60 * 60
+
+
+def admin_device(request, email: str) -> str | None:
+    """그 이메일로 로그인해 본 브라우저면 기기 키를 돌려준다. 아니면 None.
+
+    서명이 틀리거나 기한(180일)이 지났거나 다른 이메일의 쿠키면 None 이다. 이메일은
+    email_ident 로 견줘, 로그인이 같은 계정으로 보는 표기(대소문자, 전각 등)는 같게 친다.
+    """
+    value = request.get_signed_cookie(
+        ADMIN_DEVICE_COOKIE, default=None, salt=ADMIN_DEVICE_SALT, max_age=ADMIN_DEVICE_MAX_AGE
+    )
+    if not value:
+        return None
+    owner, _, device = value.partition(":")
+    if not device or not constant_time_compare(owner, email_ident(email)):
+        return None
+    return device
+
+
+def issue_admin_device(response, email: str) -> None:
+    """관리자 로그인에 성공한 응답에 기기 쿠키를 붙인다.
+
+    Admin 주소에서만 보내고(path), 화면 스크립트가 못 읽고(httponly), 다른 사이트에서
+    온 요청에는 안 실린다(SameSite=Strict).
+    """
+    response.set_signed_cookie(
+        ADMIN_DEVICE_COOKIE,
+        f"{email_ident(email)}:{secrets.token_hex(16)}",
+        salt=ADMIN_DEVICE_SALT,
+        max_age=ADMIN_DEVICE_MAX_AGE,
+        path="/admin/",
+        secure=settings.SESSION_COOKIE_SECURE,
+        httponly=True,
+        samesite="Strict",
+    )
+
+
 class AdminLoginThrottle(EmailRateThrottle):
     """관리자 로그인(/admin/login/) 시도. Admin 폼은 이메일을 username 칸에 싣는다.
 
     DRF 화면이 아니라 Django 폼이라 request.data 가 없다. 세는 방식은 위와 같다.
 
-    대가: 관리자 이메일을 아는 사람은 시간당 10번씩 보내 Admin 로그인을 계속 막아 둘 수
-    있다. Admin 은 Next 를 거치지 않아 접속 IP 를 믿을 수 없어 이메일로만 센다. 풀어 주는
-    방법은 DEPLOY.md 의 "Admin 로그인이 429 로 막혔을 때".
+    이메일로만 세면 관리자 이메일을 아는 사람이 시간당 10번씩 보내 Admin 로그인을 계속
+    막아 둘 수 있었다. Admin 은 Next 를 거치지 않아 접속 IP 를 믿을 수 없다(Railway
+    문서는 X-Real-IP 를 사용자가 지어 보내면 덮어쓰는지 적지 않았다). 그래서 기기 쿠키를
+    쓴다(OWASP 의 device cookie). 그 이메일로 로그인에 성공한 브라우저에는 쿠키를 주고,
+    쿠키를 낸 시도는 이메일 통이 아니라 그 기기의 통으로 센다. 남이 이메일 통을 채워도
+    로그인해 본 브라우저는 들어온다. 쿠키는 횟수를 따로 세게 할 뿐 로그인을 대신하지 않고,
+    쿠키를 훔쳐도 그 기기 몫(시간당 10번)만큼만 더 대볼 수 있다.
+
+    남은 대가: 처음 쓰는 브라우저는 여전히 이메일 통이라 막힐 수 있다. 풀어 주는 방법은
+    DEPLOY.md 의 "Admin 로그인이 429 로 막혔을 때".
     """
 
     scope = "admin_login"
@@ -114,6 +164,9 @@ class AdminLoginThrottle(EmailRateThrottle):
         email = request.POST.get("username", "")
         if not email.strip():
             return None
+        device = admin_device(request, email)
+        if device is not None:
+            return self.cache_format % {"scope": f"{self.scope}_device", "ident": device}
         return self.cache_format % {"scope": self.scope, "ident": email_ident(email)}
 
 
@@ -137,6 +190,31 @@ class EmailChangeThrottle(SimpleRateThrottle):
         if not (request.user and request.user.is_authenticated):
             return None
         return self.cache_format % {"scope": self.scope, "ident": f"u{request.user.pk}"}
+
+
+class EmailChangeTotalThrottle(EmailChangeThrottle):
+    """이메일 변경 확인 메일의 서비스 전체 상한. 계정마다 세는 위 제한 다음에 둔다.
+
+    계정마다 세는 것만으로는 계정을 여러 개 만들어 나눠 보내는 것을 못 막는다. 메일은
+    Gmail 계정 하나로 나가고 하루에 보낼 수 있는 양이 정해져 있다(약 500통). 그 한도를
+    이 신청이 다 쓰면 그날 오류 알림과 1년 미접속 삭제 안내가 모두 실패한다.
+
+    대가: 이 통을 누가 채우면 그 한 시간 동안 모두의 이메일 변경이 막힌다. 이메일
+    변경은 드문 일이고, 막히는 것은 확인 메일 보내기뿐이라 삭제 안내를 못 보내는 것보다
+    가볍다. 하루로 세지 않는 이유는 처리방침 3절이 시도 기록을 1시간 넘게 두지 않는다고
+    적어서다(바꾸려면 개정 공지).
+
+    뷰가 FirstThrottleWins 라 계정 제한에 막힌 요청은 여기까지 오지 않는다. 안 그러면
+    한 계정이 막힌 채 계속 보내기만 해도 이 통이 차서 모두가 막힌다.
+    """
+
+    scope = "email_change_total"
+
+    def get_cache_key(self, request, view) -> str | None:
+        # 익명을 세지 않는 판단은 부모와 같다. 키만 계정 대신 "all" 이다.
+        if super().get_cache_key(request, view) is None:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": "all"}
 
 
 class EmailChangeConfirmThrottle(SimpleRateThrottle):

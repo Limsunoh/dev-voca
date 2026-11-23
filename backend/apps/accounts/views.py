@@ -61,6 +61,7 @@ from .throttles import (
     AvatarPhotoThrottle,
     EmailChangeConfirmThrottle,
     EmailChangeThrottle,
+    EmailChangeTotalThrottle,
     EmailHourlyThrottle,
     EmailRateThrottle,
     GoogleIpThrottle,
@@ -68,6 +69,7 @@ from .throttles import (
     PasswordChangeThrottle,
     ProfileUpdateThrottle,
     SignUpIpThrottle,
+    issue_admin_device,
 )
 
 logger = logging.getLogger(__name__)
@@ -118,11 +120,17 @@ def _auth_response(user: AbstractBaseUser, created: bool = False) -> Response:
 
 
 class FirstThrottleWins:
-    """처음 막힌 제한에서 멈춘다. 쓰는 쪽은 throttle_classes 맨 앞에 접속 IP 제한을 둔다.
+    """처음 막힌 제한에서 멈춘다. 쓰는 쪽은 먼저 막아야 할 제한을 throttle_classes 맨 앞에 둔다.
 
     DRF 는 하나가 막아도 나머지 제한을 모두 돌리고, 통과한 쪽은 기록을 남긴다. 그러면
     IP 제한에 막힌 요청도 피해자 이메일의 횟수를 채워 그 계정을 잠그고, 이메일을 바꿔
     가며 보내면 캐시 표에 행이 쌓여 다른 사람의 횟수까지 밀어낸다(DB 캐시는 넘치면 지운다).
+    가입·로그인은 접속 IP 제한을, 이메일 변경은 계정 제한을 맨 앞에 둔다(계정에 막힌
+    요청이 서비스 전체 통을 채우지 않게).
+
+    반대 방향은 남는다. 앞의 제한은 통과해 기록을 남겼는데 뒤의 제한에 막히면, 앞의 횟수는
+    이미 한 번 쓴 것이다. 이메일 변경 전체 통이 찬 동안 세 번 시도한 사람은, 통이 풀린 뒤
+    그 한 시간 동안 자기 몫(5회)이 두 번만 남는다.
     """
 
     def check_throttles(self, request: Request) -> None:
@@ -171,6 +179,9 @@ def admin_login(request: HttpRequest) -> HttpResponse:
     Django Admin 은 로그인 시도를 세지 않아 관리자 비밀번호를 무한히 대볼 수 있다.
     관리자는 회원 이메일을 보고 콘텐츠를 공개하는 계정이다. config/urls.py 가 이
     함수를 admin/ 보다 앞에 둬서 같은 주소를 가로챈다.
+
+    로그인에 성공하면 기기 쿠키를 준다. 다음부터 그 브라우저의 시도는 이메일 통이 아니라
+    기기 통으로 세어, 남이 이메일 통을 채워도 막히지 않는다(AdminLoginThrottle).
     """
     if request.method == "POST":
         throttle = AdminLoginThrottle()
@@ -185,7 +196,17 @@ def admin_login(request: HttpRequest) -> HttpResponse:
             if seconds is not None:
                 response["Retry-After"] = str(seconds)
             return response
-    return admin.site.login(request)
+    response = admin.site.login(request)
+    # 성공하면 다음 화면으로 보낸다(302). Admin 폼은 staff 가 아니면 로그인시키지 않는다.
+    # 이미 로그인한 채 틀린 비밀번호를 내면 로그인 상태는 그대로이고 폼을 다시 그린다(200).
+    if (
+        request.method == "POST"
+        and response.status_code == 302
+        and request.user.is_authenticated
+        and request.user.is_staff
+    ):
+        issue_admin_device(response, request.POST.get("username", ""))
+    return response
 
 
 class GoogleLoginView(APIView):
@@ -512,7 +533,7 @@ class MeView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class EmailChangeRequestView(APIView):
+class EmailChangeRequestView(FirstThrottleWins, APIView):
     """이메일 변경 신청. 새 주소로 확인 메일을 보낸다.
 
     여기서는 아무것도 바뀌지 않는다. 주소는 링크를 누른 다음에 바뀐다.
@@ -523,7 +544,8 @@ class EmailChangeRequestView(APIView):
     # 확인 메일을 보내는 자리라 제한을 건다. 없으면 남의 주소로 반복해서
     # 신청을 걸어 우리 이름으로 메일 폭탄을 보내는 통로가 된다. 로그인만
     # 요구해서는 못 막는다. 계정 하나로 무제한 보낼 수 있다.
-    throttle_classes = [EmailChangeThrottle]
+    # 계정 제한이 먼저다. 막힌 요청이 전체 통을 채우지 않게 FirstThrottleWins 로 멈춘다.
+    throttle_classes = [EmailChangeThrottle, EmailChangeTotalThrottle]
 
     def post(self, request: Request) -> Response:
         serializer = EmailChangeRequestSerializer(

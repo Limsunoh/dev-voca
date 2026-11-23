@@ -69,6 +69,11 @@ class SlimTokenAuthentication(TokenAuthentication):
         except model.DoesNotExist:
             raise exceptions.AuthenticationFailed(_("Invalid token.")) from None
 
+        # 30일 만료를 여기서도 본다. 매일 정리(daily_cleanup)가 지우는 것만 믿으면, 정리가
+        # 멈춘 동안 새어 나간 토큰이 기한 없이 통한다. 지우는 것은 정리에 맡긴다.
+        if token.is_expired():
+            raise exceptions.AuthenticationFailed(_("Invalid token."))
+
         if not token.user.is_active:
             raise exceptions.AuthenticationFailed(_("User inactive or deleted."))
 

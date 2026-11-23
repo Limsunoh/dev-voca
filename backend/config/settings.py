@@ -99,8 +99,10 @@ if not DEBUG:
     # 이것까지 켜면 테스트 클라이언트의 http 요청이 전부 301 로 튕겨 아무것도
     # 확인 못 한다. 기본값이 True 라 운영에서 깜빡할 자리는 없다.
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
-    # HSTS 는 브라우저가 기억해버려 되돌리기 어렵다. 도메인이 확정되고 https 가
-    # 안정적으로 뜬 뒤에 늘린다. 0 이면 헤더를 보내지 않는다.
+    # HSTS 는 브라우저가 기억해버려 되돌리기 어렵다. 운영 값은 Railway 변수다(1년,
+    # DEPLOY.md 의 환경변수 표). 0 이면 헤더를 보내지 않는다. 하위 도메인까지는 걸지
+    # 않는다(SECURE_HSTS_INCLUDE_SUBDOMAINS 기본 False). up.railway.app 의 다른 주소는
+    # 남의 서비스다.
     SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
 
 
@@ -222,6 +224,9 @@ MIDDLEWARE = [
     # whitenoise 는 SecurityMiddleware 바로 다음이어야 한다(공식 권장 위치).
     # 이게 없으면 DEBUG=False 인 배포 환경에서 Admin 의 CSS 가 전부 깨진다.
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # 본문을 읽는 어떤 것보다 앞이어야 한다(CSRF 검사도 본문을 읽는다). 위 둘은 본문을 안
+    # 읽고, 그 뒤에 두어야 413 응답에도 보안 머리(nosniff, HSTS)가 붙는다. config/body_limit.py
+    "config.body_limit.body_limit_middleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -476,6 +481,8 @@ REST_FRAMEWORK = {
         "auth_email_hour": "1000/min" if sys.argv[1:2] == ["test"] else "30/hour",
         # Admin 로그인. 관리자는 한두 명이고 자주 로그인하지 않는다. 같은 계정은 API
         # 로그인(auth_email_hour)으로도 대볼 수 있어 비밀번호 추측의 실제 상한은 둘의 합이다.
+        # 로그인해 본 브라우저는 기기마다 같은 값으로 따로 센다(AdminLoginThrottle). 그
+        # 쿠키를 훔친 사람은 쿠키 하나당 이만큼 더 대볼 수 있다.
         "admin_login": "1000/min" if sys.argv[1:2] == ["test"] else "10/hour",
         # 구글 로그인도 접속 IP 마다 센다(apps.accounts.throttles 의 GoogleIpThrottle,
         # 아래 signup_ip·login_ip 와 같은 방식). 통은 login_ip 와 따로다. 로컬(DEBUG)은
@@ -489,9 +496,14 @@ REST_FRAMEWORK = {
         "signup_ip": "1000/min" if sys.argv[1:2] == ["test"] or DEBUG else "30/hour",
         "login_ip": "1000/min" if sys.argv[1:2] == ["test"] or DEBUG else "60/hour",
         # 이메일 변경 신청. 확인 메일이 나가는 자리라 낮게 잡는다 - 반복해서
-        # 신청하면 우리 이름으로 남의 메일함을 채우는 통로가 된다. 계정별로
-        # 세고, 주소를 바꾸는 일은 계정당 아주 가끔이라 좁아서 불편할 일이 없다.
-        "email_change": "2000/min" if sys.argv[1:2] == ["test"] else "5/min",
+        # 신청하면 우리 이름으로 남의 메일함을 채우는 통로가 된다. 계정별로 센다.
+        # 분당 5회였을 때는 계정 하나로 시간당 300통을 보낼 수 있었다. 현재 비밀번호를
+        # 틀린 신청도 세므로(제한이 입력 검사보다 먼저 돈다) 오타 몇 번에 한 시간씩
+        # 막히지 않게 5회로 둔다. 메일 총량은 아래 전체 상한이 막는다.
+        "email_change": "2000/min" if sys.argv[1:2] == ["test"] else "5/hour",
+        # 서비스 전체 상한. 하루 360통이라 Gmail 하루 한도(약 500통) 안에서 오류 알림과
+        # 삭제 안내 몫이 남는다(apps.accounts.throttles 의 EmailChangeTotalThrottle).
+        "email_change_total": "2000/min" if sys.argv[1:2] == ["test"] else "15/hour",
         # 확인 링크를 쓰는 쪽은 로그인이 없어 통 하나를 모두가 나눠 쓴다.
         # 좁게 잡으면 아무나 그 통을 태워 전원을 막는 스위치가 되므로 넉넉히
         # 잡는다(이유는 apps.accounts.throttles 에 적어뒀다). 서명을 맞히는
@@ -529,6 +541,10 @@ REST_FRAMEWORK = {
         # 채점을 출제보다 넉넉하게 둔다. 한 항목을 여러 번 읽어 보는 것이
         # 정상 사용이라 같은 값으로 두면 정상 사용자가 막힌다.
         "talk_grade": "5000/min" if sys.argv[1:2] == ["test"] else "180/min",
+        # 낱개 연습(단어·문장)의 채점. 한 문제를 풀고 해설을 읽고 넘어가므로 사람은 분당
+        # 스무 번도 어렵다. 로그인했으면 틀릴 때마다 오답 노트에 쓴다
+        # (apps/vocab/throttles.py 의 PracticeGradeThrottle).
+        "practice_grade": "5000/min" if sys.argv[1:2] == ["test"] else "120/min",
         # 답하기는 시작과 통을 나눈다. 40문제를 빠르게 푸는 것이 정상
         # 사용이라 조회·시작과 같은 통을 쓰면 판 중간에 막힌다.
         "daily_study_answer": "5000/min" if sys.argv[1:2] == ["test"] else "120/min",
