@@ -120,7 +120,7 @@ Host 가 `healthcheck.railway.app` 이라 일반 뷰로 두면 400·301 이 된�
   내려간 뒤(옛 배포가 요청을 받기 시작하고 Draining 30초가 지난 뒤) 그 표를 한 번 비운다.
   그 전에 비우면 내려가는 새 코드가 받아 둔 요청으로 줄을 다시 쓴다. 옛 코드는 그 표에
   쓰지 않으므로 한 번이면 된다. 비워도 되는 표인지는 모델 docstring 에
-  적는다. 지금은 `learning_dailypreview`(홈의 오늘의 단어, 비우면 다음에 다시 뽑는다)가
+  적는다. 지금은 `learning_dailypreview`(시작 전에 미리 뽑아 둔 일일공부 첫 묶음, 비우면 다음에 다시 뽑는다)가
   그렇다: `DELETE FROM learning_dailypreview;`
   `accounts_logintoken`(기기별 로그인 토큰)은 반대다. 비우면 로그인한 사람이 모두
   로그아웃된다. 이 표를 만든 배포가 도는 몇 초 동안 옛 코드가 받은 탈퇴는 500 이 된다
