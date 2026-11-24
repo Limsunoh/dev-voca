@@ -166,6 +166,12 @@ describe("구글 시작: 동의 쿠키를 굽는 조건", () => {
 
     await begin("?consent=1&next=%2F%2Fevil.example", "same-origin");
     assert.equal(jar.get(NEXT), "/");
+
+    // 점 조각. 주소창의 %2F 는 한 번 풀려 "/.//evil.example" 로 들어온다.
+    await begin("?consent=1&next=%2F.%2F%2Fevil.example", "same-origin");
+    assert.equal(jar.get(NEXT), "/");
+    await begin("?consent=1&next=%2F%252e%252e%2F%2Fevil.example", "same-origin");
+    assert.equal(jar.get(NEXT), "/");
   });
 });
 
@@ -283,7 +289,31 @@ describe("구글 콜백: 어디로 돌아가나", () => {
     );
   });
 
-  for (const next of ["//evil.example", "https://evil.example", "/"]) {
+  // 점 조각 둘은 옛 배포가 거르지 않고 쿠키에 넣었을 수 있는 값이다.
+  for (const next of ["/.//evil.example", "/a/..//evil.example"]) {
+    it(`성공해도 쿠키의 next 가 ${next} 면 홈으로 간다`, async () => {
+      backend(201, OK);
+      cookies({ next });
+
+      const res = await back();
+
+      assert.equal(res.headers.get("location"), `${ORIGIN}/`);
+    });
+  }
+
+  it("한글 쿼리가 든 next 는 같은 검색어로 돌아간다", async () => {
+    backend(201, OK);
+    cookies({ next: "/learn/words?search=한글" });
+
+    const res = await back();
+
+    const to = new URL(res.headers.get("location") ?? "");
+    assert.equal(to.origin, ORIGIN);
+    assert.equal(to.pathname, "/learn/words");
+    assert.equal(to.searchParams.get("search"), "한글");
+  });
+
+  for (const next of ["//evil.example", "https://evil.example", "/", "/.//evil.example"]) {
     it(`돌아갈 곳이 ${next} 면 next 를 붙이지 않는다`, async () => {
       backend(400, { code: "consent_required" });
       cookies({ next });

@@ -521,6 +521,35 @@ describe("입력 다듬기와 서버 오류", () => {
   });
 });
 
+describe("가입·로그인 - 점 조각으로 만든 next", () => {
+  // 화면 쪽 Next 가 주소를 풀면 "//evil.example" 이 되는 꼴. 로그인에 성공한
+  // 직후라 남의 사이트에서 다시 로그인을 요구해도 의심하기 어렵다.
+  const signUpFields = {
+    email: "dot@example.com",
+    password: "QaProbe2026!x",
+    terms_agreed: "on",
+    disclosure_agreed: "on",
+    age_confirmed: "on",
+  };
+  for (const [name, action, fields] of [
+    ["로그인", loginAction, { email: "dot@example.com", password: "QaProbe2026!x" }],
+    ["가입", signUpAction, signUpFields],
+  ] as const) {
+    for (const next of ["/.//evil.example", "/%2e%2e//evil.example", "/a/..//evil.example"]) {
+      it(`${name}: ${next} 는 홈으로`, async () => {
+        installAcceptingBackend();
+        assert.equal((await run(action, {}, { ...fields, next })).redirect, "/");
+      });
+    }
+
+    it(`${name}: 안쪽으로 풀리는 점 조각은 풀린 주소로`, async () => {
+      installAcceptingBackend();
+      const result = await run(action, {}, { ...fields, next: "/learn/./x/../words?page=2" });
+      assert.equal(result.redirect, "/learn/words?page=2");
+    });
+  }
+});
+
 describe("가입·로그인 요청에 실제 접속 IP 를 싣는다", () => {
   // 백엔드는 이 머리로 접속 IP 를 센다(backend/apps/accounts/throttles.py). 빠지면
   // 모든 사람이 "Next 를 거치지 않은 요청" 한 통에 담겨 한 시간 가입 수가 사이트

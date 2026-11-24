@@ -178,7 +178,14 @@ async function errorDetail(
 
   // 서버 오류의 본문은 그대로 보여주지 않는다. 거기엔 사용자가 할 수 있는
   // 일이 없고, 내부 사정이 적혀 나갈 수 있다. 400 대만 안내로 쓴다.
-  if (res.status >= 500) return fallback;
+  //
+  // 예외는 502·503 의 detail 문자열 하나다. 백엔드가 확인 메일을 못 보냈을 때
+  // "지금은 확인 메일을 보낼 수 없습니다. 잠시 후 다시 시도해주세요." 를 일부러
+  // 써서 보낸다(accounts.views 의 이메일 변경 신청). 그것을 버리면 사용자는
+  // "요청이 실패했습니다. (503)" 만 본다. 앞단(Railway)이 내는 502 는 JSON 이
+  // 아니라 아래에서 걸러진다.
+  const serverError = res.status >= 500;
+  if (serverError && res.status !== 502 && res.status !== 503) return fallback;
 
   try {
     const data = await res.json();
@@ -188,6 +195,9 @@ async function errorDetail(
     if (!data || typeof data !== "object") return fallback;
 
     if (typeof data.detail === "string") return { message: data.detail };
+
+    // 502·503 은 detail 문자열만 받는다. 칸별 본문은 400 대에서만 읽는다.
+    if (serverError) return fallback;
 
     // 칸별 오류는 첫 줄만 보여준다. 여러 개를 이어 붙이면 읽기 어렵다.
     //
