@@ -109,8 +109,11 @@ const BASE = "/api/learning/rounds/";
  * token 을 넘기면 그 계정의 판이 된다. 로그인 안 해도 풀 수 있으므로
  * 없어도 된다 - 그때는 끝내도 기록되지 않는다.
  */
-export function startRound(token?: string): Promise<RoundStarted> {
-  return request<RoundStarted>(BASE, { method: "POST", token });
+export function startRound(
+  token?: string,
+  guestHeaders?: Record<string, string>,
+): Promise<RoundStarted> {
+  return request<RoundStarted>(BASE, { method: "POST", token, guestHeaders });
 }
 
 export function answerRound(
@@ -118,6 +121,7 @@ export function answerRound(
   choiceId: number | null,
   skip = false,
   token?: string,
+  guestHeaders?: Record<string, string>,
 ): Promise<RoundAnswered> {
   return request<RoundAnswered>(`${BASE}answer/`, {
     method: "POST",
@@ -125,16 +129,19 @@ export function answerRound(
       ? { token: roundToken, skip: true }
       : { token: roundToken, choice_id: choiceId },
     token,
+    guestHeaders,
   });
 }
 
 export function finishRound(
   roundToken: string,
   token?: string,
+  guestHeaders?: Record<string, string>,
 ): Promise<RoundSummary> {
   return request<RoundSummary>(`${BASE}finish/`, {
     method: "POST",
     body: { token: roundToken },
     token,
+    guestHeaders,
   });
 }

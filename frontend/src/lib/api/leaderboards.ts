@@ -123,11 +123,15 @@ export function isBoardKind(value: string | undefined): value is BoardKind {
  * 만드는 화면이라 가입 전에 보여야 의미가 있다. 토큰이 없으면 me 가 null 로
  * 올 뿐 목록은 그대로 온다.
  */
-export function fetchBoard(kind: BoardKind, token?: string): Promise<Board> {
+export function fetchBoard(
+  kind: BoardKind,
+  token?: string,
+  guestHeaders?: Record<string, string>,
+): Promise<Board> {
   // all_time 만 URL 조각이 다르다. 백엔드가 하이픈을 쓰는데 값은
   // 밑줄이라, 여기서 한 번 바꾼다.
   const path = kind === "all_time" ? "all-time" : kind;
-  return request<Board>(`${BASE}${path}/`, { token });
+  return request<Board>(`${BASE}${path}/`, { token, guestHeaders });
 }
 
 /**

@@ -2,6 +2,7 @@ import { Leaderboard } from "@/components/Leaderboard";
 import type { BoardKind } from "@/lib/api/leaderboards";
 import { fetchBoard } from "@/lib/api/leaderboards";
 import { ApiError } from "@/lib/api/client";
+import { clientIpHeaders } from "@/lib/client-ip";
 import { getToken, withTokenOrGuest } from "@/lib/session";
 
 /**
@@ -21,11 +22,15 @@ export async function BoardScreen({ kind }: { kind: BoardKind }) {
   // 쿠키는 try 밖에서 읽는다. 안에서 읽으면 빌드 때 Next 가 쿠키 접근으로
   // 던지는 신호(DynamicServerError)까지 아래 catch 가 잡는다(홈의 같은 주석).
   let token = await getToken();
+  // 로그인하지 않았으면 백엔드가 접속 IP 로 센다(learning·vocab 의 throttles).
+  // 토큰이 실리면 request() 가 이 머리를 버린다.
+  // 쿠키처럼 try 밖에서 읽는다(요청 머리 읽기도 빌드 때 같은 신호를 던진다).
+  const relay = await clientIpHeaders();
   let board;
   try {
     ({ value: board, token } = await withTokenOrGuest(
       token,
-      (t) => fetchBoard(kind, t),
+      (t) => fetchBoard(kind, t, relay),
       { forget: false },
     ));
   } catch (error) {

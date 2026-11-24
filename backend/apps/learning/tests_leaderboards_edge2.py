@@ -224,8 +224,9 @@ class ThrottleBucketTest(TestCase):
     def test_a_logged_in_user_is_not_blocked_by_the_guest_bucket(self):
         """게스트가 통을 다 태워도 로그인한 사람은 들어갈 수 있어야 한다.
 
-        게스트 통은 공용이라 누구든 태울 수 있다. 그것이 회원까지 막으면
-        스크립트 하나로 전 사용자가 순위표를 못 본다.
+        테스트 클라이언트는 Next 의 비밀값을 싣지 않아 로그인하지 않은 요청이 모두
+        direct 한 통에 든다. 그 통이 회원까지 막으면 스크립트 하나로 전 사용자가
+        순위표를 못 본다.
         """
         member = make_user("회원")
 
@@ -260,8 +261,8 @@ class ThrottleBucketTest(TestCase):
     def test_the_guest_bucket_is_wider_than_a_members(self):
         """게스트 통은 배수(20)만큼 크다.
 
-        게스트는 나눌 키가 없어 다 함께 쓴다. 통이 회원과 같은 크기면
-        방문자 몇 명만 들어와도 전원이 막힌다.
+        로그인하지 않은 사람의 통(여기서는 direct, 운영에서는 접속 IP 하나)은 IP
+        하나를 여럿이 쓰는 경우를 받으려고 회원 통보다 크다.
         """
         with tighten(TIGHT):
             # 회원 한도는 3. 게스트는 3 * 20 = 60 이어야 한다.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { relayError } from "@/lib/api/relay";
 import { answerRound, finishRound, startRound } from "@/lib/api/rounds";
+import { clientIpHeaders } from "@/lib/client-ip";
 import { getToken, withTokenOrGuest } from "@/lib/session";
 
 /**
@@ -48,6 +49,9 @@ export async function POST(request: Request) {
   // 로그인 안 해도 풀 수 있다. 없으면 기록만 안 된다.
   const cookieToken = await getToken();
   const auth = cookieToken ?? undefined;
+  // 로그인하지 않았으면 백엔드가 접속 IP 로 센다(learning·vocab 의 throttles).
+  // 토큰이 실리면 request() 가 이 머리를 버린다.
+  const relay = await clientIpHeaders();
 
   try {
     // 서버가 쿠키의 토큰을 거절하면(다른 기기에서 비밀번호 변경 등) 쿠키를 지우고
@@ -55,9 +59,11 @@ export async function POST(request: Request) {
     // 유효하지 않습니다" 로 막힌다. 여기서 지워야 뒤이은 답 요청에 그 토큰이
     // 안 실린다.
     if (body.action === "start") {
-      const { value } = await withTokenOrGuest(cookieToken, startRound, {
-        forget: true,
-      });
+      const { value } = await withTokenOrGuest(
+        cookieToken,
+        (t) => startRound(t, relay),
+        { forget: true },
+      );
       return NextResponse.json(value);
     }
 
@@ -85,12 +91,12 @@ export async function POST(request: Request) {
         );
       }
       return NextResponse.json(
-        await answerRound(body.token, choice, skip, auth),
+        await answerRound(body.token, choice, skip, auth, relay),
       );
     }
 
     if (body.action === "finish") {
-      return NextResponse.json(await finishRound(body.token, auth));
+      return NextResponse.json(await finishRound(body.token, auth, relay));
     }
   } catch (error) {
     return relayError(error);

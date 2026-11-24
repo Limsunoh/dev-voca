@@ -8,8 +8,8 @@ export type LegalSection = { id: string; title: string; body: ReactNode };
 
 // 가입할 때 저장하는 backend/apps/accounts/models.py 의 TERMS_VERSION 과 같아야
 // 누가 어느 문서에 동의했는지 가릴 수 있다. 어긋나면 테스트가 실패한다.
-// 약관과 처리방침이 버전 하나를 같이 쓴다. v3·v4·v5 는 처리방침만 바뀌었다.
-export const DOC_VERSION = "v5";
+// 약관과 처리방침이 버전 하나를 같이 쓴다. v3~v6 은 처리방침만 바뀌었다.
+export const DOC_VERSION = "v6";
 
 // 약관 시행일. 시행일은 화면을 올리는 날이다.
 export const EFFECTIVE_DATE = "2026년 11월 9일";
@@ -24,15 +24,16 @@ export const EFFECTIVE_DATE = "2026년 11월 9일";
  *
  * firstChange 는 홈 알림이 "N일부터 바뀝니다" 로 띄우는 날이다. 바뀌는 것 중
  * 가장 먼저 켜지는 날이라 보통 effective 와 같다. 앞 버전의 공지 기간 중에 새
- * 버전을 공고하면 앞 버전이 켜지는 날을 띄운다(v4 가 v3 기간 중에 그랬다). 14절은
- * 지금 버전의 바뀐 내용만 적고 앞 버전 이력은 남기지 않는다. 공고 전에 이미 하고 있던
+ * 버전을 공고하면 앞 버전이 켜지는 날을 띄운다(v4 가 v3 기간 중에, v6 이 v5 기간
+ * 중에 그랬다). 그때 14절은 아직 시행 전인 앞 버전의 바뀐 내용도 같이 적고, 그 공고일과
+ * 시행일을 한 줄로 남긴다. 앞 버전이 시행된 뒤의 이력은 남기지 않는다. 공고 전에 이미 하고 있던
  * 일(v5 의 Sentry 는 11-20 부터)은 알림에 공고 전 날짜를 띄울 수 없으니 14절에
  * 시작한 날을 적고 firstChange 는 effective 로 둔다.
  */
 export const PRIVACY_CHANGE = {
-  announced: "2026-11-21",
+  announced: "2026-11-25",
   firstChange: "2026-11-28",
-  effective: "2026-11-28",
+  effective: "2026-12-02",
 };
 
 /** "2026-11-19" 를 "2026년 11월 19일" 로. 문서의 다른 날짜와 같은 꼴이다. */
