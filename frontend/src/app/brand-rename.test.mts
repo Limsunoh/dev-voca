@@ -57,6 +57,8 @@ function cookiesInCode(): Set<string> {
     "lib/session.ts",
     // 로그인 쿠키 이름(devvoca_token)은 여기 있다. session.ts 와 proxy.ts 가 같이 쓴다.
     "lib/token-cookie.ts",
+    // 게스트 쿠키 이름(devvoca_guest, devvoca_daily_length)은 여기 있다. 같은 둘이 같이 쓴다.
+    "lib/guest-cookie.ts",
     "app/api/auth/google/route.ts",
     "app/(auth)/google-actions.ts",
   ];

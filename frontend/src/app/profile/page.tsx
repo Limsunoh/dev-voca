@@ -14,13 +14,15 @@ import { DeleteAccount } from "@/app/profile/DeleteAccount";
 import { saveDailyLengthAction } from "@/app/start/daily/actions";
 import { DailyLengthPicker } from "@/components/DailyLengthPicker";
 import { EmailCard } from "@/components/EmailCard";
+import { LoginCheckFailed } from "@/components/LoginCheckFailed";
 import { PasswordCard } from "@/components/PasswordCard";
 import { MyHistory } from "@/components/MyHistory";
 import { MyStandings } from "@/components/MyStandings";
 import { ProfileForm } from "@/components/ProfileForm";
 import { fetchMyHistory } from "@/lib/api/history";
 import { fetchMyStandings } from "@/lib/api/leaderboards";
-import { getCurrentUser, getToken } from "@/lib/session";
+import { routes } from "@/lib/routes";
+import { getLoginState, getToken } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "내정보 · DeVoca",
@@ -38,7 +40,11 @@ export const metadata: Metadata = {
  * 읽혀서 안 한 것과 구분되지 않는다.
  */
 export default async function ProfilePage() {
-  const user = await getCurrentUser();
+  const { user, unreachable } = await getLoginState();
+
+  // 로그인 쿠키는 있는데 백엔드가 답하지 않았다. 로그인 화면으로 보내면 거기서
+  // "로그인 없이 둘러보기" 를 눌러 멀쩡한 로그인을 지우게 된다.
+  if (unreachable) return <LoginCheckFailed retry={routes.profile} />;
 
   // 로그인해야 볼 수 있다. 돌아올 곳을 넘겨 로그인 뒤 여기로 오게 한다.
   if (!user) redirect("/login?next=/profile");
