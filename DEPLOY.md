@@ -182,6 +182,10 @@ Host 가 `healthcheck.railway.app` 이라 일반 뷰로 두면 400·301 이 된�
 | `DATABASE_URL` | PostgreSQL 추가 시 자동 | 로컬 기본값을 침 |
 | `RELAY_SECRET` | 무작위 긴 값. **Vercel 에도 같은 이름·같은 값** | 가입·로그인(구글 포함) IP 제한이 모든 사람을 한 통으로 센다 |
 | `SECURE_HSTS_SECONDS` | `31536000`(1년) | 브라우저가 첫 접속을 http 로 할 수 있다. Admin 로그인을 가로채기 쉬워진다 |
+| `FRONTEND_BASE_URL` | `https://dev-voca.vercel.app` (끝 슬래시 없이). **web 과 cleanup 둘 다** | 메일에 넣는 링크(이메일 변경 확인 등)가 기본값 `http://localhost:3000` 을 가리킨다. 오류 없이 "보냈습니다" 만 떠서 알아채기 어렵다 |
+
+화면(Vercel Production)에는 `API_URL`(백엔드 주소, `https://xxx.up.railway.app`)이 있어야 한다.
+없으면 화면 서버가 백엔드를 부를 때마다 바로 오류를 낸다(frontend/src/lib/api/client.ts).
 
 `SECURE_HSTS_SECONDS` 는 web 서비스에만 넣는다. 브라우저로 이 주소에 들어오는 것은 Admin
 뿐이라(사용자 화면은 Next 가 서버에서 부른다) 그 로그인을 지키는 값이다. 하위 도메인까지
@@ -253,13 +257,13 @@ python backend/manage.py shell -c "from django.core.management.utils import get_
 | 경로 | 기대 |
 |---|---|
 | `/` | 404 (백엔드에 루트 페이지가 없다. 정상) |
-| `/admin/` | 200 |
+| `/admin/` | 302 (로그인 화면으로 넘김. 넘긴 곳이 200) |
 | `/api/vocab/` | 401 (로그인 없이 부르면 막는 것이 기본값이다. 정상) |
 | `/api/vocab/words/` | 200 |
 | `POST /api/accounts/google/` (본문 `{}`) | **400** (429 도 캐시는 친 것이다. 바로 부른 요청 한 통이 찼다) |
 | `POST /api/accounts/login/` (없는 계정) | **400** |
 
-`/admin/` 이 200 인데 `/api/vocab/words/` 가 500 이면 vocab 마이그레이션이
+`/admin/login/` 이 200 인데 `/api/vocab/words/` 가 500 이면 vocab 마이그레이션이
 안 돈 것이다 - 배포 로그의 `migrate` 부분을 본다.
 
 **마지막 두 줄을 빼먹지 않는다.** 위 네 줄은 요청 제한을 거치지 않아
@@ -444,7 +448,7 @@ railway ssh --service web
 | `/admin/` 로그인 | 이메일로 로그인된다 |
 | `/admin/accounts/user/add/` | 계정 추가 화면이 뜬다 |
 | Admin 에서 단어 수정 후 저장 | 500 이 안 난다(로그 외래키 확인) |
-| `/api/vocab/words/` | 200, 566개 |
+| `/api/vocab/words/` | 200, 검수된 단어 수만큼(2026-11-24 기준 3,503개) |
 
 ## 캐시 테이블
 
@@ -705,6 +709,12 @@ Schedule 을 바꾸면 Sentry 의 Crons > db-backup 일정도 같이 바꾼다. 
 성공한 날에도 메일이 온다. 무료 요금제(Developer)는 감시가 하나까지라 정리 크론에는
 따로 붙이지 않고 4번이 대신 본다.
 
+**설정을 바꾼 뒤에는 Redeploy 가 아니라 새로 배포한다.** Railway 의 Redeploy 는 직전 배포를
+만들 때의 설정(시작 명령 포함)으로 다시 돈다. 서비스 설정에서 시작 명령을 고쳐도 Redeploy
+하면 옛 명령이 돈다. 2026-11-23 에 db-backup 이 그렇게 옛 명령으로 돌아 4번의 정리 감시가
+빠진 채 매일 돌았다(로그에 `cleanup check stale rows:` 줄이 없었다). 대시보드의 Deploy 로
+새로 배포하고, 다음 날 로그에서 그 줄을 확인한다.
+
 ```
 timeout -k 60 50m sh -c 'set -eu; find /backups -name "*.part" -delete; find /backups -name "devvoca-*.dump" -mmin +$((BACKUP_KEEP_DAYS * 1440 - 180)) -print -delete; f=/backups/devvoca-$(date -u +%Y%m%dT%H%M%SZ).dump; pg_dump --dbname="$DATABASE_URL" --format=custom --file="$f.part"; d=/tmp/pgcheck; mkdir -p $d; chown postgres $d; gosu postgres initdb -D $d -A trust >/dev/null; gosu postgres pg_ctl -D $d -o "-c listen_addresses=" -w start >/dev/null; gosu postgres createdb check; gosu postgres pg_restore -d check --no-owner --no-privileges --exit-on-error "$f.part"; n=$(gosu postgres psql -d check -Atc "select (select count(*) from vocab_word), (select count(*) from vocab_sentence), (select count(*) from accounts_user), (select count(*) from learning_quizanswer)"); echo "restore check words|sentences|users|answers: $n"; test "${n%%|*}" -gt 0; s=$(gosu postgres psql -d check -Atc "select (select count(*) from accounts_logintoken where created < now() - make_interval(days => 31)) + (select count(*) from throttle_cache where expires < now() - make_interval(days => 1))") || s=err; echo "cleanup check stale rows: $s"; gosu postgres pg_ctl -D $d -w stop >/dev/null; mv "$f.part" "$f"; ls -l /backups; df -h /backups; test "$s" -eq 0; k=${SENTRY_DSN#https://}; h=${k#*@}; h=${h%%/*}; r=$(printf "GET /api/${k##*/}/cron/db-backup/${k%%@*}/?status=ok HTTP/1.1\r\nHost: $h\r\nConnection: close\r\n\r\n" | timeout 30 openssl s_client -quiet -connect "$h:443" -servername "$h" 2>/dev/null | head -n 1); echo "sentry check-in: $r"'
 ```
@@ -717,7 +727,7 @@ timeout -k 60 50m sh -c 'set -eu; find /backups -name "*.part" -delete; find /ba
 것은 옛 상태로 되살아나 처리방침 3·4절과 어긋난다.
 
 **준비(A·B 공통).** `db-backup` 의 Cron Schedule 을 비우고 시작 명령을 `sleep infinity`
-로 바꿔 배포한 뒤 `railway ssh --service db-backup` 으로 들어간다. 크론 서비스는 도는 몇
+로 바꿔 새로 배포한 뒤(Redeploy 가 아니라 Deploy. 아래 "설정을 바꾼 뒤에는" 참고) `railway ssh --service db-backup` 으로 들어간다. 크론 서비스는 도는 몇
 초 말고는 꺼져 있어 그냥은 들어갈 수 없다. `ls -l /backups` 에서 쓸 백업을 고른다.
 그동안은 백업이 돌지 않아 한국 새벽 3시 30분을 넘기면 Sentry 의 실패 메일이 온다.
 예상한 메일이다.
@@ -791,5 +801,4 @@ Railway 지역 장애까지는 막지 못한다. 하루 파일은 2026-11 기준
   비밀값과 함께 넘긴 IP)로 걸어뒀다. 나머지 조회 경로는 모든 요청이 Next 서버 하나로
   보여 그냥은 IP 로 셀 수 없다. 필요해지면 그 경로에도 lib/client-ip.ts 의 머리를
   실어 같은 방식으로 센다.
-- 프론트엔드 - Vercel 배포 시 `CORS_ALLOWED_ORIGINS` 에 도메인 추가.
 - `ANTHROPIC_API_KEY` - AI 생성을 서버에서 돌릴 때만 필요. 로컬에서 돌려도 된다.
