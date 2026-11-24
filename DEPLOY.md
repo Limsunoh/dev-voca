@@ -481,6 +481,16 @@ Admin 로그인은 이메일마다 한 시간에 10번까지다(`admin_login`). 
 railway ssh --service web "python backend/manage.py shell -c \"from django.core.cache import cache; from apps.accounts.throttles import AdminLoginThrottle as T, email_ident; print(cache.delete(T.cache_format % {'scope': T.scope, 'ident': email_ident('관리자 이메일')}))\""
 ```
 
+이메일 키를 지웠는데도 막혀 있으면 전체 통이 찬 것이다. 기기 쿠키 없이 들어온 Admin
+로그인 시도는 이메일과 상관없이 모두 한 통에서 한 시간에 30번까지다(`admin_login_total`,
+2026-11-24 부터). 이메일을 바꿔 가며 끝없이 보내는 것을 막으려고 둔 통이라, 누가 아무
+이메일로나 30번 보내면 처음 쓰는 브라우저의 Admin 로그인이 모두 한 시간 막힌다. 전에
+로그인해 본 브라우저는 이 통을 타지 않는다. 아래 명령으로 지운다.
+
+```
+railway ssh --service web "python backend/manage.py shell -c \"from django.core.cache import cache; from apps.accounts.throttles import AdminLoginTotalThrottle as A; print(cache.delete(A.cache_format % {'scope': A.scope, 'ident': 'all'}))\""
+```
+
 계속 막히면 누군가 두드리고 있는 것이다. 운영 로그에서 `/admin/login/` 의
 429 를 보고, 필요하면 관리자 이메일을 공개하지 않은 주소로 바꾼다.
 

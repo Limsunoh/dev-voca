@@ -526,8 +526,13 @@ class User(AbstractUser):
             ),
         ]
 
+    # 비밀번호 로그인을 껐는데 아직 저장하지 않았다. set_unusable_password 는
+    # set_password 와 달리 _password 를 남기지 않아 save 가 따로 알아야 한다.
+    _password_dropped = False
+
     def save(self, *args, **kwargs) -> None:
-        """이메일과 닉네임을 저장 직전에 정리한다.
+        """이메일과 닉네임을 저장 직전에 정리하고, 비밀번호·이메일이 바뀌었으면 저장 뒤
+        그 계정의 로그인을 모두 끊는다(_credentials_changed).
 
         매니저가 아니라 여기서 하는 이유: Admin 의 계정 추가 폼은
         create_user 를 거치지 않고 곧바로 save() 를 부른다. 매니저에만
@@ -544,7 +549,88 @@ class User(AbstractUser):
         if not self.display_name:
             self.display_name = self._generate_display_name()
 
+        fields = kwargs.get("update_fields")
+        credentials_changed = self._credentials_changed(fields)
+
         super().save(*args, **kwargs)
+
+        # 새 토큰은 반드시 이 save 뒤에 낸다. 먼저 내면 여기서 함께 지워진다.
+        if credentials_changed:
+            LoginToken.end_all(self.pk)
+        if fields is None or "password" in fields:
+            self._password_dropped = False
+        if fields is None or "email" in fields:
+            self._loaded_email = self.email
+
+    def _credentials_changed(self, fields) -> bool:
+        """이번 저장으로 비밀번호나 이메일이 바뀌는가. 바뀌면 save 가 로그인을 모두 끊는다.
+
+        API 의 변경 화면은 뷰가 따로 끊고 새 토큰을 주지만, Admin 에서 바꾸면 그 길을 안
+        타서 옛 토큰이 30일 동안 살아 있었다. 비밀번호가 새어 관리자가 바꿔 준 계정이
+        그대로 열려 있게 된다. 뷰가 다시 끊어도 지울 것이 없을 뿐이다.
+
+        fields 는 save 의 update_fields 다. 저장하지 않는 칸은 보지 않는다 - 메모리에서만
+        바뀐 이메일로 로그인을 끊지 않는다.
+
+        비밀번호: set_password 는 _password 를 남긴다(Django 가 저장 뒤 비운다). 로그인할
+        때 해시를 새로 저장하는 길(check_password)은 그 값을 비운 뒤 저장해 끊지 않는다.
+        해시 문자열을 견주지 않는 이유가 그것이다 - 견주면 Django 를 올려 해시 반복 횟수가
+        바뀐 날 로그인할 때마다 다른 기기가 다 끊긴다. "비밀번호 로그인 끄기" 는
+        set_unusable_password 가 따로 표시한다. 알려진 빈틈: set_password 뒤 다른 칸만
+        먼저 저장하면 Django 가 _password 를 비워 그다음 비밀번호 저장에서 놓친다. 그렇게
+        저장하는 코드는 없다.
+
+        이메일: DB 에서 읽은 값(from_db, refresh_from_db 가 기억)과 견준다.
+        """
+        if self._state.adding:
+            return False
+
+        if fields is None or "password" in fields:
+            if self._password is not None or self._password_dropped:
+                return True
+
+        if fields is not None and "email" not in fields:
+            return False
+        loaded = getattr(self, "_loaded_email", None)
+        if loaded is None:
+            # 이메일을 빼고 읽은 행(only, defer)에 이메일을 바로 넣은 경우. 비교할 값이
+            # 없으니 DB 에서 한 번 읽는다. 이메일을 읽은 뒤였다면 refresh_from_db 가 이미
+            # 채워 여기 오지 않는다.
+            loaded = type(self).objects.filter(pk=self.pk).values_list("email", flat=True).first()
+        return loaded is not None and loaded.lower() != self.email
+
+    def set_unusable_password(self) -> None:
+        """비밀번호 로그인을 끈다. 저장할 때 그 계정의 로그인도 모두 끊긴다(save).
+
+        Admin 의 비밀번호 화면에서 "비밀번호 로그인 끄기" 를 고르면 이 길로 온다. 계정이
+        털려서 관리자가 끄는 경우인데, 끊지 않으면 털어 간 쪽 토큰이 이어 가기로 계속 산다.
+        """
+        super().set_unusable_password()
+        if not self._state.adding:
+            self._password_dropped = True
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        """DB 에서 읽은 이메일을 기억한다. save 가 이메일이 바뀌었는지 가른다.
+
+        이메일을 빼고 읽은 행(only, defer)은 기억하지 않는다. 그때 비교하면 처음
+        읽는 값과 견주게 되어 바뀌지 않은 이메일을 바뀐 것으로 본다.
+        """
+        instance = super().from_db(db, field_names, values)
+        if "email" in instance.__dict__:
+            instance._loaded_email = instance.email
+        return instance
+
+    def refresh_from_db(self, using=None, fields=None, from_queryset=None) -> None:
+        """다시 읽은 이메일을 기억한다. 안 하면 그 사이 다른 곳에서 바뀐 이메일을 이 객체가
+        바꾼 것으로 보고, 이름만 저장해도 로그인을 모두 끊는다.
+
+        이메일을 다시 읽었을 때만 기억한다. 다른 칸만 읽을 때(지연 로드가 그 칸만 부른다)
+        덮으면, 메모리에서 바꾼 아직 저장 안 한 이메일을 DB 값으로 착각한다.
+        """
+        super().refresh_from_db(using=using, fields=fields, from_queryset=from_queryset)
+        if (fields is None or "email" in fields) and "email" in self.__dict__:
+            self._loaded_email = self.email
 
     def _generate_display_name(self) -> str:
         """비어 있을 때 지어주는 이름. 학습자1234 꼴.
@@ -753,7 +839,10 @@ class LoginToken(models.Model):
 
     @classmethod
     def end_all(cls, user_id: int) -> None:
-        """그 계정의 토큰을 모두 지운다. 비밀번호 변경과 이메일 변경이 쓴다.
+        """그 계정의 토큰을 모두 지운다. User.save 가 비밀번호·이메일이 바뀌었을 때 부른다.
+
+        비밀번호 변경·이메일 변경 뷰도 부르지만, 그때는 save 가 이미 지운 뒤라 남은 것이
+        없다. 뷰의 호출은 "여기서 끊는다" 를 읽는 사람에게 보이려고 둔다.
 
         뒤이어 내주는 새 토큰은 새 로그인(device)이라 renew 와 겹치지 않는다. 그래서 새
         토큰을 만드는 것까지 이 잠금 안에 둘 필요는 없다.
