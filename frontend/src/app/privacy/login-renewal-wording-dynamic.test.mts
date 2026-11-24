@@ -102,7 +102,8 @@ describe("처리방침의 로그인 이어 가기 문구", () => {
 
   it("14절 넷째 바뀐 내용이 로그인 이어 가기이고 2026년 11월 23일부터다", () => {
     const list = items("changes").filter((item) => !/^(공고일|시행일)/.test(item));
-    assert.equal(list.length, 4, list.join("\n"));
+    // 다섯째는 v6 에서 더한 로그인하지 않은 요청의 IP 세기다.
+    assert.equal(list.length, 5, list.join("\n"));
     const fourth = list[3];
     assert.ok(fourth.startsWith("서비스를 이용하는 동안 로그인을 이어 갑니다."), fourth);
     assert.ok(fourth.includes(`${renewPhrase} 새 로그인 토큰으로 바꾸고`), fourth);

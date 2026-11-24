@@ -29,6 +29,11 @@ import { createElement } from "react";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+// 로그인하지 않은 요청에 접속 IP 를 싣는 머리. 실제 파일은 "server-only" 를 불러 Next 밖에서
+// 해석되지 않는다. 머리가 실리는지는 여기서 보지 않는다.
+mock.module("@/lib/client-ip", {
+  namedExports: { clientIpHeaders: async () => ({}) },
+});
 mock.module("@/lib/session", {
   namedExports: {
     getToken: async () => null,

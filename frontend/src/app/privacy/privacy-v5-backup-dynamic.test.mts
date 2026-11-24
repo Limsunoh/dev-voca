@@ -8,11 +8,12 @@
  *     옛 문구("운영자가 따로 만드는 백업은 없습니다")는 어디에도 없다.
  *   - 14절의 백업 항목이 적은 절(3·4·6절)이 실제로 백업을 말하는 절과 같다.
  *   - 계정 삭제 안내 4절의 기간은 모두 처리방침 3·4절에 있는 기간이다.
- * 홈 알림 날짜와 문서 버전은 components/policy-notice-v5.test.mts 와 legal-pages.test.mts 가 본다.
+ * 홈 알림 날짜와 문서 버전은 components/policy-notice-v6.test.mts 와 legal-pages.test.mts 가 본다.
  *
  * 검사는 함수로 두고, 각 함수가 실제로 무는지 일부러 틀린 입력을 넣어 확인한다
- * (구현 파일은 건드리지 않는다). v5 의 문구를 글자로 박은 테스트라 다음 개정
- * (DOC_VERSION 이 v5 가 아님)에서는 건너뛴다. 그때 이 파일을 지운다.
+ * (구현 파일은 건드리지 않는다). v5 의 문구를 글자로 박은 테스트라 v5·v6 에서만 돈다.
+ * v6 은 v5 시행(11-28) 전에 공고해서 14절에 v5 의 백업 항목이 그대로 있다. 그 다음
+ * 개정에서 건너뛰면 이 파일을 지운다.
  */
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
@@ -30,7 +31,7 @@ const { default: PrivacyPage } = await import("./page");
 const { default: TermsPage } = await import("../terms/page");
 const { default: DeleteAccountPage } = await import("../delete-account/page");
 
-const SKIP = DOC_VERSION !== "v5";
+const SKIP = !["v5", "v6"].includes(DOC_VERSION);
 
 const privacyHtml = renderToStaticMarkup(createElement(PrivacyPage));
 const termsHtml = renderToStaticMarkup(createElement(TermsPage));

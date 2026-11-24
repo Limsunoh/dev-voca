@@ -32,6 +32,12 @@ import { after, beforeEach, describe, it, mock } from "node:test";
 
 const jar = new Map<string, string>();
 
+// 로그인하지 않은 요청에 접속 IP 를 싣는 머리. 실제 파일은 "server-only" 를 불러 Next 밖에서
+// 해석되지 않고, 셸에 RELAY_SECRET 이 있으면 아래 대역에 없는 headers() 를 부른다.
+// 머리가 실리는지는 lib/guest-ip-relay-dynamic.test.mts 가 본다.
+mock.module("@/lib/client-ip", {
+  namedExports: { clientIpHeaders: async () => ({}) },
+});
 mock.module("next/headers", {
   namedExports: {
     async cookies() {

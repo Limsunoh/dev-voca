@@ -1,59 +1,21 @@
-"""vocab 화면의 요청 제한. 로그인했으면 계정별, 아니면 게스트끼리 한 통.
+"""vocab 화면의 요청 제한. 로그인했으면 계정별, 아니면 접속 IP 별.
 
-소리내어 읽기(출제·채점)와 낱개 연습 채점이 쓴다. IP 로 세지 않는다. 이유는
-accounts·learning 쪽과 같고 _PerUserOrGuest 에 적었다.
+소리내어 읽기(출제·채점)와 낱개 연습 채점이 쓴다. 세는 규칙은
+accounts.throttles.PerUserOrIpThrottle 에 있고 learning 의 판·순위표와 같다.
 """
 
 from __future__ import annotations
 
-from rest_framework.throttling import SimpleRateThrottle
+from apps.accounts.throttles import PerUserOrIpThrottle
 
 
-class _PerUserOrGuest(SimpleRateThrottle):
-    """로그인했으면 계정별, 아니면 게스트끼리 한 통.
-
-    IP 로 셀 수 없다. 브라우저가 백엔드를 직접 부르지 않고 Next 서버가 대신
-    부르기 때문에 백엔드가 보는 주소는 항상 하나다(accounts·learning 도 같다).
-    IP 로 세면 접속자 전원이 한 통에 담긴다.
-
-    계정별로 나누는 것이 중요하다. 통이 하나뿐이면 한 사람이 한도를 다 쓰는
-    동안 나머지 전원이 막힌다.
-
-    게스트 통에는 그 문제가 남아 있다. 이 화면들은 로그인 없이 쓸 수 있어서
-    게스트를 나눌 키가 없다. learning 쪽과 같은 한계이고, 같은 방식으로 게스트
-    통을 크게 잡는다. 제대로 나누려면 실제 클라이언트를 아는 Next 중계가
-    제한해야 한다.
-
-    learning.throttles._PerUserOrShared 와 같은 구현을, 앱 간 의존을 늘리지
-    않으려고 복제했다. 게스트를 식별하는 방식을 바꾸면 두 곳을 함께 고친다.
-    공통으로 뺄 자리는 core 앱이 생길 때다.
-    """
-
-    # 게스트 통을 이만큼 키운다. learning.throttles 의 값과 같게 둔다 -
-    # 두 곳이 다르면 어느 쪽이 먼저 막히는지 예측이 안 된다.
-    guest_multiplier = 20
-
-    def get_cache_key(self, request, view) -> str:
-        user = getattr(request, "user", None)
-        ident = f"u{user.pk}" if user is not None and user.is_authenticated else "guest"
-        return self.cache_format % {"scope": self.scope, "ident": ident}
-
-    def allow_request(self, request, view) -> bool:
-        # DRF 는 요청마다 새 인스턴스를 만든다. 여기서 값을 바꿔도
-        # 다음 요청에 새지 않는다.
-        user = getattr(request, "user", None)
-        if self.num_requests and (user is None or not user.is_authenticated):
-            self.num_requests *= self.guest_multiplier
-        return super().allow_request(request, view)
-
-
-class TalkQuestionThrottle(_PerUserOrGuest):
+class TalkQuestionThrottle(PerUserOrIpThrottle):
     """소리내어 읽기: 읽을 것을 받아오는 쪽. 조회만 하므로 넉넉하다."""
 
     scope = "talk_question"
 
 
-class TalkGradeThrottle(_PerUserOrGuest):
+class TalkGradeThrottle(PerUserOrIpThrottle):
     """소리내어 읽기: 채점하는 쪽.
 
     출제보다 넉넉해야 한다. 발음 연습은 한 항목을 받아 세 번쯤 읽어 보는
@@ -62,19 +24,18 @@ class TalkGradeThrottle(_PerUserOrGuest):
     그래도 통을 두는 이유는 요청마다 후보 다섯 개를 문자열 비교하기 때문이다.
 
     수용 인원: 채점 180/min x 20 = 3600/min 이고 한 항목을 두세 번 읽어
-    보는 것이 정상이라, 게스트가 동시에 약 250명이면 상한에 닿는다. 429 가
-    뜬다는 신고가 오면 여기부터 본다.
+    보는 것이 정상이라, IP 하나에서 로그인하지 않은 사람이 동시에 약 250명이면
+    상한에 닿는다.
     """
 
     scope = "talk_grade"
 
 
-class PracticeGradeThrottle(_PerUserOrGuest):
+class PracticeGradeThrottle(PerUserOrIpThrottle):
     """낱개 연습(단어·문장)의 채점.
 
     로그인 없이 부를 수 있고, 로그인했으면 틀릴 때마다 오답 노트 표에 쓴다. 제한이
-    없을 때는 한 계정으로 그 표에 끝없이 쓸 수 있었다. 게스트 통이 하나라 누가 그
-    통을 채우면 그동안 게스트 채점이 막히는 것은 _PerUserOrGuest 에 적은 한계다.
+    없을 때는 한 계정으로 그 표에 끝없이 쓸 수 있었다.
     """
 
     scope = "practice_grade"

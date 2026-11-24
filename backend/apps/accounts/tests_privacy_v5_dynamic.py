@@ -1,7 +1,8 @@
-"""처리방침 v5 로 올린 뒤 가입 동의 기록을 깨뜨려 보는 테스트.
+"""처리방침 v5 로 올린 뒤 가입 동의 기록을 깨뜨려 보는 테스트. 지금은 버전과 무관하게 돈다
+(v6 에서 "v5" 글자로 못 박던 검사를 지웠다).
 
   - 이메일 가입, 구글 코드 가입, 구글 신분 토큰(계정 창) 가입 셋 모두 동의 기록의 버전이
-    화면 문서(LegalDoc.tsx 의 DOC_VERSION)와 같다. v5 동안은 글자 "v5" 로도 못 박는다.
+    화면 문서(LegalDoc.tsx 의 DOC_VERSION)와 같다.
   - 요청 본문에 버전을 실어 보내도 서버 값이 이긴다.
   - v4 로 가입한 사람이 다시 로그인해도 v5 로 올라가지 않는다(v5 에 동의한 적이 없다).
 
@@ -47,11 +48,6 @@ class PrivacyV5ConsentTest(TestCase):
     def test_서버_버전이_화면_문서_버전과_같다(self):
         self.assertEqual(TERMS_VERSION, doc_version())
 
-    def test_v5_동안은_글자로도_v5다(self):
-        if doc_version() != "v5":
-            self.skipTest("v5 가 아니다. 다음 개정 때 이 테스트를 지운다.")
-        self.assertEqual(TERMS_VERSION, "v5")
-
     def test_세_가입_길_모두_화면_문서_버전으로_남긴다(self):
         res = self.post(SIGNUP_URL, {"email": "v5-mail@example.com", "password": PASSWORD, **CONSENT})
         self.assertEqual(res.status_code, 201)
@@ -68,7 +64,8 @@ class PrivacyV5ConsentTest(TestCase):
                 self.assertIsNotNone(user.terms_agreed_at)
 
     def test_본문에_실은_버전은_무시한다(self):
-        forged = {"terms_version": "v6", "terms_agreed_at": "2000-01-01T00:00:00Z"}
+        # 서버 버전이 될 일이 없는 값이어야 한다. 서버 값과 같으면 본문을 받아도 통과한다.
+        forged = {"terms_version": "v999", "terms_agreed_at": "2000-01-01T00:00:00Z"}
         res = self.post(SIGNUP_URL, {"email": "forge@example.com", "password": PASSWORD,
                                      **CONSENT, **forged})
         self.assertEqual(res.status_code, 201)

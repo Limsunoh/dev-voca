@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ApiError } from "@/lib/api/client";
 import { getQuestion, gradeAnswer, type QuizContent } from "@/lib/api/quiz";
+import { clientIpHeaders } from "@/lib/client-ip";
 import { getToken, withTokenOrGuest } from "@/lib/session";
 
 /**
@@ -67,6 +68,9 @@ export async function POST(request: Request) {
   }
 
   const cookieToken = await getToken();
+  // 로그인하지 않았으면 백엔드가 접속 IP 로 센다(learning·vocab 의 throttles).
+  // 토큰이 실리면 request() 가 이 머리를 버린다.
+  const relay = await clientIpHeaders();
 
   try {
     // 채점도 같은 콘텐츠로 보내야 한다. 문장 문제를 단어 쪽에 채점시키면
@@ -77,7 +81,7 @@ export async function POST(request: Request) {
     // 쿠키 때문에 막히면 안 된다.
     const { value } = await withTokenOrGuest(
       cookieToken,
-      (auth) => gradeAnswer(token, picked, content, auth),
+      (auth) => gradeAnswer(token, picked, content, auth, relay),
       { forget: true },
     );
     return NextResponse.json(value);

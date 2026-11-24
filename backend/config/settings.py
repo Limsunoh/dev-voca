@@ -328,7 +328,8 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
 # Next 서버가 백엔드에 실제 접속 IP 를 넘길 때 같이 싣는 비밀값(apps.accounts.throttles 의
 # came_through_next). Vercel 의 같은 이름 환경변수와 같아야 한다. 비면 넘겨받은 IP 를 믿지
-# 않고 모든 가입·로그인을 "Next 를 거치지 않은 요청" 한 통으로 센다.
+# 않고 모든 가입·로그인과 로그인하지 않은 사람의 판·낱개 채점·순위표·소리내어 읽기를
+# "Next 를 거치지 않은 요청" 한 통으로 센다.
 RELAY_SECRET = os.getenv("RELAY_SECRET", "")
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -465,7 +466,10 @@ REST_FRAMEWORK = {
     # 접속자 전원이 한 통에 담겨, 한 사람이 빠르게 눌러도 나머지가
     # 429 를 받는다. 막고 싶은 반복 호출도 같은 통을 쓰니 구분되지 않는다.
     #
-    # 다만 로그인·가입은 예외다. 먼저 제출된 이메일로 센다(한 계정의
+    # 다만 로그인·가입과, 로그인하지 않은 사람의 판·낱개 채점·순위표·소리내어
+    # 읽기는 예외다(뒤의 것은 apps.accounts.throttles.PerUserOrIpThrottle).
+    #
+    # 로그인·가입은 먼저 제출된 이메일로 센다(한 계정의
     # 비밀번호를 무한히 추측하는 것). 이메일마다 한 번씩 던지는 것은 이메일
     # 카운터로 못 막아서 접속 IP 로도 센다. IP 는 Next 서버가 비밀값과 함께
     # 실어 보낸 것만 믿는다(apps.accounts.throttles 의 came_through_next).
@@ -543,8 +547,8 @@ REST_FRAMEWORK = {
         # 일일공부. 하루 최대 40문제라 분당 30이면 손으로 닿지 않는다.
         # 로그인해야 쓸 수 있어 계정별로 센다.
         "daily_study": "5000/min" if sys.argv[1:2] == ["test"] else "30/min",
-        # 소리내어 읽기. 로그인 없이도 쓸 수 있어 게스트는 한 통에 담긴다
-        # (apps/vocab/throttles.py 에 그 한계를 적어뒀다).
+        # 소리내어 읽기. 로그인 없이도 쓸 수 있어, 로그인하지 않은 사람은 접속 IP
+        # 별로 센다(apps/vocab/throttles.py).
         "talk_question": "5000/min" if sys.argv[1:2] == ["test"] else "60/min",
         # 채점을 출제보다 넉넉하게 둔다. 한 항목을 여러 번 읽어 보는 것이
         # 정상 사용이라 같은 값으로 두면 정상 사용자가 막힌다.

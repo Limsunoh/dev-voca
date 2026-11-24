@@ -3,8 +3,9 @@ import "server-only";
 import { headers } from "next/headers";
 
 /**
- * 가입·로그인 요청에 싣는 머리. 백엔드의 가입·로그인 제한이 접속 IP 로 센다
- * (backend/apps/accounts/throttles.py). 처리방침 v3 시행일인 2026-11-19 부터 싣는다.
+ * 가입·로그인 요청과, 로그인하지 않고 부르는 문제풀기·순위표·소리내어 읽기 요청에
+ * 싣는 머리. 백엔드가 그 요청들을 접속 IP 로 센다(backend/apps/accounts/throttles.py
+ * 의 client_ident). 로그인한 요청에는 lib/api/client.ts 의 guestHeaders 가 버린다.
  *
  * 브라우저는 백엔드를 직접 부르지 않고 이 Next 서버가 대신 불러서, 백엔드가 보는
  * 접속 주소는 늘 Vercel 이다. 그래서 여기서 실제 IP 를 싣는다. x-forwarded-for 는

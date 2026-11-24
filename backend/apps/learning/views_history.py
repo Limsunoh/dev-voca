@@ -35,7 +35,8 @@ class MistakesThrottle(UserRateThrottle):
     이유). 한 번에 검수 하위 질의 둘이 든 COUNT 와 본문 조회 둘이 돈다.
     learning 의 다른 뷰 여덟 개도 전부 한도를 단다.
 
-    로그인해야 부르는 곳이라 게스트 통(`_PerUserOrShared`)이 필요 없다.
+    로그인해야 부르는 곳이라 로그인하지 않은 사람을 IP 로 세는
+    `PerUserOrIpThrottle` 이 필요 없다.
     DRF 의 계정별 통을 그대로 쓴다.
 
     한도가 settings 가 아니라 여기 있다. 다른 한도는 전부

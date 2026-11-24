@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { fetchTalkQuestion, gradeTalk } from "@/lib/api/talk";
 import { toTalkScene, type TalkKind } from "@/lib/routes";
 import { ApiError } from "@/lib/api/client";
+import { clientIpHeaders } from "@/lib/client-ip";
 import { getToken, withTokenOrGuest } from "@/lib/session";
 
 /**
@@ -63,6 +64,9 @@ export async function POST(request: Request) {
   }
 
   const auth = (await getToken()) ?? undefined;
+  // 로그인하지 않았으면 백엔드가 접속 IP 로 센다(learning·vocab 의 throttles).
+  // 토큰이 실리면 request() 가 이 머리를 버린다.
+  const relay = await clientIpHeaders();
 
   try {
     if (body.action === "start") {
@@ -88,7 +92,8 @@ export async function POST(request: Request) {
       // 막힌다. 문장마다 오는 요청이라 로그인 확인을 먼저 하지 않는다.
       const { value } = await withTokenOrGuest(
         auth ?? null,
-        (token) => fetchTalkQuestion(kind, { exclude, token, level, scene }),
+        (token) =>
+          fetchTalkQuestion(kind, { exclude, token, level, scene, guestHeaders: relay }),
         { forget: true },
       );
       return NextResponse.json(value);
@@ -120,7 +125,7 @@ export async function POST(request: Request) {
     // 시작과 같이 쿠키를 지우고 게스트로 채점한다.
     const { value } = await withTokenOrGuest(
       auth ?? null,
-      (token) => gradeTalk({ token: body.token as string, heard }, token),
+      (token) => gradeTalk({ token: body.token as string, heard }, token, relay),
       { forget: true },
     );
     return NextResponse.json(value);
