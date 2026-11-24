@@ -18,6 +18,22 @@ import { ApiError } from "@/lib/api/client";
 import { clearToken, forgetToken, getToken, setToken } from "@/lib/session";
 
 /**
+ * 로그인이 풀려서(401) 실패한 것이면 죽은 쿠키를 지우고 로그인 화면으로 보낸다.
+ *
+ * 쿠키가 있어도 서버가 거절하면(다른 기기에서 비밀번호를 바꿨거나 로그인이 끝났다) 그
+ * 쿠키는 죽은 것이다. 남겨 두면 몇 번을 눌러도 "토큰이 유효하지 않습니다." 만 나온다.
+ *
+ * catch 안에서 부른다. redirect 는 예외를 던져 흐름을 끊으므로, 401 이 아니면 그냥
+ * 돌아와 원래 오류 처리를 이어 간다.
+ */
+async function leaveIfSignedOut(error: unknown): Promise<void> {
+  if (error instanceof ApiError && error.status === 401) {
+    await forgetToken();
+    redirect("/login?next=/profile", RedirectType.replace);
+  }
+}
+
+/**
  * 프로필 수정.
  *
  * Server Action 인 이유는 로그인·가입과 같다 - 토큰이 httpOnly 쿠키에만
@@ -68,6 +84,7 @@ export async function updateProfileAction(
   try {
     saved = await updateMe(token, { display_name: displayName, avatar });
   } catch (error) {
+    await leaveIfSignedOut(error);
     if (error instanceof ApiError) return { error: error.message };
     return { error: "잠시 후 다시 시도해주세요." };
   }
@@ -123,6 +140,7 @@ export async function requestEmailChangeAction(
     });
     return { sentTo: sent.sent_to };
   } catch (error) {
+    await leaveIfSignedOut(error);
     if (error instanceof ApiError) return { error: error.message };
     return { error: "잠시 후 다시 시도해주세요." };
   }
@@ -195,6 +213,7 @@ export async function changePasswordAction(
       new_password: newPassword,
     });
   } catch (error) {
+    await leaveIfSignedOut(error);
     if (error instanceof ApiError) {
       // 백엔드가 칸을 짚는 것은 이 둘뿐이다(현재 비밀번호 틀림, 새
       // 비밀번호 규칙 위반). 그 밖의 칸 이름이 오면 칸 탓이 아닌 것으로 둔다.
@@ -254,10 +273,7 @@ export async function deleteAccountAction(
   } catch (error) {
     // 토큰이 이미 무효다. 다른 기기에서 지웠거나 끊겼고, 지워졌는데 응답만
     // 못 받은 경우도 있다. 창에 남겨 두면 몇 번을 눌러도 같은 오류만 나온다.
-    if (error instanceof ApiError && error.status === 401) {
-      await forgetToken();
-      redirect("/login?next=/profile", RedirectType.replace);
-    }
+    await leaveIfSignedOut(error);
     if (error instanceof ApiError) return { error: error.message };
     return { error: "잠시 후 다시 시도해주세요." };
   }
@@ -324,6 +340,7 @@ export async function uploadPhotoAction(
   try {
     saved = await uploadMyPhoto(token, file);
   } catch (error) {
+    await leaveIfSignedOut(error);
     if (error instanceof ApiError) return { error: error.message };
     return { error: "잠시 후 다시 시도해주세요." };
   }
@@ -359,6 +376,7 @@ export async function deletePhotoAction(): Promise<PhotoState> {
   try {
     saved = await deleteMyPhoto(token);
   } catch (error) {
+    await leaveIfSignedOut(error);
     if (error instanceof ApiError) return { error: error.message };
     return { error: "잠시 후 다시 시도해주세요." };
   }

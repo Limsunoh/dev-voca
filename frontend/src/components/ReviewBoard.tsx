@@ -11,7 +11,7 @@ import type {
   ReviewStarted,
 } from "@/lib/api/review";
 import type { RoundChoice } from "@/lib/api/rounds";
-import { fetchOrExplain, jsonOrExplain } from "@/lib/connection";
+import { fetchOrExplain, jsonOrExplain, leaveIfSignedOut } from "@/lib/connection";
 import { routes } from "@/lib/routes";
 
 import { Burst } from "./Burst";
@@ -974,6 +974,7 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
     cache: "no-store",
   });
 
+  leaveIfSignedOut(res);
   if (!res.ok) {
     const data = await res.json().catch(() => null);
     throw new CallError(data?.detail ?? "요청이 실패했습니다.", res.status);

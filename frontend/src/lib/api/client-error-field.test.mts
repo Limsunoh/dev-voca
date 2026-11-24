@@ -6,7 +6,7 @@
  * 계약:
  *   - 400 대: DRF 본문의 첫 오류 문구를 message 로. 그 키가 칸 이름이면 field.
  *   - {"detail": "..."} 와 non_field_errors 는 칸이 아니라 field 가 없다.
- *   - 500 이상: 본문을 안 보고 기본 문구, field 없음.
+ *   - 500 이상: 기본 문구, field 없음. 단 502·503 의 detail 문자열만 그대로 보인다.
  *
  * 비밀번호 카드는 field 로 어느 칸을 비울지 고른다. field 가 잘못 붙으면
  * 멀쩡한 칸이 지워지고, 빠지면 틀린 칸이 남는다.
@@ -125,7 +125,7 @@ describe("해석할 수 없는 본문은 기본 문구, field 없음", () => {
   });
 });
 
-describe("500 이상은 본문을 안 본다", () => {
+describe("500 이상은 칸별 본문을 안 본다", () => {
   for (const status of [500, 502, 503]) {
     it(`${status}: 칸별 오류 본문이 와도 기본 문구, field 없음`, async () => {
       const e = await failWith(status, { current_password: ["내부 사정 Traceback"] });
@@ -134,6 +134,60 @@ describe("500 이상은 본문을 안 본다", () => {
       assert.doesNotMatch(e.message, /Traceback/);
     });
   }
+});
+
+describe("502·503 의 detail 문자열만은 그대로 보인다", () => {
+  it("503: 백엔드가 쓴 메일 실패 안내", async () => {
+    const notice = "지금은 확인 메일을 보낼 수 없습니다. 잠시 후 다시 시도해주세요.";
+    const e = await failWith(503, { detail: notice });
+    assert.equal(e.message, notice);
+    assert.equal(e.field, undefined);
+  });
+
+  it("502: 앞단이 낸 HTML 은 기본 문구", async () => {
+    const e = await failWith(502, "<html>Bad Gateway</html>", true);
+    assert.equal(e.message, "요청이 실패했습니다. (502)");
+  });
+
+  it("500: detail 이 와도 기본 문구", async () => {
+    const e = await failWith(500, { detail: "내부 사정 Traceback" });
+    assert.equal(e.message, "요청이 실패했습니다. (500)");
+  });
+
+  // 문자열 detail 하나만 통과시킨다. 모양이 다른 본문까지 4xx 해석으로 흘려보내면
+  // 서버 오류 본문의 첫 줄이 화면에 나간다.
+  for (const status of [502, 503]) {
+    for (const [label, body] of [
+      ["detail 이 목록", { detail: ["내부 사정 Traceback"] }],
+      ["detail 이 객체", { detail: { message: "내부 사정 Traceback" } }],
+      ["detail 이 숫자", { detail: 503 }],
+      ["detail 이 null", { detail: null }],
+      ["본문이 목록", ["내부 사정 Traceback"]],
+      ["본문이 문자열 JSON", "내부 사정 Traceback"],
+      ["본문이 null", null],
+      ["non_field_errors", { non_field_errors: ["내부 사정 Traceback"] }],
+    ] as const) {
+      it(`${status}: ${label} 이면 기본 문구, field 없음`, async () => {
+        const e = await failWith(status, body);
+        assert.equal(e.message, `요청이 실패했습니다. (${status})`);
+        assert.equal(e.field, undefined);
+        assert.equal(e.status, status);
+      });
+    }
+  }
+
+  for (const status of [500, 501, 504, 599]) {
+    it(`${status}: detail 문자열이어도 기본 문구`, async () => {
+      const e = await failWith(status, { detail: "내부 사정 Traceback" });
+      assert.equal(e.message, `요청이 실패했습니다. (${status})`);
+    });
+  }
+
+  it("503 에 detail 과 칸별 오류가 함께 오면 detail 만, field 없음", async () => {
+    const e = await failWith(503, { detail: "잠시 후 다시", email: ["x"] });
+    assert.equal(e.message, "잠시 후 다시");
+    assert.equal(e.field, undefined);
+  });
 });
 
 describe("연결 실패", () => {

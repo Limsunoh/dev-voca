@@ -12,7 +12,7 @@ import type {
   StudyProgress,
 } from "@/lib/api/daily";
 import type { RoundQuestion, RoundResult } from "@/lib/api/rounds";
-import { fetchOrExplain, jsonOrExplain } from "@/lib/connection";
+import { fetchOrExplain, jsonOrExplain, leaveIfSignedOut } from "@/lib/connection";
 import { dailyLengthLabel } from "@/lib/daily-length";
 import { routes } from "@/lib/routes";
 
@@ -54,6 +54,7 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
     cache: "no-store",
   });
 
+  leaveIfSignedOut(res);
   if (!res.ok) {
     const data = await res.json().catch(() => null);
     throw new Error(data?.detail ?? "요청이 실패했습니다.");

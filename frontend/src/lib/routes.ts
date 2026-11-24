@@ -347,7 +347,17 @@ export function safeNext(value: unknown): string {
   const next = raw.replace(/[\t\r\n]/g, "").replace(/\\/g, "/");
 
   // 슬래시 하나로 시작하고 그다음이 슬래시가 아닌 경로만 받는다.
-  return /^\/(?!\/)/.test(next) ? next : "/";
+  if (!/^\/(?!\/)/.test(next)) return "/";
+
+  // 점 조각이 든 "/.//evil.com" 은 위 검사를 지나지만, 브라우저 쪽 Next 가 주소를
+  // 풀면서 "//evil.com" 이 되어 바깥 사이트로 간다("/a/..//evil.com" 도 같다).
+  // 그래서 한 번 풀어 보고, 같은 출처이고 풀린 경로가 // 로 시작하지 않을 때만
+  // 받는다. 이미 풀린 값을 돌려주므로 브라우저가 다시 풀어도 같다.
+  // 상대 경로를 풀어 보려고 붙이는 가짜 출처다. 어디로도 요청하지 않는다.
+  const fakeOrigin = "http://n";
+  const url = new URL(next, fakeOrigin);
+  if (url.origin !== fakeOrigin || url.pathname.startsWith("//")) return "/";
+  return url.pathname + url.search + url.hash;
 }
 
 /**

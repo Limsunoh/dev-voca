@@ -185,6 +185,9 @@ describe("돌아갈 곳(next)", () => {
     "https://evil.example/x",
     "javascript:alert(1)",
     "/\t/evil.example",
+    "/.//evil.example",
+    "/%2e%2e//evil.example",
+    "/x/..//evil.example",
     " /board",
     ["/board"],
     42,
@@ -210,6 +213,14 @@ describe("돌아갈 곳(next)", () => {
     };
     jar.set(NONCE, "n1");
     assert.equal((await run({ credential: "jwt", next: "//evil.example" })).to, "/signup?error=consent");
+  });
+
+  it("동의가 필요할 때 점 조각 next 도 가입 화면 주소에 싣지 않는다", async () => {
+    reply = async () => {
+      throw new ApiError("consent_required", 400, "code");
+    };
+    jar.set(NONCE, "n1");
+    assert.equal((await run({ credential: "jwt", next: "/.//evil.example" })).to, "/signup?error=consent");
   });
 });
 
