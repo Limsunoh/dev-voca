@@ -271,9 +271,19 @@ export function TalkBoard({
       // 그려질 자리가 없다 - 오류는 아래 읽기 화면에만 있다.
       setPhase("ready");
       await loadPrompt();
-    } catch {
+    } catch (err) {
       // 거절했거나 마이크를 못 열었다. 상태를 다시 읽어 맞는 안내를 그린다.
-      setMic(await readMicState());
+      //
+      // 크롬 앱 자체의 마이크(안드로이드 권한)가 막힌 경우는 다시 읽어도 사이트
+      // 권한이라 "granted" 가 나온다. 그대로 그리면 안내 없이 "시작하기" 로
+      // 돌아가 눌러도 또 실패한다(2026-11-25 에뮬레이터에서 확인). 거절
+      // (NotAllowedError)인데 granted 로 읽히면 막힌 것으로 그린다.
+      // 권한 창을 그냥 닫은 경우도 NotAllowedError 지만 그때는 "prompt" 라
+      // 다시 물어볼 수 있게 둔다.
+      const state = await readMicState();
+      // MicCheck 와 같은 판별이다. DOMException 도 Error 를 이어받는다.
+      const refused = err instanceof Error && err.name === "NotAllowedError";
+      setMic(refused && state === "granted" ? "denied" : state);
     } finally {
       setBusy(false);
     }
@@ -394,9 +404,11 @@ export function TalkBoard({
 
       {/* 막힌 뒤 결과 안내가 안 보이는 동안(새 문장을 받는 중이거나 받은
           뒤, 받기에 실패한 뒤) 주 버튼이 왜 "새로고침" 인지 한 줄로 알린다.
-          결과 안내가 보일 때는 그쪽이 같은 말을 하므로 빠진다. */}
+          결과 안내가 보일 때는 그쪽이 같은 말을 하므로 빠진다.
+          설정 경로까지 담아 폰에서 네댓 줄이 되므로 가운데가 아니라 왼쪽에
+          맞춘다(결과 안내와 같다). */}
       {micBlocked && !(phase === "done" && outcome) && (
-        <p className="text-center text-sm" style={{ color: "var(--coral-deep)" }}>
+        <p className="text-sm" style={{ color: "var(--coral-deep)" }}>
           마이크가 막혀 있어요. {MIC_BLOCKED_HELP}
         </p>
       )}
@@ -447,7 +459,7 @@ export function TalkBoard({
           <button
             type="button"
             // 마이크가 막혔으면(micBlocked) 다시 읽어도 또 막힌다. 안내가
-            // "허용으로 바꾸고 새로고침" 이라 주 버튼도 같은 말을 한다.
+            // "설정에서 켠 뒤 '새로고침'을 누르라" 고 하므로 주 버튼이 그 버튼이다.
             onClick={micBlocked ? () => window.location.reload() : listen}
             disabled={!micBlocked && (busy || !prompt)}
             // 이 화면의 유일한 갈색. 주된 동작이 하나여야 무엇을 눌러야
