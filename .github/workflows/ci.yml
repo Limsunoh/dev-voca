@@ -14,6 +14,8 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # 보통 5~6분이다. 멈춘 실행이 러너를 6시간(기본값) 붙잡지 않게 넉넉히 끊는다.
+    timeout-minutes: 20
 
     # **PostgreSQL 컨테이너에서 돈다.** sqlite 는 NUL 바이트·컬럼 길이 초과·
     # select_for_update 를 조용히 통과시켜서, 로컬만 sqlite 로 두면 "로컬은
@@ -83,7 +85,9 @@ jobs:
       - name: 의존성 설치
         run: |
           pip install -r requirements.txt
-          pip install ruff tblib
+          # 린트 판을 고정한다. 안 하면 새 판이 나온 날 코드는 그대로인데 규칙이 바뀌어
+          # 검사가 빨개진다. 로컬 .venv 와 같은 판이다. 올릴 때는 둘을 같이 올린다.
+          pip install ruff==0.16.6 tblib
 
       - name: 린트 (ruff)
         # 규칙은 ruff.toml 이 정한다. 여기에 --select 를 주면 그 파일의
@@ -108,6 +112,8 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    # 보통 2분 안팎이다.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
