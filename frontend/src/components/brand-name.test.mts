@@ -10,7 +10,9 @@
  * 줄이 갈려서 만든 검사다.
  *
  * 못 잡는 것: 문자열로 들고 있다가 본문에 그리는 값(섹션 제목, 문구 객체, LegalDoc 의
- * title). 지금 그런 곳은 계정 삭제 안내의 큰 제목 하나다.
+ * title). 지금 그런 곳은 계정 삭제 안내의 큰 제목과, 마이크 안내 문구(TalkFeedback 의
+ * MIC_UNBLOCK_STEPS, 폰 설정에서 찾을 앱 이름이라 android/twa-manifest.json 의
+ * launcherName 과 같아야 한다) 둘이다.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";

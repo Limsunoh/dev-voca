@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { MIC_UNBLOCK_STEPS } from "@/components/TalkFeedback";
+
 /**
  * 마이크에 소리가 들어오는지 눈으로 보는 자리.
  *
@@ -16,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *
  *     막대가 크게 움직인다 + 인식 실패  인식기 쪽 문제다
  *     막대가 조금만 움직인다            소리는 들어오는데 작다. 가까이서 말하면 된다
- *     막대가 안 움직인다                장치나 윈도우 설정 문제다
+ *     막대가 안 움직인다                장치 문제다(이어폰 등)
  *     여는 것부터 실패                  권한이나 장치가 없다
  *
  * 둘째 줄이 있어야 하는 이유: 인식기는 크롬에서 "작게 말함" 과 "소리 없음"
@@ -144,7 +146,9 @@ export function MicCheck() {
       setPhase("failed");
       setError(
         err instanceof Error && err.name === "NotAllowedError"
-          ? "마이크가 막혀 있습니다. 주소창 왼쪽 아이콘에서 허용으로 바꿔주세요."
+          ? // 여기는 새로고침 버튼이 없다. 설정을 고친 뒤 이 버튼만 다시 눌러도
+            // 마이크가 열린다(2026-11-25 에뮬레이터에서 새로고침 없이 확인).
+            `마이크가 막혀 있습니다. ${MIC_UNBLOCK_STEPS} 그런 다음 '마이크 소리 확인'을 다시 눌러주세요.`
           : "마이크를 열지 못했습니다. 장치가 연결돼 있는지 봐주세요.",
       );
     }
@@ -215,7 +219,12 @@ export function MicCheck() {
               지정하는 수단이 없어 브라우저 기본 장치를 따라간다.
               마이크를 직접 여는 이 확인 막대만 장치를 고를 수 있는데, 정작
               인식은 못 고르므로 여기서 고르게 하면 "확인은 되는데 읽기는
-              안 되는" 더 나쁜 상태가 된다. 그래서 바꾸는 곳을 알려준다. */}
+              안 되는" 더 나쁜 상태가 된다.
+
+              폰의 크롬에는 마이크를 고르는 설정이 없고 폰이 정한 마이크를
+              쓴다. 그래서 바꿀 수 있는 것(이어폰)만 말한다. 예전에는 PC 크롬
+              주소와 윈도우 설정을 안내했는데, 2026-11-25 에 앱(에뮬레이터)에서
+              장치 이름 "기본값" 아래에 그 안내가 그대로 떴다. */}
           {!heard && device && (
             <div className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
               <p style={{ color: "var(--foreground)", fontWeight: "var(--weight-black)" }}>
@@ -223,17 +232,14 @@ export function MicCheck() {
               </p>
               <ol className="mt-1 grid gap-1">
                 <li>
-                  1. 크롬 주소창에 <strong>chrome://settings/content/microphone</strong> 을
-                  넣고, 맨 위 목록에서 쓰는 마이크를 고릅니다.
+                  1. 이어폰이 꽂혀 있거나 블루투스 이어폰이 연결돼 있으면 그
+                  마이크가 쓰일 수 있습니다. 이어폰 마이크에 대고 말하거나,
+                  이어폰을 빼고 해봅니다.
                 </li>
-                <li>
-                  2. 거기에 안 보이면 윈도우 설정 · 시스템 · 소리 · 입력 에서
-                  먼저 그 장치를 기본으로 바꿉니다.
-                </li>
-                <li>3. 이 화면을 새로고침하고 다시 해봅니다.</li>
+                <li>2. &apos;그만 보기&apos;를 누르고 &apos;마이크 소리 확인&apos;을 다시 눌러 봅니다.</li>
               </ol>
               <p className="mt-2">
-                앱에서는 못 바꿉니다. 음성 인식이 브라우저 기본 장치만 씁니다.
+                마이크는 폰이 정한 것을 씁니다. 이 앱에서 고를 수는 없습니다.
               </p>
             </div>
           )}
