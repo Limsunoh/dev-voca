@@ -23,7 +23,7 @@ from apps.vocab.models import Sentence, SentenceKind, Word
 from apps.vocab.quiz import TARGET_SENTENCE, TARGET_WORD
 
 from .models import ReviewState
-from .views_history import _visible_targets
+from .review import visible_targets
 
 URL = "/api/learning/mistakes/"
 PAGE_SIZE = 20
@@ -89,7 +89,7 @@ class VisibleTargetsEquivalenceTest(TestCase):
 
     def assertSame(self, **filters) -> list[int]:
         old = self._ids(_old_visible_targets(), **filters)
-        new = self._ids(_visible_targets(), **filters)
+        new = self._ids(visible_targets(), **filters)
         self.assertEqual(new, old)
         # 부정(exclude)도 같아야 한다. NULL 이 끼면 NOT IN 과 NOT EXISTS 가
         # 갈리는 자리라 함께 본다.
@@ -101,7 +101,7 @@ class VisibleTargetsEquivalenceTest(TestCase):
         )
         new_ex = list(
             ReviewState.objects.filter(**filters)
-            .exclude(_visible_targets())
+            .exclude(visible_targets())
             .order_by("-pk")
             .values_list("pk", flat=True)
         )
@@ -213,7 +213,7 @@ class VisibleTargetsEquivalenceTest(TestCase):
 
     def test_query_uses_exists_not_in_subquery(self):
         """속도 개선의 핵심. IN 하위 질의로 되돌아가면 큰 표에서 다시 느려진다."""
-        sql = str(ReviewState.objects.filter(_visible_targets()).query).upper()
+        sql = str(ReviewState.objects.filter(visible_targets()).query).upper()
 
         self.assertEqual(sql.count("EXISTS"), 2)
         self.assertNotIn("IN (SELECT", sql)

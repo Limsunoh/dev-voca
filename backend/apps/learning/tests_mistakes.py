@@ -138,8 +138,8 @@ class MistakesListTest(TestCase):
           문제풀이와 일일공부는 `bulk_update` 로 줄을 고치고, 그 경로는
           `auto_now` 를 안 돌린다(아래 테스트가 확인한다). 틀린 값을
           보여주느니 안 보낸다.
-        - "몇 번 더 맞히면 빠지나". 이 목록은 어디서든 한 번 맞히면
-          빠지므로 줄마다 다를 값이 없다. 화면이 머리말에 한 번만 적는다.
+        - "몇 번 더 맞히면 빠지나". 이 목록은 다시 한 번 맞히면 빠지므로(일일공부의
+          카드 직후 정답만 예외) 줄마다 다를 값이 없다. 화면이 머리말에 한 번만 적는다.
         """
         mark(self.user, make_word(), wrong=True)
 
@@ -170,8 +170,8 @@ class MistakesListTest(TestCase):
             "bulk_update 가 updated_at 을 움직였다면 정렬 근거를 다시 봐야 한다",
         )
 
-    def test_one_correct_answer_anywhere_removes_it(self):
-        """화면 머리말의 약속 "어디서든 다시 한 번 맞히면 빠진다".
+    def test_one_correct_answer_removes_it(self):
+        """화면 머리말의 약속 "다시 맞히면 빠진다(일일공부에서 카드를 본 직후의 정답만 예외)".
 
         연속 두 번은 복습의 졸업 조건이고, 이 목록은 마지막 답이 맞으면
         그 자리에서 빠진다. 복습을 안 거치는 자유 문제풀이 경로로 확인한다.
@@ -434,7 +434,7 @@ class MistakesGateEdgeTest(TestCase):
     def test_body_lookup_has_its_own_gate(self):
         """질의와 본문 조회 사이에 검수가 취소되는 틈. 두 번째 게이트다.
 
-        주 게이트(_visible_targets)가 살아 있으면 이 틈은 테스트로 못
+        주 게이트(visible_targets)가 살아 있으면 이 틈은 테스트로 못
         만든다. 그래서 주 게이트를 비워 틈을 흉내낸다. 본문 조회에서
         visible() 을 빼면 여기서 미검수 뜻이 그대로 나간다.
         """
@@ -446,7 +446,7 @@ class MistakesGateEdgeTest(TestCase):
         Sentence.objects.filter(pk=sentence.pk).update(is_reviewed=False)
 
         with mock.patch(
-            "apps.learning.views_history._visible_targets", return_value=Q()
+            "apps.learning.views_history.visible_targets", return_value=Q()
         ):
             rows = self.client.get(URL).json()["results"]
 
@@ -542,7 +542,7 @@ class MistakesSentenceKindEdgeTest(TestCase):
         Sentence.objects.filter(pk=sentence.pk).update(is_reviewed=False)
 
         with mock.patch(
-            "apps.learning.views_history._visible_targets", return_value=Q()
+            "apps.learning.views_history.visible_targets", return_value=Q()
         ):
             rows = self.client.get(URL).json()["results"]
 
@@ -629,10 +629,11 @@ def seed_words(count: int) -> None:
     )
 
 
-class OneCorrectAnswerAnywhereTest(TestCase):
-    """머리말의 약속 "어디서든 다시 한 번 맞히면 빠진다" 를 세 경로로 본다.
+class OneCorrectAnswerRemovesItTest(TestCase):
+    """머리말의 약속 "다시 맞히면 빠진다" 를 세 경로로 본다. 일일공부에서 카드를 본 직후의
+    정답만 예외다(아래 일일공부 시험).
 
-    위 test_one_correct_answer_anywhere_removes_it 는 record 함수를 직접
+    위 test_one_correct_answer_removes_it 는 record 함수를 직접
     부른다. 여기서는 화면이 실제로 부르는 API 로 맞힌다. 뷰가 복습 쓰기를
     빼먹는 경로가 생기면 저쪽 테스트는 통과한 채로 약속이 깨진다.
 
@@ -656,7 +657,7 @@ class OneCorrectAnswerAnywhereTest(TestCase):
         self.assertEqual(self.client.get(URL).json()["count"], 1)
 
     def test_free_round(self):
-        """자유 문제풀이. 복습 쓰기는 판을 닫을 때 일어난다."""
+        """자유 문제풀이. 맞힌 답의 복습 쓰기는 판을 닫을 때 일어난다(틀린 답은 답할 때)."""
         token = self._post("/api/learning/rounds/", {}).json()["token"]
         tt, aid = answer_of(session._load, token)
         self._plant_wrong(tt, aid)
@@ -689,8 +690,12 @@ class OneCorrectAnswerAnywhereTest(TestCase):
             [(r["target_type"], r["target_id"]) for r in rows], [(tt, aid)]
         )
 
-    def test_daily_study(self):
-        """일일공부. 끝내기가 없고 답마다 쓴다. 학습 차례면 넘긴다."""
+    def test_daily_study_right_after_the_card_keeps_it(self):
+        """일일공부. 끝내기가 없고 답마다 쓴다. 학습 차례면 넘긴다.
+
+        여기만 예외다. 첫 문제는 방금 카드로 본 묶음에서 나오므로, 맞혀도 빼지 않는다
+        (record.bump_review_states 의 keep_wrong). 화면 문구도 이 예외를 적는다.
+        """
         data = self._post("/api/learning/daily/", {"length": "5m"}).json()
         for _ in range(10):
             if data.get("question") is not None:
@@ -707,7 +712,7 @@ class OneCorrectAnswerAnywhereTest(TestCase):
         self.assertEqual(answered.status_code, 200)
         self.assertTrue(answered.json()["result"]["correct"])
 
-        self.assertEqual(self.client.get(URL).json()["count"], 0)
+        self.assertEqual(self.client.get(URL).json()["count"], 1)
 
     def test_review_needs_only_one_even_before_graduating(self):
         """복습. 한 번 맞히면 졸업 전이어도 여기서는 빠진다.

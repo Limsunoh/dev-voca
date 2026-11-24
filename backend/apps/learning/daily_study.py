@@ -388,6 +388,15 @@ def answer(
         answer_extra=extra,
     )
 
+    # 지금 묶음에서 카드로 본 단어인가. 순번을 가져가기 전에 본다(가져가면 다음
+    # 문제의 묶음을 가리킨다). 카드로 답을 보여 준 직후 묻는 자리라, 여기서 맞힌 것은
+    # 외웠다는 뜻이 아니다. 그래서 맞혀도 오답에서 빼지 않는다. 복습이 "연속 두 번"
+    # 을 요구하는 것과 같은 이유다(review.py 머리말). 빼는 것은 복습이 맡는다.
+    # 학습 차례가 끝난 뒤 전체에서 나온 문제는 카드 직후가 아니라 평소대로 뺀다.
+    right_after_card = current["tt"] == quiz.TARGET_WORD and answer_id in (
+        _study_scope(study) or ()
+    )
+
     # 토큰에 실린 순번. 이 값이 DB 와 맞아야 통과한다.
     # 채점과 복습 갱신을 한 트랜잭션으로 묶는다. 따로 커밋하면 순번을
     # 가져간 뒤 복습 쓰기가 실패했을 때 점수만 오르고 그 답은 복습에 안
@@ -415,6 +424,7 @@ def answer(
     #
     # 안에 있는 것은 전부 DB 읽기와 이 판에 대한 쓰기뿐이라, 다른
     # 사용자의 행을 잡지 않는다.
+
     with transaction.atomic():
         done = _take_step(study, int(state["n"]), gained, correct)
 
@@ -423,7 +433,9 @@ def answer(
         #
         # 여기가 없으면 하루의 주 활동에서 틀린 것이 복습에 안 뜬다. 자유
         # 문제풀이만 복습을 채우는데, 일일공부만 하는 사람이 더 많다.
-        bump_review_states(user, {(current["tt"], answer_id): correct})
+        bump_review_states(
+            user, {(current["tt"], answer_id): correct}, keep_wrong=right_after_card
+        )
 
         token, question = None, None
         if not done:
@@ -702,6 +714,11 @@ def _pick_words(user_id: int, size: int, seen: set[int]) -> list[Word]:
     같다(review.py). 거기서 이미 "지금 모르는 것" 을 그 순서로 정의했고,
     학습이 다른 순서를 쓰면 두 화면이 서로 다른 것을 "모르는 것" 이라
     부르게 된다.
+
+    다만 틀린 것은 묶음의 절반까지만 먼저 넣는다(2026-11-24 사용자 결정). 카드를 본
+    직후 맞힌 것은 오답에서 빼지 않게 되면서(answer 의 keep_wrong), 복습을 안 하는
+    사람은 틀린 단어가 줄지 않는다. 틀린 것으로 묶음을 다 채우면 그 사람은 새 단어를
+    카드로 영영 못 본다. 안 본 것과 오래된 것이 모자라 남는 자리는 틀린 것으로 채운다.
     """
     # 이 사람의 복습 상태. 없는 단어는 "안 본 것" 이라 뒤에서 채운다.
     #
@@ -720,6 +737,7 @@ def _pick_words(user_id: int, size: int, seen: set[int]) -> list[Word]:
     # 수백 개고 틀린 것이 몇 개뿐일 때 그 확률이 크다. "틀린 것 먼저" 는
     # 이 기능의 약속이라 표본 운에 맡기면 안 된다.
     picked: list[Word] = []
+    spare_wrong: list[Word] = []
     wrong_ids = [
         target_id
         for target_id, (is_wrong, _last) in states.items()
@@ -729,11 +747,10 @@ def _pick_words(user_id: int, size: int, seen: set[int]) -> list[Word]:
         # 여기는 ORDER BY RANDOM() 을 그대로 둔다. 이 사람이 틀린 단어(id 목록)
         # 안에서만 섞어 행이 몇 개뿐이다. 표 전체를 섞는 곳만 pick_random 으로
         # 바꿨다.
-        picked.extend(
-            Word.objects.visible()
-            .filter(pk__in=wrong_ids)
-            .order_by("?")[:size]
-        )
+        wrong = list(Word.objects.visible().filter(pk__in=wrong_ids).order_by("?")[:size])
+        quota = max(1, size // 2)
+        picked.extend(wrong[:quota])
+        spare_wrong = wrong[quota:]
 
     need = size - len(picked)
     if need < 1:
@@ -768,8 +785,11 @@ def _pick_words(user_id: int, size: int, seen: set[int]) -> list[Word]:
     old_ids = sorted(
         (
             target_id
-            for target_id, (_wrong, last_correct_at) in states.items()
+            for target_id, (is_wrong, last_correct_at) in states.items()
+            # 틀린 것은 위의 몫과 맨 끝의 채우기에서만 들어온다. 여기서 받으면 몫을
+            # 넘어 묶음을 다시 틀린 것으로 채운다.
             if last_correct_at is not None
+            and not is_wrong
             and target_id not in seen
             and target_id not in chosen
         ),
@@ -787,7 +807,9 @@ def _pick_words(user_id: int, size: int, seen: set[int]) -> list[Word]:
         }
         picked.extend(found[pk] for pk in old_ids if pk in found)
 
-    return picked[:size]
+    picked = picked[:size]
+    picked.extend(spare_wrong[: size - len(picked)])
+    return picked
 
 
 def _study_scope(study: DailyStudy) -> list[int] | None:
