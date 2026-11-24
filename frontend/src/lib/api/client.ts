@@ -115,7 +115,7 @@ const READ_TIMEOUT_MS = 10_000;
  *
  * fetch 에 signal 을 넘기면 Next 가 한 요청 안의 같은 GET 을 합치지 않는다
  * (next/dist/server/lib/dedupe-fetch.js). 한 화면에서 같은 것을 두 번 부르는
- * 곳(getWord, getSentence, getCurrentUser, 선택지 목록)은 React cache() 로
+ * 곳(getWord, getSentence, getLoginState, 선택지 목록)은 React cache() 로
  * 감싸 두었으니, 새로 그런 함수를 만들면 같이 감싼다.
  */
 export function readTimeout(): AbortSignal {
@@ -150,6 +150,11 @@ type RequestOptions = {
   token?: string;
   /** 더 실을 머리. 가입·로그인은 실제 접속 IP 를 싣는다(lib/client-ip.ts). */
   headers?: Record<string, string>;
+  /**
+   * 이 초만큼 Next 데이터 캐시에 둔다. 없으면 캐시하지 않는다(request 의 no-store 주석).
+   * 배포 때만 바뀌는 선택지 목록(fetchChoices)만 쓴다.
+   */
+  revalidate?: number;
 };
 
 /**
@@ -214,7 +219,7 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = "GET", body, token, headers: extra } = options;
+  const { method = "GET", body, token, headers: extra, revalidate } = options;
 
   let res: Response;
   try {
@@ -232,7 +237,7 @@ export async function request<T>(
       // 응답이 굳으면 검수가 취소된 항목을 옛 스냅샷으로 계속 보여준다.
       // 목록은 searchParams 덕에 어차피 매 요청 렌더되지만, 상세는
       // request-time API 를 쓰지 않아 이 옵션이 없으면 빌드/첫요청 시점에 고정된다.
-      cache: "no-store",
+      ...(revalidate === undefined ? { cache: "no-store" } : { next: { revalidate } }),
       signal: method === "GET" ? readTimeout() : undefined,
     });
   } catch (error) {
@@ -287,7 +292,10 @@ export async function fetchDetail<T>(
  */
 export async function fetchChoices(path: string): Promise<ChoiceOption[]> {
   try {
-    return await request<ChoiceOption[]>(path);
+    // 한 시간 캐시한다. 선택지는 백엔드 모델의 choices 라 배포 때만 바뀌는데, 목록
+    // 화면을 열 때마다 두세 개씩 백엔드에 다시 묻고 있었다. Next 는 200 응답만
+    // 캐시하므로 백엔드가 잠깐 실패한 것이 한 시간 굳지는 않는다.
+    return await request<ChoiceOption[]>(path, { revalidate: 3600 });
   } catch (error) {
     // 로그 없이 삼키면 필터 칩이 사라진 이유를 알 방법이 없다. 화면은 그대로
     // 두되 서버 로그에는 남긴다.
