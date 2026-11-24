@@ -13,7 +13,7 @@ from django.db.models.deletion import Collector
 from django.test import Client, TestCase, TransactionTestCase
 from django.utils import timezone
 
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 from apps.learning import record
 from apps.learning.models import DailyScore, QuizAnswer, QuizSession, ReviewState
 
@@ -116,7 +116,7 @@ class PasswordAccountTest(WithdrawTestCase):
         res = self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {token.key}")
 
         self.assertEqual(res.status_code, 401)
-        self.assertFalse(LoginToken.objects.filter(key=token.key).exists())
+        self.assertFalse(LoginToken.objects.filter(digest=token_digest(token.key)).exists())
 
     def test_same_email_can_sign_up_again_as_a_new_account(self):
         old_pk = self.user.pk

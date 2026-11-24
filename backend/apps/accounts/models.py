@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import re
 import secrets
@@ -21,6 +22,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models, transaction
 from django.db.models.functions import Cast, Lower, Random
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 
 from apps.learning.models import StudyLength
 
@@ -727,12 +729,45 @@ class User(AbstractUser):
 def _new_login_token_key() -> str:
     """새 로그인 토큰 값. DRF 토큰과 같은 꼴(16진수 40자)이라 옮겨 온 옛 값과 섞여도 된다.
 
-    LoginToken.device 의 기본값으로도 쓴다. 0013 이 옛 토큰의 device 를 토큰 값으로 채우므로
-    두 칸의 길이(40자)가 같아야 한다.
+    LoginToken.device 의 기본값으로도 쓴다.
 
     0009 마이그레이션이 이 이름으로 부른다. 이름을 바꾸거나 지우면 마이그레이션이 깨진다.
     """
     return secrets.token_hex(20)
+
+
+def token_digest(key: str) -> str:
+    """로그인 토큰 원문을 DB 에 두는 값(지문)으로 바꾼다. sha256 16진수 64자.
+
+    비밀번호처럼 일부러 느린 해시를 쓰지 않는다. 비밀번호는 사람이 골라 추측할 수 있어
+    느리게 만들어 추측을 막지만, 토큰은 무작위 160비트라 추측할 수 없다. 요청마다
+    인증이 부르므로 빨라야 한다.
+
+    0016 마이그레이션이 같은 계산을 따로 적어 두었다. 여기를 바꾸면 DB 에 있는 지문과
+    맞지 않아 모두 로그아웃된다.
+    """
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def _next_login_token_key(key: str) -> str:
+    """이어 가기(LoginToken.renew)가 내는 새 토큰 원문. 앞 토큰 원문과 서버 비밀 키로 정한다.
+
+    무작위로 만들지 않는 이유: DB 에는 지문만 있어서, 이미 만든 새 토큰을 한 번 더 돌려줘야
+    할 때(동시에 온 이어 가기, 새 토큰을 실은 응답이 끊긴 경우) 원문을 꺼낼 데가 없다.
+    앞 토큰 원문으로 다시 계산하면 같은 값이 나온다.
+
+    서버 비밀 키를 섞는 이유: 섞지 않으면 옛 토큰을 빼 간 쪽이 서버에 묻지 않고 새 토큰을
+    계산해, 옛 토큰을 다시 내야 걸리는 재사용 감지(SlimTokenAuthentication)를 비켜 간다.
+    DB 에는 원문이 없으니 DB 와 비밀 키를 함께 얻어도 계산할 수 없다.
+
+    DJANGO_SECRET_KEY 를 바꾸면 그 전에 이어 받은 토큰은 다시 계산되지 않는다. 그때 renew 는
+    다음 토큰을 새로 낸다.
+
+    같은 원문에서는 늘 같은 다음 토큰이 나온다. 그래서 한 로그인의 가장 새 토큰 한 줄만
+    지우면, 남은 앞 토큰의 이어 가기가 지운 값을 그대로 되살린다. 관리자 화면이 한 줄이 아니라
+    그 로그인(device)을 통째로 지우는 이유다(LoginTokenAdmin).
+    """
+    return salted_hmac("accounts.LoginToken.renew", key, algorithm="sha256").hexdigest()[:40]
 
 
 class LoginToken(models.Model):
@@ -764,10 +799,17 @@ class LoginToken(models.Model):
     이 표는 비우면 안 된다. 비우면 로그인한 사람이 모두 로그아웃되고, 0010 은 이미
     적용돼 다시 옮기지 않는다. 이 표를 만든 배포 전으로 되돌리지도 않는다
     (DEPLOY.md "배포 확인" 의 회원을 가리키는 표).
+
+    토큰 원문은 DB 에 두지 않고 지문(token_digest)만 둔다. 원문을 두면 DB 나 백업 파일을
+    본 사람이 그 값을 쿠키에 넣어 바로 그 사람으로 로그인한다. 비밀번호를 해시로 두는
+    것과 같은 이유다. 원문(key)은 발급한 그 객체와, 그 원문으로 인증한 요청의
+    객체(request.auth)에만 있다. DB 에서 새로 읽은 객체에는 없다(None).
     """
 
-    key = models.CharField(
-        "토큰", max_length=40, unique=True, default=_new_login_token_key, editable=False
+    # 지문. 칸 이름(db_column)은 원문을 두던 때의 "key" 그대로다. 이 배포 전 코드로
+    # 되돌려도 없는 칸을 찾아 500 이 나는 대신, 토큰이 안 맞아 다시 로그인하는 데서 그친다.
+    digest = models.CharField(
+        "토큰 지문", max_length=64, unique=True, editable=False, db_column="key"
     )
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="login_tokens", verbose_name="사용자"
@@ -779,7 +821,8 @@ class LoginToken(models.Model):
     # 폰에서 다시 로그인하면 새 값이다. 로그인할 때 새로 정하고 renew 가 물려준다.
     # 로그아웃은 이 값이 같은 토큰을 다 지우고, 이메일 변경 링크는 토큰 값이 아니라 이 값에
     # 묶인다(views._link_device). 토큰이 바뀌어도 대기 중인 링크가 살게.
-    # 0013 이 옛 토큰에는 토큰 값을 그대로 넣었다. 그 전에 보낸 링크가 계속 맞는다.
+    # 0013 이 11-13 전 토큰에는 토큰 원문을 넣었고, 0016 이 그 값을 토큰과 같은 지문으로
+    # 바꿨다. 그래서 길이가 지문과 같은 64자다.
     #
     # db_default 는 이 칸을 모르는 코드가 넣는 행을 위한 것이다. Railway 는 새 배포의
     # migrate 가 끝난 뒤에도 몇 초 동안 옛 코드가 요청을 받는데(0010 머리말), 옛 코드의
@@ -788,7 +831,7 @@ class LoginToken(models.Model):
     # default 가 이긴다.
     device = models.CharField(
         "기기",
-        max_length=40,
+        max_length=64,
         default=_new_login_token_key,
         db_default=Cast(Random(), models.CharField()),
         editable=False,
@@ -799,6 +842,8 @@ class LoginToken(models.Model):
     delivered = models.BooleanField("받음", default=True, db_default=True, editable=False)
     # 같은 로그인의 새 토큰이 처음 쓰인 시각. 이 뒤로 REPLACED_GRACE 동안만 통한다.
     replaced_at = models.DateTimeField("바뀐 시각", null=True, blank=True, editable=False)
+
+    _key: str | None = None
 
     # 로그인 쿠키(frontend/src/lib/token-cookie.ts 의 TOKEN_MAX_AGE)와 같은 30일.
     # 쿠키보다 짧게 잡으면 로그인해 있는 사람이 끊긴다. 쓰는 동안은 하루마다 새 토큰과
@@ -819,6 +864,27 @@ class LoginToken(models.Model):
     def __str__(self) -> str:
         # 토큰 값을 넣지 않는다. 관리자 작업 기록(LogEntry.object_repr)에 남는다.
         return f"{self.user} 의 로그인"
+
+    @property
+    def key(self) -> str | None:
+        """토큰 원문. DB 칸이 아니다(클래스 설명 끝 단락).
+
+        속성(property)으로 둔 이유: Django 는 속성이면 create(key=...) 로 받아 준다. 이어
+        가기가 정한 원문을 넣어 만들 때 쓴다.
+        """
+        return self._key
+
+    @key.setter
+    def key(self, value: str | None) -> None:
+        self._key = value
+
+    def save(self, *args, **kwargs) -> None:
+        # 새 토큰이면 원문을 정하고 지문을 채운다. 원문은 이 객체에만 남아 응답으로 나간다.
+        if not self.digest:
+            if self.key is None:
+                self.key = _new_login_token_key()
+            self.digest = token_digest(self.key)
+        super().save(*args, **kwargs)
 
     @classmethod
     def expired(cls) -> models.QuerySet[LoginToken]:
@@ -882,9 +948,14 @@ class LoginToken(models.Model):
 
         - 같은 로그인에 이 토큰보다 새 토큰이 이미 있으면 그것을 돌려준다. 이어 가기가
           동시에 둘 왔거나, 새 토큰을 실은 응답이 끊겨 옛 토큰으로 다시 온 경우다. 또
-          만들면 쿠키에 못 들어간 토큰이 쌓인다.
+          만들면 쿠키에 못 들어간 토큰이 쌓인다. DB 에는 지문만 있으므로 원문은 이 토큰
+          원문에서 다시 계산한다(_next_login_token_key). 계산이 맞지 않으면(토큰을 지문으로
+          바꾼 배포 전에 무작위로 만든 새 토큰, 서버 비밀 키를 바꾼 뒤) 이 토큰의 다음 토큰을
+          새로 낸다. 돌려주지 못한다고 끊으면 그 응답을 잃었던 사람이 로그아웃된다.
         - 하루가 안 됐으면 이 토큰을 그대로 돌려준다.
         - 그 사이 로그아웃 등으로 지워졌으면 None.
+
+        이 토큰의 원문(key)이 있어야 한다. 인증을 거친 request.auth 에는 있다.
 
         옛 토큰은 여기서 끝내지 않는다. 새 토큰이 처음 쓰일 때 끝낸다(mark_delivered).
         여기서 끝내면 새 토큰을 실은 응답을 잃은 사람이 옛 토큰만 든 채 로그아웃된다.
@@ -904,12 +975,50 @@ class LoginToken(models.Model):
             if latest is None:
                 return None
             if latest.pk != self.pk:
-                return latest
-            if latest.created > timezone.now() - self.RENEW_AFTER:
-                return latest
+                renewed = self._renewed_as(latest)
+                if renewed is not None:
+                    return renewed
+                # 이 토큰에서 계산되지 않는 새 토큰이다. 원문을 돌려줄 수 없어 이 토큰의 다음
+                # 토큰을 낸다. created 가 더 늦은 쪽이 먼저 쓰이면 다른 쪽이 바뀐 것으로 적힌다
+                # (mark_delivered 는 자기보다 created 가 이른 줄만 적는다).
+            elif latest.created > timezone.now() - self.RENEW_AFTER:
+                return self
+            key = _next_login_token_key(self._own_key())
+            # 이 토큰이 전에 낸 다음 토큰이 남아 있는데 latest 가 그 뒤 다른 갈래로 바뀌었을 수
+            # 있다. 또 만들면 지문이 겹쳐 500 이 나므로 있는 것을 돌려준다. 그것이 이미 바뀐
+            # 것으로 적힌 토큰이면 유예 뒤 그 로그인이 끊긴다. 서버 비밀 키를 바꿨다 되돌린
+            # 뒤 한 시간 안에 요청이 엇갈려야 생기는 일이라 그대로 둔다.
+            made = LoginToken.objects.filter(
+                user_id=self.user_id, device=self.device, digest=token_digest(key)
+            ).first()
+            if made is not None:
+                made.key = key
+                return made
             return LoginToken.objects.create(
-                user_id=self.user_id, device=self.device, delivered=False
+                user_id=self.user_id, device=self.device, delivered=False, key=key
             )
+
+    def _own_key(self) -> str:
+        # 원문 없이 계산하면 salted_hmac 이 None 을 "None" 으로 바꿔 엉뚱한 값을 낸다.
+        if self.key is None:
+            raise ValueError("토큰 원문이 없다. 발급하거나 인증한 객체로 불러야 한다.")
+        return self.key
+
+    def _renewed_as(self, latest: LoginToken) -> LoginToken | None:
+        """latest 가 이 토큰에서 이어 받은 것이면 원문을 채워 돌려준다. 아니면 None.
+
+        보통은 한 단계 뒤다. 이어 받은 토큰이 하루 넘게 안 쓰이다가 쓰이자마자 또 이어
+        받으면, 그 직후 유예 안에 온 이 토큰과 두 단계가 벌어질 수 있다. 이어 받기는 하루에
+        한 번이라 발급 30일 안의 단계 수만큼만 본다. renew 의 "계산되지 않는 새 토큰" 갈래는
+        하루를 기다리지 않지만, 그 갈래가 30일 안에 서른 번 넘게 엇갈릴 일은 없다.
+        """
+        key = self._own_key()
+        for _ in range(self.LIFETIME // self.RENEW_AFTER + 1):
+            key = _next_login_token_key(key)
+            if token_digest(key) == latest.digest:
+                latest.key = key
+                return latest
+        return None
 
     def mark_delivered(self) -> None:
         """renew 가 만든 이 토큰이 처음 쓰였다. 같은 로그인의 앞 토큰들을 바뀐 것으로 적는다.

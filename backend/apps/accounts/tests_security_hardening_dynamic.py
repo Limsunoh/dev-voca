@@ -32,7 +32,7 @@ from django.http import HttpRequest, HttpResponse
 from django.test import TestCase
 from rest_framework.throttling import SimpleRateThrottle
 
-from .models import LoginToken
+from .models import LoginToken, token_digest
 from .tests import EMAIL_CHANGE_URL, ME_URL, PASSWORD
 from .throttles import (
     ADMIN_DEVICE_COOKIE,
@@ -115,7 +115,7 @@ class EmailChangeTotalLimitTest(TestCase):
         return len(cache.get(key, []))
 
     def account_count(self, key: str) -> int:
-        user_pk = LoginToken.objects.get(key=key).user_id
+        user_pk = LoginToken.objects.get(digest=token_digest(key)).user_id
         cache_key = EmailChangeThrottle.cache_format % {
             "scope": EmailChangeThrottle.scope,
             "ident": f"u{user_pk}",
@@ -171,7 +171,7 @@ class EmailChangeTotalLimitTest(TestCase):
 
     def test_만료_토큰은_익명처럼_401_이고_통을_안_센다(self):
         key = self.account(1)
-        LoginToken.objects.filter(key=key).update(created=self.long_ago())
+        LoginToken.objects.filter(digest=token_digest(key)).update(created=self.long_ago())
         for i in range(10):
             self.assertEqual(self.ask(key, i).status_code, 401)
         self.assertEqual(self.total_count(), 0)
@@ -210,7 +210,7 @@ class LoginTokenExpiryBoundaryTest(TestCase):
     def test_30일_1초는_401(self):
         key = self.token_aged(LoginToken.LIFETIME + timedelta(seconds=1))
         self.assertEqual(self.me(key), 401)
-        self.assertTrue(LoginToken.objects.filter(key=key).exists(), "지우는 것은 매일 정리 몫이다")
+        self.assertTrue(LoginToken.objects.filter(digest=token_digest(key)).exists(), "지우는 것은 매일 정리 몫이다")
 
     def test_30일_1마이크로초도_401(self):
         self.assertEqual(self.me(self.token_aged(LoginToken.LIFETIME + timedelta(microseconds=1))), 401)
@@ -220,8 +220,8 @@ class LoginTokenExpiryBoundaryTest(TestCase):
         ages = [timedelta(days=29), LoginToken.LIFETIME, LoginToken.LIFETIME + timedelta(seconds=1)]
         for age in ages:
             self.token_aged(age)
-        by_method = {t.key for t in LoginToken.objects.all() if t.is_expired()}
-        by_query = set(LoginToken.expired().values_list("key", flat=True))
+        by_method = {t.digest for t in LoginToken.objects.all() if t.is_expired()}
+        by_query = set(LoginToken.expired().values_list("digest", flat=True))
         self.assertEqual(by_method, by_query)
         self.assertEqual(len(by_query), 1)
 

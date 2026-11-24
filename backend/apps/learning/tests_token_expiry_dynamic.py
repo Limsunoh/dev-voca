@@ -25,7 +25,7 @@ from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 from apps.accounts.tests import EMAIL_CHANGE_CONFIRM_URL, EMAIL_CHANGE_URL, PASSWORD
 from apps.accounts.tests_password import NEW_PASSWORD, PASSWORD_URL
 from apps.learning.tests_daily_cleanup import (
@@ -58,7 +58,9 @@ class RealClockBase(PurgeTestBase):
             LOGIN_URL, {"email": email, "password": PASSWORD}, content_type="application/json"
         )
         self.assertEqual(res.status_code, 200)
-        return LoginToken.objects.get(key=res.json()["token"])
+        token = LoginToken.objects.get(digest=token_digest(res.json()["token"]))
+        token.key = res.json()["token"]  # DB 에는 지문만 있다
+        return token
 
     def aged(self, user, age: timedelta) -> LoginToken:
         """age 만큼 전에 발급한 토큰. 실제 지금 기준이다."""
@@ -143,7 +145,7 @@ class ReissuedTokenTest(RealClockBase):
     """비밀번호·이메일 변경으로 새로 받은 토큰은 옛 토큰의 나이를 물려받지 않는다."""
 
     def assert_fresh_thirty_days(self, key: str, before: datetime) -> None:
-        token = LoginToken.objects.get(key=key)
+        token = LoginToken.objects.get(digest=token_digest(key))
         self.assertGreaterEqual(token.created, before)
 
         self.at(token.created + LIFETIME - timedelta(seconds=1))

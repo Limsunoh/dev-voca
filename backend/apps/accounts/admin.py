@@ -167,15 +167,20 @@ class LoginTokenAdmin(admin.ModelAdmin):
     """기기별 로그인 토큰. 지우면 그 기기만 로그아웃된다.
 
     쓰는 동안 하루마다 새 토큰으로 바뀌어(LoginToken.renew) 한 기기에 행이 여럿일 수
-    있다. "바뀐 시각" 이 찍힌 행은 넘어간 옛 토큰이라 지워도 로그아웃되지 않는다. "받음" 이
-    꺼진 행은 아직 한 번도 안 쓰인 새 토큰이다. 옛 토큰은 발급 30일에 매일 정리가 지운다
-    (그 전에 다시 오면 새어 나간 것으로 보고 그 로그인을 끊는 데 쓴다).
+    있다. "바뀐 시각" 이 찍힌 행은 넘어간 옛 토큰이다. "받음" 이 꺼진 행은 아직 한 번도 안
+    쓰인 새 토큰이다. 옛 토큰은 발급 30일에 매일 정리가 지운다(그 전에 다시 오면 새어 나간
+    것으로 보고 그 로그인을 끊는 데 쓴다).
+
+    한 줄을 지워도 그 기기의 줄을 모두 지운다(delete_model, delete_queryset). 이어 가기는
+    앞 토큰 원문에서 다음 토큰을 계산하므로, 가장 새 줄만 지우면 남은 앞 토큰이 지운 값을
+    그대로 되살린다. 새어 나간 토큰을 지우려던 것이 소용없어진다. 삭제 확인 화면과 작업
+    기록에는 고른 줄만 나온다.
 
     계정 전체를 막으려면 사용자의 "활성" 을 끈다. 토큰을 다 지워도 비밀번호를
     아는 사람은 다시 로그인한다.
 
-    토큰 값은 보이지 않는다. 화면에 띄우면 관리자 화면을 본 사람이 그 기기로
-    로그인한 것처럼 쓸 수 있다. 새로 만들 이유도 없어서 추가는 막는다.
+    토큰 값(지문)은 띄우지 않는다. 지문으로는 로그인할 수 없지만 값을 맞혀 보는 창구가
+    되지 않게 한다(lookup_allowed). 새로 만들 이유도 없어서 추가는 막는다.
     """
 
     list_display = ("user", "created", "delivered", "replaced_at")
@@ -190,11 +195,19 @@ class LoginTokenAdmin(admin.ModelAdmin):
     def has_add_permission(self, request) -> bool:
         return False
 
+    def delete_model(self, request, obj: LoginToken) -> None:
+        LoginToken.end_login(obj.user_id, obj.device)
+
+    def delete_queryset(self, request, queryset: QuerySet[LoginToken]) -> None:
+        for user_id, device in set(queryset.values_list("user_id", "device")):
+            LoginToken.end_login(user_id, device)
+
     def lookup_allowed(self, lookup, value, request=None) -> bool:
-        # 목록 주소의 검색어(?key__startswith=...)로 토큰 값을 거르지 못하게 한다.
+        # 목록 주소의 검색어(?digest__startswith=...)로 토큰 값을 거르지 못하게 한다.
         # Django 는 자기 표의 칸이면 list_filter 에 없어도 받아 주는데, 결과가 1건인지
-        # 0건인지로 40자를 한 글자씩 맞힐 수 있다. 막으면 400 이 난다. device 도 같다.
-        # 이메일 변경 링크의 대조값에 섞는 값이다(views._link_device).
-        if lookup.split("__", 1)[0] in ("key", "device"):
+        # 0건인지로 값을 한 글자씩 맞힐 수 있다. 막으면 400 이 난다. 지문이라 맞혀도 로그인에
+        # 쓸 수는 없지만 막아 둔다. device 도 같다. 이메일 변경 링크의 대조값에 섞는
+        # 값이다(views._link_device).
+        if lookup.split("__", 1)[0] in ("digest", "device"):
             return False
         return super().lookup_allowed(lookup, value, request)

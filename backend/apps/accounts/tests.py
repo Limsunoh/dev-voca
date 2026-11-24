@@ -22,7 +22,7 @@ from django.db.migrations.loader import MigrationLoader
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 
 from . import throttles
 from .google import GoogleAuthError, fetch_google_user
@@ -1417,11 +1417,11 @@ class EmailChangeTest(TestCase):
 
         self.assertEqual(res.status_code, 200)
         # 옛 토큰은 사라진다.
-        self.assertFalse(LoginToken.objects.filter(key=old_key).exists())
+        self.assertFalse(LoginToken.objects.filter(digest=token_digest(old_key)).exists())
         # 새 토큰을 돌려준다. 쿠키에 넣을지는 화면의 액션이 정한다.
         self.assertTrue(res.json()["token"])
         # 남의 토큰까지 지우면 안 된다.
-        self.assertTrue(LoginToken.objects.filter(key=other_device.key).exists())
+        self.assertTrue(LoginToken.objects.filter(digest=token_digest(other_device.key)).exists())
 
     def test_지금_쓰는_주소로는_못_바꾼다(self):
         with mock.patch("apps.accounts.views.send_account_mail") as sent:

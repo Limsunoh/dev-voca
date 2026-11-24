@@ -26,7 +26,7 @@ from django.test import Client, TestCase, TransactionTestCase
 from django.utils import timezone
 
 from apps.accounts import purge
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 
 from .email_change import email_mark, read_token
 from .tests import (
@@ -117,7 +117,7 @@ class IssueEveryTimeTest(DeviceMixin, TestCase):
 
         key = self.assert_auth_shape(res, 201)
         user = User.objects.get(email="fresh@example.com")
-        self.assertEqual(list(user.login_tokens.values_list("key", flat=True)), [key])
+        self.assertEqual(list(user.login_tokens.values_list("digest", flat=True)), [token_digest(key)])
 
     def test_가입이_거절되면_토큰을_만들지_않는다(self):
         before = LoginToken.objects.count()
@@ -143,7 +143,7 @@ class IssueEveryTimeTest(DeviceMixin, TestCase):
         key = self.assert_auth_shape(self.google("newbie@example.com", **CONSENT), 201)
 
         user = User.objects.get(email="newbie@example.com")
-        self.assertEqual(list(user.login_tokens.values_list("key", flat=True)), [key])
+        self.assertEqual(list(user.login_tokens.values_list("digest", flat=True)), [token_digest(key)])
 
     def test_다른_계정으로_로그인해도_내_토큰은_그대로다(self):
         mine = self.device(self.owner)
@@ -164,7 +164,7 @@ class LogoutScopeTest(DeviceMixin, TestCase):
 
         self.assertEqual(self.logout(laptop), 204)
 
-        self.assertFalse(LoginToken.objects.filter(key=laptop).exists())
+        self.assertFalse(LoginToken.objects.filter(digest=token_digest(laptop)).exists())
         self.assertEqual(self.me(laptop), 401)
         for key in (phone, tablet, *others):
             self.assertEqual(self.me(key), 200)
@@ -200,7 +200,7 @@ class LogoutScopeTest(DeviceMixin, TestCase):
         self.assertEqual(self.logout(mine), 204)
 
         self.assertEqual(list(LoginToken.objects.filter(user=self.owner)
-                              .values_list("key", flat=True)), [spare])
+                              .values_list("digest", flat=True)), [token_digest(spare)])
 
     def test_세션만으로_로그아웃하면_어느_계정_토큰도_안_지운다(self):
         keys = [self.device(self.owner), self.device(self.other)]
@@ -209,7 +209,7 @@ class LogoutScopeTest(DeviceMixin, TestCase):
 
         self.assertEqual(session.post(LOGOUT_URL).status_code, 204)
 
-        self.assertEqual(LoginToken.objects.filter(key__in=keys).count(), 2)
+        self.assertEqual(LoginToken.objects.filter(digest__in=[token_digest(k) for k in keys]).count(), 2)
 
     def test_로그인_없이_로그아웃하면_401_이고_아무것도_안_지운다(self):
         self.device(self.owner)
@@ -302,8 +302,8 @@ class PasswordChangeScopeTest(DeviceMixin, TestCase):
         self.assertEqual(set(res.json()), {"token", "user", "created"})
         fresh = res.json()["token"]
         self.assertEqual(
-            list(LoginToken.objects.filter(user=self.owner).values_list("key", flat=True)),
-            [fresh],
+            list(LoginToken.objects.filter(user=self.owner).values_list("digest", flat=True)),
+            [token_digest(fresh)],
         )
         for key in mine:
             self.assertEqual(self.me(key), 401)
@@ -337,7 +337,7 @@ class PasswordChangeScopeTest(DeviceMixin, TestCase):
 
         self.assertEqual(res.status_code, 200)
         self.assertEqual(LoginToken.objects.filter(user=self.owner).count(), 1)
-        self.assertFalse(LoginToken.objects.filter(key__in=old).exists())
+        self.assertFalse(LoginToken.objects.filter(digest__in=[token_digest(k) for k in old]).exists())
 
 
 class AccountDeletionTest(DeviceMixin, TestCase):
@@ -474,8 +474,8 @@ class EmailLinkDeviceTest(DeviceMixin, TestCase):
         fresh = self.assert_works(from_laptop, "laptop@example.com")
 
         self.assertEqual(
-            list(LoginToken.objects.filter(user=self.owner).values_list("key", flat=True)),
-            [fresh],
+            list(LoginToken.objects.filter(user=self.owner).values_list("digest", flat=True)),
+            [token_digest(fresh)],
         )
         res = self.confirm(from_phone)
         self.assertEqual(res.status_code, 400)
@@ -522,14 +522,14 @@ class EmailLinkDeviceTest(DeviceMixin, TestCase):
         others = LoginToken.objects.filter(user_id=self.other.pk)
         for device in others.values_list("device", flat=True):
             self.assertNotEqual(email_mark(self.owner.email, device), mark)
-        LoginToken.objects.filter(key=self.phone).update(user=self.other)
+        LoginToken.objects.filter(digest=token_digest(self.phone)).update(user=self.other)
 
         self.assert_rejected(link)
 
 
 def device_of(key: str) -> str:
     """그 토큰의 device. 이메일 변경 링크는 토큰 값이 아니라 이 값에 묶인다."""
-    return LoginToken.objects.get(key=key).device
+    return LoginToken.objects.get(digest=token_digest(key)).device
 
 
 class SessionLinkBindingTest(DeviceMixin, TestCase):
@@ -568,7 +568,7 @@ class SessionLinkBindingTest(DeviceMixin, TestCase):
         _, mark, _ = read_token(link)
         (bound,) = [key for key in keys if email_mark(self.owner.email, device_of(key)) == mark]
 
-        LoginToken.objects.filter(key=bound).delete()
+        LoginToken.objects.filter(digest=token_digest(bound)).delete()
 
         self.assertEqual(self.confirm(link), 400)
 
@@ -578,7 +578,7 @@ class SessionLinkBindingTest(DeviceMixin, TestCase):
         _, mark, _ = read_token(link)
         (loose,) = [key for key in keys if email_mark(self.owner.email, device_of(key)) != mark]
 
-        LoginToken.objects.filter(key=loose).delete()
+        LoginToken.objects.filter(digest=token_digest(loose)).delete()
 
         self.assertEqual(self.confirm(link), 200)
 
@@ -600,7 +600,7 @@ class AdminScreenTest(DeviceMixin, TestCase):
         super().setUp()
         self.key = self.device(self.owner)
         self.spare = self.device(self.owner)
-        self.token = LoginToken.objects.get(key=self.key)
+        self.token = LoginToken.objects.get(digest=token_digest(self.key))
         self.root = User.objects.create_superuser(email="root@example.com", password=PASSWORD)
         self.admin = Client()
         self.admin.force_login(self.root)
@@ -640,6 +640,7 @@ class AdminScreenTest(DeviceMixin, TestCase):
                 res = self.admin.get(url)
                 self.assertEqual(res.status_code, 200)
                 self.assertNotContains(res, self.key)
+                self.assertNotContains(res, self.token.digest)
                 self.assertNotContains(res, self.spare)
 
     def test_상세_주소는_토큰_값이_아니라_번호로_만든다(self):
@@ -664,12 +665,12 @@ class AdminScreenTest(DeviceMixin, TestCase):
     def test_상세에서_저장해도_값과_주인이_안_바뀐다(self):
         res = self.admin.post(
             self.change_url(),
-            {"key": "leakmark-" + "x" * 31, "user": self.other.pk, "created": "2000-01-01"},
+            {"digest": "leakmark-" + "x" * 55, "user": self.other.pk, "created": "2000-01-01"},
         )
 
         self.assertIn(res.status_code, (200, 302))
         self.token.refresh_from_db()
-        self.assertEqual(self.token.key, self.key)
+        self.assertEqual(self.token.digest, token_digest(self.key))
         self.assertEqual(self.token.user_id, self.owner.pk)
 
     def test_관리자가_지우면_그_기기만_끊기고_기록에_값이_안_남는다(self):
@@ -679,8 +680,9 @@ class AdminScreenTest(DeviceMixin, TestCase):
         self.assertEqual(self.me(self.key), 401)
         self.assertEqual(self.me(self.spare), 200)
         entry = LogEntry.objects.latest("action_time")
-        self.assertNotIn(self.key, entry.object_repr)
-        self.assertNotIn(self.key, entry.object_id)
+        for value in (self.key, self.token.digest):
+            self.assertNotIn(value, entry.object_repr)
+            self.assertNotIn(value, entry.object_id)
 
     def test_일괄_삭제도_고른_기기만_끊는다(self):
         theirs = self.device(self.other)
@@ -703,21 +705,21 @@ class AdminScreenTest(DeviceMixin, TestCase):
         self.assertEqual(res.context["cl"].result_count, 0)
 
     def test_회원_화면에서_토큰_값으로_걸러_볼_수_없다(self):
-        res = self.admin.get("/admin/accounts/user/", {"login_tokens__key": self.key})
+        res = self.admin.get("/admin/accounts/user/", {"login_tokens__digest": self.token.digest})
 
         self.assertNotEqual(res.status_code, 200)
 
     def test_주소_검색어로_토큰_값을_한_글자씩_맞혀_볼_수_없다(self):
-        """?key__startswith= 같은 주소 검색어는 거절한다.
+        """?digest__startswith= 같은 주소 검색어는 거절한다.
 
         Django 관리자 목록은 자기 표의 칸이면 list_filter 에 없어도 주소 검색어
         (lookup)를 받는다(ModelAdmin.lookup_allowed). 결과 개수가 0/1 로 갈리면
-        16진수 40자를 한 글자씩 640번 안에 맞힌다. 화면에 값을 안 띄운 것이
-        소용없어진다.
+        값을 한 글자씩 맞힌다. 화면에 값을 안 띄운 것이 소용없어진다. 지금은
+        지문이라 맞혀도 로그인에 못 쓰지만 그대로 막는다.
         """
-        for lookup in ("key", "key__startswith", "key__exact", "key__in", "key__gte"):
+        for lookup in ("digest", "digest__startswith", "digest__exact", "digest__in", "digest__gte"):
             with self.subTest(lookup):
-                res = self.admin.get(ADMIN_LIST_URL, {lookup: self.key[:20]})
+                res = self.admin.get(ADMIN_LIST_URL, {lookup: self.token.digest[:20]})
                 self.assertEqual(res.status_code, 400)
 
     def test_보기_권한만_있는_직원도_주소_검색어로_토큰을_못_거른다(self):
@@ -730,7 +732,7 @@ class AdminScreenTest(DeviceMixin, TestCase):
         client.force_login(staff)
 
         self.assertEqual(client.get(ADMIN_LIST_URL).status_code, 200)
-        res = client.get(ADMIN_LIST_URL, {"key__startswith": key[:4]})
+        res = client.get(ADMIN_LIST_URL, {"digest__startswith": token_digest(key)[:4]})
 
         self.assertEqual(res.status_code, 400)
 
@@ -784,8 +786,8 @@ class ConcurrencyTest(TransactionTestCase):
         self.assertEqual(len(statuses), 4)
         self.assertTrue(set(statuses) <= {204, 401}, statuses)
         self.assertIn(204, statuses)
-        self.assertFalse(LoginToken.objects.filter(key=key).exists())
-        self.assertEqual(LoginToken.objects.filter(key__in=kept).count(), 2)
+        self.assertFalse(LoginToken.objects.filter(digest=token_digest(key)).exists())
+        self.assertEqual(LoginToken.objects.filter(digest__in=[token_digest(k) for k in kept]).count(), 2)
 
     def test_한_계정의_기기들이_동시에_로그아웃하면_각자_것만_지운다(self):
         leaving = [self.device() for _ in range(3)]
@@ -797,8 +799,8 @@ class ConcurrencyTest(TransactionTestCase):
 
         self.assertEqual(sorted(status for status, _ in results), [204, 204, 204])
         self.assertEqual(
-            list(LoginToken.objects.filter(user=self.owner).values_list("key", flat=True)),
-            [staying],
+            list(LoginToken.objects.filter(user=self.owner).values_list("digest", flat=True)),
+            [token_digest(staying)],
         )
 
     def test_동시에_로그인해도_매번_다른_토큰이다(self):
@@ -840,11 +842,11 @@ class ConcurrencyTest(TransactionTestCase):
         self.assertTrue(set(statuses) <= {200, 400, 401}, statuses)
         self.assertIn(200, statuses)
         issued = {body["token"] for status, body in results if status == 200}
-        left = set(LoginToken.objects.filter(user=self.owner).values_list("key", flat=True))
+        left = set(LoginToken.objects.filter(user=self.owner).values_list("digest", flat=True))
         self.assertTrue(left, "지금 기기마저 끊겼다")
-        self.assertTrue(left <= issued, (left, issued))
+        self.assertTrue(left <= {token_digest(k) for k in issued}, (left, issued))
         self.assertNotIn(intruder, left)
-        self.assertTrue(LoginToken.objects.filter(key=theirs).exists())
+        self.assertTrue(LoginToken.objects.filter(digest=token_digest(theirs)).exists())
 
     def test_비밀번호_변경과_다른_기기_로그아웃이_겹쳐도_500_이_없다(self):
         phone, laptop = self.device(), self.device()
@@ -863,7 +865,7 @@ class ConcurrencyTest(TransactionTestCase):
         statuses = sorted(status for status, _ in results)
         self.assertIn(statuses, ([200, 204], [200, 401]))
         self.assertEqual(LoginToken.objects.filter(user=self.owner).count(), 1)
-        self.assertFalse(LoginToken.objects.filter(key__in=[phone, laptop]).exists())
+        self.assertFalse(LoginToken.objects.filter(digest__in=[token_digest(k) for k in [phone, laptop]]).exists())
 
 
 class SabotageTest(TestCase):
@@ -914,7 +916,7 @@ class SabotageTest(TestCase):
         from .authentication import SlimTokenAuthentication
 
         def lax(self_auth, key):
-            token = LoginToken.objects.select_related("user").get(key=key)
+            token = LoginToken.objects.select_related("user").get(digest=token_digest(key))
             return token.user, token
 
         with mock.patch.object(SlimTokenAuthentication, "authenticate_credentials", lax):
