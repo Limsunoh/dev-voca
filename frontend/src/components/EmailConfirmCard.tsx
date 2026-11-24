@@ -48,15 +48,20 @@ export function EmailConfirmCard({
         </p>
 
         {/* 다른 기기에서 로그아웃된다는 것을 알린다. 안 알리면 폰에서
-            튕긴 것을 보고 무엇이 잘못됐다고 생각한다. */}
+            튕긴 것을 보고 무엇이 잘못됐다고 생각한다. 이 기기가 같은 계정으로
+            로그인해 있지 않았으면 쿠키를 그대로 뒀으므로 다시 로그인하라고 한다. */}
         <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-          안전을 위해 다른 기기에서는 로그아웃됩니다. 이 기기는 그대로
-          쓰시면 됩니다.
+          {state.signedIn
+            ? "안전을 위해 다른 기기에서는 로그아웃됩니다. 이 기기는 그대로 쓰시면 됩니다."
+            : "바뀐 계정은 안전을 위해 모든 기기에서 로그아웃됩니다. 새 주소로 다시 로그인해 주세요."}
         </p>
 
+        {/* 로그인을 이어 가지 않은 기기는 내정보 대신 로그인 화면으로 보낸다. 로그인이
+            없거나 끊긴 기기는 로그인 폼이 뜬다. 다른 계정으로 로그인해 있던 기기는 /login 이
+            그 사람의 홈으로 돌려보낸다 - 원래 그 계정으로 쓰던 중이라 그것이 맞다. */}
         <Link
-          href="/profile"
-          className="dv-btn w-full rounded-[var(--radius-pill)] px-4 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:w-auto sm:justify-self-start sm:px-8"
+          href={state.signedIn ? "/profile" : "/login"}
+          className="dv-btn flex w-full items-center justify-center rounded-[var(--radius-pill)] px-4 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:w-auto sm:justify-self-start sm:px-8"
           style={
             {
               minHeight: "var(--hit-min)",
@@ -69,7 +74,7 @@ export function EmailConfirmCard({
             } as React.CSSProperties
           }
         >
-          내정보로
+          {state.signedIn ? "내정보로" : "로그인하러 가기"}
         </Link>
       </div>
     );
