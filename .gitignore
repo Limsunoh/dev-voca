@@ -83,3 +83,19 @@ graphify-out/
 
 # claude.ai/design 번들 사본. 작업 중 참조용이라 커밋하지 않는다.
 .design-bundle/
+
+# 공개 저장소에 올라가면 안 되는 것들(2026-11-24 점검). git add -A 한 번에 딸려 들어간다.
+# - 압축 파일: 디자인 시스템 내보내기 같은 큰 내려받기 파일이 루트에 놓인다.
+# - DB 덤프: 백업을 되살릴 때 내려받으면 회원 이메일과 비밀번호 해시가 든 파일이 생긴다.
+# - 키 파일
+*.zip
+*.dump
+*.sql
+*.pem
+*.key
+# 조사 보고서와 그 노트. 로컬에서 만든 것이라 저장소에 두지 않는다.
+/reports/
+/research_notes/
+# 세션 작업 계획과 메모. 지금은 .git/info/exclude 에만 있어 새로 받은 사본에서는 안 막힌다.
+.claude/plans/
+.claude/NOTES.md
