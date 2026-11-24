@@ -112,6 +112,9 @@ class RoundAnswerView(APIView):
         except session.SessionError as exc:
             return _fail(exc)
 
+        # 틀린 것은 답할 때마다 오답 노트에 넣는다(그만두고 나가도 남게).
+        record.note_round_miss(request.user, result)
+
         return Response(
             {
                 "token": next_token,
