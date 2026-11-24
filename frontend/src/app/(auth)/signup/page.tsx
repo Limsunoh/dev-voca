@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AuthForm } from "@/components/AuthForm";
-import { getCurrentUser } from "@/lib/session";
+import { getLoginState } from "@/lib/session";
 import { signUpAction } from "../actions";
 
 export const metadata = {
@@ -14,7 +14,10 @@ type PageProps = {
 };
 
 export default async function SignUpPage({ searchParams }: PageProps) {
-  if (await getCurrentUser()) redirect("/");
+  // 백엔드가 답하지 않아 로그인을 확인하지 못한 사람(unreachable)도 홈으로 보낸다. 여기
+  // 남기면 "로그인 없이 둘러보기" 를 눌러 멀쩡한 로그인을 지울 수 있다.
+  const { user, unreachable } = await getLoginState();
+  if (user || unreachable) redirect("/");
 
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : undefined;

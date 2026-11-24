@@ -6,6 +6,7 @@ import { cache } from "react";
 import { getMe, updateMe, type User } from "./api/accounts";
 import { ApiError } from "./api/client";
 import { type DailyLength, isDailyLength } from "./daily-length";
+import { GUEST_COOKIE, GUEST_LENGTH_COOKIE } from "./guest-cookie";
 import {
   formatTokenCookie,
   parseTokenCookie,
@@ -24,10 +25,6 @@ import {
  * 가져다 쓰면 그 자리에서 에러가 난다. next 패키지 안에 들어 있는 것이라
  * 의존성이 늘지 않는다.
  */
-
-const GUEST_COOKIE = "devvoca_guest";
-// 게스트가 고른 하루 공부량. 로그인하면 계정으로 옮기고 지운다.
-const GUEST_LENGTH_COOKIE = "devvoca_daily_length";
 
 // 게스트 쿠키들도 로그인 쿠키와 같은 30일이다(아래 setGuest 주석).
 const MAX_AGE = TOKEN_MAX_AGE;
@@ -49,7 +46,7 @@ export async function setToken(token: string): Promise<void> {
  * 아니라 쿠키가 낡은 것이라, 첫 화면(/start)을 다시 띄울 이유가 없다.
  *
  * 쿠키를 쓸 수 있는 곳(route handler·서버 액션)에서만 부른다. 화면을
- * 그리는 중에는 쿠키가 읽기 전용이라 예외가 난다(getCurrentUser 의 catch 주석).
+ * 그리는 중에는 쿠키가 읽기 전용이라 예외가 난다(getLoginState 의 catch 주석).
  */
 export async function forgetToken(): Promise<void> {
   const store = await cookies();
@@ -183,7 +180,18 @@ export async function withTokenOrGuest<T>(
 }
 
 /**
- * 지금 로그인한 사용자. 로그인 안 했으면 null.
+ * 로그인 확인 결과.
+ *
+ * unreachable 은 토큰은 있는데 백엔드가 401 이 아닌 이유(꺼짐, 10초 넘게 늦음,
+ * 500)로 답하지 못한 것이다. 이때 user 는 null 이지만 로그아웃한 것이 아니다.
+ * 이것을 로그아웃으로 다루면 홈은 첫 화면(/start)으로, 내정보는 로그인 화면으로
+ * 보내고, 거기서 "게스트로 둘러보기" 를 누르면 멀쩡한 로그인 쿠키가 정말로
+ * 지워진다.
+ */
+export type LoginState = { user: User | null; unreachable: boolean };
+
+/**
+ * 지금 로그인한 사용자를 백엔드에 묻는다.
  *
  * 쿠키에 토큰이 있어도 서버에 물어본다. 다른 기기에서 비밀번호를 바꿨거나
  * 계정이 정지됐을 수 있어서, 쿠키만 믿으면 이미 못 쓰는 토큰으로 화면을
@@ -192,12 +200,12 @@ export async function withTokenOrGuest<T>(
  * cache() 로 감싸는 이유: 한 요청 안에서 여러 번 불린다(머리말 + 페이지).
  * 감싸지 않으면 화면 하나를 그릴 때마다 백엔드에 두 번씩 물어본다.
  */
-export const getCurrentUser = cache(async (): Promise<User | null> => {
+export const getLoginState = cache(async (): Promise<LoginState> => {
   const token = await getToken();
-  if (!token) return null;
+  if (!token) return { user: null, unreachable: false };
 
   try {
-    return await getMe(token);
+    return { user: await getMe(token), unreachable: false };
   } catch (error) {
     // 여기서 쿠키를 지우면 안 된다. 이 함수는 화면을 그리는 도중에 불리는데,
     // 그 시점의 쿠키는 읽기 전용이라 지우려 하면 예외가 난다. 그 예외는
@@ -210,11 +218,21 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
     // 로그인 없이 보는 API 에도 무효 토큰이면 401 을 내서, 다시 부르지 않으면
     // 순위표와 한 판이 막힌다.
 
-    // 401 이 아니면 토큰 문제가 아니다. 백엔드가 잠깐 죽었을 뿐인데
-    // 로그아웃 상태로 그리면 멀쩡한 로그인이 날아간 것처럼 보인다.
-    if (!(error instanceof ApiError) || error.status !== 401) {
-      console.error("로그인 상태를 확인하지 못했습니다.", error);
+    if (error instanceof ApiError && error.status === 401) {
+      return { user: null, unreachable: false };
     }
-    return null;
+    // 401 이 아니면 토큰 문제가 아니다. 백엔드가 잠깐 죽었을 뿐이다.
+    console.error("로그인 상태를 확인하지 못했습니다.", error);
+    return { user: null, unreachable: true };
   }
 });
+
+/**
+ * 지금 로그인한 사용자. 로그인 안 했거나 확인하지 못했으면 null.
+ *
+ * 사람이 없을 때 다른 화면으로 보내는 곳은 이것 말고 getLoginState 를 써서
+ * 확인하지 못한 경우(unreachable)를 따로 다룬다.
+ */
+export async function getCurrentUser(): Promise<User | null> {
+  return (await getLoginState()).user;
+}

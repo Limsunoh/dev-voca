@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { DailyLengthPicker } from "@/components/DailyLengthPicker";
-import { getCurrentUser, getGuestDailyLength, isGuestChosen } from "@/lib/session";
+import { getGuestDailyLength, getLoginState, isGuestChosen } from "@/lib/session";
 
 import { saveDailyLengthAction } from "./actions";
 
@@ -22,7 +22,11 @@ export const metadata: Metadata = {
  * 일일공부를 열 때 결국 다시 골라야 한다.
  */
 export default async function DailyLengthStartPage() {
-  const user = await getCurrentUser();
+  const { user, unreachable } = await getLoginState();
+  // 로그인 쿠키는 있는데 백엔드가 답하지 않았다. 첫 화면으로 보내면 거기서 "게스트로
+  // 둘러보기" 를 눌러 멀쩡한 로그인을 지우게 된다. 홈으로 보낸다 - 홈이 탭바와 함께
+  // "다시 시도" 화면을 그린다. 이 화면에서 그리면 탭바가 없어 나갈 길이 그것 하나다.
+  if (unreachable) redirect("/");
   if (!user && !(await isGuestChosen())) redirect("/start");
 
   // 이미 골랐으면 다시 묻지 않는다. 주소로 직접 들어와도 같다. 계정에 이 칸이

@@ -1418,7 +1418,7 @@ class EmailChangeTest(TestCase):
         self.assertEqual(res.status_code, 200)
         # 옛 토큰은 사라진다.
         self.assertFalse(LoginToken.objects.filter(key=old_key).exists())
-        # 새 토큰을 받아 링크를 누른 기기는 이어서 쓴다.
+        # 새 토큰을 돌려준다. 쿠키에 넣을지는 화면의 액션이 정한다.
         self.assertTrue(res.json()["token"])
         # 남의 토큰까지 지우면 안 된다.
         self.assertTrue(LoginToken.objects.filter(key=other_device.key).exists())
