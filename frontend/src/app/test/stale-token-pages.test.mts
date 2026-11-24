@@ -58,13 +58,16 @@ const LIVE = "live-token";
 let cookie: string | null = null;
 let forgets: boolean[] = [];
 
+const member = () => (cookie === LIVE ? { id: 1, email: "a@b.c", daily_length: "10m" } : null);
+
 mock.module("@/lib/session", {
   namedExports: {
     getToken: async () => cookie,
     // 하루 공부량은 이미 고른 것으로 둔다. 비어 있으면 홈이 고르는 화면
     // (/start/daily)으로 보내서, 여기서 보려는 홈 화면이 안 그려진다.
-    getCurrentUser: async () =>
-      cookie === LIVE ? { id: 1, email: "a@b.c", daily_length: "10m" } : null,
+    getCurrentUser: async () => member(),
+    // 죽은 토큰은 백엔드가 401 로 거절한 것이라 unreachable 이 아니다.
+    getLoginState: async () => ({ user: member(), unreachable: false }),
     isGuestChosen: async () => true,
     getGuestDailyLength: async () => "10m",
     forgetToken: async () => {
@@ -86,6 +89,12 @@ mock.module("@/lib/session", {
       }
     },
   },
+});
+
+// 다시 시도 화면(LoginCheckFailed)의 로그아웃 버튼이 가져온다. 진짜 모듈은
+// lib/client-ip.ts 의 "server-only" 때문에 Next 밖에서 열리지 않는다.
+mock.module("@/app/(auth)/actions", {
+  namedExports: { logoutAction: async () => {} },
 });
 
 // ---- 가짜 백엔드 ------------------------------------------------------------

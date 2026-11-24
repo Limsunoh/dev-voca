@@ -3,6 +3,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { ApiError } from "@/lib/api/client";
 import { renewToken } from "@/lib/api/accounts";
 import { buildCsp, newNonce } from "@/lib/csp";
+import { isDailyLength } from "@/lib/daily-length";
+import { GUEST_COOKIE, GUEST_LENGTH_COOKIE } from "@/lib/guest-cookie";
+import { routes } from "@/lib/routes";
 import {
   formatTokenCookie,
   isRenewalDue,
@@ -20,6 +23,8 @@ import {
  * 로그인도 여기서 이어 간다(renewLogin). 화면을 여는 요청은 모두 여기를 지나고,
  * 화면을 그리는 도중에는 쿠키를 쓸 수 없어서(lib/session.ts 의 forgetToken 주석) 이곳이
  * 새 토큰을 쿠키에 넣을 수 있는 자리다.
+ *
+ * 처음 온 사람을 홈 대신 첫 화면으로 보내는 것도 여기서 한다(firstScreen).
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const csp = buildCsp(newNonce(), {
@@ -27,6 +32,13 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   });
   const login = await renewLogin(request);
+
+  const first = firstScreen(request, login);
+  if (first) {
+    const response = NextResponse.redirect(new URL(first, request.url));
+    if (login === null) response.cookies.delete(TOKEN_COOKIE);
+    return response;
+  }
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("Content-Security-Policy", csp);
@@ -46,6 +58,40 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // 통째로 다시 써서, 여기서 붙인 줄이 사라진다.
   else if (login !== undefined) response.headers.append("Set-Cookie", serializeTokenCookie(login));
   return response;
+}
+
+/**
+ * 홈(/)을 여는데 쿠키만 보고도 다른 화면으로 보낼 사람이면 그 주소. 아니면 null.
+ *
+ * - 로그인 쿠키도 게스트 쿠키도 없다: 처음 온 사람이라 첫 화면(/start).
+ * - 게스트인데 하루 공부량 쿠키가 없다: 공부량을 묻는 화면(/start/daily).
+ *
+ * 홈(app/page.tsx)도 같은 기준으로 보내지만 거기서는 늦다. 루트 loading.tsx 때문에 홈의
+ * 껍데기가 200 으로 먼저 나가고, 브라우저는 그 안의 신호를 읽고서야 다시 넘어간다.
+ * 처음 온 사람의 첫 화면이 /start 를 바로 열 때보다 1초쯤 늦게 떴다(운영 측정 LCP
+ * 3.65초 대 2.56초). 여기서는 화면을 그리기 전이라 307 로 바로 보낸다.
+ *
+ * 로그인 쿠키가 있으면 보내지 않는다. 그 사람이 공부량을 골랐는지는 계정에 있어
+ * 백엔드에 물어야 알고, 그건 홈이 한다. 방금 401 로 지우기로 한 쿠키(login 이 null)는
+ * 없는 것으로 본다.
+ *
+ * 브라우저가 화면을 통째로 여는 요청(sec-fetch-dest: document)만 보낸다. 앱 안의
+ * 이동과 서버 액션은 홈이 보내게 둔다. 서버 액션이 redirect("/") 하면 Next 가 서버
+ * 안에서 "/" 를 다시 받아 오는데, 그 요청이 여기 307 을 따라가 /start/daily 화면을
+ * 받아도 주소는 "/" 로 남는다. 그러면 "게스트로 둘러보기" 직후 공부량 고르는 화면에
+ * 탭바가 뜨고, 로그아웃 직후 첫 화면에도 탭바가 뜬다(TabBar 는 주소로 숨길 화면을
+ * 가른다). 그 요청은 empty 로 온다. RSC 머리(rsc)로 가를 수는 없다 - Next 가 proxy 를
+ * 부르기 전에 지운다(next/dist/server/web/adapter.js 의 FLIGHT_HEADERS). 이 머리가
+ * 없는 옛 브라우저는 홈이 보내던 대로 간다.
+ */
+function firstScreen(request: NextRequest, login: string | null | undefined): string | null {
+  if (request.method !== "GET" || request.nextUrl.pathname !== "/") return null;
+  if (request.headers.get("sec-fetch-dest") !== "document") return null;
+  const token = parseTokenCookie(request.cookies.get(TOKEN_COOKIE)?.value);
+  if (token && login !== null) return null;
+  if (request.cookies.get(GUEST_COOKIE)?.value !== "1") return "/start";
+  if (!isDailyLength(request.cookies.get(GUEST_LENGTH_COOKIE)?.value)) return routes.startDaily;
+  return null;
 }
 
 /**

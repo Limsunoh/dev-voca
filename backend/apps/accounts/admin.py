@@ -130,6 +130,12 @@ class UserAdmin(BaseUserAdmin):
         ),
     )
 
+    def get_queryset(self, request) -> QuerySet[User]:
+        # 사진 바이트(avatar_photo, 한 장 10~20KB)는 목록에도 상세에도 그리지 않는다.
+        # 빼지 않으면 목록 한 쪽(100명)을 열 때마다 사진을 통째로 읽는다. 빼 둔 채로
+        # 저장해도 Django 가 읽은 칸만 쓰므로 사진 칸은 그대로 남는다.
+        return super().get_queryset(request).defer("avatar_photo")
+
     @admin.action(description="올린 사진 지우기", permissions=["change"])
     def delete_uploaded_photo(self, request, queryset) -> None:
         """약관을 어긴 사진을 지운다. 사진은 올릴 때 자동으로 거르지 않는다.

@@ -126,18 +126,25 @@ export async function signUpAction(
   redirect(next, RedirectType.replace);
 }
 
+// 로그아웃 때 백엔드의 토큰 지우기를 기다리는 최대 시간. 넘기면 이 기기의 쿠키만 지운다.
+// "use server" 파일이라 내보내지 않는다(내보낼 수 있는 것은 async 함수뿐이다).
+const LOGOUT_WAIT_MS = 3000;
+
 export async function logoutAction(): Promise<void> {
   const token = await getToken();
 
   if (token) {
-    try {
-      // 서버의 토큰도 지운다. 쿠키만 지우면 그 사이 새어나간 토큰이
-      // 계속 통한다.
-      await logOut(token);
-    } catch {
-      // 서버가 응답하지 않아도 이쪽 쿠키는 지운다. 사용자 입장에서
-      // 로그아웃이 안 되는 것보다는 낫다.
-    }
+    // 서버의 토큰도 지운다. 쿠키만 지우면 그 사이 새어나간 토큰이
+    // 계속 통한다.
+    //
+    // 서버가 실패하거나 답하지 않아도 이쪽 쿠키는 지운다. 사용자 입장에서
+    // 로그아웃이 안 되는 것보다는 낫다. 기다림은 LOGOUT_WAIT_MS 에서 끊는다.
+    // POST 에는 대기 시간 제한이 없어서(lib/api/client.ts 의 readTimeout 은
+    // GET 만), 백엔드가 연결만 받고 멈춰 있으면 함수가 끝날 때까지 매달려 아래
+    // clearToken 에 닿지 못한다. 백엔드가 안 받을 때 뜨는 "로그인을 확인하지
+    // 못했습니다" 화면(LoginCheckFailed)의 로그아웃도 이 함수다.
+    const gaveUp = new Promise<void>((resolve) => setTimeout(resolve, LOGOUT_WAIT_MS));
+    await Promise.race([logOut(token).catch(() => {}), gaveUp]);
   }
 
   await clearToken();

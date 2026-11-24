@@ -59,8 +59,10 @@ mock.module("next/cache", {
 
 const LIVE = "live-token";
 let token: string | null = null;
-/** getCurrentUser 가 돌려줄 사람. null 이면 못 받은 것(죽은 토큰·장애). */
+/** getCurrentUser 가 돌려줄 사람. 토큰이 있는데 null 이면 백엔드가 거절한 것(죽은 토큰). */
 let me: Record<string, unknown> | null = null;
+/** 백엔드가 답하지 않아 로그인을 확인하지 못했다(getLoginState 의 unreachable). */
+let down = false;
 let guest = false;
 let guestLength: string | null = null;
 let forgot = 0;
@@ -69,6 +71,7 @@ mock.module("@/lib/session", {
   namedExports: {
     getToken: async () => token,
     getCurrentUser: async () => me,
+    getLoginState: async () => ({ user: me, unreachable: down }),
     isGuestChosen: async () => guest,
     getGuestDailyLength: async () => guestLength,
     setGuestDailyLength: async (length: string) => {
@@ -82,6 +85,12 @@ mock.module("@/lib/session", {
       return { value: await call(t ?? undefined), token: t };
     },
   },
+});
+
+// 다시 시도 화면(LoginCheckFailed)의 로그아웃 버튼이 가져온다. 진짜 모듈은
+// lib/client-ip.ts 의 "server-only" 때문에 Next 밖에서 열리지 않는다.
+mock.module("@/app/(auth)/actions", {
+  namedExports: { logoutAction: async () => {} },
 });
 
 // ---- 가짜 백엔드 ------------------------------------------------------------
@@ -128,6 +137,7 @@ const { DailyStudyBoard } = await import("../../../components/DailyStudyBoard");
 
 beforeEach(() => {
   token = null;
+  down = false;
   me = null;
   guest = false;
   guestLength = null;
@@ -315,10 +325,17 @@ describe("홈 - 하루 공부량을 물을지", () => {
     assert.equal(await redirectOf(() => Home()), null);
   });
 
-  it("토큰은 있는데 사람을 못 받았으면(죽은 토큰·장애) 묻지 않는다", async () => {
+  it("토큰은 있는데 백엔드가 거절했으면(죽은 토큰) 묻지 않는다", async () => {
     token = LIVE;
     me = null;
     guest = true;
+    assert.equal(await redirectOf(() => Home()), null);
+  });
+
+  it("백엔드가 답하지 않으면 어디로도 보내지 않는다(게스트 쿠키가 없어도)", async () => {
+    token = LIVE;
+    me = null;
+    down = true;
     assert.equal(await redirectOf(() => Home()), null);
   });
 

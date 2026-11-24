@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import logo from "@/app/start/logo.webp";
 import { StartChoices } from "@/app/start/StartChoices";
-import { getCurrentUser, isGuestChosen } from "@/lib/session";
+import { getLoginState, isGuestChosen } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "DeVoca",
@@ -32,12 +32,16 @@ export default async function StartPage({
   searchParams: Promise<{ deleted?: string }>;
 }) {
   // 이미 정한 사람에게 다시 물어볼 이유가 없다. 홈으로 보낸다.
-  const [user, guest, { deleted }] = await Promise.all([
-    getCurrentUser(),
+  //
+  // 로그인 쿠키는 있는데 백엔드가 답하지 않은 사람(unreachable)도 홈으로 보낸다. 여기
+  // 남기면 "게스트로 둘러보기" 를 눌러 멀쩡한 로그인을 지울 수 있다. 홈이 "다시 시도"
+  // 화면을 그린다.
+  const [{ user, unreachable }, guest, { deleted }] = await Promise.all([
+    getLoginState(),
     isGuestChosen(),
     searchParams,
   ]);
-  if (user || guest) redirect("/");
+  if (user || unreachable || guest) redirect("/");
 
   // 배경 레이어를 깔지 않는다. 크림 바탕(body)이 그대로 이 화면의 배경이다.
   // 다크였을 때는 surface-learn 그라디언트를 깔았는데, 그건 어두운 화면에서
