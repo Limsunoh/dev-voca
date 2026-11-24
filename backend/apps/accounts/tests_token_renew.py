@@ -21,7 +21,7 @@ from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import LoginToken
+from .models import LoginToken, token_digest
 from .tests import EMAIL_CHANGE_CONFIRM_URL, EMAIL_CHANGE_URL, LOGOUT_URL, ME_URL, PASSWORD
 
 User = get_user_model()
@@ -72,7 +72,7 @@ class TokenRenewTest(TestCase):
         new = self.rotate()
 
         self.assertNotEqual(new, self.token.key)
-        fresh = LoginToken.objects.get(key=new)
+        fresh = LoginToken.objects.get(digest=token_digest(new))
         self.assertEqual(fresh.device, self.token.device)
         self.assertFalse(fresh.delivered)
 
@@ -90,9 +90,9 @@ class TokenRenewTest(TestCase):
 
         self.assertEqual(self.me(new), 200)
 
-        old = LoginToken.objects.get(key=self.token.key)
+        old = LoginToken.objects.get(digest=token_digest(self.token.key))
         self.assertIsNotNone(old.replaced_at)
-        self.assertTrue(LoginToken.objects.get(key=new).delivered)
+        self.assertTrue(LoginToken.objects.get(digest=token_digest(new)).delivered)
         self.assertEqual(self.me(self.token.key), 200)  # 유예 안
         with after_grace():
             self.assertEqual(self.me(new), 200)
@@ -126,12 +126,13 @@ class TokenRenewTest(TestCase):
         with mock.patch("django.utils.timezone.now", return_value=later):
             LoginToken.expired().delete()  # 매일 정리
             self.assertEqual(self.me(self.token.key), 401)
-            self.assertFalse(LoginToken.objects.filter(key=new).exists())
+            self.assertFalse(LoginToken.objects.filter(digest=token_digest(new)).exists())
 
     def test_배포_전_공유_토큰은_유예가_지나도_로그인을_끊지_않는다(self):
-        """11-13 전에는 폰과 PC 가 토큰 하나를 나눠 썼다(0013 이 device 를 토큰 값으로 채움).
+        """11-13 전에는 폰과 PC 가 토큰 하나를 나눠 썼다(0013 이 device 를 토큰 값으로 채우고 0016 이
+        둘을 같은 지문으로 바꿈).
         폰이 이어 간 뒤 PC 가 그 값으로 와도 폰은 그대로다. PC 만 다시 로그인한다."""
-        LoginToken.objects.filter(pk=self.token.pk).update(device=self.token.key)
+        LoginToken.objects.filter(pk=self.token.pk).update(device=self.token.digest)
         self.token.refresh_from_db()
         new = self.rotate()
         self.me(new)
@@ -147,7 +148,7 @@ class TokenRenewTest(TestCase):
 
         self.assertEqual(self.client.post(LOGOUT_URL, **auth(new)).status_code, 204)
 
-        self.assertEqual(list(LoginToken.objects.values_list("key", flat=True)), [other_device.key])
+        self.assertEqual(list(LoginToken.objects.values_list("digest", flat=True)), [other_device.digest])
 
     def test_30일_지난_토큰은_이어_갈_수_없다(self):
         self.age(self.token, timedelta(days=30, seconds=1))
@@ -167,7 +168,7 @@ class TokenRenewTest(TestCase):
 
         new = self.rotate()
         self.me(new)
-        LoginToken.objects.filter(key=self.token.key).delete()  # 매일 정리가 지운 뒤
+        LoginToken.objects.filter(digest=token_digest(self.token.key)).delete()  # 매일 정리가 지운 뒤
 
         res = self.client.post(
             EMAIL_CHANGE_CONFIRM_URL, {"token": link}, content_type="application/json"

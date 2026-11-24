@@ -31,7 +31,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 from apps.learning import daily_study, review
 from apps.learning.models import DailyScore, QuizAnswer, QuizSession, ReviewState
 from apps.learning.session import SessionError
@@ -629,7 +629,7 @@ class AccountStateTest(PracticeCase):
         self.assertNoRows()
 
     def test_a_token_after_logout_is_401(self):
-        LoginToken.objects.filter(key=self.key).delete()
+        LoginToken.objects.filter(digest=token_digest(self.key)).delete()
 
         self.assertEqual(self.grade(self.wrong_pick).status_code, 401)
         self.assertNoRows()

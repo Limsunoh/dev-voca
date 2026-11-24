@@ -20,7 +20,7 @@ from django.core.cache import cache
 from django.db import connection, connections
 from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase, override_settings
 
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 
 from .email_change import _SALT, email_mark, make_token, read_token
 from .tests import (
@@ -166,7 +166,7 @@ class TokenConfirmTest(EmailChangeFlowMixin, TestCase):
     """링크를 눌렀을 때의 판정."""
 
     def token_keys(self):
-        return set(LoginToken.objects.filter(user=self.user).values_list("key", flat=True))
+        return set(LoginToken.objects.filter(user=self.user).values_list("digest", flat=True))
 
     def test_정상_변경(self):
         res = self.confirm(self.issued_token())
@@ -398,7 +398,9 @@ class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
         res = self.confirm(link)
         self.assertEqual(res.status_code, 200)
         self.token = LoginToken.objects.get(user=self.user)
-        self.assertEqual(res.json()["token"], self.token.key)
+        self.assertEqual(token_digest(res.json()["token"]), self.token.digest)
+        # DB 에는 지문만 있다. 다음 신청에 쓰도록 받은 원문을 실어 둔다.
+        self.token.key = res.json()["token"]
 
     def round_trip(self):
         """a -> b -> a 를 끝내고 처음 보낸 a -> b 링크를 돌려준다."""
@@ -450,7 +452,7 @@ class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
 
         self.assert_rejected(self.confirm(first))
 
-        self.assertEqual(LoginToken.objects.get(user=self.user).key, self.token.key)
+        self.assertEqual(LoginToken.objects.get(user=self.user).digest, token_digest(self.token.key))
         self.assertEqual(self.me_status(self.token.key), 200)
 
     def test_a_b_와_a_c_를_함께_받아_b_를_쓰면_c_링크는_거절된다(self):
@@ -556,17 +558,21 @@ class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
         self.assertEqual(res.status_code, 204)
         self.assertEqual(self.confirm(link).status_code, 200)
 
+    def use_new_login(self):
+        """다른 기기에서 로그인하고 그 토큰으로 바꿔 든다. DB 에는 지문만 있어 응답의 원문을 쓴다."""
+        res = self.login()
+        self.token = LoginToken.objects.get(digest=token_digest(res.json()["token"]))
+        self.token.key = res.json()["token"]
+
     def test_나중에_로그인한_기기에서_신청해도_링크가_통한다(self):
-        self.login()
-        self.token = LoginToken.objects.filter(user=self.user).latest("pk")
+        self.use_new_login()
 
         self.assertEqual(self.confirm(self.issued_token()).status_code, 200)
 
     def test_신청한_기기가_로그아웃하면_다른_기기가_남아_있어도_링크는_거절된다(self):
         """처리방침이 "로그아웃하면 대기 중인 링크는 무효" 라고 적고 있다."""
         first = self.token
-        self.login()
-        self.token = LoginToken.objects.filter(user=self.user).latest("pk")
+        self.use_new_login()
         link = self.issued_token()
 
         self.assertEqual(self.logout().status_code, 204)

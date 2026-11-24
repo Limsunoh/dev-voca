@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions
 from rest_framework.authentication import TokenAuthentication
 
-from .models import LoginToken
+from .models import LoginToken, token_digest
 
 
 def _mark_seen(user) -> None:
@@ -64,10 +64,12 @@ class SlimTokenAuthentication(TokenAuthentication):
             token = (
                 model.objects.select_related("user")
                 .defer("user__avatar_photo")
-                .get(key=key)
+                .get(digest=token_digest(key))
             )
         except model.DoesNotExist:
             raise exceptions.AuthenticationFailed(_("Invalid token.")) from None
+        # DB 에는 지문만 있다. 이어 가기(renew)가 원문으로 다음 토큰을 계산하므로 실어 둔다.
+        token.key = key
 
         # 30일 만료와 바뀐 토큰의 유예(LoginToken.REPLACED_GRACE)를 여기서도 본다. 매일
         # 정리(daily_cleanup)가 지우는 것만 믿으면, 정리가 멈춘 동안 새어 나간 토큰이 기한
@@ -82,11 +84,12 @@ class SlimTokenAuthentication(TokenAuthentication):
         if token.is_expired():
             # 유예 안의 옛 토큰은 is_expired 가 아니라서 여기까지 오지 않는다.
             #
-            # 이 배포 전에 받은 토큰(0013 이 device 를 토큰 값으로 채운 것)은 끊지 않고 이
-            # 요청만 거절한다. 11-13 전에는 계정당 토큰이 하나라 폰과 PC 가 같은 값을 나눠
+            # 11-13 배포 전에 받은 토큰은 끊지 않고 이 요청만 거절한다. 0013 이 그 토큰의
+            # device 를 토큰 값으로 채웠고, 0016 이 둘을 같은 지문으로 바꿔 device 와 digest 가
+            # 같다. 11-13 전에는 계정당 토큰이 하나라 폰과 PC 가 같은 값을 나눠
             # 가졌다. 한쪽이 이어 간 뒤 다른 쪽이 그 값으로 오는 것은 새어 나간 것이 아니다.
             # 그 토큰은 늦어도 발급 30일(12-13 무렵)이면 끝난다.
-            if token.replaced_past_grace() and token.device != token.key:
+            if token.replaced_past_grace() and token.device != token.digest:
                 LoginToken.end_login(token.user_id, token.device)
             raise exceptions.AuthenticationFailed(_("Invalid token."))
 

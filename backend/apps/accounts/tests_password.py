@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
 
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 
 from .throttles import PasswordChangeThrottle
 
@@ -184,7 +184,7 @@ class PasswordChangeTest(TestCase):
         new_key = res.json()["token"]
         # 새 토큰을 받았고 옛 값과 다르다. 같으면 다른 기기가 안 끊긴다.
         self.assertNotEqual(new_key, old_key)
-        self.assertFalse(LoginToken.objects.filter(key=old_key).exists())
+        self.assertFalse(LoginToken.objects.filter(digest=token_digest(old_key)).exists())
         # 지금 기기의 옛 토큰도, 다른 기기의 토큰도 이제 못 들어온다.
         for stale_key in (old_key, other_key):
             stale = self.client.get(ME_URL, HTTP_AUTHORIZATION=f"Token {stale_key}")

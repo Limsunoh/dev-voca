@@ -25,7 +25,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.throttling import SimpleRateThrottle
 
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 from apps.accounts.tests_security_hardening_dynamic import use_production_rates
 from apps.learning.tests_mistakes import make_user
 
@@ -108,7 +108,7 @@ class PracticeGradeGuestTest(ThrottleCase):
             self.assertEqual(self.post(WORD_GRADE).status_code, 400)
 
     def test_만료_토큰은_401_이고_게스트_통도_계정_통도_안_센다(self):
-        LoginToken.objects.filter(key=self.a).update(
+        LoginToken.objects.filter(digest=token_digest(self.a)).update(
             created=timezone.now() - LoginToken.LIFETIME - timedelta(seconds=1)
         )
         with self.rates(practice_grade="1/min"):

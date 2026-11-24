@@ -12,7 +12,7 @@
 - 로그아웃·비밀번호 변경·이메일 변경 링크가 바뀐 토큰과 함께 맞게 도는가
 - 관리자 화면이 device 를 흘리지 않는가
 - 동시에 몰릴 때(Postgres, 실제 스레드)
-- 0012/0013 을 되돌렸다 다시 적용할 때와 이 칸을 모르는 옛 코드식 INSERT
+- 0012/0013(과 0014~0016)을 되돌렸다 다시 적용할 때와 이 칸을 모르는 옛 코드식 INSERT
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from django.test import Client, TestCase, TransactionTestCase
 from django.utils import timezone
 
 from apps.accounts.admin import LoginTokenAdmin
-from apps.accounts.models import LoginToken
+from apps.accounts.models import LoginToken, token_digest
 
 from .tests import EMAIL_CHANGE_CONFIRM_URL, EMAIL_CHANGE_URL, LOGOUT_URL, ME_URL, PASSWORD
 from .tests_password import NEW_PASSWORD, PASSWORD_URL
@@ -50,6 +50,10 @@ LIFETIME = LoginToken.LIFETIME
 
 def auth(key: str) -> dict:
     return {"HTTP_AUTHORIZATION": f"Token {key}"}
+
+
+def digests(*keys: str) -> set[str]:
+    return {token_digest(k) for k in keys}
 
 
 def frozen(moment):
@@ -87,16 +91,17 @@ class RenewMixin:
         return self.client.get(ME_URL, **auth(key)).status_code
 
     def row(self, key: str) -> LoginToken:
-        return LoginToken.objects.get(key=key)
+        return LoginToken.objects.get(digest=token_digest(key))
 
-    def keys_of(self, user=None) -> set[str]:
+    def digests_of(self, user=None) -> set[str]:
+        """그 계정에 남은 토큰의 지문. 원문과 견줄 때는 digests 로 바꿔 견준다."""
         return set(
-            LoginToken.objects.filter(user=user or self.owner).values_list("key", flat=True)
+            LoginToken.objects.filter(user=user or self.owner).values_list("digest", flat=True)
         )
 
     def push_replaced(self, key: str, ago: timedelta) -> None:
         """옛 토큰이 바뀐 시각을 ago 전으로 민다."""
-        LoginToken.objects.filter(key=key).update(replaced_at=timezone.now() - ago)
+        LoginToken.objects.filter(digest=token_digest(key)).update(replaced_at=timezone.now() - ago)
 
 
 class RenewContractTest(RenewMixin, TestCase):
@@ -234,7 +239,7 @@ class ResponseLossTest(RenewMixin, TestCase):
 
         self.assertEqual(self.me(a.key), 200)
         self.assertEqual(self.renewed(a.key), b)
-        self.assertEqual(self.keys_of(), {a.key, b})
+        self.assertEqual(self.digests_of(), digests(a.key, b))
 
     def test_며칠_뒤_새_토큰도_하루가_지났어도_같은_새_토큰을_돌려준다(self):
         a = self.token(age=DAY * 4)
@@ -246,7 +251,7 @@ class ResponseLossTest(RenewMixin, TestCase):
 
         self.assertEqual(body["token"], b)
         self.assertEqual(body["issued_at"], int(self.row(b).created.timestamp()))
-        self.assertEqual(self.keys_of(), {a.key, b})
+        self.assertEqual(self.digests_of(), digests(a.key, b))
         self.assertFalse(self.row(b).delivered)
         self.assertIsNone(self.row(a.key).replaced_at)
 
@@ -294,7 +299,7 @@ class ReplacedGraceTest(RenewMixin, TestCase):
             self.assertEqual(self.me(key), 200)
         # 옛 토큰으로 온 이어 가기는 새 토큰을 돌려준다(쿠키를 다시 맞춘다).
         self.assertEqual(self.renewed(self.a.key), self.b)
-        self.assertEqual(self.keys_of(), {self.a.key, self.b, self.laptop.key})
+        self.assertEqual(self.digests_of(), digests(self.a.key, self.b, self.laptop.key))
 
     def test_유예_59분째의_옛_토큰은_통한다(self):
         self.start_using_new()
@@ -311,7 +316,7 @@ class ReplacedGraceTest(RenewMixin, TestCase):
             self.assertEqual(self.me(self.a.key), 200)
         with frozen(replaced_at + GRACE + timedelta(microseconds=1)):
             self.assertEqual(self.me(self.a.key), 401)
-        self.assertFalse(LoginToken.objects.filter(key=self.b).exists())
+        self.assertFalse(LoginToken.objects.filter(digest=token_digest(self.b)).exists())
 
     def test_유예가_지난_옛_토큰이_오면_그_로그인만_통째로_끊긴다(self):
         self.start_using_new()
@@ -330,7 +335,7 @@ class ReplacedGraceTest(RenewMixin, TestCase):
 
         self.assertEqual(self.renew(self.a.key).status_code, 401)
 
-        self.assertEqual(self.keys_of(), {self.laptop.key})
+        self.assertEqual(self.digests_of(), digests(self.laptop.key))
 
     def test_새_토큰을_여러_번_써도_바뀐_시각이_밀리지_않는다(self):
         """처음 쓰인 시각이 남아야 한다. 밀리면 옛 토큰의 유예가 쓸 때마다 늘어난다."""
@@ -356,7 +361,7 @@ class ReplacedGraceTest(RenewMixin, TestCase):
         self.push_replaced(self.a.key, GRACE + timedelta(minutes=1))
         self.assertEqual(self.me(self.a.key), 401)
         self.assertEqual(self.me(c), 401)
-        self.assertEqual(self.keys_of(), {self.laptop.key})
+        self.assertEqual(self.digests_of(), digests(self.laptop.key))
 
     def test_새_토큰을_안_쓰면_옛_토큰은_며칠이_지나도_바뀐_것이_아니다(self):
         self.age(self.row(self.a.key), DAY * 20)
@@ -375,15 +380,15 @@ class LegacySharedTokenTest(RenewMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.shared = self.token(age=DAY * 2)
-        LoginToken.objects.filter(pk=self.shared.pk).update(device=self.shared.key)
+        LoginToken.objects.filter(pk=self.shared.pk).update(device=self.shared.digest)
         self.shared.refresh_from_db()
         # 폰이 먼저 이어 받고 새 토큰을 쓰기 시작했다.
         self.phone = self.renewed(self.shared.key)
         self.assertEqual(self.me(self.phone), 200)
         self.laptop = self.token()
 
-    def test_이어_받은_토큰의_device_는_옛_토큰_값이다(self):
-        self.assertEqual(self.row(self.phone).device, self.shared.key)
+    def test_이어_받은_토큰의_device_는_옛_토큰_지문이다(self):
+        self.assertEqual(self.row(self.phone).device, self.shared.digest)
 
     def test_유예_안에는_PC_의_옛_토큰도_통한다(self):
         self.push_replaced(self.shared.key, GRACE - timedelta(minutes=1))
@@ -398,7 +403,7 @@ class LegacySharedTokenTest(RenewMixin, TestCase):
 
         self.assertEqual(self.me(self.phone), 200)
         self.assertEqual(self.me(self.laptop.key), 200)
-        self.assertEqual(self.keys_of(), {self.shared.key, self.phone, self.laptop.key})
+        self.assertEqual(self.digests_of(), digests(self.shared.key, self.phone, self.laptop.key))
 
     def test_옛_토큰이_여러_번_와도_매번_401_이고_폰의_다음_이어_가기도_된다(self):
         self.push_replaced(self.shared.key, GRACE + timedelta(minutes=1))
@@ -427,7 +432,7 @@ class LegacySharedTokenTest(RenewMixin, TestCase):
         self.assertEqual(self.client.post(LOGOUT_URL, **auth(self.shared.key)).status_code, 204)
 
         self.assertEqual(self.me(self.phone), 401)
-        self.assertEqual(self.keys_of(), {self.laptop.key})
+        self.assertEqual(self.digests_of(), digests(self.laptop.key))
 
 
 class ClockTest(RenewMixin, TestCase):
@@ -441,7 +446,7 @@ class ClockTest(RenewMixin, TestCase):
             self.assertEqual(self.renewed(a.key), b)
             self.assertEqual(self.renewed(b), b)
             self.assertEqual(self.me(a.key), 200)
-        self.assertEqual(self.keys_of(), {a.key, b})
+        self.assertEqual(self.digests_of(), digests(a.key, b))
 
     def test_시계가_31일_앞으로_튀면_모두_401_이고_다시_돌아오면_통한다(self):
         a = self.token(age=DAY * 2)
@@ -480,7 +485,7 @@ class ExpiredSelectionTest(RenewMixin, TestCase):
         b = self.token(age=DAY * 2)
         LoginToken.objects.filter(pk=b.pk).update(device=a.device)
 
-        self.assertEqual(list(LoginToken.expired().values_list("key", flat=True)), [a.key])
+        self.assertEqual(list(LoginToken.expired().values_list("digest", flat=True)), [a.digest])
 
 
 class EndLoginTest(RenewMixin, TestCase):
@@ -499,14 +504,14 @@ class EndLoginTest(RenewMixin, TestCase):
         self.assertEqual(self.client.post(LOGOUT_URL, **auth(self.b)).status_code, 204)
 
         self.assertEqual(self.me(self.a.key), 401)
-        self.assertEqual(self.keys_of(), {self.laptop.key})
+        self.assertEqual(self.digests_of(), digests(self.laptop.key))
         self.assertTrue(LoginToken.objects.filter(pk=self.theirs.pk).exists())
 
     def test_옛_토큰으로_로그아웃하면_아직_안_쓴_새_토큰도_죽는다(self):
         self.assertEqual(self.client.post(LOGOUT_URL, **auth(self.a.key)).status_code, 204)
 
         self.assertEqual(self.me(self.b), 401)
-        self.assertEqual(self.keys_of(), {self.laptop.key})
+        self.assertEqual(self.digests_of(), digests(self.laptop.key))
 
     def test_비밀번호를_바꾸면_안_쓴_새_토큰까지_죽고_새_로그인을_받는다(self):
         res = self.client.post(
@@ -518,7 +523,7 @@ class EndLoginTest(RenewMixin, TestCase):
 
         self.assertEqual(res.status_code, 200)
         fresh = res.json()["token"]
-        self.assertEqual(self.keys_of(), {fresh})
+        self.assertEqual(self.digests_of(), digests(fresh))
         self.assertNotEqual(self.row(fresh).device, self.a.device)
         self.assertTrue(self.row(fresh).delivered)
         for key in (self.a.key, self.b, self.laptop.key):
@@ -616,7 +621,7 @@ class EmailLinkAcrossRenewTest(RenewMixin, TestCase):
         fresh = res.json()["token"]
 
         self.assertEqual(self.confirm(second).status_code, 400)
-        self.assertEqual(self.keys_of(), {fresh})
+        self.assertEqual(self.digests_of(), digests(fresh))
         self.assertNotEqual(self.row(fresh).device, self.a.device)
         self.assert_email("first@example.com")
 
@@ -666,7 +671,7 @@ class AdminDeviceLeakTest(RenewMixin, TestCase):
         for lookup in (
             "user__login_tokens__device__startswith",
             "user__login_tokens__device",
-            "user__login_tokens__key__startswith",
+            "user__login_tokens__digest__startswith",
         ):
             with self.subTest(lookup):
                 res = self.admin.get(ADMIN_LIST_URL, {lookup: self.a.device[:8]})
@@ -785,7 +790,7 @@ class RenewConcurrencyTest(RenewMixin, TransactionTestCase):
             self.assertFalse(
                 LoginToken.objects.filter(device__in=old_devices).exists(), results
             )
-            self.assertEqual(self.keys_of(), {changed[0]["token"]})
+            self.assertEqual(self.digests_of(), digests(changed[0]["token"]))
 
     def test_다른_기기_둘이_동시에_이어_가도_각자_자기_로그인의_새_토큰이다(self):
         phone, laptop = self.token(age=DAY * 2), self.token(age=DAY * 2)
@@ -793,14 +798,14 @@ class RenewConcurrencyTest(RenewMixin, TransactionTestCase):
         results = _together(_renew(phone.key), _renew(laptop.key))
 
         self.assertEqual([status for status, _ in results], [200, 200])
-        devices = {LoginToken.objects.get(key=body["token"]).device for _, body in results}
+        devices = {LoginToken.objects.get(digest=token_digest(body["token"])).device for _, body in results}
         self.assertEqual(devices, {phone.device, laptop.device})
 
     def test_새_토큰이_동시에_처음_쓰여도_옛_토큰은_유예_안이라_통한다(self):
         a = self.token(age=DAY * 2)
-        b = LoginToken.objects.get(key=self.renewed_by_client(a.key))
+        b = self.renewed_by_client(a.key)
 
-        results = _together(*[(lambda client: client.get(ME_URL, **auth(b.key)))] * 3)
+        results = _together(*[(lambda client: client.get(ME_URL, **auth(b)))] * 3)
 
         self.assertEqual([status for status, _ in results], [200] * 3)
         self.assertIsNotNone(LoginToken.objects.get(pk=a.pk).replaced_at)
@@ -842,7 +847,12 @@ class LockSabotageTest(TransactionTestCase):
 
 @unittest.skipUnless(connection.vendor == "postgresql", "raw SQL 이 Postgres 문법이다")
 class MigrationTest(TransactionTestCase):
-    """0012/0013 을 되돌렸다 다시 적용한다(배포 직후). 이 칸을 모르는 옛 코드식 INSERT 도 넣는다."""
+    """0012/0013 을 되돌렸다 다시 적용한다(배포 직후). 되돌릴 때 0014~0016 도 함께 지난다.
+    이 칸을 모르는 옛 코드식 INSERT 도 넣는다.
+
+    최신 상태에서 넣는 행은 지문을 넣는다. device 를 모르는 코드가 넣어도 DB 가 채우는지를 보는
+    것이라, 원문을 넣으면 인증이 못 찾아 그 확인까지 가지 못한다.
+    """
 
     def setUp(self):
         cache.clear()
@@ -860,7 +870,7 @@ class MigrationTest(TransactionTestCase):
                 [key, self.owner.pk],
             )
 
-    def test_되돌렸다_다시_적용하면_옛_토큰의_device_가_토큰_값이고_로그인이_산다(self):
+    def test_되돌렸다_다시_적용하면_옛_토큰의_device_가_토큰_지문이고_로그인이_산다(self):
         try:
             self.migrate("0011")
             self.old_insert("a" * 40)
@@ -882,32 +892,35 @@ class MigrationTest(TransactionTestCase):
             self.migrate()
 
         for key in ("a" * 40, "b" * 40):
-            token = LoginToken.objects.get(key=key)
-            self.assertEqual(token.device, key)
+            token = LoginToken.objects.get(digest=token_digest(key))
+            self.assertEqual(token.device, token_digest(key))
             self.assertEqual(Client().get(ME_URL, **auth(key)).status_code, 200)
 
     def test_최신_상태에서_옛_코드식_INSERT_는_서로_다른_device_를_받아_따로_로그아웃된다(self):
-        self.old_insert("c" * 40)
-        self.old_insert("d" * 40)
+        self.old_insert(token_digest("c" * 40))
+        self.old_insert(token_digest("d" * 40))
 
-        c, d = LoginToken.objects.get(key="c" * 40), LoginToken.objects.get(key="d" * 40)
+        c = LoginToken.objects.get(digest=token_digest("c" * 40))
+        d = LoginToken.objects.get(digest=token_digest("d" * 40))
         self.assertTrue(c.device and d.device)
         self.assertLessEqual(len(c.device), 40)
         self.assertNotEqual(c.device, d.device)
         self.assertTrue(c.delivered)
 
-        self.assertEqual(Client().post(LOGOUT_URL, **auth(c.key)).status_code, 204)
-        self.assertEqual(Client().get(ME_URL, **auth(d.key)).status_code, 200)
+        self.assertEqual(Client().post(LOGOUT_URL, **auth("c" * 40)).status_code, 204)
+        self.assertEqual(Client().get(ME_URL, **auth("d" * 40)).status_code, 200)
 
     def test_옛_코드식_INSERT_로_만든_토큰도_이어_가기가_된다(self):
-        self.old_insert("e" * 40)
-        LoginToken.objects.filter(key="e" * 40).update(created=timezone.now() - DAY * 2)
+        self.old_insert(token_digest("e" * 40))
+        LoginToken.objects.filter(digest=token_digest("e" * 40)).update(
+            created=timezone.now() - DAY * 2
+        )
 
         res = Client().post(RENEW_URL, **auth("e" * 40))
 
         self.assertEqual(res.status_code, 200)
-        fresh = LoginToken.objects.get(key=res.json()["token"])
-        self.assertEqual(fresh.device, LoginToken.objects.get(key="e" * 40).device)
+        fresh = LoginToken.objects.get(digest=token_digest(res.json()["token"]))
+        self.assertEqual(fresh.device, LoginToken.objects.get(digest=token_digest("e" * 40)).device)
 
 
 class SabotageTest(TestCase):
@@ -1004,7 +1017,7 @@ class SabotageTest(TestCase):
             try:
                 return real_auth(self_auth, key)
             except exceptions.AuthenticationFailed:
-                token = LoginToken.objects.filter(key=key).first()
+                token = LoginToken.objects.filter(digest=token_digest(key)).first()
                 if token and token.replaced_past_grace():
                     LoginToken.end_login(token.user_id, token.device)
                 raise
