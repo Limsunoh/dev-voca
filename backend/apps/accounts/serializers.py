@@ -90,6 +90,27 @@ def validate_display_name(value: str, *, instance=None) -> str:
     return name
 
 
+PLAIN_EMAIL_MESSAGE = "이메일은 영문·숫자·기호로 된 주소만 쓸 수 있습니다."
+
+
+def ensure_plain_email(value: str) -> str:
+    """영문·숫자·기호만으로 된 주소만 받는다. 가입과 이메일 변경이 같이 쓴다.
+
+    계정은 email__iexact 로 찾는데, 이것은 PostgreSQL 의 UPPER 라 "ſ"(U+017F) 가 "S",
+    "ı"(U+0131) 가 "I" 가 된다. Django 의 이메일 검사기는 이 글자들을 받고, .lower() 를
+    거쳐도 그대로 남는다. 그래서 "boſs@example.com" 으로 가입해 두면 진짜
+    boss@example.com 의 가입·이메일 변경이 "이미 가입된 이메일" 로 막히고, 그 사람이
+    구글로 들어오면 계정이 하나 더 생겨 그 주소의 이메일 로그인이 500 이 된다. 진짜 주소의
+    메일함이 없어도 막을 수 있고, 관리자 화면에서는 같은 주소로 보인다.
+
+    한글 도메인 주소도 함께 막히는 대가가 있다. 2026-11-24 운영 회원 중 ASCII 밖 글자가
+    든 주소는 0건이었다. Admin 의 계정 추가·수정 폼은 거치지 않는다(운영자 입력).
+    """
+    if not value.isascii():
+        raise serializers.ValidationError(PLAIN_EMAIL_MESSAGE)
+    return value
+
+
 def _conflict_message(exc: IntegrityError) -> dict:
     """DB 가 막은 것이 이름인지 이메일인지 가려낸다.
 
@@ -269,11 +290,12 @@ class SignUpSerializer(serializers.ModelSerializer):
         return validate_display_name(value)
 
     def validate_email(self, value: str) -> str:
-        """이미 있는 이메일인지 본다.
+        """영문 밖 글자를 거르고(ensure_plain_email), 이미 있는 이메일인지 본다.
 
         unique=True 가 DB 에서 막아주지만, 그 에러는 영어 문구로 나오고
         500 이 되기도 한다. 여기서 걸러 한국어로 알려준다.
         """
+        value = ensure_plain_email(value)
         # 대소문자만 다른 중복을 막는다. 도메인은 대소문자를 구분하지 않아
         # Gmail.com 과 gmail.com 이 같은 주소다.
         if User.objects.filter(email__iexact=value).exists():
@@ -400,7 +422,7 @@ class EmailChangeRequestSerializer(serializers.Serializer):
     def validate_new_email(self, value: str) -> str:
         """이미 쓰는 주소인지, 지금 주소와 같은지 본다."""
         user = self.context["user"]
-        new_email = value.lower()
+        new_email = ensure_plain_email(value).lower()
 
         if new_email == user.email.lower():
             raise serializers.ValidationError("지금 쓰고 있는 이메일입니다.")

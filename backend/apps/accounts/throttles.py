@@ -153,8 +153,8 @@ class AdminLoginThrottle(EmailRateThrottle):
     로그인해 본 브라우저는 들어온다. 쿠키는 횟수를 따로 세게 할 뿐 로그인을 대신하지 않고,
     쿠키를 훔쳐도 그 기기 몫(시간당 10번)만큼만 더 대볼 수 있다.
 
-    남은 대가: 처음 쓰는 브라우저는 여전히 이메일 통이라 막힐 수 있다. 풀어 주는 방법은
-    DEPLOY.md 의 "Admin 로그인이 429 로 막혔을 때".
+    남은 대가: 처음 쓰는 브라우저는 여전히 이메일 통과 전체 통(AdminLoginTotalThrottle)에
+    들어 막힐 수 있다. 풀어 주는 방법은 DEPLOY.md 의 "Admin 로그인이 429 로 막혔을 때".
     """
 
     scope = "admin_login"
@@ -167,6 +167,28 @@ class AdminLoginThrottle(EmailRateThrottle):
         if device is not None:
             return self.cache_format % {"scope": f"{self.scope}_device", "ident": device}
         return self.cache_format % {"scope": self.scope, "ident": email_ident(email)}
+
+
+class AdminLoginTotalThrottle(SimpleRateThrottle):
+    """기기 쿠키 없이 들어온 관리자 로그인 시도 전체를 한 통으로 센다. 이메일 통보다 먼저 돈다.
+
+    이메일 통만 있으면 이메일을 바꿔 가며 끝없이 보낼 수 있다. 없는 이메일이어도 Django 가
+    비밀번호 해시(PBKDF2 100만 회, 이 PC 에서 0.2초)를 돌아 작업자 CPU 를 먹고, 요청마다
+    시도 횟수 행이 하나씩 쌓인다. 행이 MAX_ENTRIES 를 넘으면 DB 캐시가 키 이름순 앞 1/3 을
+    지우는데, 그 앞쪽이 throttle_admin_login_* 와 throttle_auth_email_* 라 관리자와 회원의
+    시도 횟수가 0 으로 돌아간다(settings 의 CACHES 주석). IP 를 믿을 수 없는 자리라
+    (AdminLoginThrottle 주석) 통 하나로 센다.
+
+    대가: 남이 이 통을 채우면 처음 쓰는 브라우저의 관리자 로그인도 한 시간 막힌다. 로그인해
+    본 브라우저는 기기 쿠키가 있어 이 통을 타지 않는다.
+    """
+
+    scope = "admin_login_total"
+
+    def get_cache_key(self, request, view) -> str | None:
+        if admin_device(request, request.POST.get("username", "")) is not None:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": "all"}
 
 
 class EmailChangeThrottle(SimpleRateThrottle):

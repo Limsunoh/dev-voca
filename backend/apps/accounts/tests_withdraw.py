@@ -346,6 +346,8 @@ class BodyEdgeTest(WithdrawTestCase):
     def test_password_spaces_are_part_of_the_value(self):
         self.user.set_password(f"  {PASSWORD}  ")
         self.user.save()
+        # 비밀번호를 바꾸면 로그인이 모두 끊긴다(User.save). 새로 로그인한 셈으로 토큰을 받는다.
+        self.token = LoginToken.objects.create(user=self.user).key
 
         self.assertEqual(self.raw(json.dumps({"current_password": PASSWORD})).status_code, 400)
         self.assertKept(self.user)

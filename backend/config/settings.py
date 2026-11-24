@@ -440,8 +440,9 @@ REST_FRAMEWORK = {
     # 두면 로그인 안 한 요청이 401 대신 403 이 되고, 401 을 보고 "로그아웃
     # 상태로 그리기" 를 판단하는 프론트의 분기가 깨진다.
     #
-    # 세션도 남겨두는 이유: Admin 화면과 DRF 의 브라우저 화면이 세션으로
-    # 동작한다. 빼면 브라우저에서 API 를 눌러볼 수 없다.
+    # 세션도 남겨두는 이유: Admin 에 로그인한 직원이 세션으로 API 를 부르는 길이
+    # 운영에도 있다(views 의 로그아웃·이메일 변경 신청). 로컬(DEBUG)의 DRF 브라우저
+    # 화면도 세션으로 돈다.
     "DEFAULT_AUTHENTICATION_CLASSES": [
         # 기본 TokenAuthentication 은 사용자 행 전체를 읽어 프로필 사진
         # 바이트까지 가져오고, 로그인한 사람의 모든 요청이 그 비용을 낸다.
@@ -452,6 +453,10 @@ REST_FRAMEWORK = {
     # 새 API 가 permission_classes 를 빠뜨리면 누구나 부를 수 있게 되는 것을 막는다.
     # 지금 있는 API 는 모두 직접 정해 두었다(공개할 것은 AllowAny 나 ReadOnly 로).
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    # DRF 의 브라우저 화면(HTML)은 로컬에서만 켠다. 운영에서 그 화면으로 API 를 볼 사람이
+    # 없고, 켜 두면 누구나 브라우저로 열어 API 목록과 입력 양식을 볼 수 있다.
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"]
+    + (["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else []),
     # 속도 제한은 여기 두지 않는다. 이 구조에서는 오히려 해가 된다.
     #
     # 브라우저가 백엔드를 직접 부르지 않는다. 목록은 서버 컴포넌트가,
@@ -484,6 +489,9 @@ REST_FRAMEWORK = {
         # 로그인해 본 브라우저는 기기마다 같은 값으로 따로 센다(AdminLoginThrottle). 그
         # 쿠키를 훔친 사람은 쿠키 하나당 이만큼 더 대볼 수 있다.
         "admin_login": "1000/min" if sys.argv[1:2] == ["test"] else "10/hour",
+        # 기기 쿠키 없이 들어온 Admin 로그인 시도 전체(AdminLoginTotalThrottle). 이메일을 바꿔
+        # 가며 보내도 이 수를 넘지 못한다. 관리자가 새 브라우저에서 몇 번 틀려도 남는 값이다.
+        "admin_login_total": "1000/min" if sys.argv[1:2] == ["test"] else "30/hour",
         # 구글 로그인도 접속 IP 마다 센다(apps.accounts.throttles 의 GoogleIpThrottle,
         # 아래 signup_ip·login_ip 와 같은 방식). 통은 login_ip 와 따로다. 로컬(DEBUG)은
         # RELAY_SECRET 이 없어 모두 direct 한 통에 들므로 넉넉하게 둔다.

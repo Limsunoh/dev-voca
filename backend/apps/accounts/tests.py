@@ -1366,9 +1366,12 @@ class EmailChangeTest(TestCase):
         """
         stale = self.issued_token()
 
-        # 그 사이 다른 주소로 바꾼다.
+        # 그 사이 다른 주소로 바꾼다. 이메일이 바뀌면 로그인이 모두 끊기므로(User.save)
+        # 같은 기기로 다시 로그인한 셈으로 토큰을 둔다. 없으면 이메일 검사가 아니라 "기기
+        # 없음" 으로 거절돼, 이 시험이 이메일 검사를 지켜보지 못한다.
         self.user.email = "other@example.com"
         self.user.save(update_fields=["email"])
+        LoginToken.objects.create(user=self.user, device=self.token.device)
 
         res = self.confirm(stale)
 
