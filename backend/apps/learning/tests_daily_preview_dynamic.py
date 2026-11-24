@@ -181,10 +181,15 @@ class NotStartingTest(DynamicCase):
         self.assertFalse(DailyPreview.objects.exists(), "시작한 뒤 홈이 미리 뽑기 줄을 다시 만들었다")
 
     def test_wrong_words_come_first_in_the_preview(self):
+        """틀린 것은 묶음의 절반까지 맨 앞에 온다(daily_study._pick_words)."""
         wrong = list(Word.objects.visible().order_by("-pk").values_list("pk", flat=True)[: chunk(SHORT)])
         for pk in wrong:
             ReviewState.objects.create(user=self.user, target_type=quiz.TARGET_WORD, target_id=pk, is_wrong=True)
-        self.assertEqual(sorted(self.home()), sorted(wrong))
+        home = self.home()
+        self.assertEqual(len(home), chunk(SHORT))
+        quota = max(1, chunk(SHORT) // 2)
+        self.assertLessEqual(set(home[:quota]), set(wrong))
+        self.assertFalse(set(home[quota:]) & set(wrong), "절반을 넘겨 틀린 것으로 채웠다")
 
 
 class LengthChurnTest(DynamicCase):

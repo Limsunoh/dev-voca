@@ -35,7 +35,7 @@ from datetime import timedelta
 
 from django.core import signing
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import Exists, F, OuterRef, Q
 from django.db.models.functions import Least
 from django.utils import timezone
 
@@ -95,6 +95,35 @@ def count_due(user) -> int:
     return _due(user).count()
 
 
+def visible_targets() -> Q:
+    """보여줄 수 있는 대상만 남기는 조건.
+
+    id 를 파이썬으로 끌어오지 않는다. 목록에 담아 넘기면 단어·문장 전부를
+    매 요청마다 읽어 오게 된다. 하위 질의로 DB 안에서 끝낸다.
+
+    하위 질의는 `IN (SELECT id ...)` 가 아니라 `EXISTS` 다. IN 둘을 OR 로
+    묶으면 Postgres 가 조인으로 못 바꾸고, 검수된 id 목록을 만들어 둔 뒤 틀린
+    항목마다 그 목록을 처음부터 훑는다. 목록이 메모리(work_mem)에 들어가면
+    해시로 찾아 빠르지만, 넘는 순간 절벽처럼 느려진다. 2026-11-13 측정에서
+    단어·문장이 33만 개씩일 때 틀린 것 1,524개인 사람의 오답 노트 응답이
+    11.5초였다(그중 개수 세기 쿼리 하나가 12초 남짓). EXISTS 는 줄마다 기본
+    키로 하나씩 찾아, 같은 쿼리가 2.3ms, 응답 전체가 11ms 가 됐다.
+
+    종류마다 조건이 다른 이유: `ReviewState` 는 대상을 FK 로 안 묶는다
+    (단어일 수도 문장일 수도 있어 한 칸에 안 들어간다). 그래서 종류를 보고
+    각자의 표에 묻는다.
+
+    지워진 대상도 이 조건에서 함께 빠진다. 찾을 줄이 없어 EXISTS 가 거짓이 된다.
+    """
+    word_visible = Exists(Word.objects.visible().filter(pk=OuterRef("target_id")))
+    sentence_visible = Exists(
+        Sentence.objects.visible().filter(pk=OuterRef("target_id"))
+    )
+    return (Q(target_type=quiz.TARGET_WORD) & word_visible) | (
+        Q(target_type=quiz.TARGET_SENTENCE) & sentence_visible
+    )
+
+
 def _due(user):
     """복습 대상 조건. 목록과 개수가 같은 조건을 써야 한다.
 
@@ -119,7 +148,11 @@ def _due(user):
     """
     stale_before = timezone.now() - timedelta(days=STALE_DAYS)
 
-    return ReviewState.objects.filter(user=user).filter(
+    # 검수가 취소됐거나 지워진 대상은 뺀다. 빼지 않으면 출제할 수 없는 줄이 목록 앞자리를
+    # 차지한다. 틀린 것이 먼저 정렬되는데 그 줄은 답할 수 없어 영영 갱신되지 않으므로,
+    # "복습 1개" 라고 해 놓고 시작하면 "낼 문제가 없습니다" 가 되고, 앞 20줄이 모두 그런
+    # 줄이면 뒤의 보이는 줄은 복습할 수 없었다. 오답 노트와 같은 조건이다.
+    return ReviewState.objects.filter(user=user).filter(visible_targets()).filter(
         Q(is_wrong=True)
         | Q(last_correct_at__isnull=True)
         | Q(last_correct_at__lt=stale_before)
@@ -149,11 +182,10 @@ def start(user) -> tuple[str, dict, int]:
     targets = [(row.target_type, row.target_id) for row in due]
     question, at = _question_at(targets, 0)
     if question is None:
-        # 목록에는 있는데 하나도 못 냈다. 그 사이 검수에서 내려갔거나
-        # 지워진 것들이다. count_due 는 그것까지 세므로 화면이 "N개
-        # 남음" 을 보여준 뒤 여기로 온다. 개수를 정확히 맞추려면 항목마다
-        # 출제를 시도해봐야 해서 비싸다. 대신 문구를 갈라 "없다" 와
-        # "지금은 못 낸다" 를 구분한다.
+        # 목록에는 있는데 하나도 못 냈다. 검수에서 내려갔거나 지워진 것은 _due 가
+        # 이미 빼므로, 목록을 읽은 뒤 출제하기 전 그 짧은 사이에 내려갔거나, 보이기는
+        # 하는데 문제를 만들 수 없는 것(상황 칸이 빈 문장, 보기를 못 채우는 경우)이다.
+        # 문구를 갈라 "없다" 와 "지금은 못 낸다" 를 구분한다.
         raise SessionError("지금은 낼 수 있는 복습 문제가 없습니다.")
 
     # 앞머리를 붙여야 판 청소가 이 판의 행을 토큰 수명만큼 둔다
