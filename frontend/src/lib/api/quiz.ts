@@ -138,10 +138,12 @@ export async function gradeAnswer(
   pickedId: number,
   content: QuizContent = "words",
   auth?: string,
+  guestHeaders?: Record<string, string>,
 ): Promise<GradeResult> {
   return request(`${BASE[content]}grade/`, {
     method: "POST",
     body: { token, picked: pickedId },
     token: auth,
+    guestHeaders,
   });
 }

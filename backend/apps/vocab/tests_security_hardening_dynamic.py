@@ -1,7 +1,8 @@
 """낱개 채점 요청 제한(PracticeGradeThrottle)과 검색 낱말 상한(CappedSearchFilter)을 깨뜨려 본다.
 
 계약:
-  - 낱개 채점(단어·문장)은 로그인했으면 계정별 분당 120회, 게스트는 한 통에 그 20배.
+  - 낱개 채점(단어·문장)은 로그인했으면 계정별 분당 120회, 로그인하지 않은 사람은 통 하나
+    (테스트는 비밀값을 싣지 않아 direct, 운영은 접속 IP 하나)에 그 20배.
     한 사람이 막혀도 다른 사람과 게스트는 안 막힌다. 429 는 다른 제한과 같은 한국어 안내다.
   - 소리내어 읽기의 제한은 기본 클래스 이름이 바뀐 뒤에도 그대로다(계정별, 게스트 20배,
     채점 통과 따로).
@@ -121,7 +122,7 @@ class PracticeGradeGuestTest(ThrottleCase):
 
 
 class TalkThrottleRegressionTest(ThrottleCase):
-    """기본 클래스 이름이 _TalkThrottle 에서 _PerUserOrGuest 로 바뀌었다. 동작은 그대로다."""
+    """기본 클래스가 _TalkThrottle 에서 _PerUserOrGuest 를 거쳐 PerUserOrIpThrottle 로 바뀌었다. 로그인한 사람의 동작은 그대로다."""
 
     def test_출제와_채점이_계정별로_센다(self):
         with self.rates(talk_question="1/min", talk_grade="1/min"):

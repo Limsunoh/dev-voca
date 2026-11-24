@@ -245,12 +245,13 @@ class EmailChangeConfirmThrottle(SimpleRateThrottle):
     열 수 있어야 한다) 계정으로 셀 수 없고, 통 하나로 합쳐 센다.
 
     요청자별로 못 나눈다. 이 프로젝트는 브라우저가 백엔드를 직접 부르지
-    않고 Next 서버가 대신 불러서, 백엔드가 보는 주소는 늘 하나다. 나누는
-    척하면 접속자 전원이 한 통에 담기면서 나눴다는 착각만 남는다.
+    않고 Next 서버가 대신 불러서, 백엔드가 보는 주소는 늘 하나다. 확인 링크를
+    여는 화면은 접속 IP 를 실어 보내지 않는다(client_ident 를 쓰는 곳은 가입·로그인과
+    PerUserOrIpThrottle 뿐이다).
 
     그래서 요율을 넉넉히 잡는다. 한 통을 모두가 나눠 쓰므로 좁게 잡으면
     아무나 그 통을 태워 전원의 이메일 변경을 막는 스위치가 된다
-    (apps/learning/throttles.py 가 같은 위험을 배수로 완화한다). 확인
+    (문제풀기의 예전 게스트 한 통도 같은 위험을 배수로 완화했다). 확인
     링크를 누르는 일은 계정당 몇 번 없어서, 넉넉해도 무차별 시도를 막는
     목적은 그대로 선다. 서명을 맞히려면 그 정도로는 어림없다.
     """
@@ -270,7 +271,8 @@ class PasswordChangeThrottle(SimpleRateThrottle):
     걸고 여기를 비워두면 그쪽 제한이 무의미해진다.
 
     계정으로 센다. 이 요청 본문에는 이메일이 없고 토큰으로 들어오므로
-    이메일로 셀 수 없다. 접속 IP 는 Next 가 가입·로그인에만 실어 보낸다(SignUpIpThrottle).
+    이메일로 셀 수 없다. 접속 IP 는 Next 가 가입·로그인과, 로그인하지 않은 판·채점·
+    순위표·소리내어 읽기 요청에만 실어 보낸다(client_ident).
     계정별로 나누면 한도를 다 쓴 사람만 기다린다. 통을 하나만 두면
     아무나 한도를 태워 전원의 비밀번호 변경을 막을 수 있다.
 
@@ -309,8 +311,9 @@ class AvatarPhotoThrottle(SimpleRateThrottle):
     반복해서 던지는 것만으로 CPU 와 메모리를 밀 수 있다.
 
     IP 로 못 막는다. 이 프로젝트는 Next 서버가 중계해서 백엔드가 보는
-    주소가 늘 하나다. 접속 IP 는 Next 가 가입·로그인에만 실어 보낸다
-    (SignUpIpThrottle). 계정 단위가 유일한 방어선이다.
+    주소가 늘 하나다. 접속 IP 는 Next 가 가입·로그인과, 로그인하지 않은 판·채점·
+    순위표·소리내어 읽기 요청에만 실어 보낸다(client_ident). 계정 단위가 유일한
+    방어선이다.
 
     인증이 없으면 세지 않는다. 이 뷰는 IsAuthenticated 라 그 경우 401 로
     끝나고, 그런 요청을 한 통에 담으면 그것이 전원을 막는 스위치가 된다.
@@ -396,12 +399,13 @@ def client_ip_bucket(request: Request) -> str | None:
     return str(ip)
 
 
-class _ClientIpThrottle(SimpleRateThrottle):
-    """접속 IP 로 센다(처리방침 v3 시행일인 2026-11-19 부터).
+def client_ident(request: Request) -> str | None:
+    """접속자를 세는 키. 가입·로그인 제한과, 로그인하지 않은 사람의 문제풀기·순위표·소리내어
+    읽기 제한(PerUserOrIpThrottle)이 같이 쓴다.
 
     - Next 를 거친 요청: 접속 IP(IPv6 는 /64)마다 따로 센다. IP 원문은 캐시 키에 두지
       않고, 이메일과 같이 서버 비밀값을 섞은 해시로 바꾼다. Next 가 IP 를 싣지 못한
-      요청은 세지 않는다.
+      요청은 None(세지 않음)이다.
     - Next 를 거치지 않은 요청(비밀값이 없거나 틀림): IP 를 보지 않고 한 통("direct")에
       담는다. 실제 사용자는 늘 Next 를 거치므로 이 통에는 봇과 시험하는 사람만 든다.
       Railway 앞단이 붙이는 X-Real-IP 는 사용자가 지어 보낸 값을 덮어쓰는지 문서로
@@ -410,16 +414,60 @@ class _ClientIpThrottle(SimpleRateThrottle):
     비밀값이 Railway 와 Vercel 중 한쪽에만 있거나 다르면, 또는 프론트를 이 기능 전으로
     되돌리면, 실제 사용자도 모두 direct 통에 든다(DEPLOY.md 의 RELAY_SECRET).
     """
+    if not came_through_next(request):
+        return "direct"
+    bucket = client_ip_bucket(request)
+    if bucket is None:
+        return None
+    return salted_hmac("accounts.throttles.ip", bucket, algorithm="sha256").hexdigest()
+
+
+class _ClientIpThrottle(SimpleRateThrottle):
+    """접속 IP 로 센다. 키는 client_ident."""
 
     def get_cache_key(self, request: Request, view) -> str | None:
-        if not came_through_next(request):
-            ident = "direct"
-        else:
-            bucket = client_ip_bucket(request)
-            if bucket is None:
-                return None
-            ident = salted_hmac("accounts.throttles.ip", bucket, algorithm="sha256").hexdigest()
+        ident = client_ident(request)
+        if ident is None:
+            return None
         return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
+class PerUserOrIpThrottle(SimpleRateThrottle):
+    """로그인했으면 계정별, 아니면 접속 IP 별(client_ident). 로그인 없이 쓸 수 있는 90초 한 판,
+    순위표, 낱개 연습 채점, 소리내어 읽기의 제한이 상속한다(learning·vocab 의 throttles).
+
+    통을 나누는 이유: 통이 하나뿐이면 한 사람이 한도를 다 쓰는 동안 나머지 전원이 막힌다.
+    예전에는 로그인하지 않은 사람 전원을 "guest" 한 통으로 세서, 계정 없이 그 통만 채우면
+    로그인하지 않은 방문자 전원이 429 를 봤다.
+
+    로그인하지 않은 사람의 통(IP 하나, 또는 direct)은 계정 통의 guest_multiplier 배다.
+    학교·회사 와이파이처럼 IP 하나를 여럿이 쓴다. direct 에도 같은 배수가 붙어, RELAY_SECRET
+    이 어긋나 실제 사용자가 모두 direct 에 들어도 예전 guest 한 통과 같은 크기는 남는다.
+
+    IP 를 못 실은 요청(client_ident 가 None)은 세지 않는다. 가입·로그인과 같다. Vercel 을
+    거친 요청에는 x-forwarded-for 가 늘 있고, 비밀값 없이 바로 부른 요청은 direct 로 가므로
+    이 길을 밖에서 고를 수 없다.
+    """
+
+    guest_multiplier = 20
+
+    def get_cache_key(self, request: Request, view) -> str | None:
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            ident = f"u{user.pk}"
+        else:
+            ident = client_ident(request)
+            if ident is None:
+                return None
+        return self.cache_format % {"scope": self.scope, "ident": ident}
+
+    def allow_request(self, request: Request, view) -> bool:
+        # DRF 는 요청마다 새 인스턴스를 만든다. 여기서 값을 바꿔도
+        # 다음 요청에 새지 않는다.
+        user = getattr(request, "user", None)
+        if self.num_requests and (user is None or not user.is_authenticated):
+            self.num_requests *= self.guest_multiplier
+        return super().allow_request(request, view)
 
 
 class SignUpIpThrottle(_ClientIpThrottle):

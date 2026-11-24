@@ -122,8 +122,9 @@ describe("처리방침 변경 공고", () => {
     assert.match(changes, new RegExp(`시행일: ${korean(effective)}`));
   });
 
+  // v6 은 v5 시행(11-28) 전에 공고해서 v5 의 바뀐 내용도 14절에 그대로 있다.
   it("v5: Sentry 를 사목·3·6·7절과 14절에 적는다", {
-    skip: DOC_VERSION !== "v5",
+    skip: !["v5", "v6"].includes(DOC_VERSION),
   }, () => {
     const section = (id: string) =>
       pages.privacy.match(new RegExp(`<section[^>]*id="${id}"[^>]*>([\\s\\S]*?)</section>`))?.[1] ?? "";

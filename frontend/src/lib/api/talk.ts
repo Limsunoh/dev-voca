@@ -176,6 +176,7 @@ export function fetchTalkQuestion(
     token?: string;
     level?: number;
     scene?: string;
+    guestHeaders?: Record<string, string>;
   } = {},
 ): Promise<TalkPrompt> {
   const query = buildQuery({
@@ -187,7 +188,10 @@ export function fetchTalkQuestion(
     // 상황도 같다. 빈 문자열이면 buildQuery 가 뺀다.
     scene: options.scene,
   });
-  return request(`${BASE}question/${query}`, { token: options.token });
+  return request(`${BASE}question/${query}`, {
+    token: options.token,
+    guestHeaders: options.guestHeaders,
+  });
 }
 
 /**
@@ -203,6 +207,7 @@ export function fetchTalkQuestion(
 export function gradeTalk(
   body: { token: string; heard: string[] },
   token?: string,
+  guestHeaders?: Record<string, string>,
 ): Promise<TalkResult> {
-  return request(`${BASE}grade/`, { method: "POST", body, token });
+  return request(`${BASE}grade/`, { method: "POST", body, token, guestHeaders });
 }

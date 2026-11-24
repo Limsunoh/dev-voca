@@ -4,8 +4,10 @@
  * 실행: cd frontend && npx tsx --test --experimental-test-module-mocks src/app/privacy/changes-section-dynamic.test.mts
  *
  * 계약:
- *   - 14절 목록은 여섯 항목이다. 공고일, 시행일, 이번 버전의 바뀐 내용 넷(v5 일 때만 본다).
- *     넷째(로그인 이어 가기)는 v5 공지 기간 중인 11-23 에 v5 에 합쳤다(운영자 결정).
+ *   - 14절 목록은 일곱 항목이다. 공고일, 시행일, 바뀐 내용 다섯(v6 일 때만 본다).
+ *     앞 넷은 아직 시행 전인 v5 의 것이고(넷째 로그인 이어 가기는 v5 공지 기간 중인 11-23
+ *     에 v5 에 합쳤다), 다섯째(로그인하지 않은 요청을 IP 로 세기)가 v6 이다. 목록 밑 한 줄이
+ *     v5 의 공고일·시행일을 적는다.
  *   - 앞 버전 이력("이전 버전" 줄, v2·v3·v4 와 그 시행일)은 페이지 어디에도 없다.
  *   - 공고일·시행일 칸은 PRIVACY_CHANGE 에서 온다. 시행일은 공고일보다 7일 이상 뒤다
  *     (14절 첫 문장이 "시행 7일 전부터 알립니다" 를 약속한다).
@@ -40,11 +42,11 @@ function items(section: string): string[] {
 }
 
 describe("처리방침 14절", () => {
-  // 바뀐 내용이 넷인 것은 v5 의 사정이다. 다음 개정 때 항목 수를 새 버전에 맞춘다.
-  it("목록은 여섯 항목이고 공고일·시행일이 맨 앞 둘이다", { skip: DOC_VERSION !== "v5" }, () => {
+  // 바뀐 내용이 다섯인 것은 v6 의 사정이다. 다음 개정 때 항목 수를 새 버전에 맞춘다.
+  it("목록은 일곱 항목이고 공고일·시행일이 맨 앞 둘이다", { skip: DOC_VERSION !== "v6" }, () => {
     const list = items(changesSection());
 
-    assert.equal(list.length, 6, list.join("\n"));
+    assert.equal(list.length, 7, list.join("\n"));
     assert.equal(list[0], `공고일: ${koreanDate(PRIVACY_CHANGE.announced)}`);
     assert.equal(list[1], `시행일: ${koreanDate(PRIVACY_CHANGE.effective)}`);
     for (const item of list.slice(2)) {

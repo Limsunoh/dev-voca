@@ -7,16 +7,17 @@
  *   - "보여지는 이름" 은 "닉네임", "프로필 그림" 은 "프로필 사진" 이다. 옛 말이 화면 글자에도,
  *     속성(aria-label·title·alt·placeholder)에도 남지 않는다.
  *   - 입력칸은 글자만 바뀌었다. name="display_name", maxLength 12 는 그대로다.
- *   - 처리방침 14절은 공고일·시행일과 이번 버전의 바뀐 내용 네 항목뿐이다. 앞 버전 이력은
- *     "이전 버전" 줄까지 모두 지웠다(2026-11-22 사용자 결정). v2·v3·v4 가 다시 나오지 않는다.
+ *   - 처리방침 14절은 공고일·시행일과 바뀐 내용 다섯 항목, 그 밑에 아직 시행 전인 v5 의
+ *     공고일·시행일 한 줄이다. 앞 버전 이력은 "이전 버전" 줄까지 모두 지웠다(2026-11-22
+ *     사용자 결정). v2·v3·v4 가 다시 나오지 않는다.
  *   - 14절 밖의 본문에 남는 날짜는 버전 줄, 3절 백업 시작일, 7절 v5 공고일 셋뿐이다.
  *   - 처리방침 3·4절과 계정 삭제 안내 4절의 기간 숫자가 서로 맞다.
  *   - 문장을 줄여도 사실은 남는다: 요청 횟수 1분·1시간 단위와 최대 1시간, 관리자 화면
  *     로그인 세기, 문제풀기 6시간 10분, 사목의 요청 방식, 14절의 11월 21일 세기 문장.
  *     해시값을 "되돌릴 수 없다" 로 과장하지 않는다.
  *
- * v5 전용 부분이 있다. 14절, 14절 밖 본문의 날짜, 버전 줄, 14절 Sentry 항목은 v5 의 날짜와
- * 문장을 글자로 박아 두어 DOC_VERSION 이 v5 가 아니면 건너뛴다. 다음 개정 때 이 파일의 v5 절을
+ * v6 전용 부분이 있다. 14절, 14절 밖 본문의 날짜, 버전 줄, 14절 Sentry 항목은 v6 의 날짜와
+ * 문장을 글자로 박아 두어 DOC_VERSION 이 v6 이 아니면 건너뛴다. 다음 개정 때 이 파일의 v6 절을
  * 지우거나 새 버전에 맞춘다. 옛 말, 입력칸 속성, 기간 일치, 줄이면 안 되는 사실(14절 제외),
  * 해시 과장, 화면 문구는 버전과 무관해 늘 돈다.
  */
@@ -56,9 +57,9 @@ const { ProfileForm } = await import("../../components/ProfileForm");
 const { GoogleNameNote } = await import("../(auth)/ConsentChecks");
 const { DOC_VERSION } = await import("../../components/LegalDoc");
 
-// v5 의 날짜·14절 문장을 글자로 박은 검사는 v5 일 때만 돈다. 다음 개정 때 지우거나 맞춘다.
-const IS_V5 = DOC_VERSION === "v5";
-const V5_ONLY = { skip: !IS_V5 };
+// v6 의 날짜·14절 문장을 글자로 박은 검사는 v6 일 때만 돈다. 다음 개정 때 지우거나 맞춘다.
+const IS_V6 = DOC_VERSION === "v6";
+const V6_ONLY = { skip: !IS_V6 };
 
 const noop = async () => ({ error: null });
 
@@ -188,14 +189,23 @@ describe("입력칸은 글자만 바뀌었다", () => {
   });
 });
 
-describe("처리방침 14절", V5_ONLY, () => {
+describe("처리방침 14절", V6_ONLY, () => {
   const lis = items(changes);
 
-  it("공고일·시행일, 바뀐 내용 네 항목 - 여섯 항목뿐이다", () => {
-    assert.equal(lis.length, 6, lis.join("\n"));
-    assert.equal(lis[0], "공고일: 2026년 11월 21일");
-    assert.equal(lis[1], "시행일: 2026년 11월 28일");
+  it("공고일·시행일, 바뀐 내용 다섯 항목 - 일곱 항목뿐이다", () => {
+    assert.equal(lis.length, 7, lis.join("\n"));
+    assert.equal(lis[0], "공고일: 2026년 11월 25일");
+    assert.equal(lis[1], "시행일: 2026년 12월 2일");
     assert.match(lis[2], /^바뀐 내용: /);
+  });
+
+  it("아직 시행 전인 v5 네 가지의 공고일·시행일을 한 줄로 적는다", () => {
+    // 홈 알림이 v5 시행일(11-28)을 띄운다(PRIVACY_CHANGE.firstChange). 14절의 시행일은
+    // v6 의 12월 2일이라, 이 줄이 없으면 알림의 날짜를 14절에서 찾을 수 없다.
+    assert.match(
+      changesText,
+      /Sentry, 데이터베이스 백업, 구글 가입·로그인 시도 세기, 로그인 이어 가기 네 가지는 v5 로 2026년 11월 21일에 공고했고, 2026년 11월 28일에 시행합니다/,
+    );
   });
 
   it("앞 버전 이력이 남지 않는다", () => {
@@ -205,7 +215,9 @@ describe("처리방침 14절", V5_ONLY, () => {
     }
   });
 
-  it("시행 전부터 하고 있는 네 가지의 시작일은 남는다", () => {
+  it("시행 전부터 하고 있는 다섯 가지의 시작일은 남는다", () => {
+    assert.match(changesText, /로그인하지 않고 문제풀기·순위표·소리내어 읽기를 쓸 때도[^.]*IP 주소의 해시값으로/);
+    assert.match(changesText, /시행일을 기다리지 않고 2026년 11월 25일부터 합니다/);
     assert.match(changesText, /Sentry 로 보내기는 2026년 11월 20일부터 하고 있습니다/);
     assert.match(changesText, /백업은 시행일을 기다리지 않고 2026년 11월 21일부터 하고 있습니다/);
     assert.match(changesText, /구글 가입·로그인 시도도[^.]*IP 주소의 해시값으로/);
@@ -215,18 +227,18 @@ describe("처리방침 14절", V5_ONLY, () => {
   });
 });
 
-describe("처리방침 본문(14절 밖)의 날짜", V5_ONLY, () => {
+describe("처리방침 본문(14절 밖)의 날짜", V6_ONLY, () => {
   it("남는 날짜는 버전 줄, 3절 백업 시작일, 7절 v5 공고일 셋뿐이다", () => {
     const found = [...bodyText.matchAll(/(?:\d{4}년\s*)?\d{1,2}월\s*\d{1,2}일[^ ]*\s*\S+/g)].map((m) => m[0]);
     assert.deepEqual(found, [
-      "2026년 11월 28일 DeVoca",
+      "2026년 12월 2일 DeVoca",
       "2026년 11월 21일부터 운영자가",
       "2026년 11월 21일 전에",
     ]);
   });
 
-  it("버전 줄은 버전 v5 · 시행일 2026년 11월 28일 이다", () => {
-    assert.match(privacyText, /버전 v5 · 시행일 2026년 11월 28일/);
+  it("버전 줄은 버전 v6 · 시행일 2026년 12월 2일 이다", () => {
+    assert.match(privacyText, /버전 v6 · 시행일 2026년 12월 2일/);
     assert.equal(privacyText.match(/버전 v\d/g)?.length, 1);
   });
 
@@ -290,8 +302,8 @@ describe("처리방침 3·4절과 계정 삭제 안내 4절의 기간", () => {
       pick(retention, /^데이터베이스 백업/),
       pick(destruction, /백업에는 최대/),
       pick(destruction, /운영자가 만든 데이터베이스 백업/),
-      // 14절의 백업 문장은 v5 의 바뀐 내용이라 다음 개정 때 빠진다.
-      ...(IS_V5 ? [changesText] : []),
+      // 14절의 백업 문장은 v5 의 바뀐 내용이라 v5 가 시행된 뒤의 개정 때 빠진다.
+      ...(IS_V6 ? [changesText] : []),
     ]) {
       // 백업을 말하는 문장 안의 일수는 모두 14일이다(같은 항목의 "사진 최대 7일" 은 백업이 아니다).
       const backup = s.split(/(?<=\.)\s/).filter((x) => x.includes("백업"));
@@ -359,7 +371,7 @@ describe("처리방침에서 줄이면 안 되는 사실", () => {
     assert.match(mail, /오류 메시지는 넣지 않습니다/);
   });
 
-  it("14절 Sentry 항목: 이메일 1시간 세기와 관리자 화면 로그인 세기를 2026년 11월 21일부터 한다고 적는다", V5_ONLY, () => {
+  it("14절 Sentry 항목: 이메일 1시간 세기와 관리자 화면 로그인 세기를 2026년 11월 21일부터 한다고 적는다", V6_ONLY, () => {
     const s = pickOne(items(changes), /^바뀐 내용: /);
     assert.match(s, /이메일 로그인 시도를 1시간 단위로도 세고/);
     assert.match(s, /관리자 화면 로그인 시도도 이메일 해시값으로 셉니다/);

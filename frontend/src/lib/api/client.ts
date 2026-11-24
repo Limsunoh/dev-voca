@@ -151,6 +151,13 @@ type RequestOptions = {
   /** 더 실을 머리. 가입·로그인은 실제 접속 IP 를 싣는다(lib/client-ip.ts). */
   headers?: Record<string, string>;
   /**
+   * token 이 없을 때만 싣는 머리. 로그인하지 않고 부를 수 있는 문제풀기·순위표·
+   * 소리내어 읽기가 접속 IP(lib/client-ip.ts)를 넘긴다. 백엔드가 로그인하지 않은
+   * 사람을 IP 별로 센다. 토큰이 있으면 버린다 - 계정으로 세므로 쓸 데가 없고,
+   * 처리방침(6절)도 로그인하지 않았을 때만 IP 를 넘긴다고 적었다.
+   */
+  guestHeaders?: Record<string, string>;
+  /**
    * 이 초만큼 Next 데이터 캐시에 둔다. 없으면 캐시하지 않는다(request 의 no-store 주석).
    * 배포 때만 바뀌는 선택지 목록(fetchChoices)만 쓴다.
    */
@@ -229,7 +236,7 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = "GET", body, token, headers: extra, revalidate } = options;
+  const { method = "GET", body, token, headers: extra, guestHeaders, revalidate } = options;
 
   let res: Response;
   try {
@@ -238,6 +245,7 @@ export async function request<T>(
       headers: {
         // 더 실을 머리를 먼저 둔다. 같은 이름이면 아래 기본 머리(인증 등)가 이긴다.
         ...extra,
+        ...(token ? {} : guestHeaders),
         Accept: "application/json",
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Token ${token}` } : {}),
