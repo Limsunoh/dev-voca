@@ -22,6 +22,7 @@
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import QuerySet
 
 from . import record
 from .models import DailyScore, DailyStudy, QuizAnswer, QuizSession, ReviewState
@@ -46,6 +47,13 @@ class ViewOnlyAdmin(admin.ModelAdmin):
     deletable = False
     list_select_related = ("user",)
     search_fields = USER_SEARCH
+
+    def get_queryset(self, request) -> QuerySet:
+        # 위 list_select_related 가 회원 행을 칸 제한 없이 붙여, 목록 한 쪽마다 회원
+        # 사진 바이트(avatar_photo)까지 읽었다. 이 화면들은 이메일만 쓴다. 상세도
+        # 읽기 전용 user 칸이 회원 행을 따로 읽으므로 여기서 붙여 둔다
+        # (LoginTokenAdmin 과 같은 방식).
+        return super().get_queryset(request).select_related("user").defer("user__avatar_photo")
 
     # User.__str__ 이 회원 번호라서 누구의 기록인지 여기서 이메일로 보여 준다.
     # 목록 표시는 관리자 작업 기록에 저장되지 않는다.

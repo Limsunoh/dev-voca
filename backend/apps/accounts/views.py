@@ -49,6 +49,7 @@ from .google import GoogleAuthError, fetch_google_user, verify_google_credential
 from .mail import MailNotConfigured, send_account_mail
 from .models import AVATAR_PHOTO, TERMS_VERSION, LoginToken, free_display_name
 from .serializers import (
+    PLAIN_EMAIL_MESSAGE,
     AvatarPhotoSerializer,
     EmailChangeRequestSerializer,
     LoginSerializer,
@@ -58,6 +59,7 @@ from .serializers import (
 )
 from .throttles import (
     AdminLoginThrottle,
+    AdminLoginTotalThrottle,
     AvatarPhotoThrottle,
     EmailChangeConfirmThrottle,
     EmailChangeThrottle,
@@ -177,7 +179,8 @@ class LoginView(FirstThrottleWins, APIView):
 
 
 def admin_login(request: HttpRequest) -> HttpResponse:
-    """Admin 로그인 화면. 비밀번호를 내는 요청만 이메일당 횟수를 센다.
+    """Admin 로그인 화면. 비밀번호를 내는 요청만 센다. 기기 쿠키 없는 시도는 먼저 전체 한
+    통(AdminLoginTotalThrottle)으로, 그다음 이메일당(AdminLoginThrottle) 센다.
 
     Django Admin 은 로그인 시도를 세지 않아 관리자 비밀번호를 무한히 대볼 수 있다.
     관리자는 회원 이메일을 보고 콘텐츠를 공개하는 계정이다. config/urls.py 가 이
@@ -187,18 +190,20 @@ def admin_login(request: HttpRequest) -> HttpResponse:
     기기 통으로 세어, 남이 이메일 통을 채워도 막히지 않는다(AdminLoginThrottle).
     """
     if request.method == "POST":
-        throttle = AdminLoginThrottle()
-        if not throttle.allow_request(request, None):
-            wait = throttle.wait()
-            seconds = math.ceil(wait) if wait is not None else None
-            response = HttpResponse(
-                f"시도가 너무 많습니다. {wait_text(seconds)} 뒤에 다시 해주세요.",
-                status=429,
-                content_type="text/plain; charset=utf-8",
-            )
-            if seconds is not None:
-                response["Retry-After"] = str(seconds)
-            return response
+        # 전체 통을 먼저 본다. 이메일 통이 먼저면 이메일을 바꿔 가며 보내는 요청이 이메일 통에
+        # 행을 하나씩 남긴 뒤에야 막힌다(AdminLoginTotalThrottle 주석).
+        for throttle in (AdminLoginTotalThrottle(), AdminLoginThrottle()):
+            if not throttle.allow_request(request, None):
+                wait = throttle.wait()
+                seconds = math.ceil(wait) if wait is not None else None
+                response = HttpResponse(
+                    f"시도가 너무 많습니다. {wait_text(seconds)} 뒤에 다시 해주세요.",
+                    status=429,
+                    content_type="text/plain; charset=utf-8",
+                )
+                if seconds is not None:
+                    response["Retry-After"] = str(seconds)
+                return response
     response = admin.site.login(request)
     # 성공하면 다음 화면으로 보낸다(302). Admin 폼은 staff 가 아니면 로그인시키지 않는다.
     # 이미 로그인한 채 틀린 비밀번호를 내면 로그인 상태는 그대로이고 폼을 다시 그린다(200).
@@ -292,6 +297,16 @@ class GoogleLoginView(APIView):
             return info
 
         User = get_user_model()
+
+        # 가입·이메일 변경과 같은 규칙(serializers.ensure_plain_email). 여기만 열려 있으면
+        # 닮은 글자 주소로 계정을 만들어 진짜 주소의 이메일 로그인을 500 으로 만들 수 있다.
+        # 구글 계정 주소는 ASCII 라 정상 사용자가 걸릴 일은 없다. 소문자로 바꾸기 전에
+        # 본다 - 켈빈 기호(U+212A)는 .lower() 를 거치면 ASCII 의 k 가 되어 검사를 지나친다.
+        if not info["email"].isascii():
+            return Response(
+                {"detail": PLAIN_EMAIL_MESSAGE},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # 이메일은 저장할 때 소문자로 내려가므로 여기서도 맞춘다.
         email = info["email"].lower()
@@ -463,7 +478,8 @@ class PasswordChangeView(APIView):
 
         # 이 계정의 토큰을 지금 요청이 들고 온 것까지 전부 지운다.
         # 남겨두고 재사용하면 "다른 기기를 끊었다" 가 성립하지 않는다.
-        # 지금 기기는 바로 아래에서 새 토큰을 받는다.
+        # 지금 기기는 바로 아래에서 새 토큰을 받는다. User.save 도 이미 끊었다 - 새 토큰은
+        # 반드시 save 뒤에 낸다(먼저 내면 save 가 함께 지운다).
         LoginToken.end_all(request.user.pk)
         token = LoginToken.objects.create(user=request.user)
 
@@ -718,8 +734,9 @@ class EmailChangeConfirmView(APIView):
 
             # 다른 기기의 토큰을 끊는다. 이메일이 바뀌었다는 것은 계정의
             # 주인이 바뀔 수 있는 사건이라, 옛 주소로 로그인해 있던 세션을
-            # 남겨두면 안 된다. 새 토큰을 발급해 돌려주므로, 링크를 누른
-            # 기기는 그대로 이어서 쓴다.
+            # 남겨두면 안 된다. 새 토큰을 발급해 돌려준다. 그것을 쿠키에 넣어
+            # 로그인을 이어 갈지는 화면의 액션이 정한다(같은 계정으로 로그인해
+            # 있던 기기만, frontend/src/app/profile/email/[token]/actions.ts).
             LoginToken.end_all(user.pk)
 
         # 지운 뒤에 새 토큰을 낸다. 순서를 바꾸면 방금 낸 토큰까지 지워져

@@ -75,6 +75,10 @@ export default withSentryConfig(nextConfig, {
   // 켜 두면 .next 안에 패키지 바로가기(junction)를 만드는데, 이 저장소가 있는 D: 는
   // exFAT 이라 바로가기를 못 만들어 로컬 next build 가 Turbopack 오류로 멈춘다.
   buildTimeInstrumentation: false,
+  // 성능 추적(browserTracingIntegration)과 SDK 디버그 로그를 화면 JS 에서 뺀다. 우리는
+  // 성능 추적을 안 쓰는데(tracesSampleRate 없음) 기본으로 실려, 모든 화면의 첫 JS 가
+  // gzip 128KB 에서 189KB 로 늘고 LCP 가 0.2~0.5초 늦어졌다. 이것으로 166KB 가 된다.
+  bundleSizeOptimizations: { excludeTracing: true, excludeDebugStatements: true },
   telemetry: false,
   silent: !process.env.CI,
 });

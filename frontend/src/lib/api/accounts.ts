@@ -214,7 +214,8 @@ export function requestEmailChange(
  * 기기에 우리 로그인이 없을 수 있다. 링크에 실린 토큰이 증거다.
  *
  * 응답으로 새 로그인 토큰이 온다. 주소가 바뀌면 서버가 옛 토큰을 전부
- * 끊기 때문에, 이것을 쿠키에 다시 넣어야 링크를 누른 기기가 이어서 쓴다.
+ * 끊는다. 쿠키에 다시 넣을지는 액션이 정한다(같은 계정으로 로그인해 있던
+ * 기기만 넣는다, app/profile/email/[token]/actions.ts).
  */
 export function confirmEmailChange(
   changeToken: string,

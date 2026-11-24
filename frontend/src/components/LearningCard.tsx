@@ -71,6 +71,8 @@ export type LearningCardProps = {
    * 저쪽에서 다시 해야 한다.
    */
   compact?: boolean;
+  /** 링크 미리 받기. 기본은 Next 기본값. 끄는 이유는 부르는 쪽(홈)에 적는다. */
+  prefetch?: false;
 };
 
 export function LearningCard({
@@ -84,10 +86,12 @@ export function LearningCard({
   tag,
   monoTitle = true,
   compact = false,
+  prefetch,
 }: LearningCardProps) {
   return (
     <Link
       href={href}
+      prefetch={prefetch}
       // 흰 종이 + 아래 3px 두께. 크림 리디자인의 핵심이라 카드가 이 시스템의
       // 기준점이다(디자인 가이드 shape-lift).
       //

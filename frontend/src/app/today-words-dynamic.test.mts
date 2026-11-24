@@ -32,22 +32,32 @@ mock.module("next/navigation", {
 /** 쿠키의 토큰. null 이면 게스트. */
 let cookie: string | null = null;
 
+// 이 테스트의 회원. 쿠키가 없으면 로그인 안 한 사람이다.
+const member = () =>
+  cookie
+    ? {
+        id: 1,
+        email: "member@example.com",
+        name: "회원",
+        daily_length: "30m",
+        avatar_display: { type: "preset", key: "a1" },
+      }
+    : null;
+
 mock.module("@/lib/session", {
   namedExports: {
     getToken: async () => cookie,
-    getCurrentUser: async () =>
-      cookie
-        ? {
-            id: 1,
-            email: "member@example.com",
-            name: "회원",
-            daily_length: "30m",
-            avatar_display: { type: "preset", key: "a1" },
-          }
-        : null,
+    getCurrentUser: async () => member(),
+    getLoginState: async () => ({ user: member(), unreachable: false }),
     isGuestChosen: async () => true,
     getGuestDailyLength: async () => "10m",
   },
+});
+
+// 다시 시도 화면(LoginCheckFailed)의 로그아웃 버튼이 가져온다. 진짜 모듈은
+// lib/client-ip.ts 의 "server-only" 때문에 Next 밖에서 열리지 않는다.
+mock.module("@/app/(auth)/actions", {
+  namedExports: { logoutAction: async () => {} },
 });
 
 // ---- 가짜 백엔드 ------------------------------------------------------------
