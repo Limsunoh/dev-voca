@@ -147,7 +147,6 @@ describe("백엔드가 짚은 칸", () => {
     ["다른 칸 이름(email)", 400, { email: ["x"] }],
     ["non_field_errors", 400, { non_field_errors: ["폼 오류"] }],
     ["detail(요청 한도)", 429, { detail: "잠시 후 다시" }],
-    ["detail(인증)", 401, { detail: "로그인이 필요합니다." }],
     ["500 에 칸별 본문", 500, { current_password: ["내부"] }],
   ] as const) {
     it(`${label} 이면 field 없음`, async () => {
@@ -157,6 +156,15 @@ describe("백엔드가 짚은 칸", () => {
       assert.ok(s.error);
     });
   }
+
+  it("로그인이 풀렸으면(401) 칸을 짚지 않고 로그인 화면으로 보낸다", async () => {
+    backend(401, { detail: "토큰이 유효하지 않습니다." });
+    await assert.rejects(changePasswordAction({}, form(filled)), (e: unknown) => {
+      assert.ok(e instanceof RedirectError);
+      assert.equal(e.to, "/login?next=/profile");
+      return true;
+    });
+  });
 
   it("연결 끊김이면 field 없음", async () => {
     globalThis.fetch = (async () => {

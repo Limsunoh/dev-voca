@@ -8,6 +8,8 @@
  * 읽을 문구로 바꾼다.
  */
 
+import { routes } from "./routes";
+
 /**
  * 연결이 끊겨 요청이나 응답이 실패했다. message 는 connectionLostMessage() 다.
  *
@@ -77,4 +79,22 @@ export function connectionLostMessage(): string {
   return typeof navigator !== "undefined" && navigator.onLine === false
     ? "인터넷에 연결되어 있지 않습니다. 연결되면 다시 눌러주세요."
     : "서버에 연결하지 못했습니다. 잠시 뒤 다시 눌러주세요.";
+}
+
+/**
+ * 중계가 401 을 주면(로그인이 풀렸다) 로그인 화면으로 보내고, 돌아올 곳은 지금 주소다.
+ *
+ * 로그인이 있어야 하는 판 화면(일일공부, 복습)이 쓴다. 다른 기기에서 비밀번호를 바꿨거나
+ * 로그인이 끝나면, 이 화면에 그대로 두는 동안 보기를 누를 때마다 "토큰이 유효하지
+ * 않습니다." 만 뜬다. 복습은 보기 말고 누를 것이 없어 막다른 길이었다. 중계가 이미 죽은
+ * 쿠키를 지웠으므로 로그인 화면이 "이미 로그인됨" 으로 되돌려 보내지 않는다.
+ *
+ * 쿼리까지 넘긴다. 일일공부의 "오늘만 다른 길이로"(?choose=1) 같은 상태가 로그인 뒤에도
+ * 남는다. 한 판·문제풀기는 로그인 없이도 되는 화면이라 게스트로 다시 부르므로 쓰지 않는다.
+ */
+export function leaveIfSignedOut(res: Response): void {
+  if (res.status !== 401) return;
+  const here = window.location.pathname + window.location.search;
+  window.location.replace(`${routes.login}?next=${encodeURIComponent(here)}`);
+  throw new Error("로그인이 풀렸습니다. 로그인 화면으로 갑니다.");
 }

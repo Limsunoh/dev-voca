@@ -498,7 +498,6 @@ describe("복습 이어 풀기 - 답이 거절되거나 실패하면", () => {
     ["429", { fail: 429, detail: "잠시 후 다시 시도해주세요." }],
     ["500", { fail: 500, detail: "알 수 없는 오류가 발생했습니다." }],
     ["503", { fail: 503, detail: "서버에 연결할 수 없습니다." }],
-    ["401", { fail: 401, detail: "로그인이 필요합니다." }],
     ["네트워크 실패", new TypeError("Failed to fetch")],
   ] as const) {
     it(`${label} 이면 판을 그대로 두고 문제 화면에 오류를 보인다`, async () => {
@@ -525,6 +524,39 @@ describe("복습 이어 풀기 - 답이 거절되거나 실패하면", () => {
       assert.deepEqual(stored(), { token: "r-4", question: Q4, correct: 2, graduated: 1 });
     });
   }
+
+  it("401 이면 지금 경로를 들고 로그인 화면으로 바꿔치기하고, 판은 남긴다", async () => {
+    const moved: string[] = [];
+    g.window = {
+      sessionStorage: storage,
+      location: { pathname: "/test/review", search: "", replace: (to: string) => moved.push(to) },
+    };
+    await pressIdle(board);
+    const before = storage.data.get(KEY);
+    replies = [{ fail: 401, detail: "토큰이 유효하지 않습니다." }];
+    await pick(board, SAVED.question.choices[0].id);
+
+    assert.deepEqual(moved, ["/login?next=%2Ftest%2Freview"]);
+    // 다시 로그인하고 돌아오면 같은 판을 이어 푼다. 400 처럼 지우면 안 된다.
+    assert.equal(storage.data.get(KEY), before, "로그인이 풀렸다고 판을 지웠다");
+    // 서버 문구를 그대로 띄우지 않는다. 그 문구가 반복되던 것이 고친 증상이다.
+    const html = draw(createElement(ReviewBoard, { due: DUE, userId: 7 }));
+    assert.doesNotMatch(html, /토큰이 유효하지 않습니다/);
+  });
+
+  it("시작이 401 이어도 로그인 화면으로 보내고 아무것도 적지 않는다", async () => {
+    storage.data.clear();
+    const moved: string[] = [];
+    g.window = {
+      sessionStorage: storage,
+      location: { pathname: "/test/review", search: "", replace: (to: string) => moved.push(to) },
+    };
+    replies = [{ fail: 401, detail: "로그인이 필요합니다." }];
+    await pressIdle(board);
+
+    assert.deepEqual(moved, ["/login?next=%2Ftest%2Freview"]);
+    assert.equal(storage.writes, 0);
+  });
 
   it("시작이 400 이면 아무것도 적지 않고 시작 화면에 오류를 보인다", async () => {
     storage.data.clear();
