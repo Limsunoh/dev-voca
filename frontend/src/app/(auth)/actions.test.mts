@@ -162,7 +162,7 @@ function form(fields: Record<string, string>): FormData {
 }
 
 // 대역 등록 뒤에 불러와야 한다.
-const { loginAction, signUpAction } = await import("./actions");
+const { loginAction, logoutAction, signUpAction } = await import("./actions");
 type FormState = Awaited<ReturnType<typeof loginAction>>;
 type Action = (prev: FormState, fd: FormData) => Promise<FormState>;
 
@@ -548,4 +548,30 @@ describe("가입·로그인 요청에 실제 접속 IP 를 싣는다", () => {
       }
     });
   }
+});
+
+describe("logoutAction - 백엔드가 연결만 받고 멈춰 있어도", () => {
+  // POST 에는 대기 시간 제한이 없다. 기다림을 끊지 않으면 clearToken 에 닿지 못해
+  // "로그인을 확인하지 못했습니다" 화면의 로그아웃이 아무 일도 안 한 채 매달린다.
+  it("3초에서 기다림을 끊고 이 기기의 쿠키를 지운 뒤 홈으로 보낸다", { timeout: 5000 }, async (t) => {
+    cookieJar.set("devvoca_token", "tok-hang");
+    globalThis.fetch = (() => new Promise<Response>(() => {})) as typeof fetch;
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+
+    const done = logoutAction().then(
+      () => null,
+      (error: unknown) => error,
+    );
+    // getToken 을 지나 기다림 타이머가 걸릴 때까지 한 번 돌린다.
+    await new Promise((resolve) => setImmediate(resolve));
+    t.mock.timers.tick(2999);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(cookieJar.has("devvoca_token"), true, "3초 전에 끊었다");
+
+    t.mock.timers.tick(1);
+    const thrown = await done;
+    assert.ok(thrown instanceof RedirectError, "홈으로 보내지 않았다");
+    assert.equal(thrown.to, "/");
+    assert.equal(cookieJar.has("devvoca_token"), false, "쿠키가 남았다");
+  });
 });

@@ -4,21 +4,17 @@ import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Highlight } from "@/components/Highlight";
 import { LearningCard } from "@/components/LearningCard";
+import { LoginCheckFailed } from "@/components/LoginCheckFailed";
 import { PolicyNotice } from "@/components/PolicyNotice";
 import { Reading } from "@/components/Reading";
 import { StudyFirstCard, studyFirst } from "@/components/StudyFirstCard";
-import {
-  loadToday,
-  OtherLengthLink,
-  type Today,
-  TodayCards,
-} from "@/components/TodayCards";
+import { loadToday, OtherLengthLink, TodayCards } from "@/components/TodayCards";
 import type { User } from "@/lib/api/accounts";
 import { pickTodayWords, type TodayWord } from "@/lib/api/daily";
 import { routes } from "@/lib/routes";
 import {
-  getCurrentUser,
   getGuestDailyLength,
+  getLoginState,
   getToken,
   isGuestChosen,
 } from "@/lib/session";
@@ -45,15 +41,36 @@ import {
  * 아직 안 한 것" 으로 읽혀서 기능이 없는 것인지 구분되지 않는다.
  */
 export default async function Home() {
+  // 토큰은 catch 밖에서 읽는다. 안에 넣으면 쿠키 접근이 일으키는
+  // DynamicServerError 까지 잡혀서, 정상 동작인데 빌드 로그에 에러가
+  // 쌓인다. 그러면 진짜 오류가 그 사이에 묻힌다.
+  const token = await getToken();
+
+  // 일일공부·복습 카드. 로그인 확인(/me)과 동시에 띄운다. 확인을 기다린 뒤
+  // 부르면 왕복 둘이 차례로 쌓이고, 그게 앱을 열자마자 보이는 시간이다.
+  // 게스트에게 안 묻는 것과 실패 처리는 loadToday 가 한다. 실패해도 던지지
+  // 않아서, 아래에서 다른 화면으로 보낼 때 기다리지 않고 두어도 된다. 그때는
+  // 이 요청 둘이 버려지지만(토큰이 거절됐거나 백엔드가 답하지 않은 드문 경우),
+  // 보통 경로의 왕복 하나를 줄이는 쪽을 골랐다.
+  //
+  // 순위는 홈에서 부르지 않는다. "나" 탭과 순위표 화면이 맡는다.
+  const todayPromise = loadToday(token);
+
+  const { user, unreachable } = await getLoginState();
+
+  // 로그인 쿠키는 있는데 백엔드가 답하지 않았다. 아래로 내려가면 로그인 안 한
+  // 사람으로 보고 첫 화면으로 보내는데, 거기서 "게스트로 둘러보기" 를 누르면
+  // 멀쩡한 로그인이 지워진다.
+  if (unreachable) return <LoginCheckFailed retry={routes.home} />;
+
   // 아직 아무것도 안 고른 사람은 첫 화면으로. 앱은 열자마자 "누구로
   // 시작할지" 를 묻는다. 로그인했거나 게스트를 고른 적이 있으면 건너뛴다.
+  // 쿠키가 하나도 없는 사람은 proxy.ts 가 이 화면을 그리기 전에 보내므로,
+  // 여기 오는 것은 백엔드가 로그인 쿠키를 거절한 경우다.
   //
   // 홈에서만 보는 이유: 앱의 진입점이 홈이다. 다른 경로로 바로 들어온
   // 사람(공유 링크 등)까지 막으면 그 링크가 안 열린다.
-  const signedIn = await getCurrentUser();
-  if (!signedIn && !(await isGuestChosen())) {
-    redirect("/start");
-  }
+  if (!user && !(await isGuestChosen())) redirect("/start");
 
   // 하루 공부량을 아직 안 골랐으면 한 번 묻는다. 로그인한 사람은 계정에,
   // 게스트는 이 기기 쿠키에 있다. 이 기능 전에 가입한 사람도 여기서 한 번 고른다.
@@ -61,33 +78,15 @@ export default async function Home() {
   // 묻지 않는 경우 둘:
   // - 계정에 이 칸이 없다(undefined). 배포가 엇갈려 옛 백엔드가 답한 것이라,
   //   물어도 저장이 안 되고 이 화면으로 되돌아오기만 한다.
-  // - 토큰은 있는데 사람을 못 받았다. 백엔드가 잠깐 안 받는 것이지 안 고른 것이
-  //   아니다. 묻는 화면에는 탭바가 없어 저장이 실패하면 거기 갇힌다.
-  const askLength = signedIn
-    ? signedIn.daily_length === ""
-    : !(await getToken()) && !(await getGuestDailyLength());
+  // - 토큰은 있는데 백엔드가 거절했다(죽은 토큰). 이 사람은 로그인한 줄 알고
+  //   있어서, 게스트 값으로 묻지 않고 홈을 그대로 보인다. 백엔드가 아예 답하지
+  //   않은 경우는 위에서 LoginCheckFailed 로 끝났다.
+  const askLength = user
+    ? user.daily_length === ""
+    : !token && !(await getGuestDailyLength());
   if (askLength) redirect(routes.startDaily);
 
-  // 요청을 동시에 띄운다. 순서대로 기다리면 왕복마다 그대로 대기 시간이
-  // 되고, 그게 앱을 열자마자 보이는 시간이다.
-  const userPromise = getCurrentUser();
-
-  // 토큰은 catch 밖에서 읽는다. 안에 넣으면 쿠키 접근이 일으키는
-  // DynamicServerError 까지 잡혀서, 정상 동작인데 빌드 로그에 에러가
-  // 쌓인다. 그러면 진짜 오류가 그 사이에 묻힌다.
-  const token = await getToken();
-
-  // 순위는 홈에서 부르지 않는다. "나" 탭과 순위표 화면이 맡고, 부르지
-  // 않으니 홈이 뜨는 데 필요한 왕복이 하나 적다.
-
-  // 일일공부·복습 카드. 게스트에게 안 묻는 것과 실패 처리는 loadToday 가 한다.
-  const todayPromise = loadToday(token);
-
-  const [user, today]: [User | null, Today] = await Promise.all([
-    userPromise,
-    todayPromise,
-  ]);
-
+  const today = await todayPromise;
   const first = studyFirst(user, today);
 
   // 오늘의 단어는 일일공부 상태와 같은 응답에 실려 온다. 로그인한 사람은
@@ -100,7 +99,7 @@ export default async function Home() {
   // 바로 부르고, 로그인한 사람은 대개 내 단어가 있어 아예 안 부른다. 둘을 미리
   // 같이 띄우면 로그인한 사람마다 쓰지 않을 요청이 셋까지 나간다. 내 단어를
   // 못 받은 드문 경우(백엔드 실패, 옛 백엔드)에만 왕복이 하나 는다. 사람은 맨
-  // 위에서 이미 받아 두어(getCurrentUser 는 cache 다) 여기서 기다림이 늘지 않는다.
+  // 위에서 이미 받아 두어 여기서 기다림이 늘지 않는다.
   //
   // 일일공부를 앞세울 때는 단어를 그리지 않으니 부르지 않는다.
   const words: TodayWord[] = first ? [] : await pickTodayWords(today.words);
@@ -363,6 +362,11 @@ function DailyWord({ word, ids }: { word: TodayWord; ids: number[] }) {
       >
         <Link
           href={routes.todayWord(word.id, ids)}
+          // 단어 상세는 동적 화면이라 미리 받기마다 Vercel 함수가 한 번씩 돈다.
+          // 홈의 단어 링크(최대 일곱 개)가 홈을 열 때마다 그만큼 돌던 것을 끈다.
+          // 대신 누른 뒤 서버가 첫 조각(learn/words/loading.tsx)을 보낼 때까지는
+          // 홈이 그대로다. 누를 때 버튼과 카드가 눌리는 모양이 그 사이를 받는다.
+          prefetch={false}
           className="dv-btn flex flex-1 items-center justify-center px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           style={
             {
@@ -455,6 +459,8 @@ function UpNext({ words, ids }: { words: TodayWord[]; ids: number[] }) {
               title={word.term}
               subtitle={word.meaning}
               compact
+              // 위 "더 보기" 와 같은 이유로 미리 받지 않는다.
+              prefetch={false}
             />
           </li>
         ))}
