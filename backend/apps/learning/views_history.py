@@ -10,7 +10,6 @@ from __future__ import annotations
 import sys
 from datetime import timedelta
 
-from django.db.models import Exists, OuterRef, Q
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -26,6 +25,7 @@ from apps.vocab.quiz import TARGET_SENTENCE, TARGET_WORD
 
 from . import calendar_kst
 from .models import DailyScore, QuizSession, ReviewState, SessionKind
+from .review import visible_targets
 
 
 class MistakesThrottle(UserRateThrottle):
@@ -75,7 +75,7 @@ class MistakesView(APIView):
             #
             # 그래서 가려질 줄을 질의에서 뺀다. 그러면 count 도 페이지
             # 나눔도 실제로 보이는 것과 같아진다.
-            .filter(_visible_targets())
+            .filter(visible_targets())
             # 늦게 쌓인 것부터. "최근에 틀린 것부터" 가 아니다. 그렇게
             # 정렬할 수 있는 칸이 아직 없다.
             #
@@ -100,35 +100,6 @@ class MistakesView(APIView):
         return paginator.get_paginated_response(_serialize(page or []))
 
 
-def _visible_targets() -> Q:
-    """보여줄 수 있는 대상만 남기는 조건.
-
-    id 를 파이썬으로 끌어오지 않는다. 목록에 담아 넘기면 단어·문장 전부를
-    매 요청마다 읽어 오게 된다. 하위 질의로 DB 안에서 끝낸다.
-
-    하위 질의는 `IN (SELECT id ...)` 가 아니라 `EXISTS` 다. IN 둘을 OR 로
-    묶으면 Postgres 가 조인으로 못 바꾸고, 검수된 id 목록을 만들어 둔 뒤 틀린
-    항목마다 그 목록을 처음부터 훑는다. 목록이 메모리(work_mem)에 들어가면
-    해시로 찾아 빠르지만, 넘는 순간 절벽처럼 느려진다. 2026-11-13 측정에서
-    단어·문장이 33만 개씩일 때 틀린 것 1,524개인 사람의 오답 노트 응답이
-    11.5초였다(그중 개수 세기 쿼리 하나가 12초 남짓). EXISTS 는 줄마다 기본
-    키로 하나씩 찾아, 같은 쿼리가 2.3ms, 응답 전체가 11ms 가 됐다.
-
-    종류마다 조건이 다른 이유: `ReviewState` 는 대상을 FK 로 안 묶는다
-    (단어일 수도 문장일 수도 있어 한 칸에 안 들어간다). 그래서 종류를 보고
-    각자의 표에 묻는다.
-
-    지워진 대상도 이 조건에서 함께 빠진다. 찾을 줄이 없어 EXISTS 가 거짓이 된다.
-    """
-    word_visible = Exists(Word.objects.visible().filter(pk=OuterRef("target_id")))
-    sentence_visible = Exists(
-        Sentence.objects.visible().filter(pk=OuterRef("target_id"))
-    )
-    return (Q(target_type=TARGET_WORD) & word_visible) | (
-        Q(target_type=TARGET_SENTENCE) & sentence_visible
-    )
-
-
 def _serialize(rows: list[ReviewState]) -> list[dict]:
     """줄들을 화면이 쓸 모양으로 바꾼다.
 
@@ -136,7 +107,7 @@ def _serialize(rows: list[ReviewState]) -> list[dict]:
     20번이 된다. 종류별로 id 를 모아 두 번만 묻는다.
 
     본문을 가져올 때도 검수 게이트를 건다. 주 게이트는 질의 안의
-    `_visible_targets` 다. 여기서 한 번 더 거는 것은 그 질의와 이 조회
+    `review.visible_targets` 다. 여기서 한 번 더 거는 것은 그 질의와 이 조회
     사이에 검수가 취소되는 짧은 틈 때문이다. 그때 게이트가 없으면 검수
     취소된 내용이 그대로 나간다(CLAUDE.md 의 검수 규칙). 비용은 거의 없다.
     """

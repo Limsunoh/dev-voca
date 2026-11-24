@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
 
 from django.db import IntegrityError, transaction
 from django.db.models import F, Max, Q
@@ -28,6 +29,9 @@ from django.utils import timezone
 from . import calendar_kst
 from .models import DailyScore, QuizAnswer, QuizSession, ReviewState, SessionKind
 from .session import ANSWER_FIELDS
+
+if TYPE_CHECKING:
+    from .session import Result
 
 logger = logging.getLogger(__name__)
 
@@ -157,12 +161,19 @@ def _bump_review(user, answers) -> None:
     bump_review_states(user, seen)
 
 
-def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
+def bump_review_states(
+    user, seen: dict[tuple[str, int], bool], *, keep_wrong: bool = False
+) -> None:
     """(종류, id) -> 맞았나 를 복습 상태에 반영한다.
 
-    자유 문제풀이(_bump_review), 일일공부(daily_study), 낱개 연습
-    (note_practice_answer)이 같이 쓴다.
-    세 곳이 규칙을 따로 구현하면 한쪽만 고쳐지고, 그 차이는 복습
+    keep_wrong 이면 맞힌 답이 이미 틀린 것으로 적힌 줄을 풀지 않는다. 그 줄은 그대로
+    둔다(마지막으로 맞힌 때도 안 당긴다). 답을 보여 준 직후의 정답에 쓴다(일일공부).
+    틀린 적 없는 줄은 평소대로 맞힌 때를 남긴다. 오늘 카드로 처음 배운 단어라 "오래된
+    것" 시계를 오늘부터 세는 것이 맞다.
+
+    자유 문제풀이(_bump_review 와 답할 때의 note_round_miss), 일일공부(daily_study),
+    낱개 연습(note_practice_answer)이 같이 쓴다.
+    여러 곳이 규칙을 따로 구현하면 한쪽만 고쳐지고, 그 차이는 복습
     목록에서만 드러나 알아채기 어렵다.
 
     규칙은 위 _bump_review docstring 참고. 맞히면 last_correct_at 만,
@@ -200,6 +211,9 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
             )
             continue
 
+        if correct and keep_wrong and row.is_wrong:
+            continue
+
         row.is_wrong = not correct
         if correct:
             row.last_correct_at = now
@@ -233,13 +247,43 @@ def bump_review_states(user, seen: dict[tuple[str, int], bool]) -> None:
         ReviewState.objects.bulk_update(miss, ["is_wrong", "streak"])
 
 
+def note_round_miss(user, result: Result) -> None:
+    """자유 문제풀이에서 틀린 답 하나를 곧바로 오답 노트에 넣는다. 게스트는 쓰지 않는다.
+
+    판 기록(점수, 맞힌 것)은 끝내기의 save_round 가 한 번에 남기는데, 그것만 있으면
+    도중에 "그만두기" 로 나간 판의 틀린 것이 사라졌다. 끝내기가 같은 답을 다시 반영해도
+    결과는 같다(마지막 결과를 쓴다).
+
+    맞힌 것은 여기서 남기지 않는다. 점수 없이 끝낸 판의 정답이 "마지막으로 맞힌 때" 를
+    당기면, 판을 끝까지 하지 않아도 복습의 오래된 것 목록이 비워진다. 넘긴 것은
+    _bump_review 와 같은 이유로 틀린 것으로 치지 않는다.
+
+    틀리면 복습 연속도 끊긴다. 한 판에서 틀렸다가 다시 맞히고 끝내도 연속은 0 이다
+    (틀리면 끊는다는 규칙 그대로).
+    """
+    if not user.is_authenticated or result.skipped or result.correct:
+        return
+    # 순번은 이미 가져간 뒤다. 여기서 실패해 500 이 되면 화면은 같은 답을 다시 보내 저장된
+    # 응답으로 이어 가지만, 그 한 번은 오류를 본다. 오답 하나가 늦게 들어가는 것이 판이
+    # 멈추는 것보다 낫다(save_round 가 _bump_review 를 감싼 것과 같은 이유). 끝내기가 같은
+    # 답을 다시 반영한다.
+    # 저장점으로 감싼다. 나중에 누가 이 함수를 트랜잭션 안에서 부르게 돼도, 여기서 난 DB
+    # 오류를 삼킨 뒤 바깥 트랜잭션이 망가진 채 남지 않는다.
+    try:
+        with transaction.atomic():
+            bump_review_states(user, {(result.answer_type, result.answer_id): False})
+    except Exception:
+        logger.exception("한 판의 틀린 답을 오답 노트에 넣지 못했습니다. user=%s", user.pk)
+
+
 def note_practice_answer(
     user, target_type: str, target_id: int, *, correct: bool
 ) -> None:
     """낱개 연습(단어·문장 채점)의 결과를 오답 노트에 반영한다.
 
     게스트는 쓰지 않는다. 틀리면 넣고, 맞히면 오답 노트에 있던 것만 뺀다.
-    오답 노트 화면이 "어디서든 다시 한 번 맞히면 빠진다" 고 약속한다.
+    오답 노트 화면이 "다시 맞히면 빠진다" 고 약속한다(일일공부에서 카드를 본 직후의
+    정답만 예외, bump_review_states 의 keep_wrong).
 
     처음 맞힌 항목에 줄을 만들지 않는 이유: 줄이 생기면 시간이 지나
     복습의 "오래된 것" 으로 나온다(review._due). 점수가 안 걸리는 연습이

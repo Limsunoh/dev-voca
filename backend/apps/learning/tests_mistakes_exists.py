@@ -1,6 +1,6 @@
 """오답 노트가 "보여줄 수 있는 대상" 을 EXISTS 로 거르는가.
 
-`views_history._visible_targets` 가 `IN (SELECT id ...)` 둘을 OR 로 묶던
+`review.visible_targets` 가 `IN (SELECT id ...)` 둘을 OR 로 묶던
 때는, 단어·문장이 수십만 개가 되면 Postgres 가 틀린 항목마다 id 목록을
 처음부터 훑어 오답 노트가 11초를 넘었다(2026-11-13 측정). EXISTS 로 바꾼
 모양을 누가 IN 으로 되돌리지 않게 SQL 모양을 지킨다.

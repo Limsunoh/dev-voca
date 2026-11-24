@@ -85,17 +85,19 @@ class PickWordsTest(TestCase):
             self.assertTrue(all(w.is_reviewed for w in picked))
 
     def test_wrong_first_then_unseen_without_duplicates(self):
-        """틀린 것을 먼저 넣고, 안 본 것에서 그 단어를 다시 고르지 않는다."""
+        """틀린 것을 묶음의 절반까지 먼저 넣고, 안 본 것에서 그 단어를 다시 고르지 않는다."""
         wrong = _words(3, tag="wrong")
         fresh = _words(40, tag="fresh")
         _states(self.user, wrong, is_wrong=True)
+        wrong_ids = {w.pk for w in wrong}
         for _ in range(30):
             picked = daily_study._pick_words(self.user.pk, 5, set())
             ids = [w.pk for w in picked]
             self.assertEqual(len(ids), 5)
             self.assertEqual(len(set(ids)), 5, "같은 단어를 두 번 골랐다")
-            self.assertEqual(set(ids[:3]), {w.pk for w in wrong})
-            self.assertLessEqual(set(ids[3:]), {w.pk for w in fresh})
+            # 5 의 절반(2)까지만 틀린 것이고 맨 앞에 온다.
+            self.assertLessEqual(set(ids[:2]), wrong_ids)
+            self.assertLessEqual(set(ids[2:]), {w.pk for w in fresh})
 
     def test_start_never_learns_unreviewed(self):
         """판을 열어도 학습 목록은 검수된 것만."""
