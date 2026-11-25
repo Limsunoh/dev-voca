@@ -353,8 +353,12 @@ class ApiCredentialChangeTest(CredentialChangeFlowCase):
             )
         link_token = sent.call_args.kwargs["body"].split("/profile/email/")[1].split()[0]
 
+        # 신청한 폰에서 누른다. 새 토큰은 같은 계정으로 로그인한 요청에만 온다.
         res = self.client.post(
-            EMAIL_CHANGE_CONFIRM_URL, {"token": link_token}, content_type="application/json"
+            EMAIL_CHANGE_CONFIRM_URL,
+            {"token": link_token},
+            content_type="application/json",
+            **auth(self.phone.key),
         )
         self.assertEqual(res.status_code, 200)
         fresh = res.json()["token"]

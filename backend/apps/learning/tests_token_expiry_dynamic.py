@@ -184,8 +184,12 @@ class ReissuedTokenTest(RealClockBase):
         link = sent.call_args.kwargs["body"].split("/profile/email/")[1].split()[0]
         before = datetime.now(UTC)
 
+        # 신청한 기기에서 누른다. 새 토큰은 같은 계정으로 로그인한 요청에만 온다.
         res = Client().post(
-            EMAIL_CHANGE_CONFIRM_URL, {"token": link}, content_type="application/json"
+            EMAIL_CHANGE_CONFIRM_URL,
+            {"token": link},
+            content_type="application/json",
+            **auth(stale.key),
         )
 
         self.assertEqual(res.status_code, 200)

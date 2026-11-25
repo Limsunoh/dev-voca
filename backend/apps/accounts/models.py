@@ -97,9 +97,21 @@ AVATAR_PHOTO_MAX_BYTES = 5 * 1024 * 1024
 # 펼쳤을 때의 픽셀 수 상한. 바이트 상한과 따로 있어야 하는 이유는 아래
 # shrink_avatar_photo 참고. 잘 압축되는 큰 그림이 바이트 검사를 지나간다.
 #
-# 5천만으로 둔다. 요즘 폰이 5천만 화소 안쪽이라 평범한 사진은 다 통과하고,
-# 그 위는 프로필 사진으로 쓸 이유가 없다.
+# 모든 형식에 5천만을 먼저 건다. 요즘 폰이 5천만 화소 안쪽이라 평범한 사진은 다
+# 통과하고, 그 위는 프로필 사진으로 쓸 이유가 없다. 한 번에 풀리는 보통 JPEG 는
+# 줄여서 펼치므로(draft) 상한에 가까운 사진도 메모리를 몇 MB 만 쓴다.
 AVATAR_PHOTO_MAX_PIXELS = 50_000_000
+
+# 줄여서 펼치지 못하는 그림의 상한. 무엇이 여기 걸리는지는 shrink_avatar_photo 의
+# 크기 검사 주석에 있다. 투명도가 있으면 줄일 때 Pillow 가 원래 크기로 한 벌 더
+# 만들고, WebP 는 여는 순간 캔버스를 따로 잡는다.
+# 같은 7000x7000 을 줄이는 동안 PNG 는 600MB, WebP 는 800MB 를 썼다(WebP 는 그중
+# 400MB 가 여는 데 든다). 작업자 하나가 요청 4개를 함께 받으므로 몇 장이면 서버
+# 메모리가 찬다.
+#
+# 1,600만(4000x4000)이면 폰 화면 갈무리(500만 안쪽)와 1,200만 화소 사진은
+# 지나가고, 상한 끝의 그림이 PNG 는 130MB, WebP 는 260MB 남짓을 쓴다.
+AVATAR_PHOTO_MAX_PIXELS_UNSCALED = 16_000_000
 AVATAR_PHOTO_FORMATS = ("JPEG", "PNG", "WEBP")
 
 # 자동으로 지어주는 이름의 앞부분. 뒤에 네 자리를 붙여 일곱 글자가 된다.
@@ -228,6 +240,49 @@ class AvatarPhotoError(ValueError):
     """올린 파일을 사진으로 못 쓸 때. 뷰가 안내 문구로 바꾼다."""
 
 
+def _jpeg_decodes_in_one_pass(raw: bytes) -> bool:
+    """libjpeg 가 원래 크기만큼의 중간 저장 공간(계수 버퍼) 없이 한 번에 풀 수 있는 JPEG 인가.
+
+    순차 JPEG(SOF0·SOF1)이고 첫 스캔이 모든 색 성분을 담고 있을 때만 그렇다. 프로그레시브
+    이거나, 성분을 스캔마다 나눠 담았거나, 무손실 같은 다른 방식이면 libjpeg 는 원래 크기만큼
+    계수를 다 들고 있어야 해서 줄여 펼쳐도(draft) 메모리가 줄지 않는다. libjpeg 가 가르는 조건보다
+    조금 좁게 본다. 산술 부호화 순차(SOF9)는 한 번에 풀리지만 폰 사진에 나오지 않아 낮은 상한으로
+    보낸다.
+
+    파일 앞부분의 표지(마커)를 길이대로 건너뛰며 읽는다. 폰 사진은 EXIF 안에 작은 JPEG 를
+    품고 있어서, 바이트를 찾는 식으로 읽으면 그 안의 표지가 먼저 걸린다. 모양이 이상하면
+    아니라고 본다(낮은 상한을 쓴다).
+
+    SOF 가 둘이면 뒤의 것으로 판정한다. libjpeg 는 그런 파일을 펼치기 전에 거절하므로
+    메모리 문제는 없다(tests_jpeg_one_pass_dynamic).
+    """
+    i, components = 2, None
+    try:
+        while True:
+            if raw[i] != 0xFF:
+                return False
+            marker = raw[i + 1]
+            if marker == 0xFF:  # 표지 앞의 채움 바이트
+                i += 1
+                continue
+            if marker == 0xDA:  # 첫 스캔 시작. 길이 다음 바이트가 이 스캔에 든 성분 수다.
+                return components is not None and raw[i + 4] == components
+            # 프레임 시작(SOF). 같은 대역의 C4(허프만표)·C8(예약)·CC(DAC)는 SOF 가 아니다.
+            if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                if marker not in (0xC0, 0xC1):
+                    return False
+                components = raw[i + 9]  # 길이·정밀도·높이·너비 다음 바이트가 성분 수다
+            # 길이를 가진 표지만 건너뛴다(APPn, 주석, 양자화표, 허프만표, DRI, DAC).
+            # RSTn·FF00 처럼 길이 없는 표지를 길이대로 읽으면 실제 해석기와 읽는 자리가
+            # 갈라져, 주석 안에 숨긴 가짜 스캔 표지에 속는다. 정상 사진의 첫 스캔 앞에는
+            # 나오지 않으므로 모르는 표지는 아니라고 본다.
+            elif not (0xE0 <= marker <= 0xEF or marker in (0xFE, 0xDB, 0xC4, 0xDD, 0xCC)):
+                return False
+            i += 2 + int.from_bytes(raw[i + 2 : i + 4], "big")
+    except IndexError:
+        return False
+
+
 def shrink_avatar_photo(raw: bytes) -> bytes:
     """올린 사진을 줄여서 WebP 바이트로 바꾼다.
 
@@ -261,6 +316,21 @@ def shrink_avatar_photo(raw: bytes) -> bytes:
     if not raw:
         raise AvatarPhotoError("사진 파일이 비어 있습니다.")
 
+    # WebP 는 크기를 열기 전에 본다. Pillow 는 WebP 를 여는 순간(Image.open)
+    # 원래 크기의 캔버스를 잡아서, 아래 픽셀 검사는 이미 늦다. 머리말에서
+    # 크기를 읽는 것은 Pillow 가 캔버스를 잡기 전에 하는 검사와 같은 함수다
+    # (Pillow 13 의 내부 함수라 올릴 때 tests_avatar_photo_memory 가 지켜본다).
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        from PIL.WebPImagePlugin import _get_size as webp_size
+
+        size = webp_size(raw[:30])
+        # 크기를 못 읽는 머리말은 받지 않는다. Pillow 는 그때 검사를 건너뛰고
+        # 해석기에 그대로 넘긴다.
+        if size is None:
+            raise AvatarPhotoError("사진 파일을 읽을 수 없습니다.")
+        if size[0] * size[1] > AVATAR_PHOTO_MAX_PIXELS_UNSCALED:
+            raise AvatarPhotoError("사진이 너무 큽니다. 다른 사진을 골라주세요.")
+
     # verify() 를 따로 부르지 않는다. 아래 fit() 이 실제로 픽셀을 읽으므로
     # "머리말만 멀쩡하고 내용이 잘린" 파일은 거기서 OSError 로 걸린다.
     # verify() 를 넣으면 그 뒤 이미지를 못 써서(Pillow 가 그렇게 정했다)
@@ -280,15 +350,39 @@ def shrink_avatar_photo(raw: bytes) -> bytes:
             #
             # Image.open 은 머리말만 읽으므로 이 시점에는 아직 안 펼쳤다.
             # 여기서 끊어야 메모리를 안 쓴다.
-            if image.width * image.height > AVATAR_PHOTO_MAX_PIXELS:
+            original_pixels = image.width * image.height
+            if original_pixels > AVATAR_PHOTO_MAX_PIXELS:
+                raise AvatarPhotoError("사진이 너무 큽니다. 다른 사진을 골라주세요.")
+
+            # JPEG(MPO 포함)는 1/2·1/4·1/8 로 줄여서 펼칠 수 있다(draft). 256px 로 줄일
+            # 사진을 원래 크기로 펼칠 이유가 없다. 4000x3000 폰 사진 한 장을 줄이는 데
+            # 100MB 쓰던 것이 재어 보니 6MB 로 준다. 두 변이 모두 512 이상으로
+            # 남게 고르므로 화질은 그대로다. 모드는 건드리지 않는다(None). 다른 형식에서는
+            # 아무 일도 안 한다.
+            image.draft(None, (AVATAR_PHOTO_SIZE * 2, AVATAR_PHOTO_SIZE * 2))
+
+            # 줄여서 펼치지 못하는 그림은 낮은 상한까지만 받는다. 셋이다.
+            # - PNG·WEBP: draft 가 크기를 안 바꾼다.
+            # - 짧은 변이 1024 보다 작은 아주 긴 JPEG(49999x1000 같은 것): 배율이 짧은
+            #   변으로 정해져 1 이 된다. 폰 파노라마는 짧은 변이 1024 를 넘어 1/2 이하로 준다.
+            # - 한 번에 풀지 못하는 JPEG(프로그레시브, 성분을 스캔마다 나눈 것 등): 줄여서
+            #   펼쳐도 해석기가 원래 크기의 버퍼를 먼저 잡는다. 5천만 화소 CMYK 가 400MB 를
+            #   썼다. 그래서 원래 크기로 본다(_jpeg_decodes_in_one_pass).
+            draft_pixels = image.width * image.height  # draft 뒤라 줄인 크기다
+            one_pass = image.format in ("JPEG", "MPO") and _jpeg_decodes_in_one_pass(raw)
+            decoded = draft_pixels if one_pass else original_pixels
+            if decoded > AVATAR_PHOTO_MAX_PIXELS_UNSCALED:
                 raise AvatarPhotoError("사진이 너무 큽니다. 다른 사진을 골라주세요.")
 
             # 폰 사진은 세로로 찍어도 가로 그림 + "돌려서 보라" 는 표시로
             # 저장되는 경우가 많다(EXIF Orientation). 그대로 줄이면 표시가
             # 사라져서 옆으로 누운 사진이 된다.
+            #
+            # in_place 로 돌린다. 기본값은 돌릴 필요가 없어도 원본을 통째로 복사해서,
+            # 펼친 그림이 메모리에 두 벌 생긴다.
             from PIL import ImageOps
 
-            image = ImageOps.exif_transpose(image) or image
+            ImageOps.exif_transpose(image, in_place=True)
 
             # 정사각형으로 자른다. 화면이 아바타를 정사각으로 그리는데
             # (Avatar.tsx 의 object-cover), 원본 비율 그대로 저장하면

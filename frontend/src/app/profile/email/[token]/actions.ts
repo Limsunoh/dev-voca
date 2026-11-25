@@ -35,8 +35,8 @@ function tokenFromPath(raw: string): string {
 /**
  * 확인 버튼을 눌렀을 때. 여기서 주소가 바뀐다.
  *
- * 서버가 옛 토큰을 전부 끊고 새것을 준다. 이 기기가 같은 계정으로 로그인해
- * 있었으면 그것을 쿠키에 다시 넣는다. 안 넣으면 방금 본인 확인을 마친 사람이
+ * 서버가 옛 토큰을 전부 끊는다. 새 토큰은 이 기기가 같은 계정으로 로그인해
+ * 있어 그 토큰을 실어 보냈을 때만 주고, 그것을 쿠키에 다시 넣는다. 안 넣으면 방금 본인 확인을 마친 사람이
  * 튕겨나가 무엇이 잘못됐는지 모른 채 다시 로그인하게 된다.
  *
  * 그 밖의 기기(로그인이 없거나 다른 계정)에서는 쿠키를 건드리지 않는다. 링크만
@@ -71,16 +71,20 @@ export async function confirmEmailChangeAction(
     }
   }
 
+  // 위에서 살아 있음을 확인한 로그인만 실어 보낸다. 서버는 그 토큰이 같은 계정일
+  // 때만 새 토큰을 준다. 확인되지 않은 토큰을 실으면 401 로 주소 변경까지 막힌다.
+  const verifiedLogin = here && loginToken ? loginToken : undefined;
+
   let result: Awaited<ReturnType<typeof confirmEmailChange>>;
   try {
-    result = await confirmEmailChange(token);
+    result = await confirmEmailChange(token, verifiedLogin);
   } catch (error) {
     if (error instanceof ApiError) return { error: error.message };
     console.error("이메일 변경 확인에 실패했습니다.", error);
     return { error: RETRY };
   }
 
-  if (here?.id !== result.user.id) return { changedTo: result.user.email };
+  if (here?.id !== result.user.id || !result.token) return { changedTo: result.user.email };
 
   // 여기부터는 주소가 이미 바뀌었다. 쿠키를 못 넣어도 "다시 시도" 를 띄우면 안 된다 -
   // 링크는 이미 쓰여 다시 누르면 "만료" 가 나온다. 다시 로그인하라는 안내로 끝낸다.

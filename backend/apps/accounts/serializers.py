@@ -570,10 +570,14 @@ class AvatarPhotoSerializer(serializers.Serializer):
     걸렸을 때 나가는 것은 우리가 지은 안내가 아니다.
     """
 
-    photo = serializers.ImageField(write_only=True)
+    # ImageField 가 아니라 FileField 다. 사진인지는 shrink_avatar_photo 가 본다.
+    # ImageField 는 그보다 먼저 Pillow 가 아는 모든 형식으로 열어 보는데, WebP 는
+    # 여는 순간 원래 크기의 캔버스를 잡는다(7000x7000 이면 열기만 해도 400MB). 그러면 아래의
+    # 픽셀 상한에 닿기 전에 메모리를 쓴다. 받지 않는 형식(BMP, TIFF 등)의 해석기도
+    # 돌지 않는다.
+    photo = serializers.FileField(write_only=True)
 
     def validate_photo(self, uploaded):
-        # ImageField 는 Pillow 로 열어보긴 하지만 머리말만 본다. 그리고
         # 여기서 걸러야 큰 파일을 바이트로 읽어 들이기 전에 막힌다.
         if uploaded.size > AVATAR_PHOTO_MAX_BYTES:
             mb = AVATAR_PHOTO_MAX_BYTES // (1024 * 1024)

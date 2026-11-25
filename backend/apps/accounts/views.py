@@ -129,7 +129,8 @@ class FirstThrottleWins:
 
     DRF 는 하나가 막아도 나머지 제한을 모두 돌리고, 통과한 쪽은 기록을 남긴다. 그러면
     IP 제한에 막힌 요청도 피해자 이메일의 횟수를 채워 그 계정을 잠그고, 이메일을 바꿔
-    가며 보내면 캐시 표에 행이 쌓여 다른 사람의 횟수까지 밀어낸다(DB 캐시는 넘치면 지운다).
+    가며 보내면 캐시 표에 행이 쌓인다(넘쳐도 살아 있는 행은 안 지우지만 표가 커진다,
+    config/throttle_cache.py 의 _cull).
     가입·로그인은 접속 IP 제한을, 이메일 변경은 계정 제한을 맨 앞에 둔다(계정에 막힌
     요청이 서비스 전체 통을 채우지 않게).
 
@@ -643,7 +644,9 @@ class EmailChangeConfirmView(APIView):
     """확인 링크를 눌렀을 때. 여기서 주소가 바뀐다.
 
     로그인을 요구하지 않는다. 메일을 다른 기기에서 열 수 있어야 하고,
-    그 기기에 우리 로그인이 없을 수 있다. 토큰 자체가 증거다.
+    그 기기에 우리 로그인이 없을 수 있다. 토큰 자체가 증거다. 다만 그것은
+    주소를 바꿀 증거일 뿐이라, 로그인 토큰은 같은 계정으로 로그인한 요청에만
+    준다(맨 아래).
 
     토큰이 유효한 것만으로는 부족하다. 만든 시점과 쓰는 시점 사이에
     상황이 달라질 수 있어서, 쓸 때 다시 본다:
@@ -686,11 +689,10 @@ class EmailChangeConfirmView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # 정지된 계정을 링크로 되살릴 수 없게 한다. 아래
-            # _auth_response 가 새 토큰을 발급하므로, 이 검사가 없으면
-            # 정지 직전에 신청해둔 링크를 눌러 계정이 되살아난다. 기존
-            # 토큰을 끊어도 이 경로가 새로 내주므로 소용없다.
-            # 문구는 GoogleLoginView 와 같게 둔다.
+            # 정지된 계정은 링크로 주소를 바꾸지 못하게 한다. 정지 직전에
+            # 신청해둔 링크로 주소를 옮기면 원래 주소가 비어, 그 주소로 새로
+            # 가입해 정지를 피할 수 있다. 새 토큰은 어차피 안 나간다(정지된
+            # 계정의 토큰은 인증 단계에서 401). 문구는 GoogleLoginView 와 같게 둔다.
             if not user.is_active:
                 return Response(
                     {"detail": "사용할 수 없는 계정입니다."},
@@ -734,14 +736,24 @@ class EmailChangeConfirmView(APIView):
 
             # 다른 기기의 토큰을 끊는다. 이메일이 바뀌었다는 것은 계정의
             # 주인이 바뀔 수 있는 사건이라, 옛 주소로 로그인해 있던 세션을
-            # 남겨두면 안 된다. 새 토큰을 발급해 돌려준다. 그것을 쿠키에 넣어
-            # 로그인을 이어 갈지는 화면의 액션이 정한다(같은 계정으로 로그인해
-            # 있던 기기만, frontend/src/app/profile/email/[token]/actions.ts).
+            # 남겨두면 안 된다.
             LoginToken.end_all(user.pk)
 
-        # 지운 뒤에 새 토큰을 낸다. 순서를 바꾸면 방금 낸 토큰까지 지워져
-        # 링크를 누른 기기도 끊긴다.
-        return _auth_response(user)
+        # 새 토큰은 같은 계정으로 로그인한 채 링크를 누른 기기에만 준다. 링크는
+        # 새 주소로 간 메일에 실려 있을 뿐이라, 주소를 잘못 적어 남의 메일함에
+        # 갔으면 그 사람도 갖는다. 링크만 보고 토큰을 주면 그 사람이 백엔드를
+        # 바로 불러 비밀번호 없이 한 번에 들어온다. 화면
+        # (frontend/src/app/profile/email/[token]/actions.ts)은 살아 있음을
+        # 확인한 로그인 토큰만 실어 보낸다.
+        #
+        # request.user 는 위에서 토큰을 끊기 전에 확인된 값이다. DRF 는 뷰를
+        # 부르기 전에 인증을 마친다. 그래서 방금 끊은 토큰으로 온 요청도 여기서
+        # 같은 계정으로 보인다.
+        if request.user.is_authenticated and request.user.pk == user.pk:
+            # 끊은 뒤에 새 토큰을 낸다. 순서를 바꾸면 방금 낸 토큰까지 지워져
+            # 링크를 누른 기기도 끊긴다.
+            return _auth_response(user)
+        return Response({"user": UserSerializer(user).data})
 
 
 class AvatarPhotoView(APIView):

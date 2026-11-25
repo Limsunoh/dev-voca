@@ -6,7 +6,8 @@ set 만 Django 의 DatabaseCache 와 다르게 쓴다(INSERT ... ON CONFLICT 한
     같은 꼴      값(pickle·base64)과 만료 시각이 Django 가 적는 것과 글자까지 같다. 서로가 쓴 것을
                  읽는다. 만료가 지나면 없다고 한다. 시간 제한이 없으면 9999년이다
     덮어쓰기     같은 키를 다시 쓰면 행 하나가 바뀐다(INSERT 만 하면 두 번째부터 조용히 실패한다)
-    넘치면 지움  테스트에서는 set 마다 세고, 지우는 결과가 Django 와 같은 키를 남긴다. 운영 간격
+    넘치면 지움  테스트에서는 set 마다 센다. 넘쳐도 만료된 행만 지우고 살아 있는 카운터는
+                 남긴다(실제 요청으로는 tests_throttle_cull_dynamic 이 본다). 운영 간격
                  (CULL_EVERY)이면 세지 않고 넘친다
     트랜잭션     바깥 트랜잭션 안에서 쓰기·지우기가 실패해도 바깥이 깨지지 않는다. 바깥이 없을
                  때도 조용히 넘긴다
@@ -209,18 +210,30 @@ class CullTest(CacheBase):
             cache.set(f"c{i:02d}", i, 3600 if i % 3 else 0)  # 셋 중 하나는 이미 만료
         return set(raw_rows())
 
-    def test_culls_exactly_like_django_when_counting_every_set(self):
-        """테스트에서는 set 마다 센다. 지우고 남는 키가 Django 와 같다."""
-        self.assertEqual(throttle_cache.CULL_EVERY, 1)
-        ours = self.run_sequence(new_cache(MAX_ENTRIES=5, CULL_FREQUENCY=2))
-        theirs = self.run_sequence(django_cache(MAX_ENTRIES=5, CULL_FREQUENCY=2))
-        self.assertEqual(ours, theirs)
-        self.assertLessEqual(len(ours), 6)
+    # run_sequence 가 만료시키지 않은 키.
+    LIVE = {f"c{i:02d}" for i in range(30) if i % 3}
 
-    def test_cull_frequency_zero_clears_like_django(self):
-        ours = self.run_sequence(new_cache(MAX_ENTRIES=5, CULL_FREQUENCY=0))
-        theirs = self.run_sequence(django_cache(MAX_ENTRIES=5, CULL_FREQUENCY=0))
-        self.assertEqual(ours, theirs)
+    @staticmethod
+    def names(keys) -> set[str]:
+        """표에 든 키(":1:c00" 꼴)에서 앞의 접두어와 버전을 뗀다."""
+        return {key.rsplit(":", 1)[-1] for key in keys}
+
+    def test_overflow_removes_only_expired_rows(self):
+        """넘쳐도 살아 있는 카운터는 지우지 않는다. CULL_FREQUENCY 와 상관없다.
+
+        Django 는 넘치면 키 이름순 앞에서부터 살아 있는 행도 지운다(0 이면 모두). 요청 제한
+        카운터가 지워지면 그 제한이 0 부터 다시 세어, 행을 채운 쪽이 남의 제한을 풀 수 있었다.
+        """
+        self.assertEqual(throttle_cache.CULL_EVERY, 1)
+        for frequency in (0, 2, 3):
+            with self.subTest(CULL_FREQUENCY=frequency):
+                ours = self.run_sequence(new_cache(MAX_ENTRIES=5, CULL_FREQUENCY=frequency))
+                self.assertEqual(self.names(ours), self.LIVE)
+
+    def test_django_default_would_have_dropped_live_rows(self):
+        """위 테스트가 무엇을 막는지 남겨 둔다. 같은 순서로 Django 기본 캐시는 살아 있는 행을 잃는다."""
+        theirs = self.run_sequence(django_cache(MAX_ENTRIES=5, CULL_FREQUENCY=2))
+        self.assertLess(len(self.names(theirs) & self.LIVE), len(self.LIVE))
 
     def test_production_interval_skips_counting_and_lets_table_grow(self):
         """운영 간격(100)에 random 이 1/100 밖이면 세지 않는다. 그 사이 상한을 넘을 수 있다."""
@@ -234,15 +247,25 @@ class CullTest(CacheBase):
         self.assertFalse(any("COUNT(" in q["sql"] for q in ctx.captured_queries))
 
     def test_production_interval_counts_when_random_hits(self):
+        """운영 간격에서 세는 차례가 오면 만료된 행만 지운다."""
         cache = new_cache(MAX_ENTRIES=5, CULL_FREQUENCY=2)
-        with mock.patch.object(throttle_cache, "CULL_EVERY", 100), \
-                mock.patch.object(throttle_cache.random, "random", return_value=0.5):
+        with (
+            mock.patch.object(throttle_cache, "CULL_EVERY", 100),
+            mock.patch.object(throttle_cache.random, "random", return_value=0.5),
+        ):
             for i in range(12):
-                cache.set(f"h{i:02d}", i, 60)
-        with mock.patch.object(throttle_cache, "CULL_EVERY", 100), \
-                mock.patch.object(throttle_cache.random, "random", return_value=0.001):
+                cache.set(f"h{i:02d}", i, 60 if i % 2 else 0)  # 둘 중 하나는 이미 만료
+        self.assertEqual(raw_count(), 12)
+        with (
+            mock.patch.object(throttle_cache, "CULL_EVERY", 100),
+            mock.patch.object(throttle_cache.random, "random", return_value=0.001),
+            CaptureQueriesContext(connection) as ctx,
+        ):
             cache.set("h99", 99, 60)
-        self.assertLessEqual(raw_count(), 7)
+        self.assertTrue(any("COUNT(" in q["sql"] for q in ctx.captured_queries))
+        self.assertEqual(
+            self.names(raw_rows()), {f"h{i:02d}" for i in range(12) if i % 2} | {"h99"}
+        )
         self.assertEqual(cache.get("h99"), 99, "센 뒤의 쓰기는 남는다")
 
 
