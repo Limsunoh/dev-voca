@@ -38,7 +38,7 @@ from .quiz import (
     make_situation_question,
     sign_question,
 )
-from .sampling import pick_random
+from .sampling import pick_pooled
 from .serializers import (
     QuizSentenceSerializer,
     QuizWordSerializer,
@@ -929,8 +929,10 @@ class TalkViewSet(viewsets.ViewSet):
         else:
             kind, model, field = KIND_PHRASE, DailyPhrase, "text"
 
+        # 방금 낸 것(exclude)은 pool 에 걸지 않고 고를 때 넘긴다. 요청마다 달라서 pool 에
+        # 걸면 후보 기억(pick_pooled)이 쓰이지 않는다.
         exclude = _parse_ids(request.query_params.get("exclude", ""))
-        pool = model.objects.visible().exclude(pk__in=exclude)
+        pool = model.objects.visible()
 
         # 난이도 고르기. 없거나 아는 값이 아니면 전부에서 낸다.
         #
@@ -952,14 +954,14 @@ class TalkViewSet(viewsets.ViewSet):
             pool = pool.filter(scene=scene)
 
         # 소리로 채점할 수 있는 것을 고른다. 무작위로 몇 개 읽어 먼저 본다.
-        sample = pick_random(pool, TALK_SAMPLE)
+        sample = pick_pooled(pool, TALK_SAMPLE, exclude=exclude)
         item = next((one for one in sample if is_speakable(getattr(one, field))), None)
         if item is None and sample:
             # 뽑은 것이 전부 약어·숫자 든 것이었다. 드물지만 그런 것만 남은
             # 풀이면 정말 없는지 전부 훑어 가린다. values_list 로 두 칸만 읽는다.
             speakable = [
                 pk
-                for pk, text in pool.values_list("pk", field)
+                for pk, text in pool.exclude(pk__in=exclude).values_list("pk", field)
                 if is_speakable(text)
             ]
             if speakable:
