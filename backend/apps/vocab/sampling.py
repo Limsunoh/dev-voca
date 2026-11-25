@@ -71,32 +71,51 @@ def pick_random(queryset: QuerySet[T], count: int) -> list[T]:
 
     # 지점마다 "키 >= r" 창 하나, 그리고 한 바퀴 돌 때 이어 읽을 맨 앞 창
     # 하나. 어느 조각에서 온 행인지 _part 로 표시해 한 쿼리로 읽는다.
+    #
+    # 창은 번호와 키만 읽는다. 고를 것은 count 개인데 창은 지점마다 20행 이상이라, 행 전체를
+    # 모델로 만들면 1개를 고르려고 40개, 문장 12개를 고르려고 100개를 만든다. 답하기 요청
+    # CPU 의 절반이 여기였다(2026-11-25 측정). 고른 번호의 행만 아래에서 다시 읽는다.
     parts = [
-        queryset.filter(random_key__gte=r).annotate(_part=Value(i)).order_by("random_key")[:window]
+        queryset.filter(random_key__gte=r)
+        .annotate(_part=Value(i))
+        .order_by("random_key")
+        .values_list("pk", "random_key", "_part")[:window]
         for i, r in enumerate(points)
     ]
-    parts.append(queryset.annotate(_part=Value(_FROM_START)).order_by("random_key")[:window])
+    parts.append(
+        queryset.annotate(_part=Value(_FROM_START))
+        .order_by("random_key")
+        .values_list("pk", "random_key", "_part")[:window]
+    )
 
-    by_part: dict[int, list[T]] = {}
-    for row in _run(parts):
-        by_part.setdefault(row._part, []).append(row)
+    # 조각마다 (키, 번호) 를 모아 키 순으로 둔다. 튜플이라 sort() 가 키 순이다.
+    by_part: dict[int, list[tuple]] = {}
+    for pk, key, part in _run(parts):
+        by_part.setdefault(part, []).append((key, pk))
     for rows in by_part.values():
-        rows.sort(key=lambda row: row.random_key)
+        rows.sort()
 
     head = by_part.get(_FROM_START, [])
-    candidates: dict[int, T] = {}
+    # 값 없는 dict 는 "넣은 순서를 지키는 집합" 으로 쓴다. 지점 창이 겹치면 같은 번호를 한 번만.
+    candidates: dict[int, None] = {}
     for i in range(len(points)):
         after = by_part.get(i, [])
         # 끝에 닿아 창이 덜 찼으면 맨 앞에서 이어 읽는다(한 바퀴 돌기).
-        for row in after + head[: window - len(after)]:
-            candidates.setdefault(row.pk, row)
+        for _key, pk in after + head[: window - len(after)]:
+            candidates.setdefault(pk, None)
 
-    chosen = list(candidates.values())
+    chosen = list(candidates)
     random.shuffle(chosen)
-    return chosen[:count]
+    chosen = chosen[:count]
+    if not chosen:
+        return []
+    # 받은 queryset 그대로(select_related·only 등을 지킨다) 고른 번호만 읽고, 고른 순서로 둔다.
+    # 두 번 읽는 사이에 검수가 취소된 행은 빠진다(그만큼 덜 돌려준다).
+    rows = {row.pk: row for row in queryset.filter(pk__in=chosen).order_by()}
+    return [rows[pk] for pk in chosen if pk in rows]
 
 
-def _run(parts: list[QuerySet[T]]) -> list[T]:
+def _run(parts: list[QuerySet]) -> list[tuple]:
     """조각들을 한 쿼리(UNION ALL)로 읽는다. 못 하는 DB 면 하나씩 읽는다.
 
     SQLite 는 LIMIT 이 붙은 조각끼리 합치지 못한다(USE_SQLITE 모드). 조각은
