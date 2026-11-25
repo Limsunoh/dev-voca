@@ -447,6 +447,22 @@ CACHES = {
         "LOCATION": "board-top",
         "TIMEOUT": 10,
     },
+    # 문제를 낼 때 고를 후보 번호(apps.vocab.sampling.pick_pooled). 조건마다(검수된 단어,
+    # 분류별 단어, 상황이 있는 문장 등) 번호 전체를 5분 동안 기억해, 고를 때마다 DB 에 후보를
+    # 묻지 않는다. 새로 검수된 콘텐츠는 작업자마다 최대 5분 늦게 문제에 나온다. 검수가
+    # 취소된 것은 늦지 않는다(고른 행을 읽을 때 검수 조건을 다시 건다).
+    # 21개 미만인 작은 조건(?item=, 일일공부 묶음)은 기억하지 않는다(sampling.POOL_MIN).
+    # 들어오는 조건은 분류·유형·난이도·상황 조합이라 기본 칸 수(300) 안이다.
+    # 테스트에서는 기억하지 않는다(위 counts 와 같은 이유).
+    "pools": {
+        "BACKEND": (
+            "django.core.cache.backends.dummy.DummyCache"
+            if sys.argv[1:2] == ["test"]
+            else "django.core.cache.backends.locmem.LocMemCache"
+        ),
+        "LOCATION": "quiz-pools",
+        "TIMEOUT": 300,
+    },
 }
 
 REST_FRAMEWORK = {

@@ -101,8 +101,9 @@ class LearningItem(models.Model):
     updated_at = models.DateTimeField("수정일", auto_now=True)
     # 무작위로 몇 개 고를 때 쓰는 키(0 이상 1 미만). 행마다 DB 가 random() 으로
     # 채운다. 문제 보기·후보를 고를 때 "키 >= 무작위 값" 을 키 순서로 몇 개
-    # 읽는다(sampling.pick_random). 표 전체를 섞는 ORDER BY RANDOM() 은 표가
-    # 커지면 표 크기만큼 든다. 화면과 API 에는 내보내지 않는다.
+    # 읽는다(sampling.pick_random). 출제는 pick_pooled 가 후보 번호를 기억해 두고
+    # 고르고, 후보가 2만 개를 넘을 때만 이 길로 간다. 표 전체를 섞는 ORDER BY
+    # RANDOM() 은 표가 커지면 표 크기만큼 든다. 화면과 API 에는 내보내지 않는다.
     #
     # 인덱스는 이 칸 하나에만 건다. 다른 인덱스처럼 검수 칸과 묶으면
     # (is_reviewed, random_key) 검수 안 된 행을 건너뛰지 않아도 되지만, 그러려면

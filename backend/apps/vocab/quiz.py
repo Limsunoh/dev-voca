@@ -26,7 +26,7 @@ from django.db.models import Q, QuerySet
 from django.db.models.functions import Trim
 
 from .models import TERM_KEY, Sentence, Word
-from .sampling import pick_random
+from .sampling import pick_pooled
 
 # 정답이 무엇을 가리키는지. 채점한 뒤 무엇을 보여줄지 정하는 데 쓴다.
 TARGET_WORD = "word"
@@ -295,17 +295,17 @@ def _pick_distractors(answer: Word, pool: QuerySet[Word], count: int) -> list[Wo
     같은 분류에서 먼저 뽑는다. 아무 데서나 뽑으면 git 단어 문제에 DB 용어가
     섞여 답이 뻔해진다. 같은 분류가 모자라면 나머지로 채운다.
 
-    무작위 고르기는 pick_random 이다. 표가 커도 표 전체를 섞지 않는다
-    (sampling 머리말).
+    무작위 고르기는 pick_pooled 다. 분류별 후보 번호를 기억해 두고 고른다. 정답처럼
+    문제마다 다른 것은 queryset 에 걸지 않고 exclude 로 넘긴다(그래야 기억이 쓰인다).
     """
-    picked = pick_random(
-        pool.filter(category=answer.category).exclude(pk=answer.pk), count
+    picked = pick_pooled(
+        pool.filter(category=answer.category), count, exclude=[answer.pk]
     )
 
     if len(picked) < count:
         # 분류가 작아서 모자란 경우. 이미 고른 것과 정답을 빼고 채운다.
         used = {answer.pk, *(w.pk for w in picked)}
-        rest = pick_random(pool.exclude(pk__in=used), count - len(picked))
+        rest = pick_pooled(pool, count - len(picked), exclude=used)
         picked.extend(rest)
 
     return picked
@@ -509,13 +509,13 @@ def make_question(
     # sentence 로 붙어 나중에 엉뚱한 문장을 정답이라고 보여준다.
     kind = kind if kind in QuizKind.WORD_KINDS else random.choice(QuizKind.WORD_KINDS)
 
-    candidates = pool.exclude(pk__in=exclude_ids) if exclude_ids else pool
+    candidates = pool
 
     # 설명 문제는 설명이 있는 단어만 낼 수 있다.
     if kind == QuizKind.DESCRIPTION:
         candidates = candidates.exclude(description="")
 
-    chosen = pick_random(candidates, 1)
+    chosen = pick_pooled(candidates, 1, exclude=exclude_ids or ())
     if not chosen:
         return None
     answer = chosen[0]
@@ -727,11 +727,9 @@ def make_blank_question(
     있는 문장이 절반쯤(2026-08 기준 380개 중 162개) 되기 때문에 실패가
     예외가 아니라 정상 흐름이다.
     """
-    pool = sentences.exclude(pk__in=exclude_sentence_ids or [])
-
     # 몇 개만 뽑아 그중 되는 것을 쓴다. 전부 훑으면 매 요청마다 380개를
     # 스캔하게 되고, 안 되는 문장이 절반이라 몇 번만 시도해도 충분히 걸린다.
-    picked = pick_random(pool, 12)
+    picked = pick_pooled(sentences, 12, exclude=exclude_sentence_ids or ())
     if not picked:
         return None
 
@@ -904,8 +902,7 @@ def make_situation_question(
         if not answer.context:
             return None
     else:
-        candidates = pool.exclude(pk__in=exclude_ids or [])
-        chosen = pick_random(candidates, 1)
+        chosen = pick_pooled(pool, 1, exclude=exclude_ids or ())
         if not chosen:
             return None
         answer = chosen[0]
@@ -931,8 +928,8 @@ def make_situation_question(
     def pick(candidates) -> list[Sentence]:
         chosen: list[Sentence] = []
         seen = {answer.context}
-        for one in pick_random(
-            candidates.exclude(pk=answer.pk), (CHOICE_COUNT - 1) * 5
+        for one in pick_pooled(
+            candidates, (CHOICE_COUNT - 1) * 5, exclude=[answer.pk]
         ):
             if one.context in seen:
                 continue

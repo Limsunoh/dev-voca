@@ -1,5 +1,11 @@
 """큰 표에서 무작위로 몇 개 고르기.
 
+함수는 둘이다. 문제를 낼 때는 pick_pooled 를 쓴다(아래 "후보 번호를 기억해 두고
+고르기" 절). 조건에 맞는 번호를 작업자 메모리에 기억해 두고 고르므로 DB 왕복이 적다.
+pick_random 은 기억이 없는 고르기다. 조건이 사람마다 달라 기억해도 다시 쓰일 일이
+없을 때와, pick_pooled 가 후보가 너무 많아 기억하지 않을 때 쓴다. 이 머리말은
+pick_random 의 방식이다.
+
 `order_by("?")`(SQL 의 ORDER BY RANDOM())는 조건에 맞는 행을 전부 읽고
 섞은 뒤 몇 개만 쓴다. 고르는 수와 상관없이 표 크기만큼 든다. 2026-11-13
 측정에서 단어·문장이 33만 개씩일 때 문제 하나 내는 데 이것만 200ms 였다
@@ -37,9 +43,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import random
+from collections.abc import Collection
 from typing import TypeVar
 
+from django.core.cache import caches
+from django.core.exceptions import EmptyResultSet
 from django.db import connections
 from django.db.models import Model, QuerySet, Value
 
@@ -125,3 +135,106 @@ def _run(parts: list[QuerySet]) -> list[tuple]:
     if features.supports_slicing_ordering_in_compound:
         return list(parts[0].union(*parts[1:], all=True))
     return [row for part in parts for row in part]
+
+
+# ---- 후보 번호를 기억해 두고 고르기(pick_pooled) ----
+
+# 기억해 둘 후보 수의 상한. 넘는 조건은 기억하지 않고 pick_random 으로 고른다.
+# 번호 2만 개는 캐시에 약 100KB 로 들고(LocMem 은 피클로 둔다), 꺼낼 때마다 잠깐
+# 0.7MB 를 쓴다. 조건 수십 개가 다 차도 작업자마다 수 MB 다. 지금은 가장 큰 조건이
+# 일상 표현 6,113개다(2026-11-25). 콘텐츠가 늘면 큰 조건(검수된 단어 전부 등)부터
+# 이 상한에 걸려 pick_random 으로 돌아간다.
+POOL_MAX = 20_000
+
+# 이보다 작은 조건은 기억하지 않는다. 문제 하나짜리(?item=)나 일일공부 묶음(2~5개)처럼
+# 요청마다 다른 작은 조건이 칸을 채우면, 자주 쓰는 큰 조건이 밀려난다. 경계는 pick_random
+# 의 창 크기다. 창(MIN_WINDOW) 이하의 조건은 pick_random 도 매번 전부를 읽으므로, 번호를
+# 새로 읽어도 예전보다 비싸지 않다. 빈 조건을 기억하지 않는 것도 이 덕이다. 기억하면 새
+# 분류에 처음 검수한 콘텐츠가 5분 동안 "문제를 낼 것이 없다" 로 나온다.
+POOL_MIN = MIN_WINDOW + 1
+
+# "너무 커서 기억하지 않는다" 를 기억해 두는 표시. 매번 2만 개를 세어 보지 않게 한다.
+_TOO_BIG = "too-big"
+
+
+def pick_pooled(queryset: QuerySet[T], count: int, exclude: Collection[int] = ()) -> list[T]:
+    """pick_random 과 같은 일을 하되, 조건에 맞는 번호 목록을 기억해 두고 고른다.
+
+    pick_random 은 고를 때마다 DB 를 두 번 다녀온다(번호 창 조각들을 합친 쿼리, 고른
+    행 읽기). 문제 하나를 만들 때 정답·보기를 따로 고르므로 이것이 너덧 번 겹쳐, 답하기
+    요청 서버 시간의 2/3 가 문제 만들기였다(2026-11-25 측정). 여기서는 조건마다 번호
+    전체를 작업자 메모리(CACHES["pools"])에 5분 동안 두고 파이썬에서 고른 뒤, 고른
+    행만 한 번 읽는다.
+
+    exclude 는 queryset 에 걸지 말고 여기로 넘긴다. 방금 낸 문제·정답처럼 요청마다
+    달라지는 것을 queryset 에 걸면 조건이 매번 달라져 기억이 쓰이지 않는다.
+
+    늦게 보이는 것: 새로 검수된 콘텐츠는 기억이 끝날 때까지(최대 5분, 작업자마다)
+    후보에 없다. 반대로 검수가 취소되거나 지워진 것은 나가지 않는다. 고른 행을 읽을
+    때 queryset 의 조건(검수됨 등)을 그대로 다시 걸기 때문이다. 그렇게 빠져 덜 모이면
+    기억을 버리고 한 번만 다시 고른다.
+
+    pick_random 과 다른 점: 후보 전체에서 고르게 뽑는다(키 창의 치우침이 없다).
+    """
+    if count < 1:
+        return []
+    key = _pool_key(queryset)
+    if key is None:
+        # none() 이나 빈 pk__in 처럼 볼 것도 없이 비는 조건. pick_random 처럼 빈 결과다.
+        return []
+    rows, short = _pick_once(queryset, key, count, exclude)
+    if short:
+        # 기억한 뒤 검수가 취소되거나 지워진 행이 섞였다. 기억을 버리고 다시 센다.
+        caches["pools"].delete(key)
+        rows, _ = _pick_once(queryset, key, count, exclude)
+    return rows
+
+
+def _pool_key(queryset: QuerySet) -> str | None:
+    """queryset 조건의 캐시 키. 볼 것도 없이 비는 조건이면 None.
+
+    정렬을 뺀 번호 쿼리의 SQL 과 인자로 만든다(pagination 의 개수 캐시와 같은 방법).
+    str(query) 는 인자를 따옴표 없이 끼워 넣어, 다른 조건이 같은 글이 될 수 있다.
+    Django 5.2 는 none()·빈 pk__in 의 SQL 을 지을 때 EmptyResultSet 을 올린다.
+    """
+    ids = queryset.order_by().values_list("pk", flat=True)
+    try:
+        sql, params = ids.query.sql_with_params()
+    except EmptyResultSet:
+        return None
+    return "pool:" + hashlib.sha256(repr((ids.db, sql, params)).encode()).hexdigest()
+
+
+def _pick_once(
+    queryset: QuerySet[T], key: str, count: int, exclude: Collection[int]
+) -> tuple[list[T], bool]:
+    """한 번 고른다. (고른 행, 고른 것보다 덜 읽혔나)."""
+    pks = _pool(queryset, key)
+    if pks is None:
+        narrowed = queryset.exclude(pk__in=exclude) if exclude else queryset
+        return pick_random(narrowed, count), False
+    skip = set(exclude)
+    # 뺄 것 수만큼 넉넉히 뽑고 빼면, 목록 전체를 거르지 않고도 남은 것 가운데 고르게 뽑힌다.
+    drawn = random.sample(pks, min(len(pks), count + len(skip)))
+    chosen = [pk for pk in drawn if pk not in skip][:count]
+    if not chosen:
+        return [], False
+    rows = {row.pk: row for row in queryset.filter(pk__in=chosen).order_by()}
+    picked = [rows[pk] for pk in chosen if pk in rows]
+    return picked, len(picked) < len(chosen)
+
+
+def _pool(queryset: QuerySet, key: str) -> tuple[int, ...] | None:
+    """queryset 조건에 맞는 번호 전체. 너무 많으면(POOL_MAX 초과) None."""
+    cache = caches["pools"]
+    hit = cache.get(key)
+    if hit is not None:
+        return None if hit == _TOO_BIG else hit
+    # 다른 표와 이어 붙인(조인) 조건이면 같은 번호가 여러 번 나올 수 있어 한 번씩만 둔다.
+    pks = tuple(dict.fromkeys(queryset.order_by().values_list("pk", flat=True)[: POOL_MAX + 1]))
+    if len(pks) > POOL_MAX:
+        cache.set(key, _TOO_BIG)
+        return None
+    if len(pks) >= POOL_MIN:
+        cache.set(key, pks)
+    return pks
