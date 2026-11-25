@@ -1,0 +1,38 @@
+name: keep-warm
+
+# 화면 서버(Vercel)를 5분마다 한 번 불러 깨워 둔다.
+#
+# Vercel 은 요청이 15분 없으면 화면 서버를 끄고, 다시 켤 때 첫 화면이 2초쯤 걸린다
+# (2026-11-25 운영에서 잰 값: 10분 쉬면 0.35초, 15분 쉬면 2.0초). 사용자가 적을 때는
+# 앱을 오랜만에 열 때마다 이 2초를 기다린다. 화면 서버는 함수 하나라 한 화면만 깨워도
+# 모든 화면이 같이 빨라진다.
+#
+# Vercel 무료 요금제의 cron 은 하루 한 번이라 여기서 부른다. GitHub 은 예약 실행을 몇
+# 분씩 늦게 돌릴 때가 있어, 그때는 가끔 꺼진 채로 열린다.
+#
+# 실패해도 실패로 끝내지 않는다(|| true). 사이트가 잠깐 멈추면 5분마다 실패 메일이
+# 쌓인다. 화면·백엔드 오류는 Sentry 에 모이고, DB 백업은 Sentry 정기 실행 감시가 본다.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      # 단어 목록은 서버가 그리는 화면이다. 게스트 쿠키가 없으면 시작 화면으로 돌려보내므로
+      # 쿠키를 싣는다. 백엔드 목록 API 도 한 번 불린다(요청당 몇 ms).
+      - name: 단어 목록 화면 불러오기
+        run: |
+          curl -sS -o /dev/null --max-time 30 -b "devvoca_guest=1" \
+            -w "status %{http_code} ttfb %{time_starttransfer}s\n" \
+            https://dev-voca.vercel.app/learn/words || true
