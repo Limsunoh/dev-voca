@@ -294,7 +294,9 @@ class FloorOutsideTopTest(FloorCase):
         for kind in BEST_BOARDS:
             for position, user in enumerate(people, start=1):
                 with self.subTest(kind=kind, position=position):
-                    item, ahead = leaderboards._my_standing(kind, user)
+                    source = leaderboards._source(kind)
+                    item = source.mine(user)[0]
+                    ahead = source.ahead(item, user)
 
                     self.assertEqual(item["score"], 0)
                     self.assertEqual(ahead + 1, position)

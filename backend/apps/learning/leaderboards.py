@@ -48,6 +48,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.core.cache import caches
 from django.db.models import (
     Case,
     Count,
@@ -70,6 +71,11 @@ User = get_user_model()
 
 # 목록에 보여줄 인원. 이보다 뒤면 "내 순위" 로만 나온다.
 TOP_SIZE = 20
+
+# 줄마다 싣는 사람 칸(User). 목록 쿼리(_best_by_user, _streak_by_user)가 user__ 를 붙여 읽고,
+# 기억한 목록은 _fresh_people 이 요청마다 이 칸들을 새로 읽어 바꿔 끼운다. 칸을 더할 때는 여기에
+# 더한다. 그러면 둘이 함께 따라간다. 여기 없이 _row 만 고치면 그 칸은 늘 비어 나온다.
+_PERSON_FIELDS = ("display_name", "avatar", "google_picture", "avatar_photo_key")
 
 WEEKLY = "weekly"
 ALL_TIME = "all_time"
@@ -139,26 +145,56 @@ class Board:
 
 
 def build(kind: str, user=None) -> Board:
-    """순위표 하나를 만든다. user 가 없으면(게스트) me 는 비어 있다."""
+    """순위표 하나를 만든다. user 가 없으면(게스트) me 는 비어 있다.
+
+    상위 20명의 순서와 점수는 10초 동안 기억한 것을 쓴다(_cached_top). 다른 사람의 점수만
+    최대 10초 늦다(사용자 결정 11-25). 이름·그림과 탈퇴 여부는 요청마다 새로 읽는다
+    (_fresh_people). 로그인한 사람은 내 기록을 새로 읽어, 기억한 목록과 어긋나면 목록을 새로
+    만든다(_stale_for_me). 그래서 내 점수와 내 이름은 늦지 않는다.
+    """
     if kind not in KINDS:
         raise ValueError(f"모르는 순위표입니다: {kind}")
 
     # pk 가 없으면(게스트, 또는 저장 안 된 인스턴스) 어느 줄도 내 줄이 아니다.
     me_pk = user.pk if user is not None and user.is_authenticated else None
 
-    top = [
-        _row(i + 1, item, me_pk=me_pk)
-        for i, item in enumerate(_source(kind).top(TOP_SIZE))
-    ]
+    source = _source(kind)
+    items, from_cache = _cached_top(kind, source)
+    if from_cache:
+        # 방금 만든 목록은 이미 지금 이름·그림이고 탈퇴자가 빠져 있다. 기억한 목록만 새로 읽는다.
+        items, someone_left = _fresh_people(items)
+        if someone_left:
+            items, from_cache = _cached_top(kind, source, refresh=True)
 
+    mine = source.mine(user) if me_pk is not None else []
+    my_item = mine[0] if mine else None
+    ahead = None
+    if me_pk is not None:
+        stale, ahead = _stale_for_me(items, me_pk, my_item, source, user)
+        # 방금 만든 목록이면 다시 만들어도 같다. 목록을 새로 만드는 것은 한 요청에 한 번뿐이다.
+        if stale and from_cache:
+            items, from_cache = _cached_top(kind, source, refresh=True)
+
+    top = [_row(i + 1, item, me_pk=me_pk) for i, item in enumerate(items)]
     board = Board(kind=kind, rows=top)
 
     if kind == WEEKLY:
         board.period_start = calendar_kst.this_week_start()
         board.period_end = calendar_kst.week_end(board.period_start)
 
-    if me_pk is not None:
-        board.me = _me_outside_top(kind, top, user)
+    if my_item is not None and not any(row.is_me for row in top):
+        # 목록 밖이면 내 줄을 따로 붙인다. 목록 안이면 rows 에 이미 있으므로 두 번 보내지
+        # 않는다. 화면이 같은 줄을 두 곳에 그리면 사용자가 자기가 둘인 줄 안다.
+        # 목록에 없으면 나보다 앞선 사람을 센다. 전체를 끌어오지 않는다. _stale_for_me 가 이미
+        # 셌으면 그 값을 쓴다.
+        #
+        # 동점자도 세야 한다. 목록은 동점이어도 1,2,3 으로 번호를 매기는데, 여기서 동점자를 빼면
+        # 규칙이 갈린다. 같은 점수 20명이 목록의 2~21등을 채우고 있을 때 21등이 자기 줄을 보면
+        # "2등" 이 나온다. 화면에 2등이 둘이고, 19등 차이가 난다. ahead 쿼리가 목록과 같은
+        # 정렬을 조건으로 옮겨 쓴다(_best_round_ahead, _streak_ahead).
+        if ahead is None:
+            ahead = source.ahead(my_item, user)
+        board.me = _row(ahead + 1, my_item, me_pk=me_pk)
 
     return board
 
@@ -166,50 +202,76 @@ def build(kind: str, user=None) -> Board:
 # ---- 안쪽 ----
 
 
-def _me_outside_top(kind: str, top: list[Row], user) -> Row | None:
-    """내가 목록 밖이면 내 줄을. 목록 안이거나 기록이 없으면 None.
+# 순위를 정하는 칸. 기억한 목록과 내 지금 기록을 이것으로 견준다. 이름·그림 칸은 요청마다 새로
+# 읽으므로(_fresh_people) 견주지 않는다. first_at 은 최고점 순위표에만 있어 꾸준함에서는 양쪽
+# 모두 None 으로 같다.
+_RANKING_KEYS = ("score", "entries", "first_at")
 
-    목록 안이면 rows 에 이미 있으므로 두 번 보내지 않는다. 화면이 같은
-    줄을 두 곳에 그리면 사용자가 자기가 둘인 줄 안다.
 
-    목록 안인지는 목록을 만들 때 붙여 둔 is_me 표시로 본다.
-    화면이 강조에 쓰는 값과 같은 것을 보므로, 표시가 틀리면 여기도 같이
-    틀려서 곧바로 드러난다.
+def _cached_top(kind: str, source: _Source, *, refresh: bool = False) -> tuple[list[dict], bool]:
+    """상위 20명과, 기억한 것을 꺼냈나. 10초 동안 작업자 메모리에 기억한다(settings 의
+    CACHES["boards"]).
 
-    목록에 없으면 따로 센다. 목록은 20명에서 잘려 있으므로 밖에 있는
-    사람은 거기 없다.
+    주간은 키에 그 주의 시작일을 넣는다. 주가 바뀌면 다른 목록이라 지난주 기억을 쓰지 않는다.
+    전체 기간과 꾸준함은 날짜로 거르지 않으므로 날짜가 필요 없다.
     """
-    if any(row.is_me for row in top):
-        return None
-
-    mine = _my_standing(kind, user)
-    if mine is None:
-        return None
-
-    item, ahead = mine
-    # me 줄은 정의상 내 줄이다. 화면이 rows 와 me 를 같은 컴포넌트로
-    # 그리므로 여기서도 표시가 맞아야 한다.
-    return _row(ahead + 1, item, me_pk=user.pk)
+    cache = caches["boards"]
+    key = f"{kind}:{calendar_kst.this_week_start().isoformat()}" if kind == WEEKLY else kind
+    if not refresh:
+        items = cache.get(key)
+        if items is not None:
+            return items, True
+    items = source.top(TOP_SIZE)
+    cache.set(key, items)
+    return items, False
 
 
-def _my_standing(kind: str, user) -> tuple[dict, int] | None:
-    """내 한 줄과, 나보다 앞선 사람 수.
+def _fresh_people(items: list[dict]) -> tuple[list[dict], bool]:
+    """목록 사람들의 이름·그림을 지금 값으로 바꿔 끼운다. (바꾼 목록, 빠진 사람이 있었나).
 
-    전체를 끌어오지 않는다. 내 점수를 구한 뒤 "나보다 위인 사람" 만 센다.
-
-    동점자도 세야 한다. 목록은 동점이어도 1,2,3 으로 번호를 매기는데,
-    여기서 동점자를 빼면 규칙이 갈린다. 같은 점수 20명이 목록의 2~21등을
-    채우고 있을 때 21등이 자기 줄을 보면 "2등" 이 나온다. 화면에 2등이
-    둘이고, 19등 차이가 난다.
+    순위와 달리 이름·그림·탈퇴는 늦으면 안 된다. 닉네임을 바꾼 사람의 옛 이름이나, 탈퇴해
+    바로 지워져야 할 사람의 이름과 사진이 10초 동안 공개 순위표에 남는다. 그래서 20명을
+    번호로 한 번 읽는다(가볍다). 비활성이거나 지워진 사람의 줄은 뺀다. 빠진 사람이 있으면
+    build 가 목록을 새로 만든다(뺀 자리에 21등이 올라와야 해서).
     """
-    source = _source(kind)
-    rows = source.mine(user)
+    if not items:
+        return items, False
+    ids = {item["user"] for item in items}
+    people = {
+        row["pk"]: row
+        for row in User.objects.filter(pk__in=ids, is_active=True).values("pk", *_PERSON_FIELDS)
+    }
+    fresh = [
+        {**item, **{f"user__{name}": people[item["user"]][name] for name in _PERSON_FIELDS}}
+        for item in items
+        if item["user"] in people
+    ]
+    return fresh, len(people) < len(ids)
 
-    if not rows:
-        return None
 
-    item = rows[0]
-    return item, source.ahead(item, user)
+def _stale_for_me(
+    items: list[dict], me_pk: int, my_item: dict | None, source: _Source, user
+) -> tuple[bool, int | None]:
+    """기억한 목록이 내 지금 기록과 어긋나나. (어긋남, 센 경우 나보다 앞선 사람 수).
+
+    - 목록에 내가 있는데 지금 기록의 순위 칸이 다르거나 기록이 없어졌다.
+    - 목록에 내가 없는데 지금 기록으로는 20등 안이다. 이것만 앞선 사람을 센다(무거운
+      집계라 목록 안에 있을 때는 세지 않는다).
+    - 목록에 내가 없는데 내 점수가 목록 맨 끝 줄보다 높다. 그 사이 다른 사람이 올라와 내가
+      21등이어도, 그대로 두면 "20등 110점" 바로 아래에 "21등 120점" 이 나온다. score 는 세
+      순위표 모두 첫째 정렬 칸이다.
+    """
+    cached = next((item for item in items if item["user"] == me_pk), None)
+    if cached is not None:
+        if my_item is None:
+            return True, None
+        same = all(cached.get(key) == my_item.get(key) for key in _RANKING_KEYS)
+        return not same, None
+    if my_item is None or not source.listed(my_item):
+        return False, None
+    ahead = source.ahead(my_item, user)
+    above_last = bool(items) and my_item["score"] > items[-1]["score"]
+    return ahead < TOP_SIZE or above_last, ahead
 
 
 def _row(rank: int, item: dict, *, me_pk: int | None) -> Row:
@@ -235,7 +297,7 @@ def _row(rank: int, item: dict, *, me_pk: int | None) -> Row:
         avatar=item.get("user__avatar") or "",
         google_picture=item.get("user__google_picture") or "",
         # 올린 사진의 주소 값. 없으면 None 이고 avatar_display 가 아바타로
-        # 떨어진다. 위 .values() 목록에서 이 칸을 빼면 사진 올린 사람이
+        # 떨어진다. _PERSON_FIELDS 에서 이 칸을 빼면 사진 올린 사람이
         # 순위표에서만 다른 그림으로 뜬다. 화면이 비지 않아서 드러나지 않는다.
         avatar_photo_key=item.get("user__avatar_photo_key"),
     )
@@ -291,13 +353,7 @@ def _best_by_user(rounds: QuerySet) -> QuerySet:
     first_at 으로 갈린다.
     """
     return (
-        rounds.values(
-            "user",
-            "user__display_name",
-            "user__avatar",
-            "user__google_picture",
-            "user__avatar_photo_key",
-        )
+        rounds.values("user", *(f"user__{name}" for name in _PERSON_FIELDS))
         .annotate(
             score=Greatest(Max("score"), Value(0)),
             entries=Count("id"),
@@ -334,13 +390,7 @@ def _streak_by_user(days: QuerySet, *, only_scored: bool = True) -> QuerySet:
     """
     rows = (
         days.annotate(_day_total=_DAY_TOTAL)
-        .values(
-            "user",
-            "user__display_name",
-            "user__avatar",
-            "user__google_picture",
-            "user__avatar_photo_key",
-        )
+        .values("user", *(f"user__{name}" for name in _PERSON_FIELDS))
         .annotate(
             # 점수가 남은 날만 센다. 판을 열기만 해도 그 날 행이 생기므로
             # 행 수로 세면 망친 날도 들어간다. 그러면 꾸준한 사람이 아니라
@@ -446,16 +496,21 @@ def _best_round_ahead(this_week: bool, item: dict, user) -> int:
 
 @dataclass(frozen=True)
 class _Source:
-    """순위표 하나가 쓰는 조회 세 개.
+    """순위표 하나가 쓰는 조회 세 개와 목록 자격.
 
-    셋이 한 세트여야 한다. 목록(top)이 매기는 순서와 세기(ahead)가
+    한 세트여야 한다. 목록(top)이 매기는 순서와 세기(ahead)가
     쓰는 기준이 다르면 화면에 같은 등수가 둘 나온다. 한 줄에 묶어두면
     한쪽만 고치는 실수가 눈에 띈다.
+
+    listed 는 내 줄(mine)이 목록에 들 수 있는 줄인가다. 꾸준함 목록은 0일을 빼지만 내 줄은
+    0일도 읽는다. 이것을 모르면 0일인 사람이 "20등 안인데 목록에 없다" 로 보여, 순위표를
+    열 때마다 목록을 새로 만든다(build 의 _stale_for_me).
     """
 
     top: Callable[[int], list[dict]]
     mine: Callable[[object], list[dict]]
     ahead: Callable[[dict, object], int]
+    listed: Callable[[dict], bool]
 
 
 def _source(kind: str) -> _Source:
@@ -464,6 +519,8 @@ def _source(kind: str) -> _Source:
             top=lambda limit: list(_streak_by_user(_days())[:limit]),
             mine=_streak_rows_for,
             ahead=_streak_ahead,
+            # 목록은 점수를 얻은 날이 있는 사람만 싣는다(_streak_by_user 의 only_scored).
+            listed=lambda item: item["score"] > 0,
         )
 
     this_week = kind == WEEKLY
@@ -471,4 +528,6 @@ def _source(kind: str) -> _Source:
         top=lambda limit: _best_round_rows(this_week=this_week, limit=limit),
         mine=lambda user: _best_round_rows_for(this_week, user),
         ahead=lambda item, user: _best_round_ahead(this_week, item, user),
+        # 판을 끝낸 사람은 모두 싣는다(_best_by_user 는 점수로 거르지 않는다).
+        listed=lambda item: True,
     )

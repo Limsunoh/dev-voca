@@ -1,6 +1,38 @@
+from functools import cache
+
+from django.utils.encoding import force_str
+from django.utils.hashable import make_hashable
 from rest_framework import serializers
 
 from .models import LearningItem, Sentence, Word
+
+
+@cache
+def _choice_labels(model, field_name: str) -> dict[object, object]:
+    return dict(make_hashable(model._meta.get_field(field_name).flatchoices))
+
+
+class ChoiceLabelField(serializers.CharField):
+    """선택지 칸의 한글 이름. 모델의 get_FOO_display() 와 같은 값을 준다.
+
+    source="get_difficulty_display" 로 두면 DRF 가 값을 꺼낼 때마다 그 메서드의 시그니처를
+    inspect 로 다시 읽는다(rest_framework.fields.is_simple_callable). 단어 20개 목록이면
+    라벨 셋 x 20 = 60번이고, 목록 요청 CPU 의 약 15%였다. 여기서는 칸의 choices 로 만든
+    사전을 한 번 만들어 두고 찾는다. 없는 값이면 값을 그대로 글자로 준다(get_FOO_display 와
+    같다). 값이 None 이면 DRF 가 이 필드를 부르지 않고 null 을 준다(예전과 같다).
+
+    ModelSerializer 안에서만 쓴다. 칸의 choices 를 부모 시리얼라이저의 Meta.model 에서 찾는다.
+    CharField 를 물려받는 이유: 예전 선언(CharField)과 같게 OPTIONS 응답에 칸 종류가 string 으로
+    나가게 하려고.
+    """
+
+    def __init__(self, field_name: str, **kwargs):
+        super().__init__(source=field_name, read_only=True, **kwargs)
+
+    def to_representation(self, value) -> str:
+        labels = _choice_labels(self.parent.Meta.model, self.source)
+        label = labels.get(make_hashable(value), value)
+        return str(force_str(label, strings_only=True))
 
 
 def visible_reading(instance, field_name: str = "reading") -> str:
@@ -114,12 +146,10 @@ class WordListSerializer(serializers.ModelSerializer):
     설명·예문 같은 긴 텍스트는 빼서 목록 응답을 가볍게 유지한다.
     """
 
-    difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
+    difficulty_label = ChoiceLabelField("difficulty")
     # 화면은 이 라벨만 쓴다. category(영어 코드)는 필터 링크를 만들 때 필요해서 함께 준다.
-    category_label = serializers.CharField(source="get_category_display", read_only=True)
-    exam_subject_label = serializers.CharField(
-        source="get_exam_subject_display", read_only=True
-    )
+    category_label = ChoiceLabelField("category")
+    exam_subject_label = ChoiceLabelField("exam_subject")
     reading = ReviewedReadingField()
 
     class Meta:
@@ -213,7 +243,7 @@ class QuizSentenceSerializer(serializers.ModelSerializer):
     워크플로우 내부 정보를 익명에게 흘리지 않는다.
     """
 
-    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    kind_label = ChoiceLabelField("kind")
     reading = ReviewedReadingField()
 
     class Meta:
@@ -238,11 +268,9 @@ class WordDetailSerializer(
 ):
     """상세 조회 + 생성/수정 공용."""
 
-    difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
-    category_label = serializers.CharField(source="get_category_display", read_only=True)
-    exam_subject_label = serializers.CharField(
-        source="get_exam_subject_display", read_only=True
-    )
+    difficulty_label = ChoiceLabelField("difficulty")
+    category_label = ChoiceLabelField("category")
+    exam_subject_label = ChoiceLabelField("exam_subject")
     # 읽기 전용이다. API 로 고치게 하면 고쳤을 때 reading_reviewed 를
     # 되돌리는 처리가 또 필요한데, 발음은 Admin 에서만 손보므로 그 경로를
     # 만들지 않는다.
@@ -307,12 +335,10 @@ class SentenceListSerializer(serializers.ModelSerializer):
     대신 설명은 뺀다.
     """
 
-    difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
-    category_label = serializers.CharField(source="get_category_display", read_only=True)
-    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
-    exam_subject_label = serializers.CharField(
-        source="get_exam_subject_display", read_only=True
-    )
+    difficulty_label = ChoiceLabelField("difficulty")
+    category_label = ChoiceLabelField("category")
+    kind_label = ChoiceLabelField("kind")
+    exam_subject_label = ChoiceLabelField("exam_subject")
     reading = ReviewedReadingField()
 
     class Meta:
@@ -341,12 +367,10 @@ class SentenceDetailSerializer(
 ):
     """상세 조회 + 생성/수정 공용."""
 
-    difficulty_label = serializers.CharField(source="get_difficulty_display", read_only=True)
-    category_label = serializers.CharField(source="get_category_display", read_only=True)
-    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
-    exam_subject_label = serializers.CharField(
-        source="get_exam_subject_display", read_only=True
-    )
+    difficulty_label = ChoiceLabelField("difficulty")
+    category_label = ChoiceLabelField("category")
+    kind_label = ChoiceLabelField("kind")
+    exam_subject_label = ChoiceLabelField("exam_subject")
     reading = ReviewedReadingField()
 
     class Meta:

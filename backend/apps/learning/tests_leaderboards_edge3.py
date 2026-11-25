@@ -149,7 +149,7 @@ class IsMeMarkTest(TestCase):
         """목록 밖이면 me 만 표시가 붙고 rows 에는 하나도 없다.
 
         rows 에까지 붙으면 화면이 남의 줄을 내 줄로 강조한다. 목록에 내가
-        없다는 판정(_me_outside_top)도 같은 표시를 보고 하므로, 여기가
+        없다는 판정(build 의 내 줄 붙이기)도 같은 표시를 보고 하므로, 여기가
         틀리면 내 줄이 안 나오거나 두 번 나온다.
         """
         for i, user in enumerate(bulk_users("밖채우기_", 22)):
@@ -274,7 +274,7 @@ class PrimaryKeyNeverLeaksTest(TestCase):
         """me 도 같은 모양이어야 한다. 화면이 같은 컴포넌트로 그린다.
 
         rows 만 검사하면 me 에 pk 가 남아 있어도 통과한다. me 는 다른
-        경로(_me_outside_top)로 만들어지므로 따로 봐야 한다.
+        경로(build 의 내 줄 붙이기)로 만들어지므로 따로 봐야 한다.
         """
         for i, user in enumerate(bulk_users("me모양_", 21)):
             record_everywhere(user, 300 - i)

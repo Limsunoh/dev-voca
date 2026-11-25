@@ -385,7 +385,8 @@ CORS_ALLOWED_ORIGINS = [
 # 공유 캐시(Redis)로 옮긴다.
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        # Django 의 DatabaseCache 에서 set 만 한 문장으로 바꾼 것(config/throttle_cache.py).
+        "BACKEND": "config.throttle_cache.ThrottleDatabaseCache",
         "LOCATION": "throttle_cache",
         # 기본값 300 을 넘으면 일부를 지워 자리를 만든다. 그때 노리던
         # 계정의 카운터가 함께 밀려나면 제한이 풀린다. 값을 올려도 그 길은
@@ -401,6 +402,9 @@ CACHES = {
         # 되돌리기 방어는 캐시에 두지 않는다. 캐시는 넘치면 스스로 지우므로
         # (cull) 공격자가 항목을 채우면 방어가 열린다. 그래서
         # apps.learning.models.RoundStep 표에 둔다.
+        #
+        # 넘쳤는지는 set 100번에 한 번꼴로만 센다(config/throttle_cache.py). 그 사이 표가 이 값을
+        # 조금 넘을 수 있다.
         "OPTIONS": {"MAX_ENTRIES": 20000},
     },
     # 익히기 목록의 전체 개수(apps.vocab.pagination). 단어 100만 개면 셀 때마다
@@ -428,6 +432,20 @@ CACHES = {
         ),
         "LOCATION": "list-counts",
         "TIMEOUT": 300,
+    },
+    # 순위표 상위 20명의 순서와 점수(apps.learning.leaderboards). 셋 다 전 사용자를 모아 정렬하는
+    # 집계라 순위표 요청마다 돌리면 비싸다. 10초 동안 기억한다. 작업자마다 따로 기억해서, 다른
+    # 사람의 점수는 작업자에 따라 최대 10초 늦게 보인다(사용자 결정 11-25). 내 기록, 이름·그림,
+    # 탈퇴는 늦지 않는다(leaderboards.build 가 요청마다 새로 읽는다).
+    # 테스트에서는 기억하지 않는다(위 counts 와 같은 이유).
+    "boards": {
+        "BACKEND": (
+            "django.core.cache.backends.dummy.DummyCache"
+            if sys.argv[1:2] == ["test"]
+            else "django.core.cache.backends.locmem.LocMemCache"
+        ),
+        "LOCATION": "board-top",
+        "TIMEOUT": 10,
     },
 }
 
