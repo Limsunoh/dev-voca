@@ -174,10 +174,9 @@ class AdminLoginTotalThrottle(SimpleRateThrottle):
 
     이메일 통만 있으면 이메일을 바꿔 가며 끝없이 보낼 수 있다. 없는 이메일이어도 Django 가
     비밀번호 해시(PBKDF2 100만 회, 이 PC 에서 0.2초)를 돌아 작업자 CPU 를 먹고, 요청마다
-    시도 횟수 행이 하나씩 쌓인다. 행이 MAX_ENTRIES 를 넘으면 DB 캐시가 키 이름순 앞 1/3 을
-    지우는데, 그 앞쪽이 throttle_admin_login_* 와 throttle_auth_email_* 라 관리자와 회원의
-    시도 횟수가 0 으로 돌아간다(settings 의 CACHES 주석). IP 를 믿을 수 없는 자리라
-    (AdminLoginThrottle 주석) 통 하나로 센다.
+    시도 횟수 행이 하나씩 쌓인다(넘쳐도 살아 있는 행은 안 지우지만 표가 커진다,
+    config/throttle_cache.py 의 _cull). IP 를 믿을 수 없는 자리라(AdminLoginThrottle 주석)
+    통 하나로 센다.
 
     대가: 남이 이 통을 채우면 처음 쓰는 브라우저의 관리자 로그인도 한 시간 막힌다. 로그인해
     본 브라우저는 기기 쿠키가 있어 이 통을 타지 않는다.

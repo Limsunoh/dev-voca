@@ -550,9 +550,13 @@ class EmailLinkAcrossRenewTest(RenewMixin, TestCase):
         self.assertEqual(res.status_code, 202, res.content)
         return sent.call_args.kwargs["body"].split("/profile/email/")[1].split()[0]
 
-    def confirm(self, link: str):
+    def confirm(self, link: str, login: str | None = None):
+        """링크를 누른다. login 을 주면 그 기기에서 누른 것이다(로그인 토큰을 실음)."""
         return Client().post(
-            EMAIL_CHANGE_CONFIRM_URL, {"token": link}, content_type="application/json"
+            EMAIL_CHANGE_CONFIRM_URL,
+            {"token": link},
+            content_type="application/json",
+            **(auth(login) if login else {}),
         )
 
     def move_on(self) -> str:
@@ -616,7 +620,7 @@ class EmailLinkAcrossRenewTest(RenewMixin, TestCase):
         first = self.issue(b, "first@example.com")
         second = self.issue(b, "second@example.com")
 
-        res = self.confirm(first)
+        res = self.confirm(first, login=b)
         self.assertEqual(res.status_code, 200)
         fresh = res.json()["token"]
 

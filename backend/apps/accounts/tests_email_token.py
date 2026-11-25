@@ -68,9 +68,14 @@ class EmailChangeFlowMixin:
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
 
-    def confirm(self, token):
+    def confirm(self, token, login=None):
+        """링크를 누른다. login 을 주면 그 로그인 토큰을 실어 보낸다(같은 기기에서 누름).
+
+        서버는 같은 계정의 로그인 토큰이 실려 있을 때만 새 로그인 토큰을 준다.
+        """
+        auth = {"HTTP_AUTHORIZATION": f"Token {login}"} if login else {}
         return self.client.post(
-            EMAIL_CHANGE_CONFIRM_URL, {"token": token}, content_type="application/json"
+            EMAIL_CHANGE_CONFIRM_URL, {"token": token}, content_type="application/json", **auth
         )
 
     def issue(self, new_email=NEW):
@@ -387,15 +392,16 @@ class TokenConfirmRaceTest(TransactionTestCase):
         )
         self.user.refresh_from_db()
         self.assertIn(self.user.email, (NEW, THIRD))
-        self.assertEqual(LoginToken.objects.filter(user=self.user).count(), 1)
+        # 로그인 없이 눌러 새 토큰은 나가지 않고, 이긴 쪽이 옛 토큰을 끊었다.
+        self.assertFalse(LoginToken.objects.filter(user=self.user).exists())
 
 
 class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
     """변경이 끝나거나 신청한 기기의 로그인이 끝나면 그 전에 보낸 링크는 죽는다."""
 
     def complete(self, link):
-        """링크로 변경을 끝낸다. 변경 뒤에는 로그인 토큰이 새것이 된다."""
-        res = self.confirm(link)
+        """신청한 기기에서 링크로 변경을 끝낸다. 변경 뒤에는 로그인 토큰이 새것이 된다."""
+        res = self.confirm(link, login=self.token.key)
         self.assertEqual(res.status_code, 200)
         self.token = LoginToken.objects.get(user=self.user)
         self.assertEqual(token_digest(res.json()["token"]), self.token.digest)
@@ -592,7 +598,10 @@ class LinkInvalidationTest(EmailChangeFlowMixin, TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, NEW)
         self.assertEqual(self.me_status(self.token.key), 401)
-        self.assertEqual(self.me_status(res.json()["token"]), 200)
+        # 링크만으로는 로그인 토큰을 주지 않는다. 주소를 잘못 적어 남의 메일함에
+        # 갔으면 그 사람이 비밀번호 없이 들어오게 된다.
+        self.assertNotIn("token", res.json())
+        self.assertEqual(res.json()["user"]["email"], NEW)
 
     def test_메일_본문에_링크가_죽는_경우를_안내한다(self):
         body, link = self.issue()

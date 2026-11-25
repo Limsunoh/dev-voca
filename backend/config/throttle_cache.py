@@ -9,13 +9,13 @@ set 을 INSERT ... ON CONFLICT DO UPDATE 한 문장으로 끝낸다. get 1 + set
 캐시 표의 cache_key 가 기본 키라 ON CONFLICT 로 받을 수 있다(createcachetable).
 
 표가 넘쳤는지 세는 일(COUNT 와 넘치면 지우기)은 set CULL_EVERY 번에 한 번꼴로만 한다. 그 사이에
-표가 MAX_ENTRIES 를 조금 넘을 수 있다. 만료된 행은 매일 정리가 지운다
-(accounts.throttles.sweep_expired_counters).
+표가 MAX_ENTRIES 를 조금 넘을 수 있다. 넘쳐도 만료된 행만 지운다(_cull). 만료된 행은 매일 정리도
+지운다(accounts.throttles.sweep_expired_counters).
 
 get, add, touch, delete 는 Django 그대로다. 이 캐시에는 요청 제한 카운터만 들어간다(settings 의
 CACHES 주석).
 
-Django 5.2 의 DatabaseCache._base_set 과 내부 값(_table, _max_entries, _cull)에 기댄다. Django 를
+Django 5.2 의 DatabaseCache._base_set 과 내부 값(_table, _max_entries, _cull 의 인자)에 기댄다. Django 를
 올릴 때 _base_set 의 값·만료 시각 만드는 방식이 그대로인지 다시 대조한다.
 """
 
@@ -82,3 +82,25 @@ class ThrottleDatabaseCache(DatabaseCache):
         except DatabaseError:
             # Django 처럼 조용히 넘긴다. 요청 제한 카운터 하나를 못 적었다고 요청을 실패시키지 않는다.
             return
+
+    def _cull(self, db, cursor, now, num) -> None:
+        """넘쳤을 때 만료된 행만 지운다. 살아 있는 카운터는 남긴다.
+
+        Django 는 만료된 행을 지운 뒤에도 넘치면 키 이름순으로 앞 1/3 을 지운다. 여기 든 것은
+        요청 제한 카운터뿐이라, 살아 있는 카운터를 지우면 그 제한이 0 부터 다시 센다. 그리고
+        행은 밖에서 늘릴 수 있다. 가입·로그인은 접속 IP 제한이 먼저 막지만(views.FirstThrottleWins),
+        IP 를 많이 가진 쪽이 이메일을 바꿔 가며 보내면 IP 마다 이메일별 카운터가 쌓인다. 이메일별
+        시간당 카운터는 1시간 살아서 IP 수백 개면 2만 행이 찬다. 그러면 이름순 맨 앞인 관리자
+        로그인 카운터부터, 이어 이메일별 비밀번호 추측 카운터가 지워졌다.
+
+        살아 있는 행은 길어야 1시간 뒤 만료되므로 표는 끝없이 크지 않는다. 받는 요청 수 x
+        카운터 수명만큼까지다. set·add·touch 가 모두 이 함수로 지운다. CULL_FREQUENCY 는
+        보지 않는다(Django 는 0 이면 표를 통째로 비운다).
+        """
+        connection = connections[db]
+        table = connection.ops.quote_name(self._table)
+        expires = connection.ops.quote_name("expires")
+        cursor.execute(
+            f"DELETE FROM {table} WHERE {expires} < %s",
+            [connection.ops.adapt_datetimefield_value(now)],
+        )

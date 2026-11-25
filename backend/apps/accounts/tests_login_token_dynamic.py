@@ -420,17 +420,23 @@ class EmailLinkDeviceTest(DeviceMixin, TestCase):
         self.assertEqual(res.status_code, 202)
         return sent.call_args.kwargs["body"].split("/profile/email/")[1].split()[0]
 
-    def confirm(self, link):
+    def confirm(self, link, login=None):
+        """링크를 누른다. login 을 주면 그 기기에서 누른 것이다(로그인 토큰을 실음)."""
         return Client().post(
-            EMAIL_CHANGE_CONFIRM_URL, {"token": link}, content_type="application/json"
+            EMAIL_CHANGE_CONFIRM_URL,
+            {"token": link},
+            content_type="application/json",
+            **(auth(login) if login else {}),
         )
 
-    def assert_works(self, link, new_email="next@example.com"):
-        res = self.confirm(link)
+    def assert_works(self, link, new_email="next@example.com", login=None):
+        """새 로그인 토큰은 같은 계정으로 로그인한 기기(login)에서 눌렀을 때만 온다."""
+        res = self.confirm(link, login)
         self.assertEqual(res.status_code, 200)
         self.owner.refresh_from_db()
         self.assertEqual(self.owner.email, new_email)
-        return res.json()["token"]
+        self.assertEqual("token" in res.json(), login is not None)
+        return res.json().get("token")
 
     def assert_rejected(self, link):
         res = self.confirm(link)
@@ -471,7 +477,7 @@ class EmailLinkDeviceTest(DeviceMixin, TestCase):
         from_phone = self.issue(self.phone, "phone@example.com")
         from_laptop = self.issue(self.laptop, "laptop@example.com")
 
-        fresh = self.assert_works(from_laptop, "laptop@example.com")
+        fresh = self.assert_works(from_laptop, "laptop@example.com", login=self.laptop)
 
         self.assertEqual(
             list(LoginToken.objects.filter(user=self.owner).values_list("digest", flat=True)),
@@ -482,9 +488,9 @@ class EmailLinkDeviceTest(DeviceMixin, TestCase):
 
     def test_세_기기를_번갈아_a_b_a_를_해도_옛_링크는_모두_죽는다(self):
         first = self.issue(self.phone, "next@example.com")
-        fresh = self.assert_works(first)
+        fresh = self.assert_works(first, login=self.phone)
         back = self.issue(fresh, "owner@example.com")
-        newest = self.assert_works(back, "owner@example.com")
+        newest = self.assert_works(back, "owner@example.com", login=fresh)
         # 돌아온 뒤 다른 기기 셋이 새로 로그인한다. 옛 링크가 그 토큰에 맞으면 안 된다.
         for _ in range(3):
             self.assertEqual(self.login().status_code, 200)

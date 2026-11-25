@@ -8,8 +8,8 @@
  * 실제로 오가는 요청과 쿠키에 남는 값을 본다.
  *   - 백엔드로 가는 토큰: Next 가 %3A 로 넘긴 쌍점이 풀려서 간다. 두 번 바뀐
  *     %253A 는 한 번만 풀린다(풀린 값에 % 가 남아 서버가 거절한다).
- *   - 확인 요청에는 이 기기의 로그인 토큰을 싣지 않는다. 실으면 로그인이 죽은
- *     기기에서 누른 확인이 401 로 막힌다.
+ *   - 확인 요청에는 /me 로 확인된 로그인 토큰만 싣는다. 백엔드는 같은 계정의
+ *     토큰이 실렸을 때만 새 토큰을 준다. 죽은 토큰을 실으면 401 로 막힌다.
  *   - 같은 계정으로 로그인해 있던 기기만 새 토큰으로 바뀐다. 로그인이 없거나
  *     죽은 토큰이거나 다른 계정이면 쿠키가 한 글자도 안 바뀐다.
  *   - 이 기기의 로그인을 확인하지 못하면(/me 가 5xx·429·연결 실패) 확인을 부르지
@@ -101,10 +101,16 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
     const token = JSON.parse(String(init?.body)).token as string;
     calls.push({ path: "confirm", auth, token });
     // 서명 검사와 같다. 한 글자라도 다르면 거절한다.
+    // 백엔드처럼 인증이 먼저다. 실린 토큰이 죽었으면 링크를 보기도 전에 401 이다.
+    if (auth !== null && auth !== `Token ${LINK_OWNER}` && auth !== `Token ${OTHER}`) {
+      return json(401, { detail: "토큰이 유효하지 않습니다." });
+    }
     if (token !== SIGNED) {
       return json(400, { detail: "확인 링크가 만료되었거나 올바르지 않습니다." });
     }
-    return json(200, { token: ISSUED, user: { id: 7, email: "new@example.com" } });
+    // 새 로그인 토큰은 링크의 계정(7)으로 로그인한 요청에만 준다.
+    const user = { id: 7, email: "new@example.com" };
+    return json(200, auth === `Token ${LINK_OWNER}` ? { token: ISSUED, user } : { user });
   }
   return json(404, {});
 }) as typeof fetch;
@@ -159,11 +165,19 @@ describe("백엔드로 가는 토큰", () => {
     assert.equal(jar.size, 0);
   });
 
-  it("확인 요청에는 이 기기의 로그인 토큰을 싣지 않는다", async () => {
+  it("죽은 로그인 토큰은 확인 요청에 싣지 않는다", async () => {
     jar.set("devvoca_token", `${DEAD}.1700000000`);
-    await confirmEmailChangeAction({}, form(SIGNED));
+    const state = await confirmEmailChangeAction({}, form(SIGNED));
     const confirm = calls.find((c) => c.path === "confirm");
     assert.equal(confirm?.auth, null);
+    assert.equal(state.changedTo, "new@example.com");
+  });
+
+  it("확인된 같은 계정의 로그인 토큰은 확인 요청에 싣는다", async () => {
+    jar.set("devvoca_token", `${LINK_OWNER}.1700000000`);
+    await confirmEmailChangeAction({}, form(SIGNED));
+    const confirm = calls.find((c) => c.path === "confirm");
+    assert.equal(confirm?.auth, `Token ${LINK_OWNER}`);
   });
 });
 
@@ -227,7 +241,8 @@ describe("쿠키에 남는 것", () => {
       calls.map((c) => [c.path, c.auth]),
       [
         ["me", `Token ${OTHER}`],
-        ["confirm", null],
+        // 살아 있는 토큰이라 싣는다. 다른 계정이라 서버는 새 토큰을 안 준다.
+        ["confirm", `Token ${OTHER}`],
       ],
     );
   });

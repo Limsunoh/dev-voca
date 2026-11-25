@@ -1274,11 +1274,14 @@ class EmailChangeTest(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
 
-    def confirm(self, token):
+    def confirm(self, token, login=None):
+        """링크를 누른다. login 을 주면 그 로그인 토큰을 실어 보낸다(같은 기기에서 누름)."""
+        auth = {"HTTP_AUTHORIZATION": f"Token {login}"} if login else {}
         return self.client.post(
             EMAIL_CHANGE_CONFIRM_URL,
             {"token": token},
             content_type="application/json",
+            **auth,
         )
 
     def issued_token(self):
@@ -1413,15 +1416,37 @@ class EmailChangeTest(TestCase):
         )
         old_key = self.token.key
 
-        res = self.confirm(self.issued_token())
+        res = self.confirm(self.issued_token(), login=old_key)
 
         self.assertEqual(res.status_code, 200)
         # 옛 토큰은 사라진다.
         self.assertFalse(LoginToken.objects.filter(digest=token_digest(old_key)).exists())
-        # 새 토큰을 돌려준다. 쿠키에 넣을지는 화면의 액션이 정한다.
+        # 같은 계정으로 로그인한 채 눌렀으니 새 토큰을 돌려준다.
         self.assertTrue(res.json()["token"])
         # 남의 토큰까지 지우면 안 된다.
         self.assertTrue(LoginToken.objects.filter(digest=token_digest(other_device.key)).exists())
+
+    def test_다른_계정으로_로그인한_채_누르면_주소만_바뀌고_토큰은_없다(self):
+        """링크는 새 주소로 간 메일에 있을 뿐이다. 주소를 잘못 적었으면 남이 갖는다.
+
+        그 사람이 백엔드를 바로 불러도 이 계정의 로그인 토큰을 받으면 안 된다.
+        """
+        stranger = LoginToken.objects.create(
+            user=User.objects.create_user(
+                email="stranger@example.com", password=PASSWORD, display_name="남남"
+            )
+        )
+
+        res = self.confirm(self.issued_token(), login=stranger.key)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertNotIn("token", res.json())
+        self.assertEqual(res.json()["user"]["email"], "new@example.com")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "new@example.com")
+        # 이 계정에는 로그인이 하나도 남지 않고, 누른 사람의 로그인은 그대로다.
+        self.assertFalse(LoginToken.objects.filter(user=self.user).exists())
+        self.assertTrue(LoginToken.objects.filter(digest=token_digest(stranger.key)).exists())
 
     def test_지금_쓰는_주소로는_못_바꾼다(self):
         with mock.patch("apps.accounts.views.send_account_mail") as sent:

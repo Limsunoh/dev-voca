@@ -210,19 +210,23 @@ export function requestEmailChange(
 /**
  * 확인 링크를 눌렀을 때. 여기서 주소가 바뀐다.
  *
- * 로그인 토큰을 안 보낸다. 메일을 다른 기기에서 열 수 있어야 하고, 그
- * 기기에 우리 로그인이 없을 수 있다. 링크에 실린 토큰이 증거다.
+ * 메일을 다른 기기에서 열 수 있어야 하고 그 기기에 우리 로그인이 없을 수
+ * 있어, 로그인 없이도 된다. 링크에 실린 토큰이 증거다.
  *
- * 응답으로 새 로그인 토큰이 온다. 주소가 바뀌면 서버가 옛 토큰을 전부
- * 끊는다. 쿠키에 다시 넣을지는 액션이 정한다(같은 계정으로 로그인해 있던
- * 기기만 넣는다, app/profile/email/[token]/actions.ts).
+ * 주소가 바뀌면 서버가 옛 로그인 토큰을 전부 끊는다. 새 토큰은 같은 계정의
+ * 로그인 토큰을 실어 보냈을 때만 온다. 링크만 가진 사람에게 토큰을 주지
+ * 않으려는 것이다. loginToken 은 방금 /me 로 살아 있음을 확인한 것만 넘긴다.
+ * 같은 계정인지는 서버가 본다. 죽은 토큰을 실으면 서버가 401 을 낸다
+ * (app/profile/email/[token]/actions.ts).
  */
 export function confirmEmailChange(
   changeToken: string,
-): Promise<{ token: string; user: User }> {
+  loginToken?: string,
+): Promise<{ token?: string; user: User }> {
   return request("/api/accounts/email-change/confirm/", {
     method: "POST",
     body: { token: changeToken },
+    token: loginToken,
   });
 }
 

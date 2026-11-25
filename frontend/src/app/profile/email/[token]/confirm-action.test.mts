@@ -8,6 +8,8 @@
  *     이것이 깨지면 모든 확인 링크가 "만료되었거나 올바르지 않습니다" 가 된다.
  *   - 같은 계정으로 로그인해 있던 기기만 새 토큰으로 로그인을 이어 간다.
  *     로그인이 없거나 다른 계정이면 쿠키를 건드리지 않는다.
+ *   - 확인된 로그인 토큰만 백엔드에 실어 보낸다. 백엔드는 같은 계정의 토큰이
+ *     실려 있을 때만 새 토큰을 주고, 죽은 토큰이 실리면 401 로 주소 변경까지 막는다.
  *   - 이 기기의 로그인을 확인하지 못하면(401 이 아닌 실패) 확인 전에 멈춘다.
  *
  * 백엔드 호출, 세션, revalidatePath 는 대역이다.
@@ -29,6 +31,7 @@ mock.module("@/lib/api/client", {
 
 let order: string[] = [];
 let sentTokens: string[] = [];
+let sentLogins: (string | undefined)[] = [];
 let confirmReply: () => Promise<unknown>;
 let meReply: () => Promise<unknown>;
 mock.module("@/lib/api/accounts", {
@@ -37,9 +40,10 @@ mock.module("@/lib/api/accounts", {
       order.push("me");
       return meReply();
     },
-    async confirmEmailChange(token: string) {
+    async confirmEmailChange(token: string, login?: string) {
       order.push("confirm");
       sentTokens.push(token);
+      sentLogins.push(login);
       return confirmReply();
     },
   },
@@ -82,6 +86,7 @@ const LINK_OWNER = { id: 7 };
 beforeEach(() => {
   order = [];
   sentTokens = [];
+  sentLogins = [];
   savedTokens = [];
   revalidated = 0;
   loginToken = null;
@@ -122,6 +127,31 @@ describe("주소에서 온 토큰", () => {
 });
 
 describe("이 기기의 로그인", () => {
+  it("확인된 로그인 토큰만 실어 보낸다", async () => {
+    loginToken = "owner-login";
+    await confirmEmailChangeAction({}, form("a:b:c"));
+    assert.deepEqual(sentLogins, ["owner-login"]);
+  });
+
+  it("죽은 토큰(401)과 로그인이 없는 것은 싣지 않는다", async () => {
+    await confirmEmailChangeAction({}, form("a:b:c"));
+    loginToken = "dead-login";
+    meReply = async () => {
+      throw new FakeApiError("토큰이 유효하지 않습니다.", 401);
+    };
+    await confirmEmailChangeAction({}, form("a:b:c"));
+    assert.deepEqual(sentLogins, [undefined, undefined]);
+  });
+
+  it("같은 계정이어도 백엔드가 새 토큰을 안 주면 쿠키를 건드리지 않는다", async () => {
+    loginToken = "owner-login";
+    confirmReply = async () => ({ user: { id: 7, email: "new@example.com" } });
+    const state = await confirmEmailChangeAction({}, form("a:b:c"));
+    assert.deepEqual(savedTokens, []);
+    assert.equal(revalidated, 0);
+    assert.deepEqual(state, { changedTo: "new@example.com" });
+  });
+
   it("같은 계정으로 로그인돼 있으면 새 토큰으로 이어 간다", async () => {
     loginToken = "owner-login";
     const state = await confirmEmailChangeAction({}, form("a:b:c"));
@@ -257,5 +287,39 @@ describe("서버 로그", () => {
     };
     await confirmEmailChangeAction({}, form("a:b:c"));
     assert.equal(logged.mock.callCount(), 0);
+  });
+});
+
+describe("확인과 로그인 확인이 엇갈릴 때", () => {
+  // /me 로 확인한 뒤 확인 요청 전에 토큰이 죽을 수 있다(다른 기기에서 로그아웃 등).
+  // 백엔드는 실린 토큰이 죽었으면 401 을 내고 주소를 안 바꾼다.
+  it("확인이 401 이면 쿠키를 건드리지 않고 백엔드 안내를 보인다", async () => {
+    loginToken = "owner-login";
+    confirmReply = async () => {
+      throw new FakeApiError("토큰이 유효하지 않습니다.", 401);
+    };
+    const state = await confirmEmailChangeAction({}, form("a:b:c"));
+    assert.deepEqual(savedTokens, []);
+    assert.equal(revalidated, 0);
+    assert.equal(state.error, "토큰이 유효하지 않습니다.");
+    assert.equal(state.changedTo, undefined);
+  });
+
+  it("다른 계정의 확인된 토큰은 실어 보내지만 돌아온 토큰은 넣지 않는다", async () => {
+    // 백엔드가 계정을 대조한다. 혹시 토큰이 돌아와도 화면이 한 번 더 막는다.
+    loginToken = "other-login";
+    meReply = async () => ({ id: 99 });
+    const state = await confirmEmailChangeAction({}, form("a:b:c"));
+    assert.deepEqual(sentLogins, ["other-login"]);
+    assert.deepEqual(savedTokens, []);
+    assert.deepEqual(state, { changedTo: "new@example.com" });
+  });
+
+  it("빈 문자열 토큰은 백엔드에 싣지 않는다", async () => {
+    // getToken 이 빈 값을 주면 로그인이 없는 것이다. /me 도 부르지 않는다.
+    loginToken = "";
+    await confirmEmailChangeAction({}, form("a:b:c"));
+    assert.deepEqual(order, ["confirm"]);
+    assert.deepEqual(sentLogins, [undefined]);
   });
 });
